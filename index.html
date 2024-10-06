@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Responsive Isometric Grid - JS Generated</title>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #25283D;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+
+    #container {
+      width: 100vw;
+      height: 100vh;
+      position: relative;
+      overflow: hidden;
+      cursor: grab;
+    }
+
+    #plane {
+      display: flex;
+      flex-wrap: wrap; /* Allows blocks to wrap into multiple rows */
+      justify-content: center;
+      align-items: center;
+      width: 55vw; /* Define the total width for the grid */
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) rotateX(45deg) rotateZ(45deg) scale(1); /* Center grid */
+      transform-style: preserve-3d;
+      transition: transform 0.1s ease;
+    }
+
+    /* Responsive block sizes */
+    .block, .block:before, .block:after {
+      width: 5vw; /* Make blocks responsive with viewport size */
+      height: 5vw; /* Make blocks responsive */
+    }
+
+    .block {
+      background: #c6d3e4;
+      box-shadow: .125em .125em .5em rgba(0, 0, 0, .09);
+      transition: transform 0.2s, background-color 0.2s;
+      position: relative;
+      border-radius: 5px;
+      border: 1px dashed; 
+    }
+
+    .block:before, .block:after {
+      content: "";
+      background: #7286A0;
+      position: absolute;
+      transform-origin: 100% 100%;
+    }
+
+    .block:before {
+      transform: rotateX(-90deg) translateY(5vw); /* Adjust height dynamically */
+      box-shadow: inset 0em -.125em .25em rgba(0, 0, 0, .1);
+    }
+
+    .block:after {
+      transform: rotateY(90deg) translateX(5vw); /* Adjust width dynamically */
+      box-shadow: inset -.125em 0em .25em rgba(0, 0, 0, .1);
+    }
+
+    /* Hover and active effects */
+    .block:hover {
+      transform: translateZ(3px); /* Slight lift on hover */
+      background-color: #e0feff !important; /* Highlight when clicked */
+    }
+    
+    .block.active {
+      background-color: #f4eca6 !important; /* Highlight when clicked */
+    }
+  </style>
+</head>
+<body>
+  <div id="container">
+    <div id="plane"></div>
+  </div>
+
+  <script>
+    const container = document.getElementById('container');
+    const plane = document.getElementById('plane');
+    let isPanning = false;
+    let startX, startY, initialLeft, initialTop;
+    let scale = 1; // Start zoomed in
+
+    // Generate the blocks dynamically
+    const rows = 10;
+    const columns = 10;
+
+    function generateGrid(rows, columns) {
+      for (let i = 0; i < rows * columns; i++) {
+        const block = document.createElement('div');
+        block.classList.add('block');
+        plane.appendChild(block);
+      }
+    }
+
+    // Call the function to generate blocks
+    generateGrid(rows, columns);
+
+    // Panning functionality
+    container.addEventListener('mousedown', (e) => {
+      isPanning = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      initialLeft = plane.offsetLeft;
+      initialTop = plane.offsetTop;
+      container.style.cursor = 'grabbing';
+    });
+
+    container.addEventListener('mousemove', (e) => {
+      if (isPanning) {
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        plane.style.left = `${initialLeft + dx}px`;
+        plane.style.top = `${initialTop + dy}px`;
+      }
+    });
+
+    container.addEventListener('mouseup', () => {
+      isPanning = false;
+      container.style.cursor = 'grab';
+    });
+
+    container.addEventListener('mouseleave', () => {
+      isPanning = false;
+    });
+
+    // Zoom functionality
+    container.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomIntensity = 0.1;
+      scale += e.deltaY > 0 ? -zoomIntensity : zoomIntensity;
+      scale = Math.min(Math.max(0.5, scale), 1); // Limit zoom scale between 0.5 and 3
+      plane.style.transform = `translate(-50%, -50%) rotateX(45deg) rotateZ(45deg) scale(${scale})`;
+    });
+
+    // Handle click and highlight
+    plane.addEventListener('click', (e) => {
+      if (e.target.classList.contains('block')) {
+        document.querySelectorAll('.block').forEach(b => b.classList.remove('active'));
+        e.target.classList.add('active');
+      }
+    });
+  </script>
+</body>
+</html>
