@@ -3,17 +3,19 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Responsive Isometric Grid - JS Generated</title>
+  <title>Responsive Isometric Grid with Icons on Top</title>
   <style>
     html, body {
       margin: 0;
       padding: 0;
       height: 100%;
       overflow: hidden;
-      background: #25283D;
+      background: #2D2F3A;
+      font-family: 'Roboto', sans-serif;
       display: flex;
       justify-content: center;
       align-items: center;
+      color: #fff;
     }
 
     #container {
@@ -25,88 +27,149 @@
     }
 
     #plane {
-      display: flex;
-      flex-wrap: wrap; /* Allows blocks to wrap into multiple rows */
-      justify-content: center;
-      align-items: center;
-      width: 55vw; /* Define the total width for the grid */
+      display: grid;
+      grid-template-columns: repeat(10, 1fr); /* Fixed number of columns */
+      grid-auto-rows: 5vw; /* Responsive block height */
+      gap: 0; /* Eliminate gaps */
+      width: 50vw;
+      max-width: 80vw;
+      max-height: 80vh;
       position: absolute;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%) rotateX(45deg) rotateZ(45deg) scale(1); /* Center grid */
+      transform: translate(-50%, -50%) rotateX(45deg) rotateZ(45deg) scale(1);
       transform-style: preserve-3d;
       transition: transform 0.1s ease;
     }
 
-    /* Responsive block sizes */
-    .block, .block:before, .block:after {
-      width: 5vw; /* Make blocks responsive with viewport size */
-      height: 5vw; /* Make blocks responsive */
-    }
-
+    /* Block styles for the isometric view */
     .block {
-      background: #c6d3e4;
-      box-shadow: .125em .125em .5em rgba(0, 0, 0, .09);
+      width: 100%;
+      height: 100%;
+      background-size: cover;
+      background-position: center;
+      box-shadow: .125em .125em .5em rgba(0, 0, 0, .2);
       transition: transform 0.2s, background-color 0.2s;
       position: relative;
-      border-radius: 5px;
-      border: 1px dashed; 
+      border-radius: 8px;
+      border: none;
     }
 
-    .block:before, .block:after {
-      content: "";
-      background: #7286A0;
-      position: absolute;
-      transform-origin: 100% 100%;
-    }
-
-    .block:before {
-      transform: rotateX(-90deg) translateY(5vw); /* Adjust height dynamically */
-      box-shadow: inset 0em -.125em .25em rgba(0, 0, 0, .1);
-    }
-
-    .block:after {
-      transform: rotateY(90deg) translateX(5vw); /* Adjust width dynamically */
-      box-shadow: inset -.125em 0em .25em rgba(0, 0, 0, .1);
-    }
-
-    /* Hover and active effects */
     .block:hover {
-      transform: translateZ(3px); /* Slight lift on hover */
-      background-color: #e0feff !important; /* Highlight when clicked */
+      transform: translate(-3px, -3px); /* Slight lift on hover */
+      background-color: rgba(129, 161, 193, 0.5) !important; /* Slight color overlay on hover */
     }
-    
+
     .block.active {
-      background-color: #f4eca6 !important; /* Highlight when clicked */
+      background-color: rgba(136, 192, 208, 0.5) !important; /* Slight color overlay when active */
+    }
+
+    /* Image (icon) placed on top of each block */
+    .block img {
+      transform: translateX(-50%);
+      width: 50px;
+      transform: rotate(-45deg);
+      z-index: 1;
+      max-width: 65px;
+      max-height: 65px;
+    }
+
+    /* Left Sidebar styling */
+    #infoPanel {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 300px; /* Sidebar width */
+      height: 100vh;
+      background-color: #3B4252;
+      color: white;
+      padding: 20px;
+      box-shadow: 10px 0 20px rgba(0, 0, 0, 0.5);
+      transform: translateX(-100%); /* Initially hidden to the left */
+      transition: transform 0.3s ease;
+    }
+
+    #infoPanel.active {
+      transform: translateX(0); /* Slide in the sidebar from the left */
+    }
+
+    #infoPanel h2 {
+      margin-top: 0;
+      font-size: 1.5rem;
+      color: #ECEFF4;
+    }
+
+    #infoPanel p {
+      font-size: 1rem;
+      color: #D8DEE9;
+    }
+
+    #closePanel {
+      background: #BF616A;
+      color: white;
+      border: none;
+      padding: 10px;
+      cursor: pointer;
+      border-radius: 5px;
+      position: absolute;
+      top: 10px;
+      right: 20px;
     }
   </style>
 </head>
 <body>
   <div id="container">
     <div id="plane"></div>
+    <div id="infoPanel">
+      <button id="closePanel">Close</button>
+      <h2>Block Details</h2>
+      <p id="blockDetails">Click on a block to see more information.</p>
+    </div>
   </div>
 
   <script>
     const container = document.getElementById('container');
     const plane = document.getElementById('plane');
+    const infoPanel = document.getElementById('infoPanel');
+    const blockDetails = document.getElementById('blockDetails');
+    const closePanel = document.getElementById('closePanel');
     let isPanning = false;
     let startX, startY, initialLeft, initialTop;
-    let scale = 1; // Start zoomed in
+    let scale = 1;
+    let activeBlock = null;
 
-    // Generate the blocks dynamically
-    const rows = 10;
-    const columns = 10;
+    // JSON Data representing block information
+    const blockData = [
+      { id: 1, iconUrl: './market.png', description: 'Block 1 Description'},
+      { id: 33, iconUrl: './clipboard.png', description: 'Block 33 Description'},
+      { id: 72, iconUrl: './medical.png', description: 'Block 72 Description'},
+    ];
 
+    // Function to generate grid based on block data
     function generateGrid(rows, columns) {
-      for (let i = 0; i < rows * columns; i++) {
+      for (let i = 1; i <= rows * columns; i++) {
         const block = document.createElement('div');
         block.classList.add('block');
+        block.setAttribute('data-id', `Block ${i}`);
+
+        // Check if this block has data in the JSON
+        const data = blockData.find(b => b.id === i);
+        if (data) {
+          // Assign the background image and description to blocks with relevant data
+          block.setAttribute('data-description', data.description);
+
+          // Create an img element and append it to the block
+          const img = document.createElement('img');
+          img.src = data.iconUrl;
+          block.appendChild(img);
+        }
+
         plane.appendChild(block);
       }
     }
 
     // Call the function to generate blocks
-    generateGrid(rows, columns);
+    generateGrid(10, 10); // 10x10 grid
 
     // Panning functionality
     container.addEventListener('mousedown', (e) => {
@@ -141,15 +204,32 @@
       e.preventDefault();
       const zoomIntensity = 0.1;
       scale += e.deltaY > 0 ? -zoomIntensity : zoomIntensity;
-      scale = Math.min(Math.max(0.5, scale), 1); // Limit zoom scale between 0.5 and 3
+      scale = Math.min(Math.max(0.7, scale), 2);
       plane.style.transform = `translate(-50%, -50%) rotateX(45deg) rotateZ(45deg) scale(${scale})`;
     });
 
-    // Handle click and highlight
+    // Handle click and highlight with info panel
     plane.addEventListener('click', (e) => {
       if (e.target.classList.contains('block')) {
-        document.querySelectorAll('.block').forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
+        if (activeBlock) {
+          activeBlock.classList.remove('active');
+        }
+        activeBlock = e.target;
+        activeBlock.classList.add('active');
+
+        // Show info panel with details
+        const description = activeBlock.getAttribute('data-description') || 'No description available.';
+        blockDetails.textContent = description;
+        infoPanel.classList.add('active');
+      }
+    });
+
+    // Close the info panel and remove active state
+    closePanel.addEventListener('click', () => {
+      infoPanel.classList.remove('active');
+      if (activeBlock) {
+        activeBlock.classList.remove('active');
+        activeBlock = null;
       }
     });
   </script>
