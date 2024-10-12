@@ -37,7 +37,7 @@
       position: absolute;
       top: 50%;
       left: 50%;
-      transform: translate(-50%, -50%) rotateX(45deg) rotateZ(45deg) scale(1);
+      transform: translate(-50%, -50%) rotateX(30deg) rotateZ(30deg) scale(1);
       transform-style: preserve-3d;
       transition: transform 0.1s ease;
     }
@@ -68,7 +68,7 @@
     .block img {
       transform: translateX(-50%);
       width: 50px;
-      transform: rotate(-45deg);
+      transform: rotate(-30deg);
       z-index: 1;
       max-width: 65px;
       max-height: 65px;
@@ -205,7 +205,7 @@
       const zoomIntensity = 0.1;
       scale += e.deltaY > 0 ? -zoomIntensity : zoomIntensity;
       scale = Math.min(Math.max(0.7, scale), 2);
-      plane.style.transform = `translate(-50%, -50%) rotateX(45deg) rotateZ(45deg) scale(${scale})`;
+      plane.style.transform = `translate(-50%, -50%) rotateX(30deg) rotateZ(30deg) scale(${scale})`;
     });
 
     // Handle click and highlight with info panel
