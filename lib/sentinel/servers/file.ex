@@ -21,6 +21,7 @@ defmodule Sentinel.Servers.File do
 
   # We write data to a specific file
   def handle_cast({:write, data, file}, s) when file in @allowed_files do
+    # TODO: get the data and we want to merge to the file, not overwrite
     case File.write(file, Jason.encode!(data)) do
       :ok ->
         {:noreply, s}
@@ -39,7 +40,18 @@ defmodule Sentinel.Servers.File do
     end
   end
 
+  # delete file
+  def handle_call({:delete, file}, _, s) when file in @allowed_files do
+    case File.rm(file) do
+      :ok ->
+        {:reply, :ok, s}
+      {:error, _} ->
+        {:reply, {:error, "There was a problem deleting the file"}, s}
+    end
+  end
+
   # helper functions to call the process functions
   def write(data, file), do: GenServer.cast(__MODULE__, {:write, data, file})
   def read(file), do: GenServer.call(__MODULE__, {:read, file})
+  def delete(file), do: GenServer.call(__MODULE__, {:delete, file})
 end

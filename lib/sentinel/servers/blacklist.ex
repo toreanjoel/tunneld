@@ -42,7 +42,7 @@ defmodule Sentinel.Servers.Blacklist do
 
   # Checks if a domain is blacklisted.
   def handle_call({:get, domain}, _from, state) do
-    {:reply, Map.has_key?(state, domain), state}
+    {:reply, Map.get?(state, domain), state}
   end
 
 
@@ -56,6 +56,7 @@ defmodule Sentinel.Servers.Blacklist do
   """
   def handle_cast(:clear, _state) do
     state = %{}
+    Sentinel.Servers.File.delete(@file_path)
     {:noreply, state}
   end
 
