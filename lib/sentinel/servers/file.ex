@@ -8,6 +8,8 @@ defmodule Sentinel.Servers.File do
   # TODO: move this to config
   @allowed_files ["blacklist.json", "network.json", "credentials.json"]
 
+  # TODO: make sure to get default values from the config
+
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
@@ -16,6 +18,12 @@ defmodule Sentinel.Servers.File do
   Init the GenServer with an empty state.
   """
   def init(_) do
+    # init the files
+    # TODO: add under the /data directory and populate defailt values for files
+    __MODULE__.write(%{}, "blacklist.json")
+    __MODULE__.write(%{}, "network.json")
+    __MODULE__.write(%{}, "credentials.json")
+
     {:ok, %{}}
   end
 
