@@ -21,33 +21,35 @@ defmodule Sentinel.Servers.DNS do
     blacklist = Sentinel.Servers.Blacklist.get_all()
 
     # Store the socket and an example blacklist in the state
-    {:ok, %{socket: socket, blacklist: blacklist}}
+    {:ok, %{socket: socket}}
   end
 
   # Handles incoming UDP messages
-  def handle_info({:udp, _socket, ip, port, data}, %{socket: socket, blacklist: blacklist} = state) do
+  def handle_info(
+        {:udp, _socket, ip, port, data},
+        %{socket: socket} = state
+      ) do
     # Decode the incoming DNS query using the DNS.Record.decode function
     case DNS.Record.decode(data) do
       # If decoding is successful, proceed with extracting the header and question (qd)
-      {:ok, %{header: header, qd: [%{domain: domain}]}} ->
-
+      %DNS.Record{header: header, qdlist: [%DNS.Query{domain: domain}]} ->
         # Convert domain list to a single string (e.g., ["example", "com"] becomes "example.com")
-        domain_str = Enum.join(domain, ".")
-
+        domain_str = domain |> to_string()
+        IO.inspect(domain_str, label: "Domain String")
         # Check if the domain is in the blacklist
-        if Map.has_key?(blacklist, domain_str) do
+        if Enum.member?(Sentinel.Servers.Blacklist.get_all(), domain_str) do
           # If blacklisted, respond with NXDOMAIN (non-existent domain)
-          send_response(socket, ip, port, header.id, :nxdomain)
+          send_response(socket, ip, port, header.id, {:error, :nxdomain, domain_str})
         else
           # Otherwise, resolve the domain to an IP address
-          case DNS.resolve(domain, :in, :a) do
+          case DNS.resolve(domain) do
             # If successful, get the first answer record's IP and send as response
-            {:ok, %{an: [%{data: ip} | _]}} ->
-              send_response(socket, ip, port, header.id, {:ok, ip})
+            {:ok, [ip]} ->
+              send_response(socket, ip, port, header.id, {:ok, ip, domain_str})
 
             # If resolution fails, respond with NXDOMAIN
             _ ->
-              send_response(socket, ip, port, header.id, :nxdomain)
+              send_response(socket, ip, port, header.id, {:error, :nxdomain, domain_str})
           end
         end
 
@@ -61,23 +63,67 @@ defmodule Sentinel.Servers.DNS do
   end
 
   # Sends an NXDOMAIN response if the domain is blacklisted or resolution fails
-  defp send_response(socket, ip, port, id, :nxdomain) do
-    # Build a DNS response struct with NXDOMAIN code
-    response = DNS.Record.encode(%{header: %{id: id, qr: true, rcode: :nxdomain}})
+  defp send_response(socket, ip, port, id, {:error, :nxdomain, _domain}) do
+    response =
+      DNS.Record.encode(%DNS.Record{
+        header: build_header(id, 0),  # 0 (or :noerror) indicates a successful response
+        qdlist: [],  # If you have a question list, put it here; otherwise, keep it empty
+        anlist: [],
+        arlist: [],  # No additional records
+        nslist: []   # No nameserver records
+      })
 
-    # Send the encoded response over UDP to the original requester
     :gen_udp.send(socket, ip, port, response)
   end
 
   # Sends a successful response with the resolved IP address
-  defp send_response(socket, ip, port, id, {:ok, ip_address}) do
-    # Build a DNS response struct containing the IP address
-    response = DNS.Record.encode(%{
-      header: %{id: id, qr: true},
-      an: [%{domain: "example.com", class: :in, type: :a, data: ip_address}]
-    })
+  defp send_response(socket, ip, port, id, {:ok, ip_address, domain}) do
+    response =
+      DNS.Record.encode(%DNS.Record{
+        header: build_header(id, 0),
+        # If there are queries you need to respond to, they go here
+        qdlist: [],
+        anlist: [
+          %DNS.Resource{
+            domain: to_charlist(domain),
+            class: :in, # internet
+            type: :a, # ipv4 - A record
+            ttl: 300, # time to live in seconds
+            data: ip_address
+          }
+        ],
+        # Additional records can go here if needed
+        arlist: [],
+        nslist: []
+      })
 
-    # Send the encoded response over UDP to the original requester
+    # Detailed logs on the request and response
+    Logger.debug("DNS Query: #{inspect(domain)}")
+    Logger.debug("DNS Response: #{inspect(response)}")
+    Logger.debug("DNS Response IP: #{inspect(ip_address)}")
+    Logger.debug("DNS Response Domain: #{inspect(domain)}")
+    Logger.debug("DNS Response ID: #{inspect(id)}")
     :gen_udp.send(socket, ip, port, response)
+  end
+
+  # Define a helper function to build the DNS Header
+  # rcode is the response code
+  # 0 – NoError: Success, meaning the query was processed without errors.
+  # 1 – FormErr: Format error, indicating the query was not understood by the server.
+  # 2 – ServFail: Server failure, which implies the server was unable to process the request due to an internal issue.
+  # 3 – NXDomain: Non-existent domain, meaning the domain does not exist in the server's DNS records.
+  # 4 – NotImp: Not implemented, used if the server does not support the requested operation.
+  # 5 – Refused: Query refused, which means the server refuses to respond to the query.
+  defp build_header(id, rcode) when rcode in [0, 1, 2, 3, 4, 5] do
+    %DNS.Header{
+      id: id,
+      qr: true,
+      opcode: :query,
+      aa: false,
+      tc: false,
+      rd: true,
+      ra: false,
+      rcode: rcode
+    }
   end
 end
