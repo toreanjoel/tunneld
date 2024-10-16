@@ -60,6 +60,11 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+# TODO: add configuration for details for the device
+# TODO: Assign device token to the cloud (1:1 user to device)
+# TODO: push notification for admin user
+# TODO: Dynamic SSO wifi connection with admin deciding ttl?
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"
