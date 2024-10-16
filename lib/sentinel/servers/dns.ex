@@ -35,7 +35,10 @@ defmodule Sentinel.Servers.DNS do
       %DNS.Record{header: header, qdlist: [%DNS.Query{domain: domain}]} ->
         # Convert domain list to a single string (e.g., ["example", "com"] becomes "example.com")
         domain_str = domain |> to_string()
+
         IO.inspect(domain_str, label: "Domain String")
+        IO.inspect(Sentinel.Servers.Blacklist.get_all(), label: "Blacklist")
+
         # Check if the domain is in the blacklist
         if Enum.member?(Sentinel.Servers.Blacklist.get_all(), domain_str) do
           # If blacklisted, respond with NXDOMAIN (non-existent domain)
@@ -63,16 +66,32 @@ defmodule Sentinel.Servers.DNS do
   end
 
   # Sends an NXDOMAIN response if the domain is blacklisted or resolution fails
-  defp send_response(socket, ip, port, id, {:error, :nxdomain, _domain}) do
+  # Sends an NXDOMAIN response if the domain is blacklisted or resolution fails
+  defp send_response(socket, ip, port, id, {:error, :nxdomain, domain}) do
     response =
       DNS.Record.encode(%DNS.Record{
-        header: build_header(id, 0),  # 0 (or :noerror) indicates a successful response
-        qdlist: [],  # If you have a question list, put it here; otherwise, keep it empty
+        # 3 – NXDomain
+        header: build_header(id, 3),
+        qdlist: [
+          %DNS.Query{
+            domain: to_charlist(domain),
+            # internet
+            class: :in,
+            # A record
+            type: :a
+          }
+        ],
+        # No answer list for NXDOMAIN
         anlist: [],
-        arlist: [],  # No additional records
-        nslist: []   # No nameserver records
+        # No additional records
+        arlist: [],
+        # No nameserver records
+        nslist: []
       })
 
+    # Log details for debugging
+    Logger.debug("Sending NXDOMAIN for domain: #{domain}")
+    Logger.debug("DNS NXDOMAIN Response: #{inspect(response)}")
     :gen_udp.send(socket, ip, port, response)
   end
 
@@ -86,9 +105,12 @@ defmodule Sentinel.Servers.DNS do
         anlist: [
           %DNS.Resource{
             domain: to_charlist(domain),
-            class: :in, # internet
-            type: :a, # ipv4 - A record
-            ttl: 300, # time to live in seconds
+            # internet
+            class: :in,
+            # ipv4 - A record
+            type: :a,
+            # time to live in seconds
+            ttl: 300,
             data: ip_address
           }
         ],
