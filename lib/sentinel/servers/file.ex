@@ -7,6 +7,7 @@ defmodule Sentinel.Servers.File do
 
   # TODO: move this to config
   @allowed_files ["blacklist.json", "network.json", "credentials.json"]
+  @data_dir "data/"
 
   # TODO: make sure to get default values from the config
 
@@ -30,7 +31,7 @@ defmodule Sentinel.Servers.File do
   # We write data to a specific file
   def handle_cast({:write, data, file}, s) when file in @allowed_files do
     # TODO: get the data and we want to merge to the file, not overwrite
-    case File.write(file, Jason.encode!(data)) do
+    case File.write(@data_dir <> file, Jason.encode!(data)) do
       :ok ->
         {:noreply, s}
       {:error, _} ->
@@ -40,7 +41,7 @@ defmodule Sentinel.Servers.File do
 
   # We read data from a specific file
   def handle_call({:read, file}, _from, s) when file in @allowed_files do
-    case File.read(file) do
+    case File.read(@data_dir <> file) do
       {:ok, data} ->
         {:reply, Jason.decode!(data), s}
       {:error, _} ->
@@ -50,7 +51,7 @@ defmodule Sentinel.Servers.File do
 
   # delete file
   def handle_call({:delete, file}, _, s) when file in @allowed_files do
-    case File.rm(file) do
+    case File.rm(@data_dir <> file) do
       :ok ->
         {:reply, :ok, s}
       {:error, _} ->
