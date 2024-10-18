@@ -11,6 +11,14 @@ prompt_with_default() {
     echo "${user_input:-$default_value}"
 }
 
+# Step 0: Set the locale to prevent locale-related warnings (before updating packages)
+# This will configure the locale for the Raspberry Pi system.
+
+echo "Configuring locale settings..."
+sudo sed -i 's/^# *en_GB.UTF-8 UTF-8/en_GB.UTF-8 UTF-8/' /etc/locale.gen
+sudo locale-gen
+sudo update-locale LANG=en_GB.UTF-8
+
 # Step 1: Update system packages
 echo "Updating system packages..."
 sudo apt-get update

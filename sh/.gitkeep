@@ -1,0 +1,4 @@
+
+# The files we only care about for the scripts on the repo
+install.sh
+uninstall.sh
