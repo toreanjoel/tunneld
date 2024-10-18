@@ -18,13 +18,16 @@ echo "Configuring locale settings..."
 sudo sed -i 's/^# *en_GB.UTF-8 UTF-8/en_GB.UTF-8 UTF-8/' /etc/locale.gen
 sudo locale-gen
 sudo update-locale LANG=en_GB.UTF-8
+export LANG=en_GB.UTF-8
+export LANGUAGE=en_GB.UTF-8
+export LC_ALL=en_GB.UTF-8
 
 # Step 1: Update system packages
 echo "Updating system packages..."
 sudo apt-get update
 
 # Step 2: Install necessary packages like dnsmasq, hostapd, git, and curl
-echo "Installing required system packages (dnsmasq, hostapd, git, curl)..."
+echo "Installing required system packages (dnsmasq, hostapd, git, curl, and uuidgen)..."
 sudo apt-get install -y dnsmasq hostapd git curl
 
 # Step 3: Install Elixir and Phoenix framework
@@ -43,7 +46,7 @@ mix archive.install hex phx_new --force
 # Step 4: Fetch Elixir project dependencies
 # Once in the project directory, we pull the necessary libraries.
 echo "Installing dependencies for Elixir project..."
-cd ./
+cd /home/pi/project_sentinel
 mix deps.get
 
 # Step 5: Prompt user for Wi-Fi access point details (AP)
@@ -57,10 +60,10 @@ channel=$(prompt_with_default "Enter the Wi-Fi channel (1, 6, or 11 recommended 
 gateway_ip=$(prompt_with_default "Enter the gateway IP for your router (usually 192.168.1.1 or 192.168.0.1)" "192.168.1.1")
 
 # The static IP is the fixed address that the Raspberry Pi will use on the network.
-static_ip=$(prompt_with_default "Enter the static IP for this device (this Raspberry Pi)" "192.168.1.100")
+static_ip=$(prompt_with_default "Enter the static IP for this device (this Raspberry Pi)" "192.168.3.58")
 
 # DNS server, typically either the router's IP or a public DNS server like Google's (8.8.8.8).
-dns_server=$(prompt_with_default "Enter the DNS server (e.g., 8.8.8.8 for Google DNS)" "8.8.8.8")
+dns_server=$(prompt_with_default "Enter the DNS server (e.g., 8.8.8.8 for Google DNS)" "1.1.1.1")
 
 # Step 7: Setup hostapd (Wi-Fi access point)
 # This part creates the configuration for the Wi-Fi access point, using the SSID, password, and channel the user provided.
@@ -122,15 +125,10 @@ sudo systemctl enable hostapd
 sudo systemctl restart dnsmasq
 sudo systemctl restart hostapd
 
-# Step 12: Generate a UUID for this device
-# A unique identifier is created for the Raspberry Pi and stored in the configs folder.
-echo "Generating UUID for this device..."
-uuid=$(uuidgen)
-echo $uuid > ./configs/device_uuid.txt
-
 # Step 13: Start the Phoenix app manually
 # This starts the Phoenix server, which will run your web dashboard for real-time management.
 echo "Starting Phoenix app..."
+cd /home/pi/project_sentinel
 MIX_ENV=prod mix phx.server &
 
 echo "Installation and setup complete! Visit your Pi's static IP ($static_ip) in a browser to access the dashboard."
