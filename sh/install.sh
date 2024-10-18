@@ -30,10 +30,9 @@ echo "Installing Phoenix framework..."
 mix local.hex --force
 mix archive.install hex phx_new --force
 
-# Clone the project repository
-echo "Cloning Project Sentinel from GitHub..."
-git clone https://github.com/your_github_username/project_sentinel.git /home/pi/project_sentinel
-cd /home/pi/project_sentinel
+# Install the project and deps
+echo "Installing dependencies for Elixir project..."
+cd ./
 mix deps.get
 
 # Prompt for Wi-Fi details
