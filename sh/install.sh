@@ -12,8 +12,6 @@ prompt_with_default() {
 }
 
 # Step 0: Set the locale to prevent locale-related warnings (before updating packages)
-# This will configure the locale for the Raspberry Pi system.
-
 echo "Configuring locale settings..."
 sudo sed -i 's/^# *en_GB.UTF-8 UTF-8/en_GB.UTF-8 UTF-8/' /etc/locale.gen
 sudo locale-gen
@@ -26,25 +24,38 @@ export LC_ALL=en_GB.UTF-8
 echo "Updating system packages..."
 sudo apt-get update
 
-# Step 2: Install necessary packages like dnsmasq, hostapd, git, curl, and uuidgen
-echo "Installing required system packages (dnsmasq, hostapd, git, curl, uuidgen)..."
-sudo apt-get install -y dnsmasq hostapd git curl util-linux
+# Step 2: Install necessary packages like dnsmasq, hostapd, git, curl, uuidgen, and build dependencies for `asdf`
+echo "Installing required system packages (dnsmasq, hostapd, git, curl, uuidgen, build dependencies)..."
+sudo apt-get install -y dnsmasq hostapd git curl autoconf build-essential libssl-dev libncurses5-dev
 
-# Step 3: Install Elixir and Phoenix framework
-# This part installs Elixir (necessary for running the Phoenix app).
-echo "Installing Elixir..."
-wget https://packages.erlang-solutions.com/erlang-solutions_2.0_all.deb
-sudo dpkg -i erlang-solutions_2.0_all.deb
-sudo apt-get update
-sudo apt-get install -y esl-erlang elixir
+# Step 3: Install `asdf` version manager
+echo "Installing asdf version manager..."
+git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.9.0
+echo -e '\n. $HOME/.asdf/asdf.sh' >> ~/.bashrc
+echo -e '\n. $HOME/.asdf/completions/asdf.bash' >> ~/.bashrc
+source ~/.bashrc
 
-# Step 4: Install Phoenix
-echo "Installing Phoenix framework..."
-mix local.hex --force
-mix archive.install hex phx_new --force
+# Step 4: Install Erlang and Elixir using `asdf`
+echo "Installing Erlang and Elixir using asdf..."
+
+# Add asdf plugins for Erlang and Elixir
+asdf plugin-add erlang https://github.com/asdf-vm/asdf-erlang.git
+asdf plugin-add elixir https://github.com/asdf-vm/asdf-elixir.git
+
+# Install the latest stable version of Erlang
+asdf install erlang latest
+asdf global erlang latest
+
+# Install the latest stable version of Elixir
+asdf install elixir latest
+asdf global elixir latest
+
+# Verify installation
+echo "Verifying Elixir and Erlang installation..."
+elixir --version
+erl -version
 
 # Step 5: Fetch Elixir project dependencies
-# Ensure you're in the project directory before running mix commands
 echo "Installing dependencies for Elixir project..."
 cd /home/pi/sentinel
 mix deps.get
@@ -65,7 +76,6 @@ mkdir -p /home/pi/sentinel/logs
 mkdir -p /home/pi/sentinel/configs
 
 # Step 9: Setup hostapd (Wi-Fi access point)
-# This part creates the configuration for the Wi-Fi access point, using the SSID, password, and channel the user provided.
 echo "Setting up hostapd configuration..."
 sudo bash -c "cat > /etc/hostapd/hostapd.conf" <<EOF
 interface=wlan0
@@ -83,8 +93,6 @@ rsn_pairwise=CCMP
 EOF
 
 # Step 10: Setup dnsmasq (DNS and DHCP server)
-# dnsmasq will handle DNS requests and assign IP addresses (via DHCP) to devices connecting to the access point.
-# We store the blacklist and logs inside the project directory.
 echo "Setting up dnsmasq configuration..."
 sudo bash -c "cat > /etc/dnsmasq.conf" <<EOF
 interface=wlan0
@@ -100,7 +108,6 @@ cache-size=1000
 EOF
 
 # Step 11: Set a static IP for the Ethernet interface (eth0)
-# This ensures the Raspberry Pi has a fixed IP on the network, so it can be accessed easily via its static IP.
 echo "Configuring static IP for Ethernet..."
 sudo bash -c 'echo "
 interface eth0
@@ -123,8 +130,12 @@ sudo systemctl restart hostapd
 sudo systemctl enable dnsmasq
 sudo systemctl restart dnsmasq
 
+# wait for a little bit to ensure dnsmasq is ready
+sleep 5
+sudo systemctl restart hostapd
+sudo systemctl restart dnsmasq.service
+
 # Step 14: Start the Phoenix app manually
-# This starts the Phoenix server, which will run your web dashboard for real-time management.
 echo "Starting Phoenix app..."
 cd /home/pi/sentinel
 MIX_ENV=prod mix phx.server &
