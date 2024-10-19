@@ -35,24 +35,27 @@ ssid=$(prompt_with_default "Enter the SSID (Wi-Fi network name) for your access 
 password=$(prompt_with_default "Enter the password for your Wi-Fi access point" "YourSecurePassword")
 channel=$(prompt_with_default "Enter the Wi-Fi channel (1, 6, or 11 recommended for 2.4GHz networks)" "6")
 
-# **Step 4: Configure Static IP for wlan0**
-# Sets a static IP address for the wireless interface.
+# **Step 4: Remove Existing Static IP Configuration for wlan0**
+echo "Removing existing static IP configuration for wlan0..."
+sudo sed -i '/interface wlan0/,/nohook wpa_supplicant/d' /etc/dhcpcd.conf
+
+# **Configure Static IP for wlan0**
 echo "Configuring static IP for wlan0..."
-sudo bash -c "cat > /etc/dhcpcd.conf" <<EOF
+sudo bash -c "cat >> /etc/dhcpcd.conf" <<EOF
+
 interface wlan0
     static ip_address=192.168.4.1/24
     nohook wpa_supplicant
 EOF
 
 # **Step 5: Restart dhcpcd Service**
-# Applies the new static IP configuration.
 echo "Restarting dhcpcd service..."
 sudo systemctl restart dhcpcd
 sleep 5  # Wait for the service to restart
 
-# **Step 6: Configure hostapd**
-# Sets up the access point configuration.
+# **Step 6: Remove Old hostapd Configuration and Set Up New One**
 echo "Setting up hostapd configuration..."
+sudo rm -f /etc/hostapd/hostapd.conf
 sudo bash -c "cat > /etc/hostapd/hostapd.conf" <<EOF
 interface=wlan0
 driver=nl80211
@@ -70,15 +73,13 @@ rsn_pairwise=CCMP
 EOF
 
 # Point hostapd to the configuration file
-sudo sed -i 's|#DAEMON_CONF="|DAEMON_CONF="/etc/hostapd/hostapd.conf"|' /etc/default/hostapd
+echo "Updating /etc/default/hostapd to point to the configuration file..."
+sudo sed -i '/^DAEMON_CONF=/d' /etc/default/hostapd
+echo 'DAEMON_CONF="/etc/hostapd/hostapd.conf"' | sudo tee -a /etc/default/hostapd
 
-# **Step 7: Configure dnsmasq**
-# Sets up DHCP and DNS services for connected clients.
+# **Step 7: Remove Old dnsmasq Configuration and Set Up New One**
 echo "Configuring dnsmasq..."
-# Backup the original dnsmasq.conf
-sudo mv /etc/dnsmasq.conf /etc/dnsmasq.conf.orig
-
-# Create a new dnsmasq configuration
+sudo rm -f /etc/dnsmasq.conf
 sudo bash -c "cat > /etc/dnsmasq.conf" <<EOF
 interface=wlan0      # Use interface wlan0
 bind-interfaces      # Bind to the interface
@@ -89,20 +90,16 @@ dhcp-range=192.168.4.2,192.168.4.20,255.255.255.0,24h
 EOF
 
 # **Step 8: Enable IP Forwarding**
-# Allows traffic forwarding between interfaces.
 echo "Enabling IP forwarding..."
-sudo sed -i 's/#net.ipv4.ip_forward=1/net.ipv4.ip_forward=1/' /etc/sysctl.conf
+sudo sed -i 's|^#net.ipv4.ip_forward=.*|net.ipv4.ip_forward=1|' /etc/sysctl.conf
 sudo sysctl -p
 
 # **Step 9: Configure NAT Between wlan0 and eth0**
-# Sets up NAT to share the Pi's internet connection.
 echo "Configuring NAT between wlan0 and eth0..."
 sudo iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
 sudo sh -c "iptables-save > /etc/iptables.ipv4.nat"
 
-# **Ensure iptables rules are loaded on boot**
 # Since you don't want services running on boot, we won't modify /etc/rc.local.
-# Instead, we'll include iptables restoration in the start script.
 
 # **Step 10: Final Message**
 echo "--------------------------------------"
