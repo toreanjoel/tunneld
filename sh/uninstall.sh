@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "Stopping services (dnsmasq, hostapd, Phoenix app)..."
+echo "Stopping services (dnsmasq, hostapd)..."
 sudo systemctl stop dnsmasq
 sudo systemctl stop hostapd
 
@@ -16,14 +16,18 @@ sudo rm -f /etc/dnsmasq.blacklist
 sudo rm -f /etc/hostapd/hostapd.conf
 
 # Remove the app directory
-echo "Removing the Elixir/Phoenix application..."
-sudo rm -rf /home/pi/project_sentinel
+echo "Removing the Elixir application..."
+sudo rm -rf /home/pi/sentinel
 
-# Remove Elixir, Erlang, and related packages (optional)
-read -p "Do you want to remove Elixir, Erlang, and related packages? (y/n): " remove_lang
+# Remove Elixir, Erlang, and ASDF (optional)
+read -p "Do you want to remove Elixir, Erlang, and ASDF? (y/n): " remove_lang
 if [ "$remove_lang" == "y" ]; then
-  sudo apt-get remove --purge -y esl-erlang elixir
-  sudo apt-get autoremove -y
+  # Remove ASDF and installed versions
+  rm -rf ~/.asdf
+  sed -i '/asdf.sh/d' ~/.bashrc
+  sed -i '/asdf.bash/d' ~/.bashrc
+  source ~/.bashrc
+  echo "ASDF and installed versions removed."
 fi
 
 # Remove system modifications
