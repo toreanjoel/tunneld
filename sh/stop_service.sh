@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# stop_services.sh
+# stop_service.sh
 # Script to stop hostapd and dnsmasq services and clear NAT
 
 if [ "$EUID" -ne 0 ]; then

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# start_services.sh
+# start_service.sh
 # Script to start hostapd and dnsmasq services and set up NAT
 
 if [ "$EUID" -ne 0 ]; then
