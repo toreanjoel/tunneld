@@ -24,7 +24,7 @@ echo "Updating system packages..."
 sudo apt-get update -y
 
 # Step 2: Install necessary packages like dnsmasq, hostapd, git, curl, and uuidgen
-echo "Installing required system packages (dnsmasq, hostapd, git, curl, uuidgen)..."
+echo "Installing required system packages..."
 sudo apt-get install -y dnsmasq hostapd git curl util-linux automake autoconf \
 libreadline-dev libncurses-dev libssl-dev libyaml-dev libxslt-dev libffi-dev \
 libtool unixodbc-dev unzip
@@ -33,10 +33,30 @@ libtool unixodbc-dev unzip
 echo "Installing ASDF Version Manager..."
 git clone https://github.com/asdf-vm/asdf.git ~/.asdf --branch v0.11.3
 
-# Add ASDF to shell
-echo 'source ~/.asdf/asdf.sh' >> ~/.bashrc
-echo 'source ~/.asdf/completions/asdf.bash' >> ~/.bashrc
-source ~/.bashrc
+# **Determine the user's shell and the appropriate initialization file**
+USER_SHELL=$(echo $SHELL)
+if [[ $USER_SHELL == *"bash" ]]; then
+    SHELL_PROFILE="$HOME/.bashrc"
+    # Ensure that .bash_profile sources .bashrc
+    if [ ! -f "$HOME/.bash_profile" ]; then
+        touch "$HOME/.bash_profile"
+    fi
+    if ! grep -q ". ~/.bashrc" "$HOME/.bash_profile"; then
+        echo -e "\n# Source .bashrc\nif [ -f ~/.bashrc ]; then\n    . ~/.bashrc\nfi" >> "$HOME/.bash_profile"
+    fi
+elif [[ $USER_SHELL == *"zsh" ]]; then
+    SHELL_PROFILE="$HOME/.zshrc"
+else
+    # Default to .profile for other shells
+    SHELL_PROFILE="$HOME/.profile"
+fi
+
+# **Add ASDF to the shell's initialization file**
+echo -e "\n. $HOME/.asdf/asdf.sh" >> "$SHELL_PROFILE"
+echo -e "\n. $HOME/.asdf/completions/asdf.bash" >> "$SHELL_PROFILE"
+
+# **Source the shell profile to make asdf available in the current session**
+source "$SHELL_PROFILE"
 
 # Step 4: Install Erlang and Elixir via ASDF
 echo "Installing Erlang and Elixir via ASDF..."
@@ -60,18 +80,18 @@ asdf install elixir $ELIXIR_VERSION
 asdf global elixir $ELIXIR_VERSION
 
 # Step 5: Install Phoenix (if needed)
-# If you need Phoenix framework, you can install it using the following commands.
 # Uncomment the lines below if you wish to install Phoenix.
-
 # echo "Installing Phoenix framework..."
 # mix local.hex --force
 # mix archive.install hex phx_new --force
 
 # Step 6: Fetch Elixir project dependencies
-# Ensure you're in the project directory before running mix commands
 echo "Installing dependencies for Elixir project..."
 cd /home/pi/sentinel || { echo "Project directory /home/pi/sentinel not found."; exit 1; }
 mix deps.get
+
+# Continue with the rest of your script...
+
 
 # Step 7: Prompt user for Wi-Fi access point details (AP)
 ssid=$(prompt_with_default "Enter the SSID (Wi-Fi network name) for your access point" "YourNetworkSSID")
@@ -153,7 +173,7 @@ sudo systemctl restart dnsmasq
 # Wait for a little bit to ensure dnsmasq is ready
 sleep 5
 sudo systemctl restart hostapd
-sudo systemctl restart dnsmasq.service
+sudo systemctl restart dnsmasq
 
 # Step 15: Start the Phoenix app manually (if applicable)
 # If you have a Phoenix app to start, you can start it here. Since you mentioned not to add Phoenix logs, we'll skip this step.
