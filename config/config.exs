@@ -60,6 +60,11 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+# DEFAILT ADMIN DASHBOARD DETAILS
+config :sentinel, :dashboard,
+  user: "admin",
+  pass: "admin"
+
 # TODO: add configuration for details for the device
 # TODO: Assign device token to the cloud (1:1 user to device)
 # TODO: push notification for admin user

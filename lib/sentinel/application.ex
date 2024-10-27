@@ -18,9 +18,7 @@ defmodule Sentinel.Application do
       # Start to serve requests, typically the last entry
       SentinelWeb.Endpoint,
       {Sentinel.Servers.File, []},
-      {Sentinel.Servers.Blacklist, []},
-      {Sentinel.Servers.DNS, []},
-      {Sentinel.Servers.Cache, []}
+      {Sentinel.Servers.Blacklist, []}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

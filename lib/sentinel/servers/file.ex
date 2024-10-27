@@ -5,8 +5,6 @@ defmodule Sentinel.Servers.File do
   use GenServer
   require Logger
 
-  # TODO: move this to config
-  @allowed_files ["blacklist.json", "network.json", "credentials.json"]
   @data_dir "data/"
 
   # TODO: make sure to get default values from the config
@@ -19,17 +17,11 @@ defmodule Sentinel.Servers.File do
   Init the GenServer with an empty state.
   """
   def init(_) do
-    # init the files
-    # TODO: add under the /data directory and populate defailt values for files
-    __MODULE__.write(%{}, "blacklist.json")
-    __MODULE__.write(%{}, "network.json")
-    __MODULE__.write(%{}, "credentials.json")
-
     {:ok, %{}}
   end
 
   # We write data to a specific file
-  def handle_cast({:write, data, file}, s) when file in @allowed_files do
+  def handle_cast({:write, data, file}, s) do
     # TODO: get the data and we want to merge to the file, not overwrite
     case File.write(@data_dir <> file, Jason.encode!(data)) do
       :ok ->
@@ -40,7 +32,7 @@ defmodule Sentinel.Servers.File do
   end
 
   # We read data from a specific file
-  def handle_call({:read, file}, _from, s) when file in @allowed_files do
+  def handle_call({:read, file}, _from, s) do
     case File.read(@data_dir <> file) do
       {:ok, data} ->
         {:reply, Jason.decode!(data), s}
@@ -50,7 +42,7 @@ defmodule Sentinel.Servers.File do
   end
 
   # delete file
-  def handle_call({:delete, file}, _, s) when file in @allowed_files do
+  def handle_call({:delete, file}, _, s) do
     case File.rm(@data_dir <> file) do
       :ok ->
         {:reply, :ok, s}
