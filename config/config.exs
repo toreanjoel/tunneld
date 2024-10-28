@@ -65,6 +65,8 @@ config :sentinel, :dashboard,
   user: "admin",
   pass: "admin"
 
+config :sentinel, version: "0.0.1"
+
 # TODO: add configuration for details for the device
 # TODO: Assign device token to the cloud (1:1 user to device)
 # TODO: push notification for admin user
