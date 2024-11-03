@@ -63,7 +63,7 @@ config :phoenix, :json_library, Jason
 # DEFAILT ADMIN DASHBOARD DETAILS
 config :sentinel, :auth,
   user: "admin",
-  pass: "admin",
+  pass: "!admin_123!",
   ttl: 900 # 15 minutes
 
 config :sentinel, :fs,

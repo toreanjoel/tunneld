@@ -14,16 +14,24 @@ defmodule SentinelWeb.Router do
     plug :accepts, ["json"]
   end
 
-  scope "/", SentinelWeb do
-    pipe_through :browser
-
-    get "/", PageController, :home
+  pipeline :session_auth do
+    plug SentinelWeb.Plugs.SessionAuth
   end
 
-  # Other scopes may use custom stacks.
-  # scope "/api", SentinelWeb do
-  #   pipe_through :api
-  # end
+  # These are the open routes
+  scope "/", SentinelWeb do
+    pipe_through [:browser, :session_auth]
+
+    live "/", Live.Login
+    live "/dashboard", Live.Dashboard
+  end
+
+  # Fallback for any unknown routes
+  scope "/*path", SentinelWeb do
+    pipe_through [:browser]
+
+    live "/", Live.NotFound
+  end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:sentinel, :dev_routes) do

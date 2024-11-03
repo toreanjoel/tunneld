@@ -6,7 +6,7 @@ defmodule Sentinel.Servers.Session do
   require Logger
 
   # Default TTL for sessions in seconds (15 minutes)
-  @default_ttl 30_000
+  @interval 10_000
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -32,7 +32,9 @@ defmodule Sentinel.Servers.Session do
   # Get a session
   def handle_call({:get, id}, _from, state) do
     case Map.fetch(state, id) do
-      {:ok, session} -> {:reply, {:ok, session}, state}
+      {:ok, session} ->
+        session = if is_nil(session), do: {:error, session}, else: {:ok, session}
+        {:reply, session, state}
       :error -> {:reply, {:error, "Session not found"}, state}
     end
   end
@@ -66,8 +68,7 @@ defmodule Sentinel.Servers.Session do
         if session.expires_at > current_time do
           Map.put(acc, id, session)
         else
-          delete(id)
-          acc
+          Map.delete(acc, id)
         end
       end)
 
@@ -77,7 +78,7 @@ defmodule Sentinel.Servers.Session do
 
   # Schedule the next cleanup using :timer.send_after
   defp schedule_cleanup() do
-    :timer.send_after(@default_ttl, :init_cleaner)
+    :timer.send_after(@interval, :init_cleaner)
   end
 
   # Public API functions
