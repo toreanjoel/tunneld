@@ -26,13 +26,6 @@ defmodule SentinelWeb.Router do
     live "/dashboard", Live.Dashboard
   end
 
-  # Fallback for any unknown routes
-  scope "/*path", SentinelWeb do
-    pipe_through [:browser]
-
-    live "/", Live.NotFound
-  end
-
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:sentinel, :dev_routes) do
     # If you want to use the LiveDashboard in production, you should put
@@ -46,7 +39,13 @@ defmodule SentinelWeb.Router do
       pipe_through :browser
 
       live_dashboard "/dashboard", metrics: SentinelWeb.Telemetry
-      forward "/mailbox", Plug.Swoosh.MailboxPreview
     end
+  end
+
+  # Fallback for any unknown routes
+  scope "/*path", SentinelWeb do
+    pipe_through [:browser]
+
+    live "/", Live.NotFound
   end
 end
