@@ -2,24 +2,29 @@ defmodule SentinelWeb.Live.Login do
   @moduledoc """
   Login page
   """
-alias Sentinel.Servers.Session
+  alias Sentinel.Servers.Session
   use SentinelWeb, :live_view
   alias Sentinel.Servers.{Auth, Session}
   alias SentinelWeb.Router.Helpers, as: Routes
 
+  # we check if the user is authenticated
+  on_mount SentinelWeb.Hooks.CheckAuth
+
   @doc """
   Initialize the login page and the session data for the client
   """
-  def mount(_params, %{ "ip" => ip} = session, socket) do
+  def mount(_params, %{"ip" => ip} = _session, socket) do
     # Initialize form data as a map - TODO: change this to a struct with ecto?
     form_data = %{"user" => "", "pass" => ""}
 
     # Convert the map to a form struct
     form = Phoenix.Component.to_form(form_data)
 
-    socket = socket
+    socket =
+      socket
       |> assign(:ip, ip)
       |> assign(form: form)
+
     # Assign the form to the socket
     {:ok, socket}
   end
@@ -49,12 +54,15 @@ alias Sentinel.Servers.Session
       Session.create(socket.assigns.ip)
 
       {:noreply,
-        socket
-        |> put_flash(:info, "Logged In!")
-        |> push_navigate(to: Routes.live_path(socket, SentinelWeb.Live.Dashboard))
-      }
+       socket
+       |> put_flash(:info, "Logged In!")
+       |> push_navigate(to: Routes.live_path(socket, SentinelWeb.Live.Dashboard))}
     else
       {:noreply, socket |> put_flash(:error, "Invalid Credentials")}
     end
+  end
+
+  def handle_info(:clear_flash, socket) do
+    {:noreply, clear_flash(socket)}
   end
 end

@@ -6,10 +6,13 @@ defmodule SentinelWeb.Live.Dashboard do
   alias Sentinel.Servers.{Session}
   alias SentinelWeb.Router.Helpers, as: Routes
 
+  # we check if the user is authenticated
+  on_mount SentinelWeb.Hooks.CheckAuth
+
   @doc """
   Initialize the dashboard
   """
-  def mount(_params, %{"ip" => ip} = session, socket) do
+  def mount(_params, %{"ip" => ip} = _session, socket) do
     socket = socket
       |> assign(:ip, ip)
     {:ok, socket}

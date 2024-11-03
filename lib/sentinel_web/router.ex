@@ -14,13 +14,13 @@ defmodule SentinelWeb.Router do
     plug :accepts, ["json"]
   end
 
-  pipeline :session_auth do
-    plug SentinelWeb.Plugs.SessionAuth
+  pipeline :set_ip do
+    plug SentinelWeb.Plugs.SetIp
   end
 
   # These are the open routes
   scope "/", SentinelWeb do
-    pipe_through [:browser, :session_auth]
+    pipe_through [:browser, :set_ip]
 
     live "/", Live.Login
     live "/dashboard", Live.Dashboard
