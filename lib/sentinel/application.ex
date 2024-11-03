@@ -4,6 +4,7 @@ defmodule Sentinel.Application do
   @moduledoc false
 
   use Application
+  alias Sentinel.Servers.{Auth, Session}
 
   @impl true
   def start(_type, _args) do
@@ -11,14 +12,12 @@ defmodule Sentinel.Application do
       SentinelWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:sentinel, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Sentinel.PubSub},
-      # Start the Finch HTTP client for sending emails
-      {Finch, name: Sentinel.Finch},
       # Start a worker by calling: Sentinel.Worker.start_link(arg)
       # {Sentinel.Worker, arg},
       # Start to serve requests, typically the last entry
       SentinelWeb.Endpoint,
-      {Sentinel.Servers.File, []},
-      {Sentinel.Servers.Blacklist, []}
+      {Auth, []},
+      {Session, []}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html
