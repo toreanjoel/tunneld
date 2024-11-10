@@ -1,7 +1,6 @@
 defmodule SentinelWeb.Components.Navigation do
   @moduledoc """
   The basic navigation component that will be wrapped around pages.
-  This will be a basic stateless component.
   """
   use Phoenix.Component
   import SentinelWeb.CoreComponents
@@ -16,7 +15,7 @@ defmodule SentinelWeb.Components.Navigation do
     ~H"""
     <div id={@id} class="flex flex-row min-h-screen">
       <!-- Fixed Navigation -->
-      <div class="fixed top-0 left-0 h-screen w-[50px] flex flex-col items-center py-3 border-r border-zinc-300 bg-gray-100">
+      <div class="fixed h-screen w-[50px] flex flex-col items-center py-3 border-r border-zinc-300 bg-gray-100">
         <!-- Navigation Icons with Hover Effect -->
         <div class="flex flex-col text-black">
           <.link navigate="/dashboard" class="cursor-pointer hover:bg-white hover:rounded-lg p-2 transition-all duration-500">

@@ -48,9 +48,9 @@ defmodule SentinelWeb.Live.Dashboard do
         <%!-- Basic badges --%>
         <div class="flex flex-wrap flex-row gap-1 my-2">
           <.status_badge title="WiFi Access Point" status="good" />
-          <.status_badge title="DNS Server" status="bad" />
+          <.status_badge title="DNS Server" status="good" />
           <.status_badge title="Internet Speed" status="warning" />
-          <.status_badge title="Internet Latency" status="warning" />
+          <.status_badge title="Internet Latency" status="bad" />
         </div>
 
         <hr class="my-3 border-dashed border-gray-300" />
