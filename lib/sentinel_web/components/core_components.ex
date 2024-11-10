@@ -573,6 +573,62 @@ defmodule SentinelWeb.CoreComponents do
   end
 
   @doc """
+  Basic badge for the status indicators.
+
+  ## Examples
+
+      <.status_badge title="Status" status="good" />
+      <.status_badge title="Status" status="bad" />
+      <.status_badge title="Status" status="warning" />
+  """
+  attr :title, :string, required: true
+  attr :status, :string, default: "good"
+
+  def status_badge(assigns) do
+    status =
+      case assigns[:status] do
+        "good" -> "bg-green-500"
+        "bad" -> "bg-red-500"
+        "warning" -> "bg-yellow-500"
+      end
+
+    assigns = assign(assigns, :status, status)
+
+    ~H"""
+    <span class="flex items-center text-sm px-3 py-1 gap-2 leading-6 bg-white rounded-full border border-zinc-300">
+      <div class={"inline-block w-3 h-3 rounded-full #{@status}"} />
+      <div class="text-xs text-gray-600"><%= @title %></div>
+    </span>
+    """
+  end
+
+  @doc """
+  Info box that will render summary information
+
+  ## Examples
+
+    <.info_box title="Status" value="100" icon="device-phone-mobile" />
+  """
+  attr :title, :string, required: true
+  attr :value, :string, required: true
+  attr :icon, :string, required: true
+
+  def info_box(assigns) do
+    ~H"""
+    <div class="flex flex-col p-2 hover:bg-gray-100 trans rounded-lg border border-gray-300 shadow-sm w-48 transition-all duration-200">
+      <!-- Title -->
+      <div class="font-light text-gray-600 mb-1"><%= @title %></div>
+      <!-- Value -->
+      <div class="text-[2.5rem] font-thin text-center text-gray-800"><%= @value %></div>
+      <!-- Icon -->
+      <div class="text-gray-500">
+        <.icon name={"hero-" <> @icon} class="h-6 w-6" />
+      </div>
+    </div>
+    """
+  end
+
+  @doc """
   Renders a [Heroicon](https://heroicons.com).
 
   Heroicons come in three styles – outline, solid, and mini.

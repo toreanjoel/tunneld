@@ -49,7 +49,7 @@ defmodule SentinelWeb.Components.Navigation do
         </span>
       </div>
       <!-- Main section -->
-      <div class="flex flex-col grow items-center justify-center w-full lg:w-3/5 p-8">
+      <div class="flex flex-col grow items-center justify-center w-full lg:w-3/5 p-8 max-w-[767px] mx-auto">
         <%= render_slot(@inner_block) %>
       </div>
     </div>
