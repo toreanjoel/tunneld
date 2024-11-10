@@ -615,7 +615,7 @@ defmodule SentinelWeb.CoreComponents do
 
   def info_box(assigns) do
     ~H"""
-    <div class="flex flex-col p-2 hover:bg-gray-100 trans rounded-lg border border-gray-300 shadow-sm w-48 transition-all duration-200">
+    <div class="flex flex-col p-2 bg-white hover:bg-gray-100 trans rounded-lg border border-gray-300 shadow-sm w-48 transition-all duration-200">
       <!-- Title -->
       <div class="font-light text-gray-600 mb-1"><%= @title %></div>
       <!-- Value -->
