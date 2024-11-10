@@ -14,14 +14,16 @@ defmodule SentinelWeb.Live.Dashboard do
   Initialize the dashboard
   """
   def mount(_params, %{"ip" => ip} = _session, socket) do
-
     # connect to the system broadcast channel topic
-    Broadcast.System.topic(:info) |> SentinelWeb.Endpoint.subscribe
+    Broadcast.System.topic(:info) |> SentinelWeb.Endpoint.subscribe()
 
     socket =
       socket
       |> assign(:ip, ip)
-      |> assign(:overview_content, "Systems are running well. Keep an eye on device 127.0.0.1 and their network usage.")
+      |> assign(
+        :overview_content,
+        "Systems are running well. Keep an eye on device 127.0.0.1 and their network usage."
+      )
       |> assign(:overview_sync_ts, "Not yet")
 
     {:ok, socket}
@@ -36,8 +38,7 @@ defmodule SentinelWeb.Live.Dashboard do
       <div class="text-left">
         <%!-- Welcome message --%>
         <div class="text-3xl md:text-5xl py-2 font-bold bg-gradient-to-r from-gray-700 to-gray-300 bg-clip-text text-transparent">
-          Hi there, <%= Application.get_env(:sentinel, :auth)[:user] |> String.capitalize %>!
-          <br />
+          Hi there, <%= Application.get_env(:sentinel, :auth)[:user] |> String.capitalize() %>! <br />
           Here's your system overview
         </div>
         <%!-- This will be the basic text information that could be informational but some insights --%>
@@ -58,10 +59,10 @@ defmodule SentinelWeb.Live.Dashboard do
 
         <%!-- Row 1 --%>
         <div class="flex flex-wrap flex-col sm:flex-row gap-4 my-3">
-          <.info_box title="Logs" value="25000" icon={"document"} />
-          <.info_box title="Blocked Devices" value="3" icon={"x-circle"} />
-          <.info_box title="Connected Devices" value="12" icon={"device-phone-mobile"} />
-          <.info_box title="Blacklisted Domains" value="100" icon={"no-symbol"} />
+          <.info_box title="Logs" value="15550" icon="document" />
+          <.info_box title="Blocked Devices" value="3" icon="x-circle" />
+          <.info_box title="Connected Devices" value="12" icon="device-phone-mobile" />
+          <.info_box title="Blacklisted Domains" value="100" icon="no-symbol" />
         </div>
 
         <%!-- Row 2 --%>
@@ -95,8 +96,10 @@ defmodule SentinelWeb.Live.Dashboard do
     case msg do
       {:dashboard_overview, content} ->
         {:noreply, assign(socket, :overview_content, content)}
+
       {:dashboard_sync_ts, ts} ->
         {:noreply, assign(socket, :overview_sync_ts, ts)}
+
       _ ->
         {:noreply, socket}
     end
