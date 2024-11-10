@@ -92,4 +92,9 @@ defmodule SentinelWeb.Live.Dashboard do
   def handle_info({:sentinel_info, {:dashboard_sync_ts, ts}}, socket) do
     {:noreply, assign(socket, :overview_sync_ts, ts)}
   end
+
+  # We ignore the rest
+  def handle_info({:sentinel_info, _}, socket) do
+    {:noreply, socket}
+  end
 end
