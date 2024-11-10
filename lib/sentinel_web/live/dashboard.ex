@@ -28,7 +28,7 @@ defmodule SentinelWeb.Live.Dashboard do
   end
 
   @doc """
-  Render the login form
+  Render the dashboard
   """
   def render(assigns) do
     ~H"""
@@ -80,6 +80,7 @@ defmodule SentinelWeb.Live.Dashboard do
 
   @doc """
   Handle form validation on input change
+  TODO: move this to the nav component
   """
   def handle_event("logout", _, socket) do
     # TODO: we need to consider doing a modal over here

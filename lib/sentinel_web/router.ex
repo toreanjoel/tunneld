@@ -24,6 +24,10 @@ defmodule SentinelWeb.Router do
 
     live "/", Live.Login
     live "/dashboard", Live.Dashboard
+    live "/blocklist", Live.Blocklist
+    live "/devices", Live.Devices
+    live "/logs", Live.Logs
+    live "/settings", Live.Settings
   end
 
   # Enable LiveDashboard and Swoosh mailbox preview in development
