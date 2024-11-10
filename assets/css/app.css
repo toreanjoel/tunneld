@@ -3,3 +3,13 @@
 @import "tailwindcss/utilities";
 
 /* This file is for your main application CSS */
+
+/* TODO: Make separate utils and component files */
+@layer utilities {
+  .bg-grid {
+    background-image: linear-gradient(to right, rgba(255, 255, 255, 0.1) 1px, transparent 0.5px),
+                      linear-gradient(to bottom, rgba(255, 255, 255, 0.1) 1px, transparent 0.5px); 
+    background-size: 150px 150px;
+  }
+  
+}

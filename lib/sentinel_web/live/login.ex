@@ -7,7 +7,7 @@ defmodule SentinelWeb.Live.Login do
   alias Sentinel.Servers.{Auth, Session}
   alias SentinelWeb.Router.Helpers, as: Routes
 
-  # we check if the user is authenticated
+  # Redirect the user to the dashboard if they are already logged in
   on_mount SentinelWeb.Hooks.CheckAuth
 
   @doc """
@@ -19,6 +19,8 @@ defmodule SentinelWeb.Live.Login do
 
     # Convert the map to a form struct
     form = Phoenix.Component.to_form(form_data)
+
+    # Setup the channel here to listen for messages?
 
     socket =
       socket
@@ -34,13 +36,35 @@ defmodule SentinelWeb.Live.Login do
   """
   def render(assigns) do
     ~H"""
-    <.simple_form for={@form} id="login_form" phx-submit="login">
-      <.input field={@form[:user]} label="Name" />
-      <.input field={@form[:pass]} label="Password" type="password" />
-      <:actions>
-        <.button>Login</.button>
-      </:actions>
-    </.simple_form>
+    <!-- Login wrapper -->
+    <div class="flex flex-col lg:flex-row min-h-screen sm:height-screen p-2">
+      <!-- Overview wrapper -->
+      <div class="bg-black relative hidden text-white lg:w-3/5 w-full lg:flex flex-col items-center justify-center p-8 rounded-lg">
+        <%!-- backgroud grid --%>
+        <div class="absolute inset-0 bg-grid pointer-events-none"></div>
+
+        <div class="grow" />
+        <div class="text-center grow">
+          <h1 class="text-3xl font-bold mb-4">sentinel.local</h1>
+          <div></div>
+        </div>
+        <%!-- application version --%>
+        <span class="text-xs">
+          <%= Application.get_env(:sentinel, :version) %>
+        </span>
+      </div>
+      <!-- Form wrapper -->
+      <div class="lg:w-2/5 w-full flex items-center justify-center p-8">
+        <.simple_form for={@form} id="login_form" phx-submit="login" class="w-full max-w-sm">
+          <h1 class="text-3xl font-bold mb-4 text-center">sentinel.local</h1>
+          <.input field={@form[:user]} label="Name" class="mb-4" />
+          <.input field={@form[:pass]} label="Password" type="password" class="mb-6" />
+          <:actions>
+            <.button class="w-full">Login</.button>
+          </:actions>
+        </.simple_form>
+      </div>
+    </div>
     """
   end
 
@@ -58,7 +82,11 @@ defmodule SentinelWeb.Live.Login do
        |> put_flash(:info, "Logged In!")
        |> push_navigate(to: Routes.live_path(socket, SentinelWeb.Live.Dashboard))}
     else
-      {:noreply, socket |> put_flash(:error, "Invalid Credentials")}
+      socket = socket |> put_flash(:error, "Invalid Credentials")
+      # We clear the flash after 3 seconds
+      Process.send_after(self(), :clear_flash, 3000)
+
+      {:noreply, socket}
     end
   end
 
