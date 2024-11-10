@@ -99,7 +99,6 @@ defmodule SentinelWeb.Live.Login do
 
   # handle the broadcast from the sentinel channel
   def handle_info({:sentinel_info, content}, socket) do
-    IO.inspect(content, label: "content")
     {:noreply, assign(socket, :info_content, content)}
   end
 
