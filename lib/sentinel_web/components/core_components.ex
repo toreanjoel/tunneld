@@ -615,15 +615,15 @@ defmodule SentinelWeb.CoreComponents do
 
   def info_box(assigns) do
     ~H"""
-    <div class="flex flex-col p-2 bg-white hover:bg-gray-100 trans rounded-lg border border-gray-300 shadow-sm w-48 transition-all duration-200">
-      <!-- Title -->
-      <div class="font-light text-gray-600 mb-1"><%= @title %></div>
-      <!-- Value -->
-      <div class="text-[2.5rem] font-thin text-center text-gray-800"><%= @value %></div>
-      <!-- Icon -->
-      <div class="text-gray-500">
-        <.icon name={"hero-" <> @icon} class="h-6 w-6" />
+    <div class="flex flex-col p-2 bg-white hover:bg-gray-100 trans rounded-lg border border-gray-300 shadow-sm w-full sm:max-w-48 transition-all duration-200">
+      <div class="flex flex-row items-center space-x-2">
+        <!-- Icon -->
+        <span class={"#{"hero-" <> @icon} text-gray-300 h-5 w-5"} />
+        <!-- Title -->
+        <div class="font-light grow text-left text-gray-600"><%= @title %></div>
       </div>
+        <!-- Value -->
+        <div class="text-[2.5rem] text-center font-bold text-gray-500"><%= @value %></div>
     </div>
     """
   end

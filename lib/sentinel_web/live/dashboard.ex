@@ -35,7 +35,7 @@ defmodule SentinelWeb.Live.Dashboard do
     <Navigation.show id="nav">
       <div class="text-left">
         <%!-- Welcome message --%>
-        <div class="text-3xl md:text-5xl py-2 font-bold bg-gradient-to-r from-gray-700 to-gray-200 bg-clip-text text-transparent">
+        <div class="text-3xl md:text-5xl py-2 font-bold bg-gradient-to-r from-gray-700 to-gray-300 bg-clip-text text-transparent">
           Hi there, <%= Application.get_env(:sentinel, :auth)[:user] |> String.capitalize %>!
           <br />
           Here's your system overview
@@ -45,17 +45,28 @@ defmodule SentinelWeb.Live.Dashboard do
         <hr class="my-3 border-dashed border-gray-300" />
 
         <%!-- Basic badges --%>
-        <div class="flex flex-row gap-1 my-2">
+        <div class="flex flex-wrap flex-row gap-1 my-2">
           <.status_badge title="WiFi Access Point" status="good" />
           <.status_badge title="DNS Server" status="bad" />
           <.status_badge title="Internet Speed" status="warning" />
           <.status_badge title="Internet Latency" status="warning" />
         </div>
 
+        <hr class="my-3 border-dashed border-gray-300" />
+
         <%!-- Info boxes that are used to summary with values --%>
-        <div class="flex flex-row gap-4 my-8">
+
+        <%!-- Row 1 --%>
+        <div class="flex flex-wrap flex-col sm:flex-row gap-4 my-3">
+          <.info_box title="Logs" value="25000" icon={"document"} />
+          <.info_box title="Blocked Devices" value="3" icon={"x-circle"} />
           <.info_box title="Connected Devices" value="12" icon={"device-phone-mobile"} />
           <.info_box title="Blacklisted Domains" value="100" icon={"no-symbol"} />
+        </div>
+
+        <%!-- Row 2 --%>
+        <div class="flex flex-row gap-4 my-2">
+          <%!-- Insert the other relevant info here --%>
         </div>
 
         <%!-- We can have --%>
