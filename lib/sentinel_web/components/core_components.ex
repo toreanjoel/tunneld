@@ -595,7 +595,7 @@ defmodule SentinelWeb.CoreComponents do
     assigns = assign(assigns, :status, status)
 
     ~H"""
-    <span class="flex items-center text-sm px-3 py-1 gap-2 leading-6 bg-white rounded-full border border-zinc-300">
+    <span class="flex items-center text-sm px-3 py-1 gap-2 bg-white rounded-full border border-gray-200">
       <div class={"inline-block w-3 h-3 rounded-full #{@status}"} />
       <div class="text-xs text-gray-600"><%= @title %></div>
     </span>

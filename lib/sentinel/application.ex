@@ -18,7 +18,7 @@ defmodule Sentinel.Application do
       SentinelWeb.Endpoint,
       {Auth, []},
       {Session, []},
-      {Broadcast, []},
+      {Broadcast.System, []},
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

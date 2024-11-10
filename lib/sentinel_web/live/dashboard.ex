@@ -3,23 +3,20 @@ defmodule SentinelWeb.Live.Dashboard do
   Dashboard Page
   """
   use SentinelWeb, :live_view
-  alias Sentinel.Servers.{Session}
+  alias Sentinel.Servers.{Session, Broadcast}
   alias SentinelWeb.Components.Navigation
   alias SentinelWeb.Router.Helpers, as: Routes
 
   # we check if the user is authenticated
   on_mount SentinelWeb.Hooks.CheckAuth
 
-  # sentinel channels
-  @sentinel_info "sentinel:info"
-
   @doc """
   Initialize the dashboard
   """
   def mount(_params, %{"ip" => ip} = _session, socket) do
 
-    # connect to the broadcast channel
-    SentinelWeb.Endpoint.subscribe(@sentinel_info)
+    # connect to the system broadcast channel topic
+    Broadcast.System.topic(:info) |> SentinelWeb.Endpoint.subscribe
 
     socket =
       socket
@@ -38,7 +35,7 @@ defmodule SentinelWeb.Live.Dashboard do
     <Navigation.show id="nav">
       <div class="text-left">
         <%!-- Welcome message --%>
-        <div class="text-3xl md:text-5xl py-2 font-bold bg-gradient-to-r from-zinc-600 to-cyan-400 bg-clip-text text-transparent">
+        <div class="text-3xl md:text-5xl py-2 font-bold bg-gradient-to-r from-gray-700 to-gray-200 bg-clip-text text-transparent">
           Hi there, <%= Application.get_env(:sentinel, :auth)[:user] |> String.capitalize %>!
           <br />
           Here's your system overview
@@ -80,21 +77,16 @@ defmodule SentinelWeb.Live.Dashboard do
   end
 
   @doc """
-  Handle the broadcast from the sentinel channel - content
+  Handle the broadcast from the sentinel channel
   """
-  def handle_info({:sentinel_info, {:dashboard_overview, content}}, socket) do
-    {:noreply, assign(socket, :overview_content, content)}
-  end
-
-  @doc """
-  Handle the broadcast from the sentinel channel - sync timestamp
-  """
-  def handle_info({:sentinel_info, {:dashboard_sync_ts, ts}}, socket) do
-    {:noreply, assign(socket, :overview_sync_ts, ts)}
-  end
-
-  # We ignore the rest
-  def handle_info({:sentinel_info, _}, socket) do
-    {:noreply, socket}
+  def handle_info({:info, msg}, socket) do
+    case msg do
+      {:dashboard_overview, content} ->
+        {:noreply, assign(socket, :overview_content, content)}
+      {:dashboard_sync_ts, ts} ->
+        {:noreply, assign(socket, :overview_sync_ts, ts)}
+      _ ->
+        {:noreply, socket}
+    end
   end
 end

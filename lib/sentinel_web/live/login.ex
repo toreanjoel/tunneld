@@ -4,11 +4,8 @@ defmodule SentinelWeb.Live.Login do
   """
   alias Sentinel.Servers.Session
   use SentinelWeb, :live_view
-  alias Sentinel.Servers.{Auth, Session}
+  alias Sentinel.Servers.{Auth, Session, Broadcast}
   alias SentinelWeb.Router.Helpers, as: Routes
-
-  # sentinel channels
-  @sentinel_info "sentinel:info"
 
   # Redirect the user to the dashboard if they are already logged in
   on_mount SentinelWeb.Hooks.CheckAuth
@@ -18,7 +15,7 @@ defmodule SentinelWeb.Live.Login do
   """
   def mount(_params, %{"ip" => ip} = _session, socket) do
     # Setup the channel here to listen for messages
-    SentinelWeb.Endpoint.subscribe(@sentinel_info)
+    Broadcast.System.topic(:info) |> SentinelWeb.Endpoint.subscribe
 
     # Initialize form data as a map - TODO: change this to a struct with ecto?
     form_data = %{"user" => "", "pass" => ""}
@@ -30,7 +27,7 @@ defmodule SentinelWeb.Live.Login do
       socket
       |> assign(:ip, ip)
       |> assign(form: form)
-      |> assign(:info_content, "Welcome")
+      |> assign(:info_content, "127.0.0.1")
 
     # Assign the form to the socket
     {:ok, socket}
@@ -98,13 +95,13 @@ defmodule SentinelWeb.Live.Login do
   end
 
   # handle the broadcast from the sentinel channel
-  def handle_info({:sentinel_info, {:login_info, content}}, socket) do
-    {:noreply, assign(socket, :info_content, content)}
-  end
-
-  # We ignore the rest
-  def handle_info({:sentinel_info, _}, socket) do
-    {:noreply, socket}
+  def handle_info({:info, msg}, socket) do
+    case msg do
+      {:login_info, content} ->
+        {:noreply, assign(socket, :info_content, content)}
+      _ ->
+        {:noreply, socket}
+    end
   end
 
   # clear the flash messages
