@@ -20,13 +20,13 @@ defmodule SentinelWeb.Components.Navigation do
       <div class="min-w-[50px] flex flex-col items-center py-3 border-r border-zinc-300">
         <!-- Navigation Icons with Hover Effect -->
         <div class="flex flex-col text-black">
-          <div class="cursor-pointer hover:bg-white hover:rounded-lg p-2">
+          <div class="cursor-pointer hover:bg-white hover:rounded-lg p-2 transition-all duration-500 transition-all duration-500">
             <.icon name="hero-home" class="h-5 w-5" />
           </div>
-          <div class="cursor-pointer hover:bg-white hover:rounded-lg p-2">
+          <div class="cursor-pointer hover:bg-white hover:rounded-lg p-2 transition-all duration-500">
             <.icon name="hero-no-symbol" class="h-5 w-5" />
           </div>
-          <div class="cursor-pointer hover:bg-white hover:rounded-lg p-2">
+          <div class="cursor-pointer hover:bg-white hover:rounded-lg p-2 transition-all duration-500">
             <.icon name="hero-device-phone-mobile" class="h-5 w-5" />
           </div>
         </div>
@@ -34,12 +34,12 @@ defmodule SentinelWeb.Components.Navigation do
         <div class="grow" />
         <!-- Settings Icons with Hover Effect -->
         <div class="flex flex-col text-black">
-          <div class="cursor-pointer hover:bg-white hover:rounded-lg p-2">
+          <div class="cursor-pointer hover:bg-white hover:rounded-lg p-2 transition-all duration-500">
             <.icon name="hero-cog" class="h-5 w-5" />
           </div>
 
           <%!-- Logout --%>
-          <div phx-click="logout" class="cursor-pointer hover:bg-white hover:rounded-lg p-2">
+          <div phx-click="logout" class="cursor-pointer hover:bg-white hover:rounded-lg p-2 transition-all duration-500">
             <.icon name="hero-arrow-right-end-on-rectangle" class="h-5 w-5" />
           </div>
         </div>
