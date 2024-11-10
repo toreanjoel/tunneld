@@ -98,7 +98,7 @@ defmodule SentinelWeb.Live.Login do
   end
 
   # handle the broadcast from the sentinel channel
-  def handle_info({:sentinel_info, content}, socket) do
+  def handle_info({:sentinel_info, {:login, content}}, socket) do
     {:noreply, assign(socket, :info_content, content)}
   end
 
