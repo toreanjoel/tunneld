@@ -7,6 +7,9 @@ defmodule SentinelWeb.Live.Login do
   alias Sentinel.Servers.{Auth, Session}
   alias SentinelWeb.Router.Helpers, as: Routes
 
+  # sentinel channels
+  @sentinel_info "sentinel:info"
+
   # Redirect the user to the dashboard if they are already logged in
   on_mount SentinelWeb.Hooks.CheckAuth
 
@@ -14,18 +17,20 @@ defmodule SentinelWeb.Live.Login do
   Initialize the login page and the session data for the client
   """
   def mount(_params, %{"ip" => ip} = _session, socket) do
+    # Setup the channel here to listen for messages
+    SentinelWeb.Endpoint.subscribe(@sentinel_info)
+
     # Initialize form data as a map - TODO: change this to a struct with ecto?
     form_data = %{"user" => "", "pass" => ""}
 
-    # Convert the map to a form struct
+    # Convert the map to a form struct - we should be using the Ecto.Schema here
     form = Phoenix.Component.to_form(form_data)
-
-    # Setup the channel here to listen for messages?
 
     socket =
       socket
       |> assign(:ip, ip)
       |> assign(form: form)
+      |> assign(:info_content, "Welcome")
 
     # Assign the form to the socket
     {:ok, socket}
@@ -45,8 +50,10 @@ defmodule SentinelWeb.Live.Login do
 
         <div class="grow" />
         <div class="text-center grow">
-          <h1 class="text-3xl font-bold mb-4">sentinel.local</h1>
-          <div></div>
+          <span class="text-xs bg-gray-600 font-bold px-[10px] p-[5px] rounded">
+            <%= @info_content %>
+          </span>
+          <h1 class="text-3xl font-bold my-4">sentinel.local</h1>
         </div>
         <%!-- application version --%>
         <span class="text-xs">
@@ -90,6 +97,13 @@ defmodule SentinelWeb.Live.Login do
     end
   end
 
+  # handle the broadcast from the sentinel channel
+  def handle_info({:sentinel_info, content}, socket) do
+    IO.inspect(content, label: "content")
+    {:noreply, assign(socket, :info_content, content)}
+  end
+
+  # clear the flash messages
   def handle_info(:clear_flash, socket) do
     {:noreply, clear_flash(socket)}
   end
