@@ -22,9 +22,26 @@ defmodule SentinelWeb.Live.Dashboard do
       |> assign(:ip, ip)
       |> assign(
         :overview_content,
-        "Systems are running well. Keep an eye on device 127.0.0.1 and their network usage."
+        "Systems are running well."
       )
-      |> assign(:overview_sync_ts, "Not yet")
+      |> assign(:updated_at, "Not yet")
+      |> assign(:network, %{
+        speed: 0,
+        latency: 0
+      })
+      |> assign(:services, %{
+        dnsmasq: 0,
+        dhcpcd: 0,
+        hostapd: 0
+      })
+      |> assign(:count, %{
+        logs: 0,
+        blacklist: 0,
+        devices: 0
+      })
+
+    # Get base details here to init the application with
+    send(self(), :init)
 
     {:ok, socket}
   end
@@ -33,6 +50,18 @@ defmodule SentinelWeb.Live.Dashboard do
   Render the dashboard
   """
   def render(assigns) do
+    hostapd_status = if assigns.services.hostapd == 1, do: "good", else: "bad"
+    dns_status = if assigns.services.dnsmasq == 1, do: "good", else: "bad"
+    internet_speed_status = if assigns.network.speed > 0, do: "good", else: "bad"
+    internet_latency_status = if assigns.network.latency < 24, do: "good", else: "bad"
+
+    assigns =
+      assigns
+      |> assign(:hostapd_status, hostapd_status)
+      |> assign(:dns_status, dns_status)
+      |> assign(:internet_speed_status, internet_speed_status)
+      |> assign(:internet_latency_status, internet_latency_status)
+
     ~H"""
     <Navigation.show id="nav">
       <div class="text-left">
@@ -47,10 +76,16 @@ defmodule SentinelWeb.Live.Dashboard do
 
         <%!-- Basic badges --%>
         <div class="flex flex-wrap flex-row gap-1 my-2">
-          <.status_badge title="WiFi Access Point" status="good" />
-          <.status_badge title="DNS Server" status="good" />
-          <.status_badge title="Internet Speed" status="warning" />
-          <.status_badge title="Internet Latency" status="bad" />
+          <.status_badge title="WiFi Access Point" status={@hostapd_status} />
+          <.status_badge title="DNS Server" status={@dns_status} />
+          <.status_badge
+            title={"Speed: " <> to_string(@network.speed) <> " kbps"}
+            status={@internet_speed_status}
+          />
+          <.status_badge
+            title={"Latency: " <> to_string(@network.latency) <> "ms"}
+            status={@internet_latency_status}
+          />
         </div>
 
         <hr class="my-3 border-dashed border-gray-300" />
@@ -59,10 +94,9 @@ defmodule SentinelWeb.Live.Dashboard do
 
         <%!-- Row 1 --%>
         <div class="flex flex-wrap flex-col sm:flex-row gap-4 my-3">
-          <.info_box title="Logs" value="15550" icon="document" />
-          <.info_box title="Blocked Devices" value="3" icon="x-circle" />
-          <.info_box title="Connected Devices" value="12" icon="device-phone-mobile" />
-          <.info_box title="Blacklisted Domains" value="100" icon="no-symbol" />
+          <.info_box title="Logs" value={@count.logs} icon="document" />
+          <.info_box title="Connected Devices" value={@count.devices} icon="device-phone-mobile" />
+          <.info_box title="Blacklisted Domains" value={@count.blacklist} icon="no-symbol" />
         </div>
 
         <%!-- Row 2 --%>
@@ -72,7 +106,7 @@ defmodule SentinelWeb.Live.Dashboard do
 
         <%!-- We can have --%>
         <div class="text-gray-500 text-xs">
-          Last updated: <%= @overview_sync_ts %>
+          Last updated: <%= @updated_at %>
         </div>
       </div>
     </Navigation.show>
@@ -97,11 +131,38 @@ defmodule SentinelWeb.Live.Dashboard do
       {:dashboard_overview, content} ->
         {:noreply, assign(socket, :overview_content, content)}
 
-      {:dashboard_sync_ts, ts} ->
-        {:noreply, assign(socket, :overview_sync_ts, ts)}
+      {:dashboard_updated_at, data} ->
+        {:noreply, assign(socket, :updated_at, data)}
+
+      {:dashboard_network, data} ->
+        {:noreply, assign(socket, :network, data)}
+
+      {:dashboard_services, data} ->
+        {:noreply, assign(socket, :services, data)}
+
+      {:dashboard_count, data} ->
+        {:noreply, assign(socket, :count, data)}
 
       _ ->
         {:noreply, socket}
     end
+  end
+
+  @doc """
+  Handle the init of the application
+  """
+  def handle_info(:init, socket) do
+    # Get the base data
+    {_, resp} = Sentinel.Servers.Overview.get()
+
+    # Set the base init data
+    socket =
+      socket
+      |> assign(:updated_at, resp.updated_at)
+      |> assign(:network, resp.network)
+      |> assign(:services, resp.services)
+      |> assign(:count, resp.count)
+
+    {:noreply, socket}
   end
 end
