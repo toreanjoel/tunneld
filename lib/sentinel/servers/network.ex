@@ -31,12 +31,12 @@ defmodule Sentinel.Servers.Network do
 
   # get the data and restart sync
   def handle_info(:sync, state) do
-    {data, _} = System.cmd("speedtest", ["--format=json"])
+    # {data, _} = System.cmd("speedtest", ["--format=json"])
 
-    result =
-      data
-      |> String.trim()
-      |> Jason.decode!()
+    # result =
+    #   data
+    #   |> String.trim()
+    #   |> Jason.decode!()
 
     # Broadcast the result to the topic
     Phoenix.PubSub.broadcast(Sentinel.PubSub, @topic, {:network_info, %{}})
@@ -44,7 +44,7 @@ defmodule Sentinel.Servers.Network do
     # Refetch
     sync_network()
 
-    {:noreply, Map.merge(state, result)}
+    {:noreply, Map.merge(state, %{})}
   end
 
   # The job that will start interval sync
