@@ -5,7 +5,7 @@ defmodule Sentinel.Servers.Devices do
   use GenServer
   require Logger
 
-  @interval 30_000
+  @interval 10_000
   @topic "sentinel:devices"
 
   def start_link(_) do
@@ -41,7 +41,8 @@ defmodule Sentinel.Servers.Devices do
     # TODO: Here we get the logs and also any specific information we want to broadcast i.e count of devices
     devices = fetch_devices()
     result = %{
-      count: devices |> length()
+      count: devices |> length(),
+      devices: devices
     }
 
     Phoenix.PubSub.broadcast(Sentinel.PubSub, @topic, {:device_info, result})
@@ -49,7 +50,7 @@ defmodule Sentinel.Servers.Devices do
     # Refetch
     sync_devices()
 
-    {:noreply, Map.merge(state, %{ devices: devices, count: result.count})}
+    {:noreply, Map.merge(state, result)}
   end
 
   # The job that will start interval sync
@@ -58,13 +59,14 @@ defmodule Sentinel.Servers.Devices do
   end
 
   # get the current devices connected to the network
-  defp fetch_devices() do
+  def fetch_devices() do
     {data, _} = System.cmd("bash", ["./sh/leases.sh"])
+    clean_data = data |> String.trim
 
     leases =
-      data
-      |> String.trim
-      |> String.split("\n")
+      if clean_data == "",
+        do: [],
+        else: clean_data |> String.split("\n")
 
     Enum.map(leases, fn lease ->
       [lease_expiry, mac_addr, ip, host_name, client_id] = String.split(lease, " ")
