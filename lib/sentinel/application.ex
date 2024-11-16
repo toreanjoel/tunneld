@@ -16,8 +16,7 @@ defmodule Sentinel.Application do
       # {Sentinel.Worker, arg},
       # Start to serve requests, typically the last entry
       SentinelWeb.Endpoint,
-      # TODO: uncomment so we can get the network details
-      # {Network, []},
+      {Network, []},
       {Services, []},
       {Logs, []},
       {Devices, []},

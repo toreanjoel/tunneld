@@ -29,17 +29,27 @@ defmodule Sentinel.Servers.Devices do
     {:reply, {:ok, state}, state}
   end
 
+  # we get the current devices connected to the network
+  def handle_call(:get_devices, _from, state) do
+    leases = fetch_devices()
+    state = Map.put(state, :leases, leases)
+    {:reply, {:ok, leases}, state}
+  end
+
   # get the data and restart sync
   def handle_info(:sync, state) do
     # TODO: Here we get the logs and also any specific information we want to broadcast i.e count of devices
-    result = %{ count: Enum.random(1..30_000)}
+    devices = fetch_devices()
+    result = %{
+      count: devices |> length()
+    }
 
     Phoenix.PubSub.broadcast(Sentinel.PubSub, @topic, {:device_info, result})
 
     # Refetch
     sync_devices()
 
-    {:noreply, Map.merge(state, result)}
+    {:noreply, Map.merge(state, %{ devices: devices, count: result.count})}
   end
 
   # The job that will start interval sync
@@ -47,6 +57,29 @@ defmodule Sentinel.Servers.Devices do
     :timer.send_after(@interval, :sync)
   end
 
+  # get the current devices connected to the network
+  defp fetch_devices() do
+    {data, _} = System.cmd("bash", ["./sh/leases.sh"])
+
+    leases =
+      data
+      |> String.trim
+      |> String.split("\n")
+
+    Enum.map(leases, fn lease ->
+      [lease_expiry, mac_addr, ip, host_name, client_id] = String.split(lease, " ")
+
+      %{
+        expiry: lease_expiry,
+        mac_addr: mac_addr,
+        ip: ip,
+        host_name: host_name,
+        client_id: client_id
+      }
+    end)
+  end
+
   # Get entire state details for the devices
   def get_state(), do: GenServer.call(__MODULE__, :get_state)
+  def get_devices(), do: GenServer.call(__MODULE__, :get_devices)
 end
