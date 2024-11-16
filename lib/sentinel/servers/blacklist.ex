@@ -7,6 +7,8 @@ defmodule Sentinel.Servers.Blacklist do
 
   @interval 30_000
   @topic "sentinel:blacklist"
+  # we also have a system blacklist but this they dont change for now
+  @path System.user_home() <> "/blacklists/dnsmasq-user.blacklist"
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -17,7 +19,9 @@ defmodule Sentinel.Servers.Blacklist do
   """
   def init(_) do
     send(self(), :sync)
-    {:ok, %{}}
+    {:ok, %{
+      count: count_blacklist()
+    }}
   end
 
   @doc """
@@ -25,14 +29,22 @@ defmodule Sentinel.Servers.Blacklist do
   Note: for now the user needs to get everything
   """
   def handle_call(:get_state, _from, state) do
-    # TODO: Get the blacklist
+    {:reply, {:ok, state}, state}
+  end
+
+  # Here we get the list of domains based off page
+  def handle_call({:get_blacklist_page, offset, limit}, _from, state) do
+    fetch_blacklist(offset, limit)
     {:reply, {:ok, state}, state}
   end
 
   # get the data and restart sync
   def handle_info(:sync, state) do
     # TODO: Here we get the logs and also any specific information we want to broadcast i.e count of blacklist
-    result = %{ count: Enum.random(1..30_000)}
+    # THIS IS NOT GOOD, WE NEED A BETTER WAY TO TRACK COUNT
+    result = %{
+      count: count_blacklist(),
+    }
 
     Phoenix.PubSub.broadcast(Sentinel.PubSub, @topic, {:blacklist_info, result})
 
@@ -47,6 +59,34 @@ defmodule Sentinel.Servers.Blacklist do
     :timer.send_after(@interval, :sync)
   end
 
+  # we fetch the user blacklist file data
+  defp fetch_blacklist(offset \\ 0, limit \\ 10) do
+    File.stream!(@path)
+    |> Stream.drop(offset)
+    |> Stream.take(limit)
+    |> Enum.to_list()
+    |> clean_data()
+  end
+
+  # we will remove the syntax from the file as we only need the domains
+  defp clean_data(data) do
+    data
+    |> Enum.map(fn item ->
+      item
+      # Remove "local=/"
+      |> String.trim_leading("local=/")
+      # Remove "/\n"
+      |> String.trim_trailing("/\n")
+    end)
+  end
+
+  # we count the number of lines in the blacklist file
+  def count_blacklist() do
+    File.stream!(@path)
+    |> Enum.reduce(0, fn _, acc -> acc + 1 end)
+  end
+
   # Get entire state details for the blacklist
   def get_state(), do: GenServer.call(__MODULE__, :get_state)
+  def get_blacklist_page(offset, limit), do: GenServer.call(__MODULE__, {:get_blacklist_page, offset, limit})
 end

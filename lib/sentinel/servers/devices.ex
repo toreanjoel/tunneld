@@ -7,6 +7,8 @@ defmodule Sentinel.Servers.Devices do
 
   @interval 10_000
   @topic "sentinel:devices"
+  # TODO: this needs to be added to config?
+  @path "/var/lib/misc/dnsmasq.leases"
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -60,7 +62,7 @@ defmodule Sentinel.Servers.Devices do
 
   # get the current devices connected to the network
   def fetch_devices() do
-    {data, _} = System.cmd("bash", ["./sh/leases.sh"])
+    {data, _} = System.cmd("bash", ["cat #{@path}"])
     clean_data = data |> String.trim
 
     leases =

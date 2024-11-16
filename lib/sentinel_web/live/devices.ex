@@ -22,6 +22,7 @@ defmodule SentinelWeb.Live.Devices do
       socket
       |> assign(:ip, ip)
       |> assign(:devices, [])
+      |> assign(:count, 0)
 
     send(self(), :init)
 
@@ -36,9 +37,13 @@ defmodule SentinelWeb.Live.Devices do
     <Navigation.show id="nav">
       <div class="text-left">
         <h2>Devices</h2>
-        <%= for device <- @devices do %>
-          <%= Jason.encode!(device) %>
-        <% end %>
+        <p :if={@count > 0}>No devices connected</p>
+
+        <div :if={@count == 0}>
+          <%= for device <- @devices do %>
+            <%= Jason.encode!(device) %>
+          <% end %>
+        </div>
       </div>
     </Navigation.show>
     """

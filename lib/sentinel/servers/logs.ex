@@ -7,6 +7,7 @@ defmodule Sentinel.Servers.Logs do
 
   @interval 30_000
   @topic "sentinel:logs"
+  @path System.user_home() <> "/logs/dnsmasq.log"
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
