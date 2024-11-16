@@ -51,8 +51,8 @@ defmodule Sentinel.Servers.Services do
   end
 
   # check if services is running
-  def check_service(service_name) do
-    {output, _exit_code} = System.cmd("systemctl", ["is-active", service_name])
+  def check_service(service) do
+    {output, _exit_code} = System.cmd("systemctl", ["is-active", service |> to_string])
     String.trim(output) == "active"
   end
 
