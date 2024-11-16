@@ -5,7 +5,7 @@ defmodule Sentinel.Servers.Network do
   use GenServer
   require Logger
 
-  @interval 30_000
+  @interval 600_000
   @topic "sentinel:network"
 
   def start_link(_) do
