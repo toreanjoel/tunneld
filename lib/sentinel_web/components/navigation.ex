@@ -6,6 +6,7 @@ defmodule SentinelWeb.Components.Navigation do
   import SentinelWeb.CoreComponents
 
   attr :id, :string, required: true
+  attr :align, :string, default: "center"
   slot :inner_block, required: true
 
   @doc """
@@ -21,7 +22,7 @@ defmodule SentinelWeb.Components.Navigation do
           <.link navigate="/dashboard" class="cursor-pointer hover:bg-white hover:rounded-lg p-2 transition-all duration-500">
             <.icon name="hero-home" class="h-5 w-5" />
           </.link>
-          <.link navigate="/blocklist" class="cursor-pointer hover:bg-white hover:rounded-lg p-2 transition-all duration-500">
+          <.link navigate="/blacklist" class="cursor-pointer hover:bg-white hover:rounded-lg p-2 transition-all duration-500">
             <.icon name="hero-no-symbol" class="h-5 w-5" />
           </.link>
           <.link navigate="/devices" class="cursor-pointer hover:bg-white hover:rounded-lg p-2 transition-all duration-500">
@@ -49,7 +50,7 @@ defmodule SentinelWeb.Components.Navigation do
       </div>
 
       <!-- Centered, scrollable main section -->
-      <div class="flex grow items-start md:items-center justify-center ml-[50px] overflow-y-auto">
+      <div class={"flex grow items-start md:items-#{@align} justify-center ml-[50px] overflow-y-auto"}>
         <div class="flex flex-col items-center w-full lg:w-3/5 max-w-[767px] p-8">
           <%= render_slot(@inner_block) %>
         </div>

@@ -1,6 +1,6 @@
-defmodule SentinelWeb.Live.Blocklist do
+defmodule SentinelWeb.Live.Blacklist do
   @moduledoc """
-  Blocklist Page
+  Blacklist Page
   """
   use SentinelWeb, :live_view
   alias Sentinel.Servers.{Session}
@@ -11,7 +11,7 @@ defmodule SentinelWeb.Live.Blocklist do
   on_mount SentinelWeb.Hooks.CheckAuth
 
   @doc """
-  Initialize the Blocklist
+  Initialize the Blacklist
   """
   def mount(_params, %{"ip" => ip} = _session, socket) do
 
@@ -26,13 +26,13 @@ defmodule SentinelWeb.Live.Blocklist do
   end
 
   @doc """
-  Render the Blocklist
+  Render the Blacklist
   """
   def render(assigns) do
     ~H"""
     <Navigation.show id="nav">
       <div class="text-left">
-        <h2>Blocklist</h2>
+        <h2>Blacklist</h2>
       </div>
     </Navigation.show>
     """

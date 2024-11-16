@@ -34,8 +34,7 @@ defmodule Sentinel.Servers.Blacklist do
 
   # Here we get the list of domains based off page
   def handle_call({:get_blacklist_page, offset, limit}, _from, state) do
-    fetch_blacklist(offset, limit)
-    {:reply, {:ok, state}, state}
+    {:reply, {:ok, fetch_blacklist(offset, limit)}, state}
   end
 
   # get the data and restart sync
@@ -60,7 +59,7 @@ defmodule Sentinel.Servers.Blacklist do
   end
 
   # we fetch the user blacklist file data
-  defp fetch_blacklist(offset \\ 0, limit \\ 10) do
+  defp fetch_blacklist(offset, limit) do
     File.stream!(@path)
     |> Stream.drop(offset)
     |> Stream.take(limit)

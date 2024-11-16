@@ -62,7 +62,7 @@ defmodule Sentinel.Servers.Devices do
 
   # get the current devices connected to the network
   def fetch_devices() do
-    {data, _} = System.cmd("bash", ["cat #{@path}"])
+    {data, _} = System.cmd("cat", [@path])
     clean_data = data |> String.trim
 
     leases =

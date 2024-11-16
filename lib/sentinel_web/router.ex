@@ -24,7 +24,7 @@ defmodule SentinelWeb.Router do
 
     live "/", Live.Login
     live "/dashboard", Live.Dashboard
-    live "/blocklist", Live.Blocklist
+    live "/blacklist", Live.Blacklist
     live "/devices", Live.Devices
     live "/logs", Live.Logs
     live "/settings", Live.Settings

@@ -34,12 +34,12 @@ defmodule SentinelWeb.Live.Devices do
   """
   def render(assigns) do
     ~H"""
-    <Navigation.show id="nav">
+    <Navigation.show id="nav" align="start">
       <div class="text-left">
         <h2>Devices</h2>
-        <p :if={@count > 0}>No devices connected</p>
+        <p :if={@count == 0}>No devices connected</p>
 
-        <div :if={@count == 0}>
+        <div :if={@count > 0}>
           <%= for device <- @devices do %>
             <%= Jason.encode!(device) %>
           <% end %>
