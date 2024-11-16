@@ -33,7 +33,6 @@ defmodule Sentinel.Servers.Blacklist do
   def handle_info(:sync, state) do
     # TODO: Here we get the logs and also any specific information we want to broadcast i.e count of blacklist
     result = %{ count: Enum.random(1..30_000)}
-    data = File.read!("/home/pi/blacklists/dnsmasq-system.blacklist")
 
     Phoenix.PubSub.broadcast(Sentinel.PubSub, @topic, {:blacklist_info, result})
 

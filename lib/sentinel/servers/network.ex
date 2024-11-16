@@ -39,7 +39,7 @@ defmodule Sentinel.Servers.Network do
       |> Jason.decode!()
 
     # Broadcast the result to the topic
-    Phoenix.PubSub.broadcast(Sentinel.PubSub, @topic, {:network_info, result})
+    Phoenix.PubSub.broadcast(Sentinel.PubSub, @topic, {:network_info, %{}})
 
     # Refetch
     sync_network()
