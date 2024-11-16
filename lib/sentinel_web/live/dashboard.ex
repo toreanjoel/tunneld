@@ -3,7 +3,7 @@ defmodule SentinelWeb.Live.Dashboard do
   Dashboard Page
   """
   use SentinelWeb, :live_view
-  alias Sentinel.Servers.{Session, Broadcast}
+  alias Sentinel.Servers.{Session, Logs, Blacklist, Services, Network, Devices}
   alias SentinelWeb.Components.Navigation
   alias SentinelWeb.Router.Helpers, as: Routes
 
@@ -14,8 +14,12 @@ defmodule SentinelWeb.Live.Dashboard do
   Initialize the dashboard
   """
   def mount(_params, %{"ip" => ip} = _session, socket) do
-    # connect to the system broadcast channel topic
-    Broadcast.System.topic(:info) |> SentinelWeb.Endpoint.subscribe()
+    # connect to the system broadcast channel topics
+    SentinelWeb.Endpoint.subscribe("sentinel:network")
+    SentinelWeb.Endpoint.subscribe("sentinel:logs")
+    SentinelWeb.Endpoint.subscribe("sentinel:devices")
+    SentinelWeb.Endpoint.subscribe("sentinel:blacklist")
+    SentinelWeb.Endpoint.subscribe("sentinel:services")
 
     socket =
       socket
@@ -24,15 +28,17 @@ defmodule SentinelWeb.Live.Dashboard do
         :overview_content,
         "Systems are running well."
       )
-      |> assign(:updated_at, "Not yet")
+      |> assign(:updated_at, updated_at())
       |> assign(:network, %{
-        speed: 0,
-        latency: 0
+        d_speed: 0,
+        u_speed: 0,
+        latency: 0,
+        isp: nil
       })
       |> assign(:services, %{
-        dnsmasq: 0,
-        dhcpcd: 0,
-        hostapd: 0
+        dnsmasq: false,
+        dhcpcd: false,
+        hostapd: false
       })
       |> assign(:count, %{
         logs: 0,
@@ -49,18 +55,16 @@ defmodule SentinelWeb.Live.Dashboard do
   @doc """
   Render the dashboard
   """
-  def render(assigns) do
-    hostapd_status = if assigns.services.hostapd == 1, do: "good", else: "bad"
-    dns_status = if assigns.services.dnsmasq == 1, do: "good", else: "bad"
-    internet_speed_status = if assigns.network.speed > 0, do: "good", else: "bad"
-    internet_latency_status = if assigns.network.latency < 24, do: "good", else: "bad"
+  def render(%{services: services, network: network} = assigns) do
+    hostapd_status = if !is_nil(services.hostapd) and services.hostapd, do: "good", else: "bad"
+    dns_status = if !is_nil(services.dnsmasq) and services.dnsmasq, do: "good", else: "bad"
+    latency = if !is_nil(network.latency) and network.latency < 80, do: "good", else: "bad"
 
     assigns =
       assigns
       |> assign(:hostapd_status, hostapd_status)
       |> assign(:dns_status, dns_status)
-      |> assign(:internet_speed_status, internet_speed_status)
-      |> assign(:internet_latency_status, internet_latency_status)
+      |> assign(:latency, latency)
 
     ~H"""
     <Navigation.show id="nav">
@@ -79,12 +83,16 @@ defmodule SentinelWeb.Live.Dashboard do
           <.status_badge title="WiFi Access Point" status={@hostapd_status} />
           <.status_badge title="DNS Server" status={@dns_status} />
           <.status_badge
-            title={"Speed: " <> to_string(@network.speed) <> " kbps"}
-            status={@internet_speed_status}
+            title={"Download: " <> to_string(@network.d_speed) <> " Mbps"}
+            status={"info"}
           />
           <.status_badge
-            title={"Latency: " <> to_string(@network.latency) <> "ms"}
-            status={@internet_latency_status}
+            title={"Upload: " <> to_string(@network.u_speed) <> " Mbps"}
+            status={"info"}
+          />
+          <.status_badge
+            title={"Latency: " <> to_string(@network.latency) <> " ms"}
+            status={@latency}
           />
         </div>
 
@@ -124,45 +132,99 @@ defmodule SentinelWeb.Live.Dashboard do
   end
 
   @doc """
-  Handle the broadcast from the sentinel channel
+  Handle the broadcast messages from the sentinel channel topics
   """
-  def handle_info({:info, msg}, socket) do
-    case msg do
-      {:dashboard_overview, content} ->
-        {:noreply, assign(socket, :overview_content, content)}
-
-      {:dashboard_updated_at, data} ->
-        {:noreply, assign(socket, :updated_at, data)}
-
-      {:dashboard_network, data} ->
-        {:noreply, assign(socket, :network, data)}
-
-      {:dashboard_services, data} ->
-        {:noreply, assign(socket, :services, data)}
-
-      {:dashboard_count, data} ->
-        {:noreply, assign(socket, :count, data)}
-
-      _ ->
-        {:noreply, socket}
-    end
+  def handle_info({:network_info, msg}, socket) do
+    socket =
+      socket
+      |> assign(:network, get_network_info(msg))
+      |> assign(:updated_at, updated_at())
+    {:noreply, socket}
   end
 
-  @doc """
-  Handle the init of the application
-  """
+  # count update for blacklist_info
+  def handle_info({:blacklist_info, msg}, socket) do
+    updated_count = Map.merge(socket.assigns.count, %{blacklist: msg.count})
+    socket =
+      socket
+      |> assign(:count, updated_count)
+      |> assign(:updated_at, updated_at())
+
+    {:noreply, socket}
+  end
+
+  # count update for log_info
+  def handle_info({:log_info, msg}, socket) do
+    updated_count = Map.merge(socket.assigns.count, %{log: msg.count})
+    socket =
+      socket
+      |> assign(:count, updated_count)
+      |> assign(:updated_at, updated_at())
+
+    {:noreply, socket}
+  end
+
+  # count update for device_info
+  def handle_info({:device_info, msg}, socket) do
+    updated_count = Map.merge(socket.assigns.count, %{devices: msg.count})
+    socket =
+      socket
+      |> assign(:count, updated_count)
+      |> assign(:updated_at, updated_at())
+
+    {:noreply, socket}
+  end
+
+  # The services and updates to their status
+  def handle_info({:services_info, msg}, socket) do
+    socket =
+      socket
+      |> assign(:services, msg)
+      |> assign(:updated_at, updated_at())
+
+    {:noreply, socket}
+  end
+
+  # Handle the init of the application
   def handle_info(:init, socket) do
     # Get the base data
-    {_, resp} = Sentinel.Servers.Overview.get()
+    {_, network} = Network.get_state()
+    {_, logs} = Logs.get_state()
+    {_, blacklist} = Blacklist.get_state()
+    {_, services} = Services.get_state()
+    {_, devices} = Devices.get_state()
 
     # Set the base init data
     socket =
       socket
-      |> assign(:updated_at, resp.updated_at)
-      |> assign(:network, resp.network)
-      |> assign(:services, resp.services)
-      |> assign(:count, resp.count)
+      |> assign(:updated_at, updated_at())
+      |> assign(:network, get_network_info(network))
+      |> assign(:services, services)
+      |> assign(:count, %{
+        logs: logs.count,
+        blacklist: blacklist.count,
+        devices: devices.count
+      })
 
     {:noreply, socket}
+  end
+
+  # The updated at date for the ts when syncing happens
+  defp updated_at() do
+    DateTime.utc_now() |> to_string
+  end
+
+  # get the relevant network information details
+  defp get_network_info(network) do
+    # bps to mbps
+    conversion_value = 125000
+
+    # Get the base data
+    %{
+      d_speed: network["download"]["bandwidth"] / conversion_value,
+      u_speed: network["upload"]["bandwidth"] / conversion_value,
+      latency: network["ping"]["latency"],
+      isp: network["isp"],
+    }
   end
 end

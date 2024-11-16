@@ -4,7 +4,7 @@ defmodule SentinelWeb.Live.Login do
   """
   alias Sentinel.Servers.Session
   use SentinelWeb, :live_view
-  alias Sentinel.Servers.{Auth, Session, Broadcast}
+  alias Sentinel.Servers.{Auth, Session}
   alias SentinelWeb.Router.Helpers, as: Routes
 
   # Redirect the user to the dashboard if they are already logged in
@@ -14,9 +14,6 @@ defmodule SentinelWeb.Live.Login do
   Initialize the login page and the session data for the client
   """
   def mount(_params, %{"ip" => ip} = _session, socket) do
-    # Setup the channel here to listen for messages
-    Broadcast.System.topic(:info) |> SentinelWeb.Endpoint.subscribe
-
     # Initialize form data as a map - TODO: change this to a struct with ecto?
     form_data = %{"user" => "", "pass" => ""}
 
@@ -91,16 +88,6 @@ defmodule SentinelWeb.Live.Login do
       Process.send_after(self(), :clear_flash, 3000)
 
       {:noreply, socket}
-    end
-  end
-
-  # handle the broadcast from the sentinel channel
-  def handle_info({:info, msg}, socket) do
-    case msg do
-      {:login_info, content} ->
-        {:noreply, assign(socket, :info_content, content)}
-      _ ->
-        {:noreply, socket}
     end
   end
 

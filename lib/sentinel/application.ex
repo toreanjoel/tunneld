@@ -4,7 +4,7 @@ defmodule Sentinel.Application do
   @moduledoc false
 
   use Application
-  alias Sentinel.Servers.{Auth, Session, Broadcast, Overview, Network}
+  alias Sentinel.Servers.{Auth, Session, Network, Services, Logs, Devices, Blacklist}
 
   @impl true
   def start(_type, _args) do
@@ -17,10 +17,12 @@ defmodule Sentinel.Application do
       # Start to serve requests, typically the last entry
       SentinelWeb.Endpoint,
       {Network, []},
+      {Services, []},
+      {Logs, []},
+      {Devices, []},
+      {Blacklist, []},
       {Auth, []},
-      {Session, []},
-      {Overview, []},
-      {Broadcast.System, []},
+      {Session, []}
     ]
 
     # See https://hexdocs.pm/elixir/Supervisor.html

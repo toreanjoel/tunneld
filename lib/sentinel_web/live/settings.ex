@@ -3,7 +3,7 @@ defmodule SentinelWeb.Live.Settings do
   Settings Page
   """
   use SentinelWeb, :live_view
-  alias Sentinel.Servers.{Session, Broadcast}
+  alias Sentinel.Servers.{Session}
   alias SentinelWeb.Components.Navigation
   alias SentinelWeb.Router.Helpers, as: Routes
 
@@ -14,9 +14,6 @@ defmodule SentinelWeb.Live.Settings do
   Initialize the Settings
   """
   def mount(_params, %{"ip" => ip} = _session, socket) do
-
-    # connect to the system broadcast channel topic
-    Broadcast.System.topic(:info) |> SentinelWeb.Endpoint.subscribe
 
     socket =
       socket

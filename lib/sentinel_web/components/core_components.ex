@@ -590,6 +590,7 @@ defmodule SentinelWeb.CoreComponents do
         "good" -> "bg-green-500"
         "bad" -> "bg-red-500"
         "warning" -> "bg-yellow-500"
+        "info" -> "bg-blue-500"
       end
 
     assigns = assign(assigns, :status, status)
