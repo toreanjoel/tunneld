@@ -34,7 +34,17 @@ defmodule Sentinel.Servers.Blacklist do
 
   # Here we get the list of domains based off page
   def handle_call({:get_blacklist_page, offset, limit}, _from, state) do
-    {:reply, {:ok, fetch_blacklist(offset, limit)}, state}
+    result = fetch_blacklist(offset, limit)
+    check_ahead = fetch_blacklist(offset + limit, limit)
+
+    # We check if there is more data ahead
+    result = %{
+      data: result,
+      has_more_data: !Enum.empty?(check_ahead),
+      curr_page: offset,
+    }
+
+    {:reply, {:ok, result}, state}
   end
 
   # get the data and restart sync

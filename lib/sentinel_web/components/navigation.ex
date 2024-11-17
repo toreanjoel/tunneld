@@ -50,7 +50,7 @@ defmodule SentinelWeb.Components.Navigation do
       </div>
 
       <!-- Centered, scrollable main section -->
-      <div class={"flex grow items-start md:items-#{@align} justify-center ml-[50px] overflow-y-auto"}>
+      <div class={"flex grow items-center md:items-#{@align} justify-center ml-[50px] overflow-y-auto"}>
         <div class="flex flex-col items-center w-full lg:w-3/5 max-w-[767px] p-8">
           <%= render_slot(@inner_block) %>
         </div>
