@@ -70,11 +70,15 @@ defmodule Sentinel.Servers.Blacklist do
 
   # we fetch the user blacklist file data
   defp fetch_blacklist(offset, limit) do
-    File.stream!(@path)
-    |> Stream.drop(offset)
-    |> Stream.take(limit)
-    |> Enum.to_list()
-    |> clean_data()
+    try do
+      File.stream!(@path)
+      |> Stream.drop(offset)
+      |> Stream.take(limit)
+      |> Enum.to_list()
+    rescue
+      _ ->
+        []
+    end |> clean_data()
   end
 
   # we will remove the syntax from the file as we only need the domains
@@ -91,8 +95,13 @@ defmodule Sentinel.Servers.Blacklist do
 
   # we count the number of lines in the blacklist file
   def count_blacklist() do
-    File.stream!(@path)
-    |> Enum.reduce(0, fn _, acc -> acc + 1 end)
+    try do
+      File.stream!(@path)
+      |> Enum.reduce(0, fn _, acc -> acc + 1 end)
+    rescue
+      _ ->
+        0
+    end
   end
 
   # Get entire state details for the blacklist

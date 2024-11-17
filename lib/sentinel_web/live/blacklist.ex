@@ -82,30 +82,34 @@ defmodule SentinelWeb.Live.Blacklist do
 
   # Next and prev pages
   def handle_event("prev_page", _, socket) do
-    curr_page = if socket.assigns.page > 0, do: socket.assigns.page - @page_size, else: 0
+    curr_page = if socket.assigns.curr_page > 0, do: socket.assigns.curr_page - @page_size, else: 0
     {_, blacklist} = Blacklist.get_blacklist_page(curr_page, @page_size)
     socket =
       socket
       |> assign(:blacklist, blacklist.data)
       |> assign(:has_more_data, blacklist.has_more_data)
-      |> assign(:curr_page, blacklist.page)
+      |> assign(:curr_page, blacklist.curr_page)
 
     {:noreply, socket}
   end
 
   def handle_event("next_page", _, socket) do
-    curr_page = socket.assigns.page
+    curr_page = socket.assigns.curr_page
     {_, blacklist} = Blacklist.get_blacklist_page(curr_page + @page_size, @page_size)
     socket =
       socket
       |> assign(:blacklist, blacklist.data)
       |> assign(:has_more_data, blacklist.has_more_data)
-      |> assign(:curr_page, blacklist.page)
+      |> assign(:curr_page, blacklist.curr_page)
 
     {:noreply, socket}
   end
 
   # get the blacklist for the current blacklist connect
+  @spec handle_info(
+          :init | {:blacklist_info, atom() | %{:count => any(), optional(any()) => any()}},
+          map()
+        ) :: {:noreply, map()}
   def handle_info(:init, socket) do
     {_, blacklist_state} = Blacklist.get_state()
     {_, blacklist} = Blacklist.get_blacklist_page(0, @page_size)
@@ -114,7 +118,7 @@ defmodule SentinelWeb.Live.Blacklist do
       socket
       |> assign(:blacklist, blacklist.data)
       |> assign(:has_more_data, blacklist.has_more_data)
-      |> assign(:curr_page, blacklist.page)
+      |> assign(:curr_page, blacklist.curr_page)
       |> assign(:count, blacklist_state.count)
 
     {:noreply, socket}
