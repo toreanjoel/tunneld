@@ -31,7 +31,7 @@ defmodule Sentinel.Servers.Network do
 
   # get the data and restart sync
   def handle_info(:sync, state) do
-    {data, _} = System.cmd("speedtest", ["--format=json"])
+    {data, _exit_code} = System.cmd("speedtest", ["--accept-license", "--format=json"])
 
     result =
       data
