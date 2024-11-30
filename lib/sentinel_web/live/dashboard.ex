@@ -215,16 +215,25 @@ defmodule SentinelWeb.Live.Dashboard do
   end
 
   # get the relevant network information details
-  defp get_network_info(network) do
+  defp get_network_info(network) when network !== %{} do
     # bps to mbps
     conversion_value = 125000
 
     # Get the base data
     %{
-      d_speed: network["download"]["bandwidth"] / conversion_value,
-      u_speed: network["upload"]["bandwidth"] / conversion_value,
-      latency: network["ping"]["latency"],
-      isp: network["isp"],
+      d_speed: Map.get(network["download"], "bandwidth", 0) / conversion_value,
+      u_speed: Map.get(network["upload"], "bandwidth", 0) / conversion_value,
+      latency: Map.get(network["ping"], "latency", 0),
+      isp: Map.get(network, "isp", "")
+    }
+  end
+  defp get_network_info(_) do
+    # Get the base data
+    %{
+      d_speed: 0,
+      u_speed: 0,
+      latency: 0,
+      isp: 0
     }
   end
 end
