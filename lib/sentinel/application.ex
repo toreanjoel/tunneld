@@ -8,6 +8,7 @@ defmodule Sentinel.Application do
 
   @impl true
   def start(_type, _args) do
+    IO.inspect("MAKE SURE TO SET THE MOCK_DATA ENV VAR for development")
     children = [
       SentinelWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:sentinel, :dns_cluster_query) || :ignore},

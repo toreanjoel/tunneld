@@ -10,8 +10,5 @@ config :sentinel, SentinelWeb.Endpoint, cache_static_manifest: "priv/static/cach
 # Do not print debug messages in production
 config :logger, level: :info
 
-# Use the mock data
-config :sentinel, mock_data: false
-
 # Runtime production configuration, including reading
 # of environment variables, is done on config/runtime.exs.

@@ -13,7 +13,6 @@ defmodule Sentinel.Servers.Logs do
   Init Logs
   """
   def init(_) do
-    send(self(), :sync)
     {:ok, %{}}
   end
 

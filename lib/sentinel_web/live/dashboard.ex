@@ -3,7 +3,7 @@ defmodule SentinelWeb.Live.Dashboard do
   Dashboard Page
   """
   use SentinelWeb, :live_view
-  alias Sentinel.Servers.{Session, Logs, Blacklist, Services, Network, Devices}
+  alias Sentinel.Servers.{Session, Blacklist, Services, Network, Devices}
   alias SentinelWeb.Components.Navigation
   alias SentinelWeb.Router.Helpers, as: Routes
 
