@@ -41,7 +41,6 @@ defmodule SentinelWeb.Live.Dashboard do
         hostapd: false
       })
       |> assign(:count, %{
-        logs: 0,
         blacklist: 0,
         devices: 0
       })
@@ -102,7 +101,6 @@ defmodule SentinelWeb.Live.Dashboard do
 
         <%!-- Row 1 --%>
         <div class="flex flex-wrap flex-col sm:flex-row gap-4 my-3">
-          <.info_box title="Logs" value={@count.logs} icon="document" />
           <.info_box title="Connected Devices" value={@count.devices} icon="device-phone-mobile" />
           <.info_box title="Blacklisted Domains" value={@count.blacklist} icon="no-symbol" />
         </div>
@@ -189,7 +187,6 @@ defmodule SentinelWeb.Live.Dashboard do
   def handle_info(:init, socket) do
     # Get the base data
     {_, network} = Network.get_state()
-    {_, logs} = Logs.get_state()
     {_, blacklist} = Blacklist.get_state()
     {_, services} = Services.get_state()
     {_, devices} = Devices.get_state()
@@ -201,7 +198,6 @@ defmodule SentinelWeb.Live.Dashboard do
       |> assign(:network, get_network_info(network))
       |> assign(:services, services)
       |> assign(:count, %{
-        logs: logs.count,
         blacklist: blacklist.count,
         devices: devices.count
       })

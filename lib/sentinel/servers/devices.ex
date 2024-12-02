@@ -62,7 +62,7 @@ defmodule Sentinel.Servers.Devices do
 
   # get the current devices connected to the network
   def fetch_devices() do
-      {data, _} = if Mix.env() != :dev, do: System.cmd("cat", [@path]), else: Sentinel.Servers.FakeData.Devices.get_devices()
+      {data, _} = if Mix.env() != :dev, do: System.cmd("cat", [@path]), else: Sentinel.Servers.FakeData.Devices.get_data()
       clean_data = data |> String.trim
 
     leases =

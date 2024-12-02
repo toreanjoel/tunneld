@@ -14,7 +14,6 @@ defmodule SentinelWeb.Live.Devices do
   Initialize the Devices
   """
   def mount(_params, %{"ip" => ip} = _session, socket) do
-
     # connect to the system broadcast channel topic
     SentinelWeb.Endpoint.subscribe("sentinel:devices")
 
@@ -34,15 +33,47 @@ defmodule SentinelWeb.Live.Devices do
   """
   def render(assigns) do
     ~H"""
-    <Navigation.show id="nav" align="start">
-      <div class="text-left">
-        <h2>Devices</h2>
-        <p :if={@count == 0}>No devices connected</p>
+    <Navigation.show id="nav" align="center">
+      <div class="text-left w-full">
+        <div class="text-3xl md:text-5xl py-2 font-bold bg-gradient-to-r from-gray-700 to-gray-300 bg-clip-text text-transparent">
+          Connected Devices
+        </div>
+        <%!-- This will be the basic text information that could be informational but some insights --%>
+        <div class="py-1 text-sm text-gray-600">
+          The devices and their assigned or leased IP addresses on the system currently
+        </div>
+        <hr class="my-3 border-dashed border-gray-300" />
 
-        <div :if={@count > 0}>
-          <%= for device <- @devices do %>
-            <%= Jason.encode!(device) %>
-          <% end %>
+        <p :if={@count == 0} class="text-gray-500">No devices connected</p>
+        <div :if={@count > 0} class="overflow-x-auto">
+          <table class="table-auto border-collapse border border-gray-200 w-full">
+            <thead>
+              <tr class="bg-gray-100">
+                <th class="border border-gray-300 px-4 py-2 text-left">IP Address</th>
+                <th class="border border-gray-300 px-4 py-2 text-left">Client ID</th>
+                <th class="border border-gray-300 px-4 py-2 text-left">MAC Address</th>
+                <th class="border border-gray-300 px-4 py-2 text-left">Host Name</th>
+                <th class="border border-gray-300 px-4 py-2 text-left">Expiry</th>
+              </tr>
+            </thead>
+            <tbody>
+              <%= for device <- @devices do %>
+                <tr
+                  class="hover:bg-gray-50 cursor-pointer"
+                  phx-click="navigate"
+                  phx-value-ip={device.ip}
+                >
+                  <td class="border border-gray-300 px-4 py-2"><%= device.ip %></td>
+                  <td class="border border-gray-300 px-4 py-2"><%= device.client_id %></td>
+                  <td class="border border-gray-300 px-4 py-2"><%= device.mac_addr %></td>
+                  <td class="border border-gray-300 px-4 py-2"><%= device.host_name %></td>
+                  <td class="border border-gray-300 px-4 py-2">
+                    <%= DateTime.from_unix!(String.to_integer(device.expiry)) |> DateTime.to_string() %>
+                  </td>
+                </tr>
+              <% end %>
+            </tbody>
+          </table>
         </div>
       </div>
     </Navigation.show>
@@ -57,6 +88,12 @@ defmodule SentinelWeb.Live.Devices do
     # TODO: we need to consider doing a modal over here
     Session.delete(socket.assigns.ip)
     {:noreply, socket |> push_navigate(to: Routes.live_path(socket, SentinelWeb.Live.Login))}
+  end
+
+  # Handles navigation when a table row is clicked.
+  def handle_event("navigate", %{"ip" => ip}, socket) do
+    {:noreply,
+     push_navigate(socket, to: Routes.live_path(socket, SentinelWeb.Live.DeviceDetails, ip))}
   end
 
   # get the devices for the current devices connect

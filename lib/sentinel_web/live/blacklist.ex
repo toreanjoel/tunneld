@@ -106,10 +106,6 @@ defmodule SentinelWeb.Live.Blacklist do
   end
 
   # get the blacklist for the current blacklist connect
-  @spec handle_info(
-          :init | {:blacklist_info, atom() | %{:count => any(), optional(any()) => any()}},
-          map()
-        ) :: {:noreply, map()}
   def handle_info(:init, socket) do
     {_, blacklist_state} = Blacklist.get_state()
     {_, blacklist} = Blacklist.get_blacklist_page(0, @page_size)
