@@ -27,7 +27,7 @@ defmodule Sentinel.Servers.Logs do
   end
 
   def handle_call({:get_logs, ip}, _from, state) do
-    logs = if Mix.env() == :dev do
+    logs = if Application.get_env(:sentinel, :dev_routes) do
       Sentinel.Servers.FakeData.Logs.get_data()
     else
       filter_queries_by_ip(ip)
