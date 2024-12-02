@@ -62,7 +62,7 @@ defmodule Sentinel.Servers.Devices do
 
   # get the current devices connected to the network
   def fetch_devices() do
-      {data, _} = if !Application.get_env(:sentinel, :dev_routes), do: System.cmd("cat", [@path]), else: Sentinel.Servers.FakeData.Devices.get_data()
+      {data, _} = if !Application.get_env(:sentinel, :mock_data), do: Sentinel.Servers.FakeData.Devices.get_data(), else: System.cmd("cat", [@path])
       clean_data = data |> String.trim
 
     leases =
