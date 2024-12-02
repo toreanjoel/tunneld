@@ -45,8 +45,13 @@ defmodule Sentinel.Servers.Logs do
             }
 
           _ ->
-            # Return a default map if parsing fails
-            %{error: "Invalid log format", raw: log}
+            # Return a default map if parsing fails - we return the same data just t
+            %{
+              time: "!err",
+              query_type: "!err",
+              domain: "!err",
+              ip: "!err"
+            }
         end
       end)
     end
@@ -58,7 +63,7 @@ defmodule Sentinel.Servers.Logs do
     # Dynamically resolve the path to the logs directory one level up
     log_file = Path.expand("../logs/dnsmasq.log", File.cwd!())
 
-    case System.cmd("grep", ["-E", "query\\[A\\].*#{ip}", log_file]) do
+    case System.cmd("sh", ["-c", "grep -E 'query\\[A\\].*#{ip}' #{log_file} | tail -n 30 | tac"]) do
       {output, 0} ->
         String.split(output, "\n", trim: true)
 

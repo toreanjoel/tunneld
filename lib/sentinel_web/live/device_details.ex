@@ -12,31 +12,41 @@ defmodule SentinelWeb.Live.DeviceDetails do
     # TODO: fetch logs for IP
     send(self(), :init)
 
-    socket = socket
+    socket =
+      socket
       |> assign(:ip, params["ip"])
       |> assign(:logs, [])
+      |> assign(:loading, true)
 
     {:ok, socket}
   end
 
   def render(assigns) do
     ~H"""
-    <Navigation.show id="nav" align="center">
+    <Navigation.show id="nav" align="start">
       <div class="text-left w-full">
         <.back navigate={~p"/devices"}>Back to devices</.back>
         <div class="text-3xl md:text-5xl py-2 font-bold bg-gradient-to-r from-gray-700 to-gray-300 bg-clip-text text-transparent">
-          Device Logs
+          Logs: <%= @ip %>
         </div>
         <%!-- This will be the basic text information that could be informational but some insights --%>
-        <div class="py-1 text-sm text-gray-600">
-          The logs for the current device connected to the ip address <%= @ip %>
+        <div class="py-1 text-sm text-gray-600 flex flex-row items-center">
+          <div class="grow">
+            The logs for the current device connected
+          </div>
+          <div phx-click="refresh" class="cursor-pointer hover:bg-white p-1 hover:rounded-lg transition-all duration-500">
+            <.icon name="hero-arrow-path" class="h-5 w-5" />
+          </div>
         </div>
         <hr class="my-3 border-dashed border-gray-300" />
 
-        <div :if={@logs == []}>
+        <div :if={@loading}>
+          Loading...
+        </div>
+        <div :if={@logs == [] and not @loading}>
           No logs found
         </div>
-        <div :if={@logs != []}>
+        <div :if={@logs != [] and not @loading}>
           <table class="table-auto border-collapse border border-gray-200 w-full">
             <thead>
               <tr class="bg-gray-100">
@@ -66,8 +76,16 @@ defmodule SentinelWeb.Live.DeviceDetails do
   """
   def handle_info(:init, socket) do
     {_, logs} = Sentinel.Servers.Logs.get_logs(socket.assigns.ip)
-    socket = socket
+    socket =
+      socket
       |> assign(:logs, logs)
+      |> assign(:loading, false)
+    {:noreply, socket}
+  end
+
+  # refresh the lists
+  def handle_event("refresh", _p, socket) do
+    send(self(), :init)
     {:noreply, socket}
   end
 end

@@ -33,7 +33,7 @@ defmodule SentinelWeb.Live.Devices do
   """
   def render(assigns) do
     ~H"""
-    <Navigation.show id="nav" align="center">
+    <Navigation.show id="nav" align="start">
       <div class="text-left w-full">
         <div class="text-3xl md:text-5xl py-2 font-bold bg-gradient-to-r from-gray-700 to-gray-300 bg-clip-text text-transparent">
           Connected Devices
