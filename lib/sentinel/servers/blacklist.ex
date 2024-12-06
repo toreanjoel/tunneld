@@ -70,14 +70,18 @@ defmodule Sentinel.Servers.Blacklist do
 
   # we fetch the user blacklist file data
   defp fetch_blacklist(offset, limit) do
-    try do
-      File.stream!(@path)
-      |> Stream.drop(offset)
-      |> Stream.take(limit)
-      |> Enum.to_list()
-    rescue
-      _ ->
-        []
+    if Application.get_env(:sentinel, :mock_data, false) do
+      Sentinel.Servers.FakeData.Blacklist.get_data()
+    else
+      try do
+        File.stream!(@path)
+        |> Stream.drop(offset)
+        |> Stream.take(limit)
+        |> Enum.to_list()
+      rescue
+        _ ->
+          []
+      end
     end |> clean_data()
   end
 
