@@ -100,8 +100,12 @@ defmodule Sentinel.Servers.Blacklist do
   # we count the number of lines in the blacklist file
   def count_blacklist() do
     try do
-      File.stream!(@path)
-      |> Enum.reduce(0, fn _, acc -> acc + 1 end)
+      if Application.get_env(:sentinel, :mock_data, false) do
+        Sentinel.Servers.FakeData.Blacklist.get_data() |> length
+      else
+        File.stream!(@path)
+        |> Enum.reduce(0, fn _, acc -> acc + 1 end)
+      end
     rescue
       _ ->
         0
