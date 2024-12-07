@@ -4,7 +4,7 @@ defmodule SentinelWeb.Live.Blacklist do
   """
   use SentinelWeb, :live_view
   alias Sentinel.Servers.{Session, Blacklist}
-  alias Sentinel.Schema.Blacklist, as: BlaclistSchema
+  alias Sentinel.Schema.Blacklist, as: BlacklistSchema
   alias SentinelWeb.Components.Navigation
   alias SentinelWeb.Router.Helpers, as: Routes
 
@@ -19,7 +19,7 @@ defmodule SentinelWeb.Live.Blacklist do
   """
   def mount(_params, %{"ip" => ip} = _session, socket) do
     blacklist_changeset =
-      BlaclistSchema.changeset(%BlaclistSchema{}, %{})
+      BlacklistSchema.changeset(%BlacklistSchema{}, %{})
 
     # connect to the system broadcast channel topic
     SentinelWeb.Endpoint.subscribe("sentinel:blacklist")
@@ -33,6 +33,7 @@ defmodule SentinelWeb.Live.Blacklist do
       |> assign(:count, 0)
       |> assign(blacklist_changeset: blacklist_changeset)
       |> assign(modal: %{show: false, type: nil})
+      |> assign(errors: [])
 
     send(self(), :init)
 
@@ -46,7 +47,7 @@ defmodule SentinelWeb.Live.Blacklist do
     ~H"""
     <Navigation.show id="nav" align="start">
       <div class="text-left">
-      <div class="text-3xl md:text-5xl py-2 font-bold bg-gradient-to-r from-gray-700 to-gray-300 bg-clip-text text-transparent">
+        <div class="text-3xl md:text-5xl py-2 font-bold bg-gradient-to-r from-gray-700 to-gray-300 bg-clip-text text-transparent">
           Blacklist
         </div>
         <%!-- This will be the basic text information that could be informational but some insights --%>
@@ -54,7 +55,10 @@ defmodule SentinelWeb.Live.Blacklist do
           <div class="grow">
             List of domains that are blocked from being accessed
           </div>
-          <div phx-click="open_modal" class="cursor-pointer hover:bg-white p-1 hover:rounded-lg transition-all duration-500">
+          <div
+            phx-click="open_modal"
+            class="cursor-pointer hover:bg-white p-1 hover:rounded-lg transition-all duration-500"
+          >
             <.icon name="hero-plus-circle" class="h-5 w-5" />
           </div>
         </div>
@@ -96,7 +100,6 @@ defmodule SentinelWeb.Live.Blacklist do
           </button>
         </div>
       </div>
-
       <!-- Modal -->
       <%= if @modal.show do %>
         <div class="fixed inset-0 z-10 flex items-center justify-center bg-black bg-opacity-50">
@@ -121,8 +124,11 @@ defmodule SentinelWeb.Live.Blacklist do
 
   # Next and prev pages
   def handle_event("prev_page", _, socket) do
-    curr_page = if socket.assigns.curr_page > 0, do: socket.assigns.curr_page - @page_size, else: 0
+    curr_page =
+      if socket.assigns.curr_page > 0, do: socket.assigns.curr_page - @page_size, else: 0
+
     {_, blacklist} = Blacklist.get_blacklist_page(curr_page, @page_size)
+
     socket =
       socket
       |> assign(:blacklist, blacklist.data)
@@ -135,6 +141,7 @@ defmodule SentinelWeb.Live.Blacklist do
   def handle_event("next_page", _, socket) do
     curr_page = socket.assigns.curr_page
     {_, blacklist} = Blacklist.get_blacklist_page(curr_page + @page_size, @page_size)
+
     socket =
       socket
       |> assign(:blacklist, blacklist.data)
@@ -152,6 +159,39 @@ defmodule SentinelWeb.Live.Blacklist do
   # Close the modal
   def handle_event("close_modal", _params, socket) do
     {:noreply, assign(socket, modal: %{show: false, type: nil})}
+  end
+
+  # Add a domain to the blacklist
+  def handle_event("add_domain", params, socket) do
+    changeset = BlacklistSchema.changeset(%BlacklistSchema{}, params)
+    case changeset.valid? do
+      true ->
+        # TODO: Write domain to file
+
+        # TODO: Restart the blacklist service
+
+        # TODO: Fetch the blacklist current page again
+
+        # Add success flash message
+        socket =
+          socket
+          |> put_flash(:info, "Domain added successfully!")
+          # Close modal
+          |> assign(modal: %{show: false, type: nil})
+
+        {:noreply, socket}
+
+      _ ->
+        # Add error flash message and reassign changeset
+        errors = Enum.map(changeset.errors, fn {field, {msg, _}} -> "#{field} #{msg}" end)
+
+        socket =
+          socket
+          |> assign(:errors, errors)
+          |> assign(blacklist_changeset: changeset)
+
+        {:noreply, socket}
+    end
   end
 
   # get the blacklist for the current blacklist connect
@@ -196,6 +236,12 @@ defmodule SentinelWeb.Live.Blacklist do
           <span class="text-xs text-gray-500 leading-0">
             Domain that you want to block across all devices on the network
           </span>
+        </div>
+        <!-- Error Messages -->
+        <div class="text-xs text-red-600">
+          <%= for error <- @errors do %>
+            <p><%= error |> String.capitalize() %></p>
+          <% end %>
         </div>
         <!-- Action Buttons -->
         <div class="flex w-full justify-end gap-4 mt-3">

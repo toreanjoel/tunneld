@@ -49,10 +49,10 @@ defmodule SentinelWeb.Live.Devices do
           <table class="table-auto border-collapse border border-gray-200 w-full">
             <thead>
               <tr class="bg-gray-100">
-                <th class="border border-gray-300 px-4 py-2 text-left">IP Address</th>
+                <th class="border border-gray-300 px-4 py-2 text-left">IP</th>
                 <th class="border border-gray-300 px-4 py-2 text-left">Client ID</th>
                 <th class="border border-gray-300 px-4 py-2 text-left">MAC Address</th>
-                <th class="border border-gray-300 px-4 py-2 text-left">Host Name</th>
+                <th class="border border-gray-300 px-4 py-2 text-left">Name</th>
                 <th class="border border-gray-300 px-4 py-2 text-left">Expiry</th>
               </tr>
             </thead>
