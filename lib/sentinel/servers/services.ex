@@ -30,10 +30,10 @@ defmodule Sentinel.Servers.Services do
     {:reply, {:ok, state}, state}
   end
 
-  # Start a service
+  # Restart a service
   # Note: that we wont get a response so we need to manage this
-  def handle_cast({:start_service, service}, state) do
-    System.cmd("systemctl", ["start", service |> to_string])
+  def handle_cast({:restart_service, service}, state) do
+    System.cmd("systemctl", ["restart", service |> to_string])
     {:noreply, state}
   end
 
@@ -80,6 +80,6 @@ defmodule Sentinel.Servers.Services do
 
   # Get entire state details for the services
   def get_state(), do: GenServer.call(__MODULE__, :get_state)
-  def start_service(service) when service in @services, do: GenServer.cast(__MODULE__, {:start_service, service})
-  def start_service(_), do: "Invalid Service"
+  def restart_service(service) when service in @services, do: GenServer.cast(__MODULE__, {:restart_service, service})
+  def restart_service(_), do: "Invalid Service"
 end
