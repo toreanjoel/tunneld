@@ -4,6 +4,7 @@ defmodule SentinelWeb.Live.Blacklist do
   """
   use SentinelWeb, :live_view
   alias Sentinel.Servers.{Session, Blacklist}
+  alias Sentinel.Schema.Blacklist, as: BlaclistSchema
   alias SentinelWeb.Components.Navigation
   alias SentinelWeb.Router.Helpers, as: Routes
 
@@ -17,6 +18,9 @@ defmodule SentinelWeb.Live.Blacklist do
   Initialize the Blacklist
   """
   def mount(_params, %{"ip" => ip} = _session, socket) do
+    blacklist_changeset =
+      BlaclistSchema.changeset(%BlaclistSchema{}, %{})
+
     # connect to the system broadcast channel topic
     SentinelWeb.Endpoint.subscribe("sentinel:blacklist")
 
@@ -27,6 +31,8 @@ defmodule SentinelWeb.Live.Blacklist do
       |> assign(:has_more_data, false)
       |> assign(:curr_page, 0)
       |> assign(:count, 0)
+      |> assign(blacklist_changeset: blacklist_changeset)
+      |> assign(modal: %{show: false, type: nil})
 
     send(self(), :init)
 
@@ -48,7 +54,7 @@ defmodule SentinelWeb.Live.Blacklist do
           <div class="grow">
             List of domains that are blocked from being accessed
           </div>
-          <div phx-click="refresh" class="cursor-pointer hover:bg-white p-1 hover:rounded-lg transition-all duration-500">
+          <div phx-click="open_modal" class="cursor-pointer hover:bg-white p-1 hover:rounded-lg transition-all duration-500">
             <.icon name="hero-plus-circle" class="h-5 w-5" />
           </div>
         </div>
@@ -90,6 +96,15 @@ defmodule SentinelWeb.Live.Blacklist do
           </button>
         </div>
       </div>
+
+      <!-- Modal -->
+      <%= if @modal.show do %>
+        <div class="fixed inset-0 z-10 flex items-center justify-center bg-black bg-opacity-50">
+          <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+            <%= render_modal(@modal.type, assigns) %>
+          </div>
+        </div>
+      <% end %>
     </Navigation.show>
     """
   end
@@ -129,6 +144,16 @@ defmodule SentinelWeb.Live.Blacklist do
     {:noreply, socket}
   end
 
+  # Open the modal
+  def handle_event("open_modal", _params, socket) do
+    {:noreply, assign(socket, modal: %{show: true, type: :add_domain})}
+  end
+
+  # Close the modal
+  def handle_event("close_modal", _params, socket) do
+    {:noreply, assign(socket, modal: %{show: false, type: nil})}
+  end
+
   # get the blacklist for the current blacklist connect
   def handle_info(:init, socket) do
     {_, blacklist_state} = Blacklist.get_state()
@@ -151,5 +176,38 @@ defmodule SentinelWeb.Live.Blacklist do
       |> assign(:count, msg.count)
 
     {:noreply, socket}
+  end
+
+  # Render the modal content
+  defp render_modal(:add_domain, assigns) do
+    ~H"""
+    <div class="flex flex-col items-center justify-center w-full gap-3">
+      <h2 class="text-2xl font-bold text-center">Add Domain</h2>
+      <.simple_form for={@blacklist_changeset} phx-submit="add_domain" class="w-full max-w-md">
+        <div class="w-full">
+          <.input
+            label="Url"
+            name="domain"
+            id="domain"
+            type="text"
+            value={@blacklist_changeset.changes[:domain] || ""}
+            class="mt-2 block w-full rounded-md border border-gray-300 bg-white shadow-sm focus:border-zinc-400 focus:ring-0 sm:text-sm"
+          />
+          <span class="text-xs text-gray-500 leading-0">
+            Domain that you want to block across all devices on the network
+          </span>
+        </div>
+        <!-- Action Buttons -->
+        <div class="flex w-full justify-end gap-4 mt-3">
+          <.button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md">
+            Add
+          </.button>
+          <.button phx-click="close_modal" class="bg-red-500 text-white px-4 py-2 rounded-md">
+            Close
+          </.button>
+        </div>
+      </.simple_form>
+    </div>
+    """
   end
 end
