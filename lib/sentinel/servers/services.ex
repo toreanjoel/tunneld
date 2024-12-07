@@ -54,7 +54,16 @@ defmodule Sentinel.Servers.Services do
   def check_service(service) do
     try do
       {output, _exit_code} = System.cmd("systemctl", ["is-active", service |> to_string])
-      String.trim(output) == "active"
+      is_active = String.trim(output) == "active"
+
+      # Attempt to start the service
+      if !is_active do
+        Task.start(fn ->
+          System.cmd("systemctl", ["start", service |> to_string])
+        end)
+      end
+
+      is_active
     rescue
       _ ->
         # fallback for when the command fails
