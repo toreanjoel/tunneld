@@ -30,6 +30,13 @@ defmodule Sentinel.Servers.Services do
     {:reply, {:ok, state}, state}
   end
 
+  # Start a service
+  # Note: that we wont get a response so we need to manage this
+  def handle_cast({:start_service, service}, state) do
+    System.cmd("systemctl", ["start", service |> to_string])
+    {:noreply, state}
+  end
+
   # get the data and restart sync
   def handle_info(:sync, state) do
     # TODO: Here we get the logs and also any specific information we want to broadcast i.e state
@@ -51,7 +58,7 @@ defmodule Sentinel.Servers.Services do
   end
 
   # check if services is running
-  def check_service(service) do
+  defp check_service(service) do
     try do
       {output, _exit_code} = System.cmd("systemctl", ["is-active", service |> to_string])
       is_active = String.trim(output) == "active"
@@ -73,4 +80,6 @@ defmodule Sentinel.Servers.Services do
 
   # Get entire state details for the services
   def get_state(), do: GenServer.call(__MODULE__, :get_state)
+  def start_service(service) when service in @services, do: GenServer.cast(__MODULE__, {:start_service, service})
+  def start_service(_), do: "Invalid Service"
 end
