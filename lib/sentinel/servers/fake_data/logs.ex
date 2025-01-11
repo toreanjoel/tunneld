@@ -2,7 +2,7 @@ defmodule Sentinel.Servers.FakeData.Logs do
   @moduledoc """
   Fake data for Logs
   """
-  def get_data() do
+  def get_device_data() do
     [
       %{
         domain: "connectivitycheck.gstatic.com",
@@ -59,5 +59,9 @@ defmodule Sentinel.Servers.FakeData.Logs do
         time: "Nov 29 22:32:18"
       }
     ]
+  end
+
+  def get_archived_files() do
+    ["dnsmasq.log.#1", "dnsmasq.log.#2", "dnsmasq.log.#3", "dnsmasq.log"]
   end
 end

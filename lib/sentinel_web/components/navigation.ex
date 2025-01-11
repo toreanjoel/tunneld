@@ -29,6 +29,9 @@ defmodule SentinelWeb.Components.Navigation do
           <.link navigate="/devices" class="cursor-pointer hover:bg-white hover:rounded-lg p-2 transition-all duration-500">
             <.icon name="hero-device-phone-mobile" class="h-5 w-5" />
           </.link>
+          <.link navigate="/logs" class="cursor-pointer hover:bg-white hover:rounded-lg p-2 transition-all duration-500">
+            <.icon name="hero-briefcase" class="h-5 w-5" />
+          </.link>
         </div>
         <!-- Spacer -->
         <div class="grow" />

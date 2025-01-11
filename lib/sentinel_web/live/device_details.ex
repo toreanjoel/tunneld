@@ -75,7 +75,7 @@ defmodule SentinelWeb.Live.DeviceDetails do
     Fetch the logs for the current device
   """
   def handle_info(:init, socket) do
-    {_, logs} = Sentinel.Servers.Logs.get_logs(socket.assigns.ip)
+    {_, logs} = Sentinel.Servers.Logs.get_device_logs(socket.assigns.ip)
     socket =
       socket
       |> assign(:logs, logs)
