@@ -31,6 +31,13 @@ defmodule SentinelWeb.Router do
     live "/devices/:ip", Live.DeviceDetails
   end
 
+  # controller to manage the file downloads
+  scope "/files", SentinelWeb do
+    pipe_through [:browser, :set_ip]
+
+    get "/download/:name", Controllers.FileDownloadController, :download
+  end
+
   # Enable LiveDashboard and Swoosh mailbox preview in development
   if Application.compile_env(:sentinel, :dev_routes) do
     # If you want to use the LiveDashboard in production, you should put
