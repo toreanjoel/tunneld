@@ -51,6 +51,17 @@ defmodule SentinelWeb.Live.Dashboard do
     {:ok, socket}
   end
 
+  # unsubsroce from the pubsub
+  def terminate(_reason, _state) do
+    SentinelWeb.Endpoint.unsubscribe("sentinel:network")
+    SentinelWeb.Endpoint.unsubscribe("sentinel:logs")
+    SentinelWeb.Endpoint.unsubscribe("sentinel:devices")
+    SentinelWeb.Endpoint.unsubscribe("sentinel:blacklist")
+    SentinelWeb.Endpoint.unsubscribe("sentinel:services")
+    IO.puts("Unsubscribed from PubSub")
+    :ok
+  end
+
   @doc """
   Render the dashboard
   """
@@ -81,14 +92,8 @@ defmodule SentinelWeb.Live.Dashboard do
         <div class="flex flex-wrap flex-row gap-1 my-2">
           <.status_badge title="WiFi Access Point" status={@hostapd_status} />
           <.status_badge title="DNS Server" status={@dns_status} />
-          <.status_badge
-            title={"Download: " <> to_string(@network.d_speed) <> " Mbps"}
-            status={"info"}
-          />
-          <.status_badge
-            title={"Upload: " <> to_string(@network.u_speed) <> " Mbps"}
-            status={"info"}
-          />
+          <.status_badge title={"Download: " <> to_string(@network.d_speed) <> " Mbps"} status="info" />
+          <.status_badge title={"Upload: " <> to_string(@network.u_speed) <> " Mbps"} status="info" />
           <.status_badge
             title={"Latency: " <> to_string(@network.latency) <> " ms"}
             status={@latency}
@@ -137,12 +142,14 @@ defmodule SentinelWeb.Live.Dashboard do
       socket
       |> assign(:network, get_network_info(msg))
       |> assign(:updated_at, updated_at())
+
     {:noreply, socket}
   end
 
   # count update for blacklist_info
   def handle_info({:blacklist_info, msg}, socket) do
     updated_count = Map.merge(socket.assigns.count, %{blacklist: msg.count})
+
     socket =
       socket
       |> assign(:count, updated_count)
@@ -154,6 +161,7 @@ defmodule SentinelWeb.Live.Dashboard do
   # count update for log_info
   def handle_info({:log_info, msg}, socket) do
     updated_count = Map.merge(socket.assigns.count, %{log: msg.count})
+
     socket =
       socket
       |> assign(:count, updated_count)
@@ -165,6 +173,7 @@ defmodule SentinelWeb.Live.Dashboard do
   # count update for device_info
   def handle_info({:device_info, msg}, socket) do
     updated_count = Map.merge(socket.assigns.count, %{devices: msg.count})
+
     socket =
       socket
       |> assign(:count, updated_count)
@@ -213,7 +222,7 @@ defmodule SentinelWeb.Live.Dashboard do
   # get the relevant network information details
   defp get_network_info(network) when network !== %{} do
     # bps to mbps
-    conversion_value = 125000
+    conversion_value = 125_000
 
     # Get the base data
     %{
@@ -223,6 +232,7 @@ defmodule SentinelWeb.Live.Dashboard do
       isp: Map.get(network, "isp", "")
     }
   end
+
   defp get_network_info(_) do
     # Get the base data
     %{

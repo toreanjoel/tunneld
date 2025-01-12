@@ -40,6 +40,13 @@ defmodule SentinelWeb.Live.Blacklist do
     {:ok, socket}
   end
 
+  # unsubsroce from the pubsub
+  def terminate(_reason, _state) do
+    SentinelWeb.Endpoint.unsubscribe("sentinel:blacklist")
+    IO.puts("Unsubscribed from PubSub")
+    :ok
+  end
+
   @doc """
   Render the Blacklist
   """
@@ -164,6 +171,7 @@ defmodule SentinelWeb.Live.Blacklist do
   # Add a domain to the blacklist
   def handle_event("add_domain", params, socket) do
     changeset = BlacklistSchema.changeset(%BlacklistSchema{}, params)
+
     case changeset.valid? do
       true ->
         # TODO: Write domain to file
