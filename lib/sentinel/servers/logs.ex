@@ -80,12 +80,13 @@ defmodule Sentinel.Servers.Logs do
         # Restart the service explicitly (if needed)
         Sentinel.Servers.Services.restart_service(:dnsmasq)
 
-        # Try the backup later again
-        archive_log_file()
       _ ->
         # Return state unchanged
         :ok
       end
+
+    # Try the backup later again - regardless if it found or now
+    archive_log_file()
 
     {:noreply, state}
   end
