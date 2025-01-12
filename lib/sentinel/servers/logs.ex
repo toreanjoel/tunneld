@@ -12,7 +12,7 @@ defmodule Sentinel.Servers.Logs do
   @backup_interval 10_000
   # @cleanup_interval 43200000 # 12h
   # 10s
-  @cleanup_interval 30_000
+  @cleanup_interval 120_000
 
   @topic "sentinel:logs"
   @log_file "_data.log"
@@ -67,7 +67,7 @@ defmodule Sentinel.Servers.Logs do
     backup_path = Path.expand("../logs/#{timestamp}.log.gz", File.cwd!())
 
     case get_file_size_mb(@log_file) do
-      {:ok, size} when size > 0.2 ->
+      {:ok, size} when size > 0.02 ->
         # Copy the log file to a new file before compression
         System.cmd("cp", [log_path, String.replace_suffix(backup_path, ".gz", "")])
 
@@ -93,14 +93,37 @@ defmodule Sentinel.Servers.Logs do
 
   # Handle questions to remove old backup files
   def handle_info(:cleanup_logs, state) do
-    # Delete the old log files that are older than a certain time relative to the current time - relies on the title of the fileW
+    # Define log directory and get list of files
+    log_dir = Path.expand("../logs/", File.cwd!())
 
-    IO.inspect("Cleaning up the old log files")
+    # Get current Unix timestamp
+    current_time = DateTime.utc_now() |> DateTime.to_unix()
 
-    # Process archiving jobs later again
+    # Get list of files in the log directory
+    log_files = File.ls!(log_dir)
+
+    # Filter and delete old log files
+    Enum.each(log_files, fn filename ->
+      case String.split(filename, ".") do
+        [timestamp_str, "log", "gz"] ->
+          # 3 array means it was a backup that was made
+          timestamp = String.to_integer(timestamp_str)
+
+          if current_time - timestamp > 120 do # 86_400
+            file_path = Path.join(log_dir, filename)
+            case File.rm(file_path) do
+              :ok -> IO.puts("Deleted old log file: #{filename}")
+              {:error, reason} -> IO.puts("Failed to delete #{filename}: #{inspect(reason)}")
+            end
+          end
+
+        _ -> :ok # Skip non-matching files
+      end
+    end)
+
+    IO.puts("Cleanup completed")
     cleanup_archived_files()
 
-    # Return the current state as we dont need to change general data state
     {:noreply, state}
   end
 
