@@ -126,7 +126,7 @@ defmodule Sentinel.Servers.Logs do
   # filter by IP
   def filter_queries_by_ip(ip) do
     # Dynamically resolve the path to the logs directory one level up
-    log_file = Path.expand("../logs/dnsmasq.log", File.cwd!())
+    log_file = Path.expand("../logs/_dnsmasq.log", File.cwd!())
 
     case System.cmd("sh", ["-c", "grep -E 'query\\[A\\].*#{ip}' #{log_file} | tail -n 30 | tac"]) do
       {output, 0} ->

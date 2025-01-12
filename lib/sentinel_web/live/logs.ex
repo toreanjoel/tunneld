@@ -25,6 +25,7 @@ defmodule SentinelWeb.Live.Logs do
       |> assign(:archived_files, [])
       |> assign(:count, 0)
       |> assign(modal: %{show: false, type: nil})
+      |> assign(:active_log_file, @active_log_file)
 
     send(self(), :init)
     {:ok, socket}
