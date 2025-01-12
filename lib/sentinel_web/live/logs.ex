@@ -43,7 +43,7 @@ defmodule SentinelWeb.Live.Logs do
         </div>
         <%!-- This will be the basic text information that could be informational but some insights --%>
         <div class="py-1 text-sm text-gray-600">
-          The archived list of logs (note logs will be available only for 7 days)
+          The archived list of logs (Logs will be available only for 7 days. All logs will be deleted after.)
         </div>
         <hr class="my-3 border-dashed border-gray-300" />
 
@@ -62,8 +62,10 @@ defmodule SentinelWeb.Live.Logs do
                   class={"#{if log_file === @active_log_file, do: "bg-gray-200 text-gray-500", else: ""}"}
                   phx-value-name={if log_file !== @active_log_file, do: log_file, else: nil}
                 >
-                  <td class="border border-gray-300 px-4 py-2"><%= log_file %></td>
-                  <td :if={log_file !== @active_log_file} class="border border-gray-300 px-4 py-2">
+                  <td class="border border-gray-300 px-4 py-2">
+                  <%= log_file %> <%= if log_file === @active_log_file, do: "(active)" %>
+                  </td>
+                  <td class="border border-gray-300 px-4 py-2">
                     <div class="flex flex-row gap-2">
                       <a
                         href={Routes.file_download_path(@socket, :download, log_file)}
@@ -72,6 +74,7 @@ defmodule SentinelWeb.Live.Logs do
                         <.icon name="hero-arrow-down-tray" class="h-5 w-5" />
                       </a>
                       <div
+                        :if={log_file !== @active_log_file}
                         phx-click="open_modal"
                         phx-value-file={log_file}
                         class="bg-white hover:bg-gray-200 p-1 rounded cursor-pointer"
@@ -79,9 +82,6 @@ defmodule SentinelWeb.Live.Logs do
                         <.icon name="hero-no-symbol" class="h-5 w-5" />
                       </div>
                     </div>
-                  </td>
-                  <td :if={log_file === @active_log_file} class="border border-gray-300 px-4 py-2">
-                    in-use
                   </td>
                 </tr>
               <% end %>

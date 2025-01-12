@@ -8,6 +8,7 @@ defmodule Sentinel.Servers.Logs do
   @interval 3_600_000 # 1h
   @topic "sentinel:logs"
   @log_dir System.user_home() <> "/logs"
+  @log_file "_dnsmasq.log"
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -19,6 +20,11 @@ defmodule Sentinel.Servers.Logs do
   def init(_) do
     archived_files = fetch_archived_files()
     send(self(), :sync)
+
+    # Setup auto compress and backup based on log file size (> 20mb)
+    # Check should happen more once a day (unix timestamp and file name 1736642285.log)
+    # Auto delete logs older than 7 days
+    # Update rendering to use the human reable file name after file is made (1736642285 |> DateTime.from_unix! |> DateTime.to_iso8601)
 
     {:ok,
      %{
@@ -126,7 +132,7 @@ defmodule Sentinel.Servers.Logs do
   # filter by IP
   def filter_queries_by_ip(ip) do
     # Dynamically resolve the path to the logs directory one level up
-    log_file = Path.expand("../logs/_dnsmasq.log", File.cwd!())
+    log_file = Path.expand("../logs/" <> @log_file, File.cwd!())
 
     case System.cmd("sh", ["-c", "grep -E 'query\\[A\\].*#{ip}' #{log_file} | tail -n 30 | tac"]) do
       {output, 0} ->
