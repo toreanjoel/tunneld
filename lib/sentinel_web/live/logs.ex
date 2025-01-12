@@ -2,7 +2,6 @@ defmodule SentinelWeb.Live.Logs do
   @moduledoc """
   Logs Page
   """
-  alias ElixirSense.Log
   use SentinelWeb, :live_view
   import SentinelWeb.CoreComponents
   alias Sentinel.Servers.{Session, Logs}
@@ -12,8 +11,8 @@ defmodule SentinelWeb.Live.Logs do
   # we check if the user is authenticated
   on_mount SentinelWeb.Hooks.CheckAuth
 
-  # variables
-  @log_dir System.user_home() <> "/logs"
+  # The current active file used for the running process
+  @active_log_file "_dnsmasq.log"
 
   @doc """
   The list of log backups
@@ -59,11 +58,11 @@ defmodule SentinelWeb.Live.Logs do
             <tbody>
               <%= for log_file <- @archived_files do %>
                 <tr
-                  class={"#{if log_file === "dnsmasq.log", do: "bg-gray-200 text-gray-500", else: ""}"}
-                  phx-value-name={if log_file !== "dnsmasq.log", do: log_file, else: nil}
+                  class={"#{if log_file === @active_log_file, do: "bg-gray-200 text-gray-500", else: ""}"}
+                  phx-value-name={if log_file !== @active_log_file, do: log_file, else: nil}
                 >
                   <td class="border border-gray-300 px-4 py-2"><%= log_file %></td>
-                  <td :if={log_file !== "dnsmasq.log"} class="border border-gray-300 px-4 py-2">
+                  <td :if={log_file !== @active_log_file} class="border border-gray-300 px-4 py-2">
                     <div class="flex flex-row gap-2">
                       <a
                         href={Routes.file_download_path(@socket, :download, log_file)}
@@ -79,6 +78,9 @@ defmodule SentinelWeb.Live.Logs do
                         <.icon name="hero-no-symbol" class="h-5 w-5" />
                       </div>
                     </div>
+                  </td>
+                  <td :if={log_file === @active_log_file} class="border border-gray-300 px-4 py-2">
+                    in-use
                   </td>
                 </tr>
               <% end %>
@@ -107,6 +109,7 @@ defmodule SentinelWeb.Live.Logs do
     {:noreply, socket |> push_navigate(to: Routes.live_path(socket, SentinelWeb.Live.Login))}
   end
 
+  # Delete the file
   def handle_event("delete", %{"file" => file}, socket) do
     case Logs.delete_log_file(file) do
       {:ok, _} ->
@@ -131,7 +134,7 @@ defmodule SentinelWeb.Live.Logs do
 
   # get the devices for the current devices connect
   def handle_info(:init, socket) do
-    {_, data} = Logs.get_state()
+    {_, data} = Logs.init_state()
 
     socket =
       socket
