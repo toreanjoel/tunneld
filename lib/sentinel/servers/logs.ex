@@ -5,14 +5,10 @@ defmodule Sentinel.Servers.Logs do
   use GenServer
   require Logger
 
-  # 2m
-  @sync_data_interval 120_000
-  # 1d
-  # @backup_interval 86_400_000
-  @backup_interval 10_000
-  # @cleanup_interval 43200000 # 12h
-  # 10s
-  @cleanup_interval 120_000
+  # We backup every 6 hours and attempt cleanup every day
+  # The cleanup will check for files older than 7d
+  @six_hours 21_600_000 # 6h
+  @one_day 86_400_000 # 1d
 
   @topic "sentinel:logs"
   @log_file "_data.log"
@@ -67,7 +63,7 @@ defmodule Sentinel.Servers.Logs do
     backup_path = Path.expand("../logs/#{timestamp}.log.gz", File.cwd!())
 
     case get_file_size_mb(@log_file) do
-      {:ok, size} when size > 0.02 ->
+      {:ok, size} when size > 20 ->
         # Copy the log file to a new file before compression
         System.cmd("cp", [log_path, String.replace_suffix(backup_path, ".gz", "")])
 
@@ -109,7 +105,7 @@ defmodule Sentinel.Servers.Logs do
           # 3 array means it was a backup that was made
           timestamp = String.to_integer(timestamp_str)
 
-          if current_time - timestamp > 120 do # 86_400
+          if current_time - timestamp > (@one_day * 7) do
             file_path = Path.join(log_dir, filename)
             case File.rm(file_path) do
               :ok -> IO.puts("Deleted old log file: #{filename}")
@@ -232,19 +228,14 @@ defmodule Sentinel.Servers.Logs do
     end
   end
 
-  # The job that will start interval sync amake sure we have the latest data
-  defp sync_archived_files() do
-    :timer.send_after(@sync_data_interval, :sync)
-  end
-
   # Backup the current log file based on some condition (file size?)
   defp archive_log_file() do
-    :timer.send_after(@backup_interval, :backup_logs)
+    :timer.send_after(@six_hours, :backup_logs)
   end
 
   # The function that will be used to remove old archived or old files after n time
   defp cleanup_archived_files() do
-    :timer.send_after(@cleanup_interval, :cleanup_logs)
+    :timer.send_after(@one_day, :cleanup_logs)
   end
 
   # Get entire state details for the logs
