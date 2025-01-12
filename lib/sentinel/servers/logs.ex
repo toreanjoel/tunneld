@@ -52,8 +52,8 @@ defmodule Sentinel.Servers.Logs do
     # sync and return the archived logs data
     Phoenix.PubSub.broadcast(Sentinel.PubSub, @topic, {:archived_files, archived_result})
 
-    # Refetch - recheck
-    sync_archived_files()
+    # Refetch - recheck - this will start the process to check all the time if this function is called once, we can remove this for now
+    # sync_archived_files()
 
     {:noreply, state}
   end
@@ -67,7 +67,7 @@ defmodule Sentinel.Servers.Logs do
     backup_path = Path.expand("../logs/#{timestamp}.log.gz", File.cwd!())
 
     case get_file_size_mb(@log_file) do
-      {:ok, size} when size > 5 ->
+      {:ok, size} when size > 0.2 ->
         # Copy the log file to a new file before compression
         System.cmd("cp", [log_path, String.replace_suffix(backup_path, ".gz", "")])
 

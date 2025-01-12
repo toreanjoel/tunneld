@@ -31,6 +31,13 @@ defmodule SentinelWeb.Live.Logs do
     {:ok, socket}
   end
 
+  # unsubsroce from the pubsub
+  def terminate(_reason, _state) do
+    SentinelWeb.Endpoint.unsubscribe("sentinel:logs")
+    IO.puts("Unsubscribed from PubSub")
+    :ok
+  end
+
   @doc """
   Render the Devices
   """
