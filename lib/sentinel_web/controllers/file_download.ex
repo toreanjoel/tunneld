@@ -14,9 +14,11 @@ defmodule SentinelWeb.Controllers.FileDownloadController do
       |> put_resp_header("content-disposition", "attachment; filename=\"#{file_name}\"")
       |> send_file(200, file_path)
     else
+      # TODO: change this so that we can fix the toasts that are needed
       conn
+      |> fetch_flash()
       |> put_flash(:error, "File not found")
-      |> redirect(to: "/")
+      |> send_resp(204, "")
     end
   end
 end

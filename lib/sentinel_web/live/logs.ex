@@ -2,6 +2,7 @@ defmodule SentinelWeb.Live.Logs do
   @moduledoc """
   Logs Page
   """
+  alias ElixirSense.Log
   use SentinelWeb, :live_view
   import SentinelWeb.CoreComponents
   alias Sentinel.Servers.{Session, Logs}
@@ -24,6 +25,7 @@ defmodule SentinelWeb.Live.Logs do
       socket
       |> assign(:archived_files, [])
       |> assign(:count, 0)
+      |> assign(modal: %{show: false, type: nil})
 
     send(self(), :init)
     {:ok, socket}
@@ -61,20 +63,21 @@ defmodule SentinelWeb.Live.Logs do
                   phx-value-name={if log_file !== "dnsmasq.log", do: log_file, else: nil}
                 >
                   <td class="border border-gray-300 px-4 py-2"><%= log_file %></td>
-                  <td class="border border-gray-300 px-4 py-2" :if={log_file !== "dnsmasq.log"}>
+                  <td :if={log_file !== "dnsmasq.log"} class="border border-gray-300 px-4 py-2">
                     <div class="flex flex-row gap-2">
-                    <div phx-click="delete" phx-value-file={log_file} class="bg-white hover:bg-gray-200 p-1 rounded cursor-pointer">
-                      <.icon
-                        name="hero-no-symbol" class="h-5 w-5" />
-                    </div>
-                    <a href={Routes.file_download_path(@socket, :download, log_file)}
-                      class="px-4 py-2 bg-blue-500 text-white rounded">
-                      Download Log
-                    </a>
-                    <div  phx-click="download" phx-value-file={log_file} class="bg-white hover:bg-gray-200 p-1 rounded cursor-pointer">
-                      <.icon
-                        name="hero-arrow-down-tray" class="h-5 w-5" />
-                    </div>
+                      <a
+                        href={Routes.file_download_path(@socket, :download, log_file)}
+                        class="bg-white hover:bg-gray-200 p-1 rounded cursor-pointer"
+                      >
+                        <.icon name="hero-arrow-down-tray" class="h-5 w-5" />
+                      </a>
+                      <div
+                        phx-click="open_modal"
+                        phx-value-file={log_file}
+                        class="bg-white hover:bg-gray-200 p-1 rounded cursor-pointer"
+                      >
+                        <.icon name="hero-no-symbol" class="h-5 w-5" />
+                      </div>
                     </div>
                   </td>
                 </tr>
@@ -82,6 +85,14 @@ defmodule SentinelWeb.Live.Logs do
             </tbody>
           </table>
         </div>
+        <!-- Modal -->
+        <%= if @modal.show do %>
+          <div class="fixed inset-0 z-10 flex items-center justify-center bg-black bg-opacity-50">
+            <div class="bg-white rounded-lg shadow-lg p-6 w-full max-w-md">
+              <%= render_modal(@modal.type, assigns) %>
+            </div>
+          </div>
+        <% end %>
       </div>
     </Navigation.show>
     """
@@ -89,7 +100,6 @@ defmodule SentinelWeb.Live.Logs do
 
   @doc """
   Handle form validation on input change
-  TODO: move this to the nav component
   """
   def handle_event("logout", _, socket) do
     # TODO: we need to consider doing a modal over here
@@ -97,16 +107,26 @@ defmodule SentinelWeb.Live.Logs do
     {:noreply, socket |> push_navigate(to: Routes.live_path(socket, SentinelWeb.Live.Login))}
   end
 
-  def handle_event("download", %{"file" => file}, socket) do
-    path = @log_dir <> "/" <> file
-    IO.inspect("download item here: #{path}")
-    {:noreply, socket}
+  def handle_event("delete", %{"file" => file}, socket) do
+    case Logs.delete_log_file(file) do
+      {:ok, _} ->
+        Logs.init_state()
+        {:noreply, assign(socket, modal: %{show: false, type: nil, file: nil})}
+
+      {:error, reason} ->
+        IO.inspect("Error: #{reason}")
+        {:noreply, assign(socket, modal: %{show: false, type: nil, file: nil})}
+    end
   end
 
-  def handle_event("delete", %{"file" => file}, socket) do
-    path = @log_dir <> "/" <> file
-    IO.inspect("delete item here: #{path}")
-    {:noreply, socket}
+  # Open the modal
+  def handle_event("open_modal", %{"file" => file}, socket) do
+    {:noreply, assign(socket, modal: %{show: true, type: :confirm_removal, file: file})}
+  end
+
+  # Close the modal
+  def handle_event("close_modal", _params, socket) do
+    {:noreply, assign(socket, modal: %{show: false, type: nil, file: nil})}
   end
 
   # get the devices for the current devices connect
@@ -129,5 +149,32 @@ defmodule SentinelWeb.Live.Logs do
       |> assign(:count, archived.count)
 
     {:noreply, socket}
+  end
+
+  # Render the modal content
+  defp render_modal(:confirm_removal, assigns) do
+    ~H"""
+    <div class="flex flex-col w-full gap-3">
+      <h2 class="text-2xl font-bold">Are you sure?</h2>
+      <div class="w-full">
+        <span class="text-xs text-gray-500 leading-0">
+          Are you sure you want to remove this file <%= @modal.file %>?
+        </span>
+      </div>
+      <!-- Action Buttons -->
+      <div class="flex w-full justify-end gap-4 mt-3">
+        <.button
+          phx-click="delete"
+          phx-value-file={@modal.file}
+          class="bg-blue-500 text-white px-4 py-2 rounded-md"
+        >
+          Delete
+        </.button>
+        <.button phx-click="close_modal" class="bg-red-500 text-white px-4 py-2 rounded-md">
+          Cancel
+        </.button>
+      </div>
+    </div>
+    """
   end
 end

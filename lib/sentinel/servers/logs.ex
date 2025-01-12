@@ -64,10 +64,17 @@ defmodule Sentinel.Servers.Logs do
   Get all of the log information from the log file
   Note: for now the user needs to get everything
   """
-  def handle_call(:get_state, _from, state) do
+  def handle_call({:get_state, refetch}, _from, state) when refetch === true do
+    send(self(), :sync)
+    {:reply, {:ok, state}, state}
+  end
+  def handle_call({:get_state, _refetch}, _from, state) do
     {:reply, {:ok, state}, state}
   end
 
+  @doc """
+  Get all of the log information from the log file for a specific device
+  """
   def handle_call({:get_device_logs, ip}, _from, state) do
     logs =
       if Application.get_env(:sentinel, :mock_data, false) do
@@ -103,6 +110,19 @@ defmodule Sentinel.Servers.Logs do
     {:reply, {:ok, logs}, state}
   end
 
+  @doc """
+  Delete the log file
+  """
+  def handle_call({:delete_log_file, file}, _from, state) do
+    path = @log_dir <> "/" <> file
+    case File.rm(path) do
+      :ok ->
+        {:reply, {:ok, "File deleted successfully"}, state}
+      {:error, reason} ->
+        {:reply, {:error, "Failed to delete file: #{inspect(reason)}"}, state}
+    end
+  end
+
   # filter by IP
   def filter_queries_by_ip(ip) do
     # Dynamically resolve the path to the logs directory one level up
@@ -123,6 +143,8 @@ defmodule Sentinel.Servers.Logs do
   end
 
   # Get entire state details for the logs
-  def get_state(), do: GenServer.call(__MODULE__, :get_state)
+  def get_state(), do: GenServer.call(__MODULE__, {:get_state, false})
+  def init_state(), do: GenServer.call(__MODULE__, {:get_state, true})
   def get_device_logs(ip), do: GenServer.call(__MODULE__, {:get_device_logs, ip})
+  def delete_log_file(file), do: GenServer.call(__MODULE__, {:delete_log_file, file})
 end
