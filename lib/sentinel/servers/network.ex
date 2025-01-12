@@ -61,6 +61,6 @@ defmodule Sentinel.Servers.Network do
     :timer.send_after(@interval, :sync)
   end
 
-  # Get details around the network
-  def get_state(), do: GenServer.call(__MODULE__, :get_state)
+  # Get details around the network - added longer timeout incase we have to for speedtest lib
+  def get_state(), do: GenServer.call(__MODULE__, :get_state, 30_000)
 end

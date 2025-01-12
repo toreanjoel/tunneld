@@ -63,6 +63,9 @@ defmodule Sentinel.Servers.Logs do
     # compress - gzip -k _data.log
     IO.inspect("Checking the file size and try compress and backup the main log file if needed")
 
+    # Process archiving jobs later again
+    archive_log_file()
+
     # Return the current state as we dont need to change general data state
     {:noreply, state}
   end
@@ -72,6 +75,9 @@ defmodule Sentinel.Servers.Logs do
     # Delete the old log files that are older than a certain time relative to the current time - relies on the title of the fileW
 
     IO.inspect("Cleaning up the old log files")
+
+    # Process archiving jobs later again
+    cleanup_archived_files()
 
     # Return the current state as we dont need to change general data state
     {:noreply, state}
