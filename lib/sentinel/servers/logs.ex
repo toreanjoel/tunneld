@@ -5,8 +5,8 @@ defmodule Sentinel.Servers.Logs do
   use GenServer
   require Logger
 
-  @sync_data_interval 3_600_000 # 1h
-  @backup_interval 10_000 # 10s
+  @sync_data_interval 30_000 # 30s
+  @backup_interval 86400000 # 1d
   @cleanup_interval 30_000 # 30s
 
   @topic "sentinel:logs"
@@ -22,7 +22,6 @@ defmodule Sentinel.Servers.Logs do
   """
   def init(_) do
     archived_files = fetch_archived_files()
-    send(self(), :sync)
 
     # Trigger the start of the processes that will run after set time to cleanup over time
     archive_log_file()
@@ -57,21 +56,30 @@ defmodule Sentinel.Servers.Logs do
 
   # Handle questions to backup the current logs
   def handle_info(:backup_logs, state) do
-    # Look at the main file and try to check the file data and backup/compress if its too large with a new file
-    # The new file can be a labled with unix time stamps
+    log_path = Path.join(@log_dir, @log_file) # Full path to _data.log
+    timestamp = DateTime.utc_now() |> DateTime.to_unix() # Get current timestamp
+    backup_path = Path.join(@log_dir, "#{timestamp}.log.gz") # Compressed backup name
 
-    # compress - gzip -k _data.log
-    IO.inspect("Checking the file size and try compress and backup the main log file if needed")
+    # Step 1: Copy the log file to a new file before compression
+    System.cmd("cp", [log_path, String.replace_suffix(backup_path, ".gz", "")])
 
-    # Process archiving jobs later again
+    # Step 2: Compress the copied file
+    System.cmd("gzip", [String.replace_suffix(backup_path, ".gz", "")])
+
+    # Step 3: Clear the original log file to continue logging
+    System.cmd("truncate", ["-s", "0", log_path])
+
+    # Process archiving jobs later
     archive_log_file()
 
-    # Return the current state as we dont need to change general data state
+    # Return state unchanged
     {:noreply, state}
   end
 
   # Handle questions to remove old backup files
   def handle_info(:cleanup_logs, state) do
+    path = @log_dir <> "/" <> @log_file
+
     # Delete the old log files that are older than a certain time relative to the current time - relies on the title of the fileW
 
     IO.inspect("Cleaning up the old log files")

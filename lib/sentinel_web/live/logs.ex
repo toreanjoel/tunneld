@@ -42,8 +42,13 @@ defmodule SentinelWeb.Live.Logs do
           Log Archive
         </div>
         <%!-- This will be the basic text information that could be informational but some insights --%>
-        <div class="py-1 text-sm text-gray-600">
+        <div class="py-1 text-sm text-gray-600 flex flex-row items-center">
+        <div class="grow">
           The archived list of logs (Logs will be available only for 7 days. All logs will be deleted after.)
+        </div>
+        <div phx-click="refresh" class="cursor-pointer hover:bg-white p-1 hover:rounded-lg transition-all duration-500">
+            <.icon name="hero-arrow-path" class="h-5 w-5" />
+          </div>
         </div>
         <hr class="my-3 border-dashed border-gray-300" />
 
@@ -131,6 +136,12 @@ defmodule SentinelWeb.Live.Logs do
   # Close the modal
   def handle_event("close_modal", _params, socket) do
     {:noreply, assign(socket, modal: %{show: false, type: nil, file: nil})}
+  end
+
+  # refresh the lists
+  def handle_event("refresh", _p, socket) do
+    send(self(), :init)
+    {:noreply, socket}
   end
 
   # get the devices for the current devices connect
