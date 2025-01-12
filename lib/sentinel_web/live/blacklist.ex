@@ -12,7 +12,7 @@ defmodule SentinelWeb.Live.Blacklist do
   on_mount SentinelWeb.Hooks.CheckAuth
 
   # The size of the page we want to retrieve
-  @page_size 2
+  @page_size 50
 
   @doc """
   Initialize the Blacklist

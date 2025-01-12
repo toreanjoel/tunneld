@@ -17,11 +17,12 @@ defmodule SentinelWeb.Live.Logs do
   @doc """
   The list of log backups
   """
-  def mount(_params, _session, socket) do
+  def mount(_params, %{"ip" => ip} = _session, socket) do
     SentinelWeb.Endpoint.subscribe("sentinel:logs")
 
     socket =
       socket
+      |> assign(:ip, ip)
       |> assign(:archived_files, [])
       |> assign(:count, 0)
       |> assign(modal: %{show: false, type: nil})

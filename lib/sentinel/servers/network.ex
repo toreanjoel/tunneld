@@ -17,7 +17,7 @@ defmodule Sentinel.Servers.Network do
   Note: we could make a struct here that maps to the tpe for the network
   """
   def init(_) do
-    send(self(), :sync)
+    sync_network()
     {:ok, %{}}
   end
 

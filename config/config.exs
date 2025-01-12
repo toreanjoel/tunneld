@@ -70,7 +70,7 @@ config :sentinel, :fs,
   root: "/data",
   auth: "/auth.json"
 
-config :sentinel, version: "0.0.1"
+config :sentinel, version: "0.1.1"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

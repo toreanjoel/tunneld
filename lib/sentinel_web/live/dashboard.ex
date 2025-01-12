@@ -26,7 +26,7 @@ defmodule SentinelWeb.Live.Dashboard do
       |> assign(:ip, ip)
       |> assign(
         :overview_content,
-        "Systems are running well."
+        "Note: Processes to fetch network information will happen later in the lifecycle of starting the sytem"
       )
       |> assign(:updated_at, updated_at())
       |> assign(:network, %{

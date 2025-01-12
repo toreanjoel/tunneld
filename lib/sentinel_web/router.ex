@@ -33,7 +33,7 @@ defmodule SentinelWeb.Router do
 
   # controller to manage the file downloads
   scope "/files", SentinelWeb do
-    pipe_through [:browser, :set_ip]
+    pipe_through [:browser]
 
     get "/download/:name", Controllers.FileDownloadController, :download
   end
