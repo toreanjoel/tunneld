@@ -5,8 +5,8 @@ defmodule Sentinel.Servers.Logs do
   use GenServer
   require Logger
 
-  # 30s
-  @sync_data_interval 30_000
+  # 2m
+  @sync_data_interval 120_000
   # 1d
   # @backup_interval 86_400_000
   @backup_interval 10_000
@@ -66,38 +66,26 @@ defmodule Sentinel.Servers.Logs do
     # Compressed backup name
     backup_path = Path.expand("../logs/#{timestamp}.log.gz", File.cwd!())
 
-    # case get_file_size_mb(@log_file) do
-    #   {:ok, size} when size > 1 ->
-    #     # Copy the log file to a new file before compression
-    #     System.cmd("cp", [log_path, String.replace_suffix(backup_path, ".gz", "")])
+    case get_file_size_mb(@log_file) do
+      {:ok, size} when size > 5 ->
+        # Copy the log file to a new file before compression
+        System.cmd("cp", [log_path, String.replace_suffix(backup_path, ".gz", "")])
 
-    #     # Compress the copied file
-    #     System.cmd("gzip", [String.replace_suffix(backup_path, ".gz", "")])
+        # Compress the copied file
+        System.cmd("gzip", [String.replace_suffix(backup_path, ".gz", "")])
 
-    #     # Clear the original log file to continue logging
-    #     System.cmd("truncate", ["-s", "0", log_path])
+        # Clear the original log file to continue logging
+        System.cmd("truncate", ["-s", "0", log_path])
 
-    #     # Restart dnsmasq with SIGHUP (force reload)
-    #     System.cmd("pkill", ["-HUP", "dnsmasq"])
+        # Restart the service explicitly (if needed)
+        Sentinel.Servers.Services.restart_service(:dnsmasq)
 
-    #     # Restart the service explicitly (if needed)
-    #     Sentinel.Servers.Services.restart_service(:dnsmasq)
-    #   _ ->
-    #     # Return state unchanged
-    #     :ok
-    #   end
-
-    # Copy the log file to a new file before compression
-    System.cmd("cp", [log_path, String.replace_suffix(backup_path, ".gz", "")])
-
-    # Compress the copied file
-    System.cmd("gzip", [String.replace_suffix(backup_path, ".gz", "")])
-
-    # Clear the original log file to continue logging
-    System.cmd("truncate", ["-s", "0", log_path])
-
-    # Restart the service explicitly (if needed)
-    Sentinel.Servers.Services.restart_service(:dnsmasq)
+        # Try the backup later again
+        archive_log_file()
+      _ ->
+        # Return state unchanged
+        :ok
+      end
 
     {:noreply, state}
   end
