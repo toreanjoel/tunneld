@@ -66,28 +66,40 @@ defmodule Sentinel.Servers.Logs do
     # Compressed backup name
     backup_path = Path.expand("../logs/#{timestamp}.log.gz", File.cwd!())
 
-    case get_file_size_mb(@log_file) do
-      {:ok, size} when size > 1 ->
-        # Copy the log file to a new file before compression
-        System.cmd("cp", [log_path, String.replace_suffix(backup_path, ".gz", "")])
+    # case get_file_size_mb(@log_file) do
+    #   {:ok, size} when size > 1 ->
+    #     # Copy the log file to a new file before compression
+    #     System.cmd("cp", [log_path, String.replace_suffix(backup_path, ".gz", "")])
 
-        # Compress the copied file
-        System.cmd("gzip", [String.replace_suffix(backup_path, ".gz", "")])
+    #     # Compress the copied file
+    #     System.cmd("gzip", [String.replace_suffix(backup_path, ".gz", "")])
 
-        # Clear the original log file to continue logging
-        System.cmd("truncate", ["-s", "0", log_path])
+    #     # Clear the original log file to continue logging
+    #     System.cmd("truncate", ["-s", "0", log_path])
 
-        # Restart dnsmasq with SIGHUP (force reload)
-        System.cmd("pkill", ["-HUP", "dnsmasq"])
+    #     # Restart dnsmasq with SIGHUP (force reload)
+    #     System.cmd("pkill", ["-HUP", "dnsmasq"])
 
-        # Restart the service explicitly (if needed)
-        Sentinel.Servers.Services.restart_service(:dnsmasq)
-      _ ->
-        # Return state unchanged
-        :ok
-      end
+    #     # Restart the service explicitly (if needed)
+    #     Sentinel.Servers.Services.restart_service(:dnsmasq)
+    #   _ ->
+    #     # Return state unchanged
+    #     :ok
+    #   end
 
-      {:noreply, state}
+    # Copy the log file to a new file before compression
+    System.cmd("cp", [log_path, String.replace_suffix(backup_path, ".gz", "")])
+
+    # Compress the copied file
+    System.cmd("gzip", [String.replace_suffix(backup_path, ".gz", "")])
+
+    # Clear the original log file to continue logging
+    System.cmd("truncate", ["-s", "0", log_path])
+
+    # Restart the service explicitly (if needed)
+    Sentinel.Servers.Services.restart_service(:dnsmasq)
+
+    {:noreply, state}
   end
 
   # Handle questions to remove old backup files
