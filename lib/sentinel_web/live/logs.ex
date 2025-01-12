@@ -12,7 +12,7 @@ defmodule SentinelWeb.Live.Logs do
   on_mount SentinelWeb.Hooks.CheckAuth
 
   # The current active file used for the running process
-  @active_log_file "_dnsmasq.log"
+  @active_log_file "_data.log"
 
   @doc """
   The list of log backups

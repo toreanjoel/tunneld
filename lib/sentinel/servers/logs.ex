@@ -5,10 +5,13 @@ defmodule Sentinel.Servers.Logs do
   use GenServer
   require Logger
 
-  @interval 3_600_000 # 1h
+  @sync_data_interval 3_600_000 # 1h
+  @backup_interval 10_000 # 10s
+  @cleanup_interval 30_000 # 30s
+
   @topic "sentinel:logs"
+  @log_file "_data.log"
   @log_dir System.user_home() <> "/logs"
-  @log_file "_dnsmasq.log"
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -21,10 +24,9 @@ defmodule Sentinel.Servers.Logs do
     archived_files = fetch_archived_files()
     send(self(), :sync)
 
-    # Setup auto compress and backup based on log file size (> 20mb)
-    # Check should happen more once a day (unix timestamp and file name 1736642285.log)
-    # Auto delete logs older than 7 days
-    # Update rendering to use the human reable file name after file is made (1736642285 |> DateTime.from_unix! |> DateTime.to_iso8601)
+    # Trigger the start of the processes that will run after set time to cleanup over time
+    archive_log_file()
+    cleanup_archived_files()
 
     {:ok,
      %{
@@ -35,6 +37,7 @@ defmodule Sentinel.Servers.Logs do
      }}
   end
 
+  # The job that will start interval sync to fetch the current log file details
   def handle_info(:sync, state) do
     archived_files = fetch_archived_files()
 
@@ -52,24 +55,35 @@ defmodule Sentinel.Servers.Logs do
     {:noreply, state}
   end
 
-  # The job that will start interval sync
-  defp sync_archived_files() do
-    :timer.send_after(@interval, :sync)
+  # Handle questions to backup the current logs
+  def handle_info(:backup_logs, state) do
+    # Look at the main file and try to check the file data and backup/compress if its too large with a new file
+    # The new file can be a labled with unix time stamps
+
+    # compress - gzip -k _data.log
+    IO.inspect("Checking the file size and try compress and backup the main log file if needed")
+
+    # Try send the updated state back to the client to render if they wan
+    send(self(), :sync)
+
+    # Return the current state as we dont need to change general data state
+    {:noreply, state}
   end
 
-  # archived logs
-  defp fetch_archived_files() do
-    if Application.get_env(:sentinel, :mock_data, false) do
-      Sentinel.Servers.FakeData.Logs.get_archived_files()
-    else
-      @log_dir |> File.ls!()
-    end
+  # Handle questions to remove old backup files
+  def handle_info(:cleanup_logs, state) do
+    # Delete the old log files that are older than a certain time relative to the current time - relies on the title of the fileW
+
+    IO.inspect("Cleaning up the old log files")
+
+    # Try send the updated state back to the client to render if they wan
+    send(self(), :sync)
+
+    # Return the current state as we dont need to change general data state
+    {:noreply, state}
   end
 
-  @doc """
-  Get all of the log information from the log file
-  Note: for now the user needs to get everything
-  """
+  # Get all of the log information from the log file
   def handle_call({:get_state, refetch}, _from, state) when refetch === true do
     send(self(), :sync)
     {:reply, {:ok, state}, state}
@@ -78,9 +92,7 @@ defmodule Sentinel.Servers.Logs do
     {:reply, {:ok, state}, state}
   end
 
-  @doc """
-  Get all of the log information from the log file for a specific device
-  """
+  # Get all of the log information from the log file for a specific device
   def handle_call({:get_device_logs, ip}, _from, state) do
     logs =
       if Application.get_env(:sentinel, :mock_data, false) do
@@ -116,9 +128,7 @@ defmodule Sentinel.Servers.Logs do
     {:reply, {:ok, logs}, state}
   end
 
-  @doc """
-  Delete the log file
-  """
+  # Delete the log file
   def handle_call({:delete_log_file, file}, _from, state) do
     path = @log_dir <> "/" <> file
     case File.rm(path) do
@@ -130,11 +140,11 @@ defmodule Sentinel.Servers.Logs do
   end
 
   # filter by IP
-  def filter_queries_by_ip(ip) do
+  defp filter_queries_by_ip(ip) do
     # Dynamically resolve the path to the logs directory one level up
     log_file = Path.expand("../logs/" <> @log_file, File.cwd!())
 
-    case System.cmd("sh", ["-c", "grep -E 'query\\[A\\].*#{ip}' #{log_file} | tail -n 30 | tac"]) do
+    case System.cmd("sh", ["-c", "cat #{log_file} | grep -E 'query\\[A\\].*#{ip}' | tail -n 100 | tac"]) do
       {output, 0} ->
         String.split(output, "\n", trim: true)
 
@@ -145,6 +155,30 @@ defmodule Sentinel.Servers.Logs do
       {error, _} ->
         IO.puts("Error: #{error}")
         []
+    end
+  end
+
+  # The job that will start interval sync amake sure we have the latest data
+  defp sync_archived_files() do
+    :timer.send_after(@sync_data_interval, :sync)
+  end
+
+  # Backup the current log file based on some condition (file size?)
+  defp archive_log_file() do
+    :timer.send_after(@backup_interval, :backup_logs)
+  end
+
+  # The function that will be used to remove old archived or old files after n time
+  defp cleanup_archived_files() do
+    :timer.send_after(@cleanup_interval, :cleanup_logs)
+  end
+
+  # archived logs
+  defp fetch_archived_files() do
+    if Application.get_env(:sentinel, :mock_data, false) do
+      Sentinel.Servers.FakeData.Logs.get_archived_files()
+    else
+      @log_dir |> File.ls!()
     end
   end
 
