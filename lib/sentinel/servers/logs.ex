@@ -24,6 +24,10 @@ defmodule Sentinel.Servers.Logs do
     archived_files = fetch_archived_files()
     send(self(), :sync)
 
+    # Trigger the start of the processes that will run after set time to cleanup over time
+    archive_log_file()
+    cleanup_archived_files()
+
     {:ok,
      %{
        archived: %{
@@ -48,10 +52,6 @@ defmodule Sentinel.Servers.Logs do
     # Refetch - recheck
     sync_archived_files()
 
-    # Trigger the start of the processes that will run after set time to cleanup over time
-    archive_log_file()
-    cleanup_archived_files()
-
     {:noreply, state}
   end
 
@@ -63,9 +63,6 @@ defmodule Sentinel.Servers.Logs do
     # compress - gzip -k _data.log
     IO.inspect("Checking the file size and try compress and backup the main log file if needed")
 
-    # Try send the updated state back to the client to render if they wan
-    send(self(), :sync)
-
     # Return the current state as we dont need to change general data state
     {:noreply, state}
   end
@@ -75,9 +72,6 @@ defmodule Sentinel.Servers.Logs do
     # Delete the old log files that are older than a certain time relative to the current time - relies on the title of the fileW
 
     IO.inspect("Cleaning up the old log files")
-
-    # Try send the updated state back to the client to render if they wan
-    send(self(), :sync)
 
     # Return the current state as we dont need to change general data state
     {:noreply, state}
