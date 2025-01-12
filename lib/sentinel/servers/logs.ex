@@ -24,10 +24,6 @@ defmodule Sentinel.Servers.Logs do
     archived_files = fetch_archived_files()
     send(self(), :sync)
 
-    # Trigger the start of the processes that will run after set time to cleanup over time
-    archive_log_file()
-    cleanup_archived_files()
-
     {:ok,
      %{
        archived: %{
@@ -51,6 +47,10 @@ defmodule Sentinel.Servers.Logs do
 
     # Refetch - recheck
     sync_archived_files()
+
+    # Trigger the start of the processes that will run after set time to cleanup over time
+    archive_log_file()
+    cleanup_archived_files()
 
     {:noreply, state}
   end
