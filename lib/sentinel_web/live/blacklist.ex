@@ -178,7 +178,7 @@ defmodule SentinelWeb.Live.Blacklist do
           case Blacklist.add_domain(params["domain"]) do
             {:ok, msg} ->
               # Restart the service
-              Services.restart_service(:dnsmasq)
+              Services.reload_service(:dnsmasq)
 
               # Add success flash message
               socket

@@ -85,7 +85,8 @@ defmodule Sentinel.Servers.Blacklist do
       Sentinel.Servers.FakeData.Blacklist.get_data()
     else
       try do
-        File.stream!(@blacklist_file)
+        blacklist_path = Path.expand("../blacklists/" <> @blacklist_file, File.cwd!())
+        File.stream!(blacklist_path)
         |> Stream.drop(offset)
         |> Stream.take(limit)
         |> Enum.to_list()
