@@ -18,6 +18,7 @@ defmodule Sentinel.Servers.Blacklist do
   """
   def init(_) do
     send(self(), :sync)
+
     {:ok, %{
       count: count_blacklist()
     }}
@@ -80,7 +81,7 @@ defmodule Sentinel.Servers.Blacklist do
   end
 
   # we fetch the user blacklist file data
-  defp fetch_blacklist(offset, limit) do
+  def fetch_blacklist(offset, limit) do
     if Application.get_env(:sentinel, :mock_data, false) do
       Sentinel.Servers.FakeData.Blacklist.get_data()
     else
@@ -115,7 +116,8 @@ defmodule Sentinel.Servers.Blacklist do
       if Application.get_env(:sentinel, :mock_data, false) do
         Sentinel.Servers.FakeData.Blacklist.get_data() |> length
       else
-        File.stream!(@blacklist_file)
+        blacklist_path = Path.expand("../blacklists/" <> @blacklist_file, File.cwd!())
+        File.stream!(blacklist_path)
         |> Enum.reduce(0, fn _, acc -> acc + 1 end)
       end
     rescue

@@ -32,7 +32,7 @@ defmodule SentinelWeb.Live.Blacklist do
       |> assign(:curr_page, 0)
       |> assign(:count, 0)
       |> assign(blacklist_changeset: blacklist_changeset)
-      |> assign(modal: %{show: false, type: nil})
+      |> assign(modal: %{show: false, type: nil, data: nil})
       |> assign(errors: [])
 
     send(self(), :init)
@@ -78,12 +78,24 @@ defmodule SentinelWeb.Live.Blacklist do
             <thead>
               <tr class="bg-gray-100">
                 <th class="border border-gray-300 px-4 py-2 text-left">Domain</th>
+                <th class="border border-gray-300 px-4 py-2 text-left">Action</th>
               </tr>
             </thead>
             <tbody>
               <%= for domain <- @blacklist do %>
                 <tr class="hover:bg-gray-50 cursor-pointer">
                   <td class="border border-gray-300 px-4 py-2"><%= domain %></td>
+                  <td class="border border-gray-300 px-4 py-2">
+                    <div class="flex flex-row gap-2">
+                      <div
+                        phx-click="open_modal"
+                        phx-value-domain={domain}
+                        class="bg-white hover:bg-gray-200 p-1 rounded cursor-pointer"
+                      >
+                        <.icon name="hero-no-symbol" class="h-5 w-5" />
+                      </div>
+                    </div>
+                  </td>
                 </tr>
               <% end %>
             </tbody>
@@ -159,13 +171,27 @@ defmodule SentinelWeb.Live.Blacklist do
   end
 
   # Open the modal
+  def handle_event("open_modal", %{ "domain" => domain} = _params, socket) do
+    {:noreply, assign(socket, modal: %{show: true, type: :confirm, data: domain})}
+  end
+
   def handle_event("open_modal", _params, socket) do
-    {:noreply, assign(socket, modal: %{show: true, type: :add_domain})}
+    {:noreply, assign(socket, modal: %{show: true, type: :add_domain, data: nil})}
   end
 
   # Close the modal
   def handle_event("close_modal", _params, socket) do
-    {:noreply, assign(socket, modal: %{show: false, type: nil})}
+    {:noreply, assign(socket, modal: %{show: false, type: nil, data: nil})}
+  end
+
+  # Remove a domain from the blacklist
+  def handle_event("remove_domain", _params, socket) do
+    # TODO: add the request to delete the item from the blacklist
+    socket = socket
+      |> put_flash(:info, "Domain removed from blacklist")
+      |> assign(modal: %{show: false, type: nil, data: nil})
+
+    {:noreply, socket}
   end
 
   # Add a domain to the blacklist
@@ -178,7 +204,7 @@ defmodule SentinelWeb.Live.Blacklist do
           case Blacklist.add_domain(params["domain"]) do
             {:ok, msg} ->
               # Restart the service
-              Services.reload_service(:dnsmasq)
+              Services.restart_service(:dnsmasq)
 
               # Add success flash message
               socket
@@ -261,6 +287,30 @@ defmodule SentinelWeb.Live.Blacklist do
           </.button>
           <.button phx-click="close_modal" class="bg-red-500 text-white px-4 py-2 rounded-md">
             Close
+          </.button>
+        </div>
+      </.simple_form>
+    </div>
+    """
+  end
+
+  defp render_modal(:confirm, assigns) do
+    ~H"""
+    <div class="flex flex-col items-center justify-center w-full gap-3">
+      <h2 class="text-2xl font-bold text-center">Are you sure?</h2>
+      <.simple_form for={@blacklist_changeset} phx-submit="remove_domain" phx-value-domain={@modal.data} class="w-full max-w-md">
+        <div class="w-full">
+          <span class="text-xs text-gray-500 leading-0">
+            Are you sure you want to remove the blacklisted domain?
+          </span>
+        </div>
+        <!-- Action Buttons -->
+        <div class="flex w-full justify-end gap-4 mt-3">
+          <.button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md">
+            Remove
+          </.button>
+          <.button phx-click="close_modal" class="bg-red-500 text-white px-4 py-2 rounded-md">
+            Cancel
           </.button>
         </div>
       </.simple_form>
