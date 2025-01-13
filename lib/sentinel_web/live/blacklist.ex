@@ -3,7 +3,7 @@ defmodule SentinelWeb.Live.Blacklist do
   Blacklist Page
   """
   use SentinelWeb, :live_view
-  alias Sentinel.Servers.{Session, Blacklist}
+  alias Sentinel.Servers.{Session, Blacklist, Services}
   alias Sentinel.Schema.Blacklist, as: BlacklistSchema
   alias SentinelWeb.Components.Navigation
   alias SentinelWeb.Router.Helpers, as: Routes
@@ -174,20 +174,23 @@ defmodule SentinelWeb.Live.Blacklist do
 
     case changeset.valid? do
       true ->
-        # TODO: Write domain to file
+        socket =
+          case Blacklist.add_domain(params["domain"]) do
+            {:ok, msg} ->
+              # Restart the service
+              Services.restart_service(:dnsmasq)
 
-        # TODO: Restart the blacklist service
+              # Add success flash message
+              socket
+              |> put_flash(:info, msg)
+
+            {:error, err} ->
+              socket
+              |> put_flash(:error, err)
+          end
 
         # TODO: Fetch the blacklist current page again
-
-        # Add success flash message
-        socket =
-          socket
-          |> put_flash(:info, "Domain added successfully!")
-          # Close modal
-          |> assign(modal: %{show: false, type: nil})
-
-        {:noreply, socket}
+        {:noreply, socket |> assign(modal: %{show: false, type: nil})}
 
       _ ->
         # Add error flash message and reassign changeset

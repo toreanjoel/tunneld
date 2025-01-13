@@ -7,8 +7,7 @@ defmodule Sentinel.Servers.Blacklist do
 
   @interval 30_000
   @topic "sentinel:blacklist"
-  # we also have a system blacklist but this they dont change for now
-  @path System.user_home() <> "/blacklists/dnsmasq-user.blacklist"
+  @blacklist_file "dnsmasq-user.blacklist"
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -30,6 +29,18 @@ defmodule Sentinel.Servers.Blacklist do
   """
   def handle_call(:get_state, _from, state) do
     {:reply, {:ok, state}, state}
+  end
+
+  # Add a domain to the blacklist
+  def handle_call({:add_domain, domain}, _from, state) do
+    blacklist_path = Path.expand("../blacklists/" <> @blacklist_file, File.cwd!())
+
+    case File.write(blacklist_path, "local=/#{domain}/\n", [:append]) do
+      :ok ->
+        {:reply, {:ok, "Added #{domain} to blacklist"}, state}
+      _ ->
+        {:reply, {:error, "Failed to add #{domain} to blacklist"}, state}
+    end
   end
 
   # Here we get the list of domains based off page
@@ -74,7 +85,7 @@ defmodule Sentinel.Servers.Blacklist do
       Sentinel.Servers.FakeData.Blacklist.get_data()
     else
       try do
-        File.stream!(@path)
+        File.stream!(@blacklist_file)
         |> Stream.drop(offset)
         |> Stream.take(limit)
         |> Enum.to_list()
@@ -103,7 +114,7 @@ defmodule Sentinel.Servers.Blacklist do
       if Application.get_env(:sentinel, :mock_data, false) do
         Sentinel.Servers.FakeData.Blacklist.get_data() |> length
       else
-        File.stream!(@path)
+        File.stream!(@blacklist_file)
         |> Enum.reduce(0, fn _, acc -> acc + 1 end)
       end
     rescue
@@ -115,4 +126,5 @@ defmodule Sentinel.Servers.Blacklist do
   # Get entire state details for the blacklist
   def get_state(), do: GenServer.call(__MODULE__, :get_state)
   def get_blacklist_page(offset, limit), do: GenServer.call(__MODULE__, {:get_blacklist_page, offset, limit})
+  def add_domain(domain), do: GenServer.call(__MODULE__, {:add_domain, domain})
 end

@@ -32,20 +32,21 @@ defmodule Sentinel.Servers.Network do
   # get the data and restart sync
   def handle_info(:sync, state) do
     result = try do
-      {data, _exit_code} = System.cmd("speedtest", ["--accept-license", "--format=json"])
+      # {data, _exit_code} = System.cmd("speedtest", ["--accept-license", "--format=json"])
 
-      result =
-        data
-        |> String.trim()
-        |> Jason.decode!()
+      # result =
+      #   data
+      #   |> String.trim()
+      #   |> Jason.decode!()
 
-      # Broadcast the result to the topic
-      Phoenix.PubSub.broadcast(Sentinel.PubSub, @topic, {:network_info, result})
+      # # Broadcast the result to the topic
+      # Phoenix.PubSub.broadcast(Sentinel.PubSub, @topic, {:network_info, result})
 
-      # Refetch
-      sync_network()
+      # # Refetch
+      # sync_network()
 
-      result
+      # result
+      %{}
     rescue
       _ ->
         # fallback for when the command fails
