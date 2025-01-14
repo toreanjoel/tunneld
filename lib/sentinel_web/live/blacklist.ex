@@ -298,22 +298,20 @@ defmodule SentinelWeb.Live.Blacklist do
     ~H"""
     <div class="flex flex-col items-center justify-center w-full gap-3">
       <h2 class="text-2xl font-bold text-center">Are you sure?</h2>
-      <.simple_form for={@blacklist_changeset} phx-submit="remove_domain" phx-value-domain={@modal.data} class="w-full max-w-md">
-        <div class="w-full">
-          <span class="text-xs text-gray-500 leading-0">
-            Are you sure you want to remove the blacklisted domain?
-          </span>
-        </div>
-        <!-- Action Buttons -->
-        <div class="flex w-full justify-end gap-4 mt-3">
-          <.button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md">
-            Remove
-          </.button>
-          <.button phx-click="close_modal" class="bg-red-500 text-white px-4 py-2 rounded-md">
-            Cancel
-          </.button>
-        </div>
-      </.simple_form>
+      <div class="w-full">
+        <span class="text-xs text-gray-500 leading-0">
+          Are you sure you want to remove the blacklisted domain?
+        </span>
+      </div>
+      <!-- Action Buttons -->
+      <div class="flex w-full justify-end gap-4 mt-3">
+        <.button phx-click="remove_domain" phx-value-domain={@modal.data} class="bg-blue-500 text-white px-4 py-2 rounded-md">
+          Remove
+        </.button>
+        <.button phx-click="close_modal" class="bg-red-500 text-white px-4 py-2 rounded-md">
+          Cancel
+        </.button>
+      </div>
     </div>
     """
   end
