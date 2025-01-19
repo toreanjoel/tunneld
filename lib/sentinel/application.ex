@@ -9,6 +9,7 @@ defmodule Sentinel.Application do
   @impl true
   def start(_type, _args) do
     IO.inspect("MAKE SURE TO SET THE MOCK_DATA ENV VAR for development")
+    IO.inspect("MAKE SURE THE OS IS USING LEGACY IPTABLES: sudo update-alternatives --set iptables /usr/sbin/iptables-legacy")
 
     children = [
       SentinelWeb.Telemetry,

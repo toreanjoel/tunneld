@@ -83,23 +83,16 @@ defmodule Sentinel.Servers.Blacklist do
     # Read from the blacklist file
     {_, data} = read_file()
 
-    # HACK: set the legacy version of iptables
-    # update-alternatives --set iptables /usr/sbin/iptables-legacy
-    {_output, exit_code} = System.cmd("update-alternatives", ["--set", "iptables", "/usr/sbin/iptables-legacy"])
 
-    if exit_code != 0 do
-      # Loop over the data
-      Enum.each(data, fn policy ->
-        # Check if the entry already exists
-        if not has_policy?(policy) do
-          # Add entry to entry table if it isnt added
-          IO.inspect("Adding policy to iptables: #{inspect(policy)}")
-          add_policy(policy)
-        end
-      end)
-    else
-      raise "Failed to set iptables legacy"
-    end
+    # Loop over the data
+    Enum.each(data, fn policy ->
+      # Check if the entry already exists
+      if not has_policy?(policy) do
+        # Add entry to entry table if it isnt added
+        IO.inspect("Adding policy to iptables: #{inspect(policy)}")
+        add_policy(policy)
+      end
+    end)
 
     {:noreply, state}
   end
