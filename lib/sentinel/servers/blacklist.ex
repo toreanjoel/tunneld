@@ -49,20 +49,16 @@ defmodule Sentinel.Servers.Blacklist do
         # Get current data
         {_, data} = read_file()
 
-        # Add the data to the file
-        policy =
-          data ++
-            [
-              %{
-                "type" => type,
-                "ip" => ip,
-                "mac_addr" => mac_addr,
-                "domain" => domain,
-                "ttl" => "NULL"
-              }
-            ]
+        # policy
+        policy = %{
+          "type" => type,
+          "ip" => ip,
+          "mac_addr" => mac_addr,
+          "domain" => domain,
+          "ttl" => "NULL"
+        }
 
-        case File.write(path(), Jason.encode!(policy)) do
+        case File.write(path(), Jason.encode!(data ++ [policy])) do
           :ok ->
             # We add the item to iptables
             add_policy(policy)
@@ -159,7 +155,7 @@ defmodule Sentinel.Servers.Blacklist do
               "-C",
               "PREROUTING",
               "-d",
-              policy.ip,
+              policy["ip"],
               "-j",
               "DROP"
             ])
@@ -207,7 +203,7 @@ defmodule Sentinel.Servers.Blacklist do
           "-I",
           "PREROUTING",
           "-d",
-          policy.ip,
+          policy["ip"],
           "-j",
           "DROP"
         ])
