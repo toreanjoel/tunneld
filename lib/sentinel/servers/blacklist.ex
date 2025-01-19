@@ -58,8 +58,14 @@ defmodule Sentinel.Servers.Blacklist do
           "ttl" => "NULL"
         }
 
-        case File.write(path(), Jason.encode!(data ++ [policy])) do
+        data = data ++ [policy]
+
+        write_file = File.write(path(), Jason.encode!(data))
+        IO.inspect(write_file, label: "Policy =1")
+
+        case write_file do
           :ok ->
+            IO.inspect(policy, label: "Policy =2")
             # We add the item to iptables
             add_policy(policy)
 
@@ -77,15 +83,23 @@ defmodule Sentinel.Servers.Blacklist do
     # Read from the blacklist file
     {_, data} = read_file()
 
-    # Loop over the data
-    Enum.each(data, fn policy ->
-      # Check if the entry already exists
-      if not has_policy?(policy) do
-        # Add entry to entry table if it isnt added
-        IO.inspect("Adding policy to iptables: #{inspect(policy)}")
-        add_policy(policy)
-      end
-    end)
+    # HACK: set the legacy version of iptables
+    # update-alternatives --set iptables /usr/sbin/iptables-legacy
+    {_output, exit_code} = System.cmd("update-alternatives", ["--set", "iptables", "/usr/sbin/iptables-legacy"])
+
+    if exit_code != 0 do
+      # Loop over the data
+      Enum.each(data, fn policy ->
+        # Check if the entry already exists
+        if not has_policy?(policy) do
+          # Add entry to entry table if it isnt added
+          IO.inspect("Adding policy to iptables: #{inspect(policy)}")
+          add_policy(policy)
+        end
+      end)
+    else
+      raise "Failed to set iptables legacy"
+    end
 
     {:noreply, state}
   end
@@ -177,6 +191,8 @@ defmodule Sentinel.Servers.Blacklist do
     if Application.get_env(:sentinel, :mock_data, false) do
       :ok
     else
+      IO.inspect(policy, label: "Policy =3")
+
       if policy["type"] === "user" do
         # sudo iptables -t mangle -I PREROUTING -m mac --mac-source [MAC] -d [DOMAIN] -j DROP
         System.cmd("iptables", [
@@ -258,7 +274,7 @@ defmodule Sentinel.Servers.Blacklist do
   def file_exists?(), do: path() |> File.exists?()
 
   # Path helper
-  defp path(), do: "./" <> config_fs(:root) <> config_fs(:blacklist)
+  def path(), do: "./" <> config_fs(:root) <> config_fs(:blacklist)
 
   # Config helper
   defp config_fs(), do: Application.get_env(:sentinel, :fs)
