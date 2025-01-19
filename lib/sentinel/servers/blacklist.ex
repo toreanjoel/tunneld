@@ -83,7 +83,6 @@ defmodule Sentinel.Servers.Blacklist do
     # Read from the blacklist file
     {_, data} = read_file()
 
-
     # Loop over the data
     Enum.each(data, fn policy ->
       # Check if the entry already exists
@@ -137,7 +136,7 @@ defmodule Sentinel.Servers.Blacklist do
         if policy["type"] === "user" do
           {_output, exit_code} =
             System.cmd("sudo", [
-              "iptables",
+              "/usr/sbin/iptables",
               "-t",
               "mangle",
               "-C",
@@ -156,7 +155,7 @@ defmodule Sentinel.Servers.Blacklist do
         else
           {_output, exit_code} =
             System.cmd("sudo", [
-              "iptables",
+              "/usr/sbin/iptables",
               "-t",
               "mangle",
               "-C",
@@ -188,7 +187,8 @@ defmodule Sentinel.Servers.Blacklist do
 
       if policy["type"] === "user" do
         # sudo iptables -t mangle -I PREROUTING -m mac --mac-source [MAC] -d [DOMAIN] -j DROP
-        System.cmd("iptables", [
+        System.cmd("sudo", [
+          "/usr/sbin/iptables",
           "-t",
           "mangle",
           "-I",
@@ -206,7 +206,8 @@ defmodule Sentinel.Servers.Blacklist do
         {:ok, "Policy Added"}
       else
         # sudo iptables -t mangle -I PREROUTING -d [DOMAIN] -j DROP
-        System.cmd("iptables", [
+        System.cmd("sudo", [
+          "/usr/sbin/iptables",
           "-t",
           "mangle",
           "-I",
