@@ -61,11 +61,9 @@ defmodule Sentinel.Servers.Blacklist do
         data = data ++ [policy]
 
         write_file = File.write(path(), Jason.encode!(data))
-        IO.inspect(write_file, label: "Policy =1")
 
         case write_file do
           :ok ->
-            IO.inspect(policy, label: "Policy =2")
             # We add the item to iptables
             add_policy(policy)
 
@@ -135,8 +133,7 @@ defmodule Sentinel.Servers.Blacklist do
       exit_code =
         if policy["type"] === "user" do
           {_output, exit_code} =
-            System.cmd("sudo", [
-              "/usr/sbin/iptables",
+            System.cmd("iptables", [
               "-t",
               "mangle",
               "-C",
@@ -154,8 +151,7 @@ defmodule Sentinel.Servers.Blacklist do
           exit_code
         else
           {_output, exit_code} =
-            System.cmd("sudo", [
-              "/usr/sbin/iptables",
+            System.cmd("iptables", [
               "-t",
               "mangle",
               "-C",
@@ -183,12 +179,9 @@ defmodule Sentinel.Servers.Blacklist do
     if Application.get_env(:sentinel, :mock_data, false) do
       :ok
     else
-      IO.inspect(policy, label: "Policy =3")
-
       if policy["type"] === "user" do
         # sudo iptables -t mangle -I PREROUTING -m mac --mac-source [MAC] -d [DOMAIN] -j DROP
-        System.cmd("sudo", [
-          "/usr/sbin/iptables",
+        System.cmd("iptables", [
           "-t",
           "mangle",
           "-I",
@@ -206,8 +199,7 @@ defmodule Sentinel.Servers.Blacklist do
         {:ok, "Policy Added"}
       else
         # sudo iptables -t mangle -I PREROUTING -d [DOMAIN] -j DROP
-        System.cmd("sudo", [
-          "/usr/sbin/iptables",
+        System.cmd("iptables", [
           "-t",
           "mangle",
           "-I",
