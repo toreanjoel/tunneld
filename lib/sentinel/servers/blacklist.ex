@@ -53,7 +53,7 @@ defmodule Sentinel.Servers.Blacklist do
         policy = %{
           "type" => type,
           "ip" => ip,
-          "mac_addr" => mac_addr,
+          "mac_addr" => (if type == "user", do: mac_addr, else: "-"),
           "domain" => domain,
           "ttl" => "NULL"
         }
