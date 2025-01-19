@@ -54,11 +54,11 @@ defmodule Sentinel.Servers.Blacklist do
           data ++
             [
               %{
-                type: type,
-                ip: ip,
-                mac_addr: mac_addr,
-                domain: domain,
-                ttl: nil
+                "type" => type,
+                "ip" => ip,
+                "mac_addr" => mac_addr,
+                "domain" => domain,
+                "ttl" => "NULL"
               }
             ]
 
@@ -125,46 +125,47 @@ defmodule Sentinel.Servers.Blacklist do
   end
 
   # Here we check if the policy exists in the iptables
-  def has_policy?(policy) when policy.type in ["system", "user"]  do
+  def has_policy?(policy)do
     if Application.get_env(:sentinel, :mock_data, false) do
       false
     else
       # sudo iptables -t mangle -I PREROUTING -m mac --mac-source [MAC] -d [DOMAIN] -j DROP
-      exit_code = if policy.type === "user" do
-        {_output, exit_code} =
-          System.cmd("sudo", [
-            "iptables",
-            "-t",
-            "mangle",
-            "-C",
-            "PREROUTING",
-            "-m",
-            "mac",
-            "--mac-source",
-            policy.mac_addr,
-            "-d",
-            policy.ip,
-            "-j",
-            "DROP"
-          ])
+      exit_code =
+        if policy["type"] === "user" do
+          {_output, exit_code} =
+            System.cmd("sudo", [
+              "iptables",
+              "-t",
+              "mangle",
+              "-C",
+              "PREROUTING",
+              "-m",
+              "mac",
+              "--mac-source",
+              policy["mac_addr"],
+              "-d",
+              policy["ip"],
+              "-j",
+              "DROP"
+            ])
 
-        exit_code
-      else
-        {_output, exit_code} =
-          System.cmd("sudo", [
-            "iptables",
-            "-t",
-            "mangle",
-            "-C",
-            "PREROUTING",
-            "-d",
-            policy.ip,
-            "-j",
-            "DROP"
-          ])
+          exit_code
+        else
+          {_output, exit_code} =
+            System.cmd("sudo", [
+              "iptables",
+              "-t",
+              "mangle",
+              "-C",
+              "PREROUTING",
+              "-d",
+              policy.ip,
+              "-j",
+              "DROP"
+            ])
 
-        exit_code
-      end
+          exit_code
+        end
 
       # Check if things already exists
       if exit_code == 0 do
@@ -176,11 +177,11 @@ defmodule Sentinel.Servers.Blacklist do
   end
 
   # Here we add the policy for to iptables - system vs user will have systemwide vs not
-  def add_policy(policy) when policy.type in ["system", "user"] do
+  def add_policy(policy)do
     if Application.get_env(:sentinel, :mock_data, false) do
       :ok
     else
-      if policy.type === "user" do
+      if policy["type"] === "user" do
         # sudo iptables -t mangle -I PREROUTING -m mac --mac-source [MAC] -d [DOMAIN] -j DROP
         System.cmd("iptables", [
           "-t",
@@ -190,9 +191,9 @@ defmodule Sentinel.Servers.Blacklist do
           "-m",
           "mac",
           "--mac-source",
-          policy.mac_addr,
+          policy["mac_addr"],
           "-d",
-          policy.ip,
+          policy["ip"],
           "-j",
           "DROP"
         ])
@@ -215,12 +216,6 @@ defmodule Sentinel.Servers.Blacklist do
       {:ok, "Policy Added"}
     end
   end
-
-  def get_blacklist_page(offset, limit),
-    do: GenServer.call(__MODULE__, {:get_blacklist_page, offset, limit})
-
-  def add_domain(domain, %{type: type, user: mac_addr}),
-    do: GenServer.call(__MODULE__, {:add_domain, %{domain: domain, type: type, user: mac_addr}})
 
   @doc """
   Create the blacklist file
@@ -254,6 +249,12 @@ defmodule Sentinel.Servers.Blacklist do
         {:error, "There was a problem reading the file: #{inspect(reason)}"}
     end
   end
+
+  def get_blacklist_page(offset, limit),
+    do: GenServer.call(__MODULE__, {:get_blacklist_page, offset, limit})
+
+  def add_domain(domain, %{type: type, user: mac_addr}),
+    do: GenServer.call(__MODULE__, {:add_domain, %{domain: domain, type: type, user: mac_addr}})
 
   @doc """
   Check if the Blacklist file exists
