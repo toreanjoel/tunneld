@@ -3,11 +3,6 @@ defmodule Sentinel.Servers.Blacklist do
   Manage blacklist domains
   """
   use GenServer
-  require Logger
-
-  @interval 30_000
-  @topic "sentinel:blacklist"
-  @blacklist_file "dnsmasq-user.blacklist"
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -17,31 +12,13 @@ defmodule Sentinel.Servers.Blacklist do
   Init blacklist
   """
   def init(_) do
-    send(self(), :sync)
+    # send(self(), :sync)
+    if not file_exists?(), do: create_file()
 
-    {:ok, %{
-      count: count_blacklist()
-    }}
-  end
+    # Here we need to add data to Iptables
+    send(self(), :init_iptables)
 
-  @doc """
-  Get all of the information around blacklist
-  Note: for now the user needs to get everything
-  """
-  def handle_call(:get_state, _from, state) do
-    {:reply, {:ok, state}, state}
-  end
-
-  # Add a domain to the blacklist
-  def handle_call({:add_domain, domain}, _from, state) do
-    blacklist_path = Path.expand("../blacklists/" <> @blacklist_file, File.cwd!())
-
-    case File.write(blacklist_path, "local=/#{domain}/\n", [:append]) do
-      :ok ->
-        {:reply, {:ok, "Added #{domain} to blacklist"}, state}
-      _ ->
-        {:reply, {:error, "Failed to add #{domain} to blacklist"}, state}
-    end
+    {:ok, %{}}
   end
 
   # Here we get the list of domains based off page
@@ -53,31 +30,68 @@ defmodule Sentinel.Servers.Blacklist do
     result = %{
       data: result,
       has_more_data: !Enum.empty?(check_ahead),
-      curr_page: offset,
+      curr_page: offset
     }
 
     {:reply, {:ok, result}, state}
   end
 
-  # get the data and restart sync
-  def handle_info(:sync, state) do
-    # TODO: Here we get the logs and also any specific information we want to broadcast i.e count of blacklist
-    # THIS IS NOT GOOD, WE NEED A BETTER WAY TO TRACK COUNT
-    result = %{
-      count: count_blacklist(),
-    }
+  # Here we add the domain to the blacklist
+  def handle_call({:add_domain, %{domain: domain, type: type, user: mac_addr}}, _from, state) do
+    {ip_str, _} = System.cmd("dig", ["+short", domain])
 
-    Phoenix.PubSub.broadcast(Sentinel.PubSub, @topic, {:blacklist_info, result})
+    if ip_str != "" do
+      # split the ip string
+      ip_list = String.split(ip_str, "\n") |> Enum.filter(fn ip -> ip != "" end)
 
-    # Refetch
-    sync_blacklist()
+      # Loop and add the ip to the blacklist
+      Enum.each(ip_list, fn ip ->
+        # Get current data
+        {_, data} = read_file()
 
-    {:noreply, Map.merge(state, result)}
+        # Add the data to the file
+        policy =
+          data ++
+            [
+              %{
+                type: type,
+                ip: ip,
+                mac_addr: mac_addr,
+                domain: domain,
+                ttl: nil
+              }
+            ]
+
+        case File.write(path(), Jason.encode!(policy)) do
+          :ok ->
+            # We add the item to iptables
+            add_policy(policy)
+
+          {:error, err} ->
+            {:error, "Failed to add domain to blacklist: #{inspect(err)}"}
+        end
+      end)
+    end
+
+    {:reply, {:ok, %{}}, state}
   end
 
-  # The job that will start interval sync
-  defp sync_blacklist() do
-    :timer.send_after(@interval, :sync)
+  # Add entiries to iptables - async as we have the system starting up at this point
+  def handle_info(:init_iptables, state) do
+    # Read from the blacklist file
+    {_, data} = read_file()
+
+    # Loop over the data
+    Enum.each(data, fn policy ->
+      # Check if the entry already exists
+      if not has_policy?(policy) do
+        # Add entry to entry table if it isnt added
+        IO.inspect("Adding policy to iptables: #{inspect(policy)}")
+        add_policy(policy)
+      end
+    end)
+
+    {:noreply, state}
   end
 
   # we fetch the user blacklist file data
@@ -86,28 +100,13 @@ defmodule Sentinel.Servers.Blacklist do
       Sentinel.Servers.FakeData.Blacklist.get_data()
     else
       try do
-        blacklist_path = Path.expand("../blacklists/" <> @blacklist_file, File.cwd!())
-        File.stream!(blacklist_path)
-        |> Stream.drop(offset)
-        |> Stream.take(limit)
-        |> Enum.to_list()
+        {_, data} = read_file()
+        Enum.slice(data, offset, limit)
       rescue
         _ ->
           []
       end
-    end |> clean_data()
-  end
-
-  # we will remove the syntax from the file as we only need the domains
-  defp clean_data(data) do
-    data
-    |> Enum.map(fn item ->
-      item
-      # Remove "local=/"
-      |> String.trim_leading("local=/")
-      # Remove "/\n"
-      |> String.trim_trailing("/\n")
-    end)
+    end
   end
 
   # we count the number of lines in the blacklist file
@@ -116,9 +115,8 @@ defmodule Sentinel.Servers.Blacklist do
       if Application.get_env(:sentinel, :mock_data, false) do
         Sentinel.Servers.FakeData.Blacklist.get_data() |> length
       else
-        blacklist_path = Path.expand("../blacklists/" <> @blacklist_file, File.cwd!())
-        File.stream!(blacklist_path)
-        |> Enum.reduce(0, fn _, acc -> acc + 1 end)
+        {_, data} = read_file()
+        data |> length
       end
     rescue
       _ ->
@@ -126,8 +124,146 @@ defmodule Sentinel.Servers.Blacklist do
     end
   end
 
-  # Get entire state details for the blacklist
-  def get_state(), do: GenServer.call(__MODULE__, :get_state)
-  def get_blacklist_page(offset, limit), do: GenServer.call(__MODULE__, {:get_blacklist_page, offset, limit})
-  def add_domain(domain), do: GenServer.call(__MODULE__, {:add_domain, domain})
+  # Here we check if the policy exists in the iptables
+  def has_policy?(policy) when policy.type in ["system", "user"]  do
+    if Application.get_env(:sentinel, :mock_data, false) do
+      false
+    else
+      # sudo iptables -t mangle -I PREROUTING -m mac --mac-source [MAC] -d [DOMAIN] -j DROP
+      exit_code = if policy.type === "user" do
+        {_output, exit_code} =
+          System.cmd("sudo", [
+            "iptables",
+            "-t",
+            "mangle",
+            "-C",
+            "PREROUTING",
+            "-m",
+            "mac",
+            "--mac-source",
+            policy.mac_addr,
+            "-d",
+            policy.ip,
+            "-j",
+            "DROP"
+          ])
+
+        exit_code
+      else
+        {_output, exit_code} =
+          System.cmd("sudo", [
+            "iptables",
+            "-t",
+            "mangle",
+            "-C",
+            "PREROUTING",
+            "-d",
+            policy.ip,
+            "-j",
+            "DROP"
+          ])
+
+        exit_code
+      end
+
+      # Check if things already exists
+      if exit_code == 0 do
+        true
+      else
+        false
+      end
+    end
+  end
+
+  # Here we add the policy for to iptables - system vs user will have systemwide vs not
+  def add_policy(policy) when policy.type in ["system", "user"] do
+    if Application.get_env(:sentinel, :mock_data, false) do
+      :ok
+    else
+      if policy.type === "user" do
+        # sudo iptables -t mangle -I PREROUTING -m mac --mac-source [MAC] -d [DOMAIN] -j DROP
+        System.cmd("iptables", [
+          "-t",
+          "mangle",
+          "-I",
+          "PREROUTING",
+          "-m",
+          "mac",
+          "--mac-source",
+          policy.mac_addr,
+          "-d",
+          policy.ip,
+          "-j",
+          "DROP"
+        ])
+
+        {:ok, "Policy Added"}
+      else
+        # sudo iptables -t mangle -I PREROUTING -d [DOMAIN] -j DROP
+        System.cmd("iptables", [
+          "-t",
+          "mangle",
+          "-I",
+          "PREROUTING",
+          "-d",
+          policy.ip,
+          "-j",
+          "DROP"
+        ])
+      end
+
+      {:ok, "Policy Added"}
+    end
+  end
+
+  def get_blacklist_page(offset, limit),
+    do: GenServer.call(__MODULE__, {:get_blacklist_page, offset, limit})
+
+  def add_domain(domain, %{type: type, user: mac_addr}),
+    do: GenServer.call(__MODULE__, {:add_domain, %{domain: domain, type: type, user: mac_addr}})
+
+  @doc """
+  Create the blacklist file
+  """
+  def create_file() do
+    case path()
+         |> File.write(Jason.encode!([])) do
+      :ok ->
+        {:ok, "Blacklist file created"}
+
+      {:error, reason} ->
+        {:error, "Failed to create Blacklist file: #{inspect(reason)}"}
+    end
+  end
+
+  @doc """
+  Read the Blacklist file
+  """
+  def read_file() do
+    case path() |> File.read() do
+      {:ok, data} ->
+        case Jason.decode(data) do
+          {:ok, data} ->
+            {:ok, data}
+
+          {:error, err} ->
+            {:error, "Failed to decode Blacklist file: #{inspect(err)}"}
+        end
+
+      {:error, reason} ->
+        {:error, "There was a problem reading the file: #{inspect(reason)}"}
+    end
+  end
+
+  @doc """
+  Check if the Blacklist file exists
+  """
+  def file_exists?(), do: path() |> File.exists?()
+
+  # Path helper
+  defp path(), do: "./" <> config_fs(:root) <> config_fs(:blacklist)
+
+  # Config helper
+  defp config_fs(), do: Application.get_env(:sentinel, :fs)
+  defp config_fs(key), do: config_fs()[key]
 end

@@ -4,11 +4,55 @@ defmodule Sentinel.Servers.FakeData.Blacklist do
   """
   def get_data() do
     [
-      "local=/item.1.com",
-      "local=/item.2.com",
-      "local=/item.3.com",
-      "local=/item.4.com",
-      "local=/item.5.com",
+      %{
+        "domain" => "facebook.com",
+        "ip" => "102.132.99.35",
+        "mac_addr" => "123",
+        "ttl" => "NULL",
+        "type" => "system"
+      },
+      %{
+        "domain" => "example.com",
+        "ip" => "23.215.0.138",
+        "mac_addr" => "111",
+        "ttl" => "NULL",
+        "type" => "system"
+      },
+      %{
+        "domain" => "example.com",
+        "ip" => "96.7.128.198",
+        "mac_addr" => "111",
+        "ttl" => "NULL",
+        "type" => "system"
+      },
+      %{
+        "domain" => "example.com",
+        "ip" => "23.215.0.136",
+        "mac_addr" => "111",
+        "ttl" => "NULL",
+        "type" => "system"
+      },
+      %{
+        "domain" => "example.com",
+        "ip" => "23.192.228.84",
+        "mac_addr" => "111",
+        "ttl" => "NULL",
+        "type" => "system"
+      },
+      %{
+        "domain" => "example.com",
+        "ip" => "23.192.228.80",
+        "mac_addr" => "111",
+        "ttl" => "NULL",
+        "type" => "system"
+      },
+      %{
+        "type" => "system",
+        "ttl" => "NULL",
+        "domain" => "example.com",
+        "ip" => "96.7.128.175",
+        "mac_addr" => "111"
+      }
     ]
   end
 end

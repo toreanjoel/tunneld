@@ -60,7 +60,7 @@ defmodule SentinelWeb.Live.Blacklist do
         <%!-- This will be the basic text information that could be informational but some insights --%>
         <div class="py-1 text-sm text-gray-600 flex flex-row items-center">
           <div class="grow">
-            List of domains that are blocked from being accessed
+            List of domains that are blocked from being accessed. This is blocking system wide or per device
           </div>
           <div
             phx-click="open_modal"
@@ -85,7 +85,7 @@ defmodule SentinelWeb.Live.Blacklist do
               <%= for domain <- @blacklist do %>
                 <tr class="hover:bg-gray-50 cursor-pointer">
                   <td class="border border-gray-300 px-4 py-2"><%= domain %></td>
-                  <td class="border border-gray-300 px-4 py-2">
+                  <td class="border border-gray-300 px-4 py-2 w-2">
                     <div class="flex flex-row gap-2">
                       <div
                         phx-click="open_modal"

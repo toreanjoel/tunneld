@@ -4,7 +4,7 @@ defmodule Sentinel.Application do
   @moduledoc false
 
   use Application
-  alias Sentinel.Servers.{Auth, Session, Network, Services, Logs, Devices, Blacklist}
+  alias Sentinel.Servers.{Auth, Session, Services, Logs, Devices, Blacklist}
 
   @impl true
   def start(_type, _args) do
@@ -17,12 +17,11 @@ defmodule Sentinel.Application do
       # {Sentinel.Worker, arg},
       # Start to serve requests, typically the last entry
       SentinelWeb.Endpoint,
-      {Network, []},
       {Services, []},
       {Logs, []},
       {Devices, []},
-      {Blacklist, []},
       {Auth, []},
+      {Blacklist, []},
       {Session, []}
     ]
 
