@@ -6,7 +6,7 @@ defmodule Iptables do
   @doc """
   Add iptables entry - with user mac address
   """
-  def add_user_entry(ip, mac_addr, :insert) do
+  def add_user_entry(ip, mac_addr) do
     System.cmd("iptables", [
       "-t",
       "mangle",
@@ -23,7 +23,7 @@ defmodule Iptables do
     ])
   end
 
-  def remove_user_entry(ip, mac_addr, :remove) do
+  def remove_user_entry(ip, mac_addr) do
     System.cmd("iptables", [
       "-t",
       "mangle",
@@ -43,7 +43,7 @@ defmodule Iptables do
   @doc """
   Add iptables entry - system wide entry
   """
-  def add_system_entry(ip, :insert) do
+  def add_system_entry(ip) do
     System.cmd("iptables", [
       "-t",
       "mangle",
@@ -56,7 +56,7 @@ defmodule Iptables do
     ])
   end
 
-  def remove_system_entry(ip, :remove) do
+  def remove_system_entry(ip) do
     System.cmd("iptables", [
       "-t",
       "mangle",

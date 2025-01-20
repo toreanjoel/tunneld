@@ -106,7 +106,7 @@ defmodule Sentinel.Servers.Blacklist do
         case write_file do
           :ok ->
             # We remove the item to iptables
-            remove_policy(policy)
+            remove_policy(policy, mac_addr)
 
           {:error, err} ->
             {:error, "Failed to remove domain to blacklist: #{inspect(err)}"}
@@ -195,25 +195,25 @@ defmodule Sentinel.Servers.Blacklist do
       :ok
     else
       if policy["type"] === "user" do
-        Iptables.add_user_entry(policy["ip"], policy["mac_addr"], :insert)
+        Iptables.add_user_entry(policy["ip"], policy["mac_addr"])
         {:ok, "Policy Added"}
       else
-        Iptables.add_system_entry(policy["ip"], :insert)
+        Iptables.add_system_entry(policy["ip"])
         {:ok, "Policy Added"}
       end
     end
   end
 
   # Remove a policy for to iptables - system vs user will have systemwide vs not
-  def remove_policy(policy) do
+  def remove_policy(policy, mac) do
     if Application.get_env(:sentinel, :mock_data, false) do
       :ok
     else
       if policy["type"] === "user" do
-        Iptables.remove_user_entry(policy["ip"], policy["mac_addr"], :remove)
+        Iptables.remove_user_entry(policy["ip"], mac)
         {:ok, "Policy Removed"}
       else
-        Iptables.remove_system_entry(policy["ip"], :remove)
+        Iptables.remove_system_entry(policy["ip"])
         {:ok, "Policy Removed"}
       end
     end
@@ -255,12 +255,15 @@ defmodule Sentinel.Servers.Blacklist do
   def get_blacklist_page(offset, limit),
     do: GenServer.call(__MODULE__, {:get_blacklist_page, offset, limit})
 
-  def add_domain(domain, %{type: type, user: mac_addr}),
+  def add_domain(domain, %{type: type}) when type === "system",
+    do: GenServer.call(__MODULE__, {:add_domain, %{domain: domain, type: type, user: "-"}})
+  def add_domain(domain, %{type: type, user: mac_addr}) when type === "user",
     do: GenServer.call(__MODULE__, {:add_domain, %{domain: domain, type: type, user: mac_addr}})
 
-  def remove_domain(domain, %{type: type, user: mac_addr}),
-    do:
-      GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, user: mac_addr}})
+  def remove_domain(domain, %{type: type}) when type === "system",
+    do: GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, user: "-"}})
+  def remove_domain(domain, %{type: type, user: mac_addr}) when type === "user",
+    do: GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, user: mac_addr}})
 
   @doc """
   Check if the Blacklist file exists
