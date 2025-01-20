@@ -3,6 +3,7 @@ defmodule Sentinel.Servers.Blacklist do
   Manage blacklist domains
   """
   use GenServer
+  alias Iptables
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -53,7 +54,7 @@ defmodule Sentinel.Servers.Blacklist do
         policy = %{
           "type" => type,
           "ip" => ip,
-          "mac_addr" => (if type == "user", do: mac_addr, else: "-"),
+          "mac_addr" => if(type == "user", do: mac_addr, else: "-"),
           "domain" => domain,
           "ttl" => "NULL"
         }
@@ -72,6 +73,46 @@ defmodule Sentinel.Servers.Blacklist do
         end
       end)
     end
+
+    {:reply, {:ok, %{}}, state}
+  end
+
+  # Sentinel.Servers.Blacklist.remove_domain("example.com", %{ type: "system", user: "123"})
+  # Request to remove the domains from the blacklist and from iptables
+  def handle_call({:remove_domain, %{domain: domain, type: type, user: mac_addr}}, _from, state) do
+    # Read from the blacklist file
+    {_, data} = read_file()
+
+    # Get all items that need to be removed - domains could have multiple servers stored
+    items_to_remove =
+      Enum.filter(data, fn policy ->
+        policy["domain"] === domain and policy["type"] === type
+      end)
+
+    # Update the file to new data set
+    updated_blocklist =
+      Enum.reject(data, fn policy ->
+        policy["domain"] === domain and policy["type"] === type
+      end)
+
+    write_file = File.write(path(), Jason.encode!(updated_blocklist))
+
+    # Attemtp to remove the items from iptables
+    Enum.each(items_to_remove, fn policy ->
+      # Check if the entry already exists
+      if not has_policy?(policy) do
+        IO.inspect("Removing policy from iptables: #{inspect(policy)}")
+
+        case write_file do
+          :ok ->
+            # We remove the item to iptables
+            remove_policy(policy)
+
+          {:error, err} ->
+            {:error, "Failed to remove domain to blacklist: #{inspect(err)}"}
+        end
+      end
+    end)
 
     {:reply, {:ok, %{}}, state}
   end
@@ -125,43 +166,17 @@ defmodule Sentinel.Servers.Blacklist do
   end
 
   # Here we check if the policy exists in the iptables
-  def has_policy?(policy)do
+  def has_policy?(policy) do
     if Application.get_env(:sentinel, :mock_data, false) do
       false
     else
       # sudo iptables -t mangle -I PREROUTING -m mac --mac-source [MAC] -d [DOMAIN] -j DROP
       exit_code =
         if policy["type"] === "user" do
-          {_output, exit_code} =
-            System.cmd("iptables", [
-              "-t",
-              "mangle",
-              "-C",
-              "PREROUTING",
-              "-m",
-              "mac",
-              "--mac-source",
-              policy["mac_addr"],
-              "-d",
-              policy["ip"],
-              "-j",
-              "DROP"
-            ])
-
+          {_output, exit_code} = Iptables.has_user_entry?(policy["ip"], policy["mac_addr"])
           exit_code
         else
-          {_output, exit_code} =
-            System.cmd("iptables", [
-              "-t",
-              "mangle",
-              "-C",
-              "PREROUTING",
-              "-d",
-              policy["ip"],
-              "-j",
-              "DROP"
-            ])
-
+          {_output, exit_code} = Iptables.has_system_entry?(policy["ip"])
           exit_code
         end
 
@@ -175,43 +190,32 @@ defmodule Sentinel.Servers.Blacklist do
   end
 
   # Here we add the policy for to iptables - system vs user will have systemwide vs not
-  def add_policy(policy)do
+  def add_policy(policy) do
     if Application.get_env(:sentinel, :mock_data, false) do
       :ok
     else
       if policy["type"] === "user" do
-        # sudo iptables -t mangle -I PREROUTING -m mac --mac-source [MAC] -d [DOMAIN] -j DROP
-        System.cmd("iptables", [
-          "-t",
-          "mangle",
-          "-I",
-          "PREROUTING",
-          "-m",
-          "mac",
-          "--mac-source",
-          policy["mac_addr"],
-          "-d",
-          policy["ip"],
-          "-j",
-          "DROP"
-        ])
-
+        Iptables.add_user_entry(policy["ip"], policy["mac_addr"], :insert)
         {:ok, "Policy Added"}
       else
-        # sudo iptables -t mangle -I PREROUTING -d [DOMAIN] -j DROP
-        System.cmd("iptables", [
-          "-t",
-          "mangle",
-          "-I",
-          "PREROUTING",
-          "-d",
-          policy["ip"],
-          "-j",
-          "DROP"
-        ])
+        Iptables.add_system_entry(policy["ip"], :insert)
+        {:ok, "Policy Added"}
       end
+    end
+  end
 
-      {:ok, "Policy Added"}
+  # Remove a policy for to iptables - system vs user will have systemwide vs not
+  def remove_policy(policy) do
+    if Application.get_env(:sentinel, :mock_data, false) do
+      :ok
+    else
+      if policy["type"] === "user" do
+        Iptables.remove_user_entry(policy["ip"], policy["mac_addr"], :remove)
+        {:ok, "Policy Removed"}
+      else
+        Iptables.remove_system_entry(policy["ip"], :remove)
+        {:ok, "Policy Removed"}
+      end
     end
   end
 
@@ -253,6 +257,10 @@ defmodule Sentinel.Servers.Blacklist do
 
   def add_domain(domain, %{type: type, user: mac_addr}),
     do: GenServer.call(__MODULE__, {:add_domain, %{domain: domain, type: type, user: mac_addr}})
+
+  def remove_domain(domain, %{type: type, user: mac_addr}),
+    do:
+      GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, user: mac_addr}})
 
   @doc """
   Check if the Blacklist file exists
