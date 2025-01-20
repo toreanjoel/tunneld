@@ -100,7 +100,7 @@ defmodule Sentinel.Servers.Blacklist do
     # Attemtp to remove the items from iptables
     Enum.each(items_to_remove, fn policy ->
       # Check if the entry already exists
-      if not has_policy?(policy) do
+      if has_policy?(policy) do
         IO.inspect("Removing policy from iptables: #{inspect(policy)}")
 
         case write_file do
@@ -111,6 +111,8 @@ defmodule Sentinel.Servers.Blacklist do
           {:error, err} ->
             {:error, "Failed to remove domain to blacklist: #{inspect(err)}"}
         end
+      else
+        IO.inspect("No policy found to remove from iptables: #{inspect(policy)}")
       end
     end)
 

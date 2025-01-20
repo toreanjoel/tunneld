@@ -89,6 +89,9 @@ defmodule Iptables do
     ])
   end
 
+  @doc """
+  Check the existence of the iptables entry
+  """
   def has_system_entry?(ip) do
     System.cmd("iptables", [
       "-t",
@@ -99,6 +102,18 @@ defmodule Iptables do
       ip,
       "-j",
       "DROP"
+    ])
+  end
+
+  @doc """
+  Flush the iptables - remove all entries
+  """
+  def flush() do
+    System.cmd("iptables", [
+      "-t",
+      "mangle",
+      "-F",
+      "PREROUTING"
     ])
   end
 end
