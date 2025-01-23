@@ -129,7 +129,6 @@ defmodule Sentinel.Servers.Blacklist do
       # Check if the entry already exists
       if not has_policy?(policy) do
         # Add entry to entry table if it isnt added
-        IO.inspect("Adding policy to iptables: #{inspect(policy)}")
         add_policy(policy)
       end
     end)
@@ -196,6 +195,8 @@ defmodule Sentinel.Servers.Blacklist do
     if Application.get_env(:sentinel, :mock_data, false) do
       :ok
     else
+      IO.inspect("Adding policy to iptables: #{inspect(policy)}")
+
       if policy["type"] === "user" do
         Iptables.add_user_entry(policy["ip"], policy["mac_addr"])
         {:ok, "Policy Added"}
