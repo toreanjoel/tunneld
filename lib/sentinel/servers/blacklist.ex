@@ -66,6 +66,7 @@ defmodule Sentinel.Servers.Blacklist do
         case write_file do
           :ok ->
             # We add the item to iptables
+            # TODO: maybe try do this first and then write to file? - could have errors
             add_policy(policy)
 
           {:error, err} ->
