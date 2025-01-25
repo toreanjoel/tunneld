@@ -63,7 +63,7 @@ defmodule Sentinel.Servers.Blacklist do
         # Converting to seconds
         ttl =
           if is_nil(ttl) or ttl === "",
-            do: "NULL",
+            do: "-",
             else: (System.os_time(:second) + String.to_integer(ttl) * 60) |> Integer.to_string()
 
         # policy
@@ -96,7 +96,7 @@ defmodule Sentinel.Servers.Blacklist do
 
   # Sentinel.Servers.Blacklist.remove_domain("example.com", %{ type: "system", user: "123"})
   # Request to remove the domains from the blacklist and from iptables
-  def handle_call({:remove_domain, %{domain: domain, type: type, user: mac_addr}}, _from, state) do
+  def handle_call({:remove_domain, %{domain: domain, type: type, user: _mac_addr}}, _from, state) do
     # Read from the blacklist file
     {_, data} = read_file()
 
@@ -143,21 +143,19 @@ defmodule Sentinel.Servers.Blacklist do
     # Get all items that need to be removed - domains could have multiple servers stored
     items_to_remove =
       Enum.filter(data, fn policy ->
-        ttl = String.to_integer(policy["ttl"])
-        System.os_time(:second) > ttl
+        policy["ttl"] != "-" and System.os_time(:second) > String.to_integer(policy["ttl"])
       end)
 
     # Update the file to new data set
     updated_blocklist =
       Enum.reject(data, fn policy ->
-        ttl = String.to_integer(policy["ttl"])
-        System.os_time(:second) > ttl
+        policy["ttl"] != "-" and System.os_time(:second) > String.to_integer(policy["ttl"])
       end)
 
     write_file = File.write(path(), Jason.encode!(updated_blocklist))
 
     Enum.each(items_to_remove, fn policy ->
-      if policy["ttl"] != "" or policy["ttl"] != "NULL" do
+      if policy["ttl"] != "" do
         IO.inspect("TTL Expired for #{policy["domain"]}, removing from blacklist")
 
         if has_policy?(policy) do
