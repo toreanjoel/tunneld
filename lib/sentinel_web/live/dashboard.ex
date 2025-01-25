@@ -3,7 +3,7 @@ defmodule SentinelWeb.Live.Dashboard do
   Dashboard Page
   """
   use SentinelWeb, :live_view
-  alias Sentinel.Servers.{Session, Blacklist, Services, Devices}
+  alias Sentinel.Servers.{Session, Services, Devices}
   alias SentinelWeb.Components.Navigation
   alias SentinelWeb.Router.Helpers, as: Routes
 
@@ -29,7 +29,8 @@ defmodule SentinelWeb.Live.Dashboard do
       |> assign(:services, %{
         dnsmasq: false,
         dhcpcd: false,
-        hostapd: false
+        hostapd: false,
+        'dnscrypt-proxy': false
       })
       |> assign(:count, %{
         devices: 0
@@ -56,12 +57,14 @@ defmodule SentinelWeb.Live.Dashboard do
     hostapd_status = if !is_nil(services.hostapd) and services.hostapd, do: "good", else: "bad"
     dns_status = if !is_nil(services.dnsmasq) and services.dnsmasq, do: "good", else: "bad"
     dhcpcd_status = if !is_nil(services.dhcpcd) and services.dhcpcd, do: "good", else: "bad"
+    dnscrypt_status = if !is_nil(services[:'dnscrypt-proxy']) and services[:'dnscrypt-proxy'], do: "good", else: "bad"
 
     assigns =
       assigns
       |> assign(:hostapd_status, hostapd_status)
       |> assign(:dns_status, dns_status)
       |> assign(:dhcpcd_status, dhcpcd_status)
+      |> assign(:dnscrypt_status, dnscrypt_status)
 
     ~H"""
     <Navigation.show id="nav">
@@ -78,7 +81,9 @@ defmodule SentinelWeb.Live.Dashboard do
         <%!-- Basic badges --%>
         <div class="flex flex-wrap flex-row gap-1 my-2">
           <.status_badge title="WiFi Access Point" status={@hostapd_status} />
-          <.status_badge title="DNS Server" status={@dns_status} />
+          <.status_badge title="DNS" status={@dns_status} />
+          <.status_badge title="DoH" status={@dnscrypt_status} />
+          <.status_badge title="Dhcpcd" status={@dnscrypt_status} />
         </div>
 
         <hr class="my-3 border-dashed border-gray-300" />
