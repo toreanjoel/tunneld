@@ -63,7 +63,7 @@ defmodule Sentinel.Servers.Logs do
     backup_path = Path.expand("../logs/#{timestamp}.log.gz", File.cwd!())
 
     case get_file_size_mb(@log_file) do
-      {:ok, size} when size > 20 ->
+      {:ok, size} when size > 5 ->
         # Copy the log file to a new file before compression
         System.cmd("cp", [log_path, String.replace_suffix(backup_path, ".gz", "")])
 
@@ -190,7 +190,7 @@ defmodule Sentinel.Servers.Logs do
 
     case System.cmd("sh", [
            "-c",
-           "cat #{log_file} | grep -E 'query\\[A\\].*#{ip}' | tail -n 100 | tac"
+           "cat #{log_file} | grep -E 'query\\[A\\].*#{ip}' | tail -n 1000 | tac"
          ]) do
       {output, 0} ->
         String.split(output, "\n", trim: true)

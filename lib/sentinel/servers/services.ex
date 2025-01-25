@@ -5,7 +5,7 @@ defmodule Sentinel.Servers.Services do
   use GenServer
   require Logger
 
-  @services [:dnsmasq, :dhcpcd, :hostapd]
+  @services [:dnsmasq, :dhcpcd, :hostapd, :'dnscrypt-proxy']
   @interval 30_000
   @topic "sentinel:services"
 
@@ -33,7 +33,9 @@ defmodule Sentinel.Servers.Services do
   # Restart a service
   # Note: that we wont get a response so we need to manage this
   def handle_cast({:restart_service, service}, state) do
-    System.cmd("systemctl", ["restart", service |> to_string])
+    Task.start(fn ->
+      System.cmd("systemctl", ["restart", service |> to_string])
+    end)
     {:noreply, state}
   end
 
