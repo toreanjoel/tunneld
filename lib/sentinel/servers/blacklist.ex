@@ -5,7 +5,7 @@ defmodule Sentinel.Servers.Blacklist do
   use GenServer
   alias Iptables
 
-  # Check every 30s if one of the items in the blacklist had a ttl and remove it if it has expired
+  # Check every 60s if one of the items in the blacklist had a ttl and remove it if it has expired
   @ttl_check_interval 60_000
 
   def start_link(_) do
@@ -172,6 +172,9 @@ defmodule Sentinel.Servers.Blacklist do
         end
       end
     end)
+
+    # Restart the ttl cron
+    ttl_cron()
 
     {:noreply, state}
   end
