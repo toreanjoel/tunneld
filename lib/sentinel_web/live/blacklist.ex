@@ -88,8 +88,8 @@ defmodule SentinelWeb.Live.Blacklist do
                   <td class="border border-gray-300 px-4 py-2"><%= domain %></td>
                   <td class="border border-gray-300 px-4 py-2"><%= ip %></td>
                   <td class="border border-gray-300 px-4 py-2"><%= mac_addr %></td>
-                  <td class="border border-gray-300 px-4 py-2"><%= ttl %></td>
-                  <td class="border border-gray-300 px-4 py-2"><%= type %></td>
+                  <td class="border border-gray-300 px-4 py-2 w-2"><%= ttl %></td>
+                  <td class="border border-gray-300 px-4 py-2 w-2"><%= type %></td>
                   <td class="border border-gray-300 px-4 py-2 w-2">
                     <div class="flex flex-row gap-2">
                       <div
@@ -249,11 +249,12 @@ defmodule SentinelWeb.Live.Blacklist do
         # can be made better without if statemenst and matching rather
         domain_add_fn =
           if params["type"] === "system",
-            do: Blacklist.add_domain(params["domain"], %{type: params["type"]}),
+            do: Blacklist.add_domain(params["domain"], %{type: params["type"], ttl: params["ttl"]}),
             else:
               Blacklist.add_domain(params["domain"], %{
                 type: params["type"],
-                user: params["mac_addr"]
+                user: params["mac_addr"],
+                ttl: params["ttl"]
               })
 
         socket =
@@ -366,12 +367,12 @@ defmodule SentinelWeb.Live.Blacklist do
             label="TTL"
             name="ttl"
             id="ttl"
-            type="text"
+            type="number"
             value={@blacklist_changeset.changes[:ttl] || ""}
             class="mt-2 block w-full rounded-md border border-gray-300 bg-white shadow-sm focus:border-zinc-400 focus:ring-0 sm:text-sm"
           />
           <span class="text-xs text-gray-500 leading-0">
-            How long we want to have the domain blocked for. Not required
+            How long we want to have the domain blocked for. This is in minutes
           </span>
         </div>
         <!-- Error Messages -->

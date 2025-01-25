@@ -5,6 +5,9 @@ defmodule Sentinel.Servers.Blacklist do
   use GenServer
   alias Iptables
 
+  # Check every 30s if one of the items in the blacklist had a ttl and remove it if it has expired
+  @ttl_check_interval 60_000
+
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
@@ -18,6 +21,9 @@ defmodule Sentinel.Servers.Blacklist do
 
     # Here we need to add data to Iptables
     send(self(), :init_iptables)
+
+    # delayed start of the ttl check
+    ttl_cron()
 
     {:ok, %{}}
   end
@@ -38,7 +44,11 @@ defmodule Sentinel.Servers.Blacklist do
   end
 
   # Here we add the domain to the blacklist
-  def handle_call({:add_domain, %{domain: domain, type: type, user: mac_addr}}, _from, state) do
+  def handle_call(
+        {:add_domain, %{domain: domain, type: type, user: mac_addr, ttl: ttl}},
+        _from,
+        state
+      ) do
     {ip_str, _} = System.cmd("dig", ["+short", domain])
 
     if ip_str != "" do
@@ -50,13 +60,19 @@ defmodule Sentinel.Servers.Blacklist do
         # Get current data
         {_, data} = read_file()
 
+        # Converting to seconds
+        ttl =
+          if is_nil(ttl) or ttl === "",
+            do: "NULL",
+            else: (System.os_time(:second) + (String.to_integer(ttl) * 60)) |> Integer.to_string()
+
         # policy
         policy = %{
           "type" => type,
           "ip" => ip,
           "mac_addr" => if(type == "user", do: mac_addr, else: "-"),
           "domain" => domain,
-          "ttl" => "NULL"
+          "ttl" => ttl
         }
 
         data = data ++ [policy]
@@ -135,6 +151,34 @@ defmodule Sentinel.Servers.Blacklist do
     end)
 
     {:noreply, state}
+  end
+
+  # Process the list of items in the blacklist and check if the ttl is expired
+  def handle_info(:ttl_job, state) do
+    {_, data} = read_file()
+
+    Enum.each(data, fn policy ->
+      if policy["ttl"] != "" or policy["ttl"] != "NULL" do
+        ttl = String.to_integer(policy["ttl"])
+
+        if System.os_time(:second) > ttl do
+          IO.inspect("TTL Expired for #{policy["domain"]}, removing from blacklist")
+
+          if policy["type"] === "user" do
+            remove_domain(policy["domain"], %{type: policy["type"], user: policy["mac_addr"]})
+          else
+            remove_domain(policy["domain"], %{type: policy["type"]})
+          end
+        end
+      end
+    end)
+
+    {:noreply, state}
+  end
+
+  # The job that will start interval sync
+  def ttl_cron() do
+    :timer.send_after(@ttl_check_interval, :ttl_job)
   end
 
   # we fetch the user blacklist file data
@@ -259,15 +303,26 @@ defmodule Sentinel.Servers.Blacklist do
   def get_blacklist_page(offset, limit),
     do: GenServer.call(__MODULE__, {:get_blacklist_page, offset, limit})
 
-  def add_domain(domain, %{type: type}) when type === "system",
-    do: GenServer.call(__MODULE__, {:add_domain, %{domain: domain, type: type, user: "-"}})
-  def add_domain(domain, %{type: type, user: mac_addr}) when type === "user",
-    do: GenServer.call(__MODULE__, {:add_domain, %{domain: domain, type: type, user: mac_addr}})
+  def add_domain(domain, %{type: type, ttl: ttl}) when type === "system",
+    do:
+      GenServer.call(
+        __MODULE__,
+        {:add_domain, %{domain: domain, type: type, user: "-", ttl: ttl}}
+      )
+
+  def add_domain(domain, %{type: type, user: mac_addr, ttl: ttl}) when type === "user",
+    do:
+      GenServer.call(
+        __MODULE__,
+        {:add_domain, %{domain: domain, type: type, user: mac_addr, ttl: ttl}}
+      )
 
   def remove_domain(domain, %{type: type}) when type === "system",
     do: GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, user: "-"}})
+
   def remove_domain(domain, %{type: type, user: mac_addr}) when type === "user",
-    do: GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, user: mac_addr}})
+    do:
+      GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, user: mac_addr}})
 
   @doc """
   Check if the Blacklist file exists
