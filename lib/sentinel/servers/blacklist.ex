@@ -178,6 +178,7 @@ defmodule Sentinel.Servers.Blacklist do
 
   # The job that will start interval sync
   def ttl_cron() do
+    IO.inspect("Starting ttl cron")
     :timer.send_after(@ttl_check_interval, :ttl_job)
   end
 
