@@ -64,7 +64,7 @@ defmodule Sentinel.Servers.Blacklist do
         ttl =
           if is_nil(ttl) or ttl === "",
             do: "NULL",
-            else: (System.os_time(:second) + (String.to_integer(ttl) * 60)) |> Integer.to_string()
+            else: (System.os_time(:second) + String.to_integer(ttl) * 60) |> Integer.to_string()
 
         # policy
         policy = %{
@@ -123,7 +123,7 @@ defmodule Sentinel.Servers.Blacklist do
         case write_file do
           :ok ->
             # We remove the item to iptables
-            remove_policy(policy, mac_addr)
+            remove_policy(policy)
 
           {:error, err} ->
             {:error, "Failed to remove domain to blacklist: #{inspect(err)}"}
@@ -134,6 +134,53 @@ defmodule Sentinel.Servers.Blacklist do
     end)
 
     {:reply, {:ok, %{}}, state}
+  end
+
+  # Process the list of items in the blacklist and check if the ttl is expired
+  def handle_info(:ttl_job, state) do
+    {_, data} = read_file()
+
+    # Get all items that need to be removed - domains could have multiple servers stored
+    items_to_remove =
+      Enum.filter(data, fn policy ->
+        ttl = String.to_integer(policy["ttl"])
+        System.os_time(:second) > ttl
+      end)
+
+    # Update the file to new data set
+    updated_blocklist =
+      Enum.reject(data, fn policy ->
+        ttl = String.to_integer(policy["ttl"])
+        System.os_time(:second) > ttl
+      end)
+
+    write_file = File.write(path(), Jason.encode!(updated_blocklist))
+
+    Enum.each(items_to_remove, fn policy ->
+      if policy["ttl"] != "" or policy["ttl"] != "NULL" do
+        IO.inspect("TTL Expired for #{policy["domain"]}, removing from blacklist")
+
+        if has_policy?(policy) do
+          IO.inspect("Removing policy from iptables: #{inspect(policy)}")
+
+          case write_file do
+            :ok ->
+              # We remove the item to iptables
+              remove_policy(policy)
+
+            {:error, err} ->
+              {:error, "Failed to remove domain to blacklist: #{inspect(err)}"}
+          end
+        else
+          IO.inspect("No policy found to remove from iptables: #{inspect(policy)}")
+        end
+      end
+    end)
+
+    # Restart the ttl cron
+    ttl_cron()
+
+    {:noreply, state}
   end
 
   # Add entiries to iptables - async as we have the system starting up at this point
@@ -149,32 +196,6 @@ defmodule Sentinel.Servers.Blacklist do
         add_policy(policy)
       end
     end)
-
-    {:noreply, state}
-  end
-
-  # Process the list of items in the blacklist and check if the ttl is expired
-  def handle_info(:ttl_job, state) do
-    {_, data} = read_file()
-
-    Enum.each(data, fn policy ->
-      if policy["ttl"] != "" or policy["ttl"] != "NULL" do
-        ttl = String.to_integer(policy["ttl"])
-
-        if System.os_time(:second) > ttl do
-          IO.inspect("TTL Expired for #{policy["domain"]}, removing from blacklist")
-
-          if policy["type"] === "user" do
-            remove_domain(policy["domain"], %{type: policy["type"], user: policy["mac_addr"]})
-          else
-            remove_domain(policy["domain"], %{type: policy["type"]})
-          end
-        end
-      end
-    end)
-
-    # Restart the ttl cron
-    ttl_cron()
 
     {:noreply, state}
   end
@@ -256,12 +277,12 @@ defmodule Sentinel.Servers.Blacklist do
   end
 
   # Remove a policy for to iptables - system vs user will have systemwide vs not
-  def remove_policy(policy, mac) do
+  def remove_policy(policy) do
     if Application.get_env(:sentinel, :mock_data, false) do
       :ok
     else
       if policy["type"] === "user" do
-        Iptables.remove_user_entry(policy["ip"], mac)
+        Iptables.remove_user_entry(policy["ip"], policy["mac_addr"])
         {:ok, "Policy Removed"}
       else
         Iptables.remove_system_entry(policy["ip"])
