@@ -8,7 +8,7 @@ defmodule Sentinel.Servers.Logs do
   # We backup every 6 hours and attempt cleanup every day
   # The cleanup will check for files older than 7d
   @six_hours 21_600_000 # 6h
-  @one_day 86_400_000 # 1d
+  @one_day 86_400 # 1d in seconds so we can make sure it works
 
   @topic "sentinel:logs"
   @log_file "_data.log"
@@ -111,6 +111,7 @@ defmodule Sentinel.Servers.Logs do
               :ok -> IO.puts("Deleted old log file: #{filename}")
               {:error, reason} -> IO.puts("Failed to delete #{filename}: #{inspect(reason)}")
             end
+            :ok
           end
 
         _ -> :ok # Skip non-matching files
