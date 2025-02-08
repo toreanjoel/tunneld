@@ -4,7 +4,8 @@ defmodule Sentinel.Application do
   @moduledoc false
 
   use Application
-  alias Sentinel.Servers.{Auth, Session, Services, Logs, Devices, Blacklist}
+  alias Sentinel.Servers.FakeData.Whitelist
+  alias Sentinel.Servers.{Auth, Session, Services, Logs, Devices, Blacklist, Whitelist}
 
   @impl true
   def start(_type, _args) do
@@ -24,6 +25,7 @@ defmodule Sentinel.Application do
       {Devices, []},
       {Auth, []},
       {Blacklist, []},
+      {Whitelist, []},
       {Session, []}
     ]
 

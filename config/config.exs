@@ -69,7 +69,8 @@ config :sentinel, :auth,
 config :sentinel, :fs,
   root: "/data",
   auth: "/auth.json",
-  blacklist: "/blacklist.json"
+  blacklist: "/blacklist.json",
+  whitelist: "/whitelist.json"
 
 config :sentinel, version: "0.1.1"
 
