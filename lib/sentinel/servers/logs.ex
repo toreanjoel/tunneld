@@ -118,7 +118,6 @@ defmodule Sentinel.Servers.Logs do
       end
     end)
 
-    IO.puts("Cleanup completed")
     cleanup_archived_files()
 
     {:noreply, state}

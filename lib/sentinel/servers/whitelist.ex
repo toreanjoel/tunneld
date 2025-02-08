@@ -6,9 +6,11 @@ defmodule Sentinel.Servers.Whitelist do
   alias Iptables
 
   # Check if the devices still have access
-  @access_ttl_interval 300_000
+  # @access_ttl_interval 300_000
+  @access_ttl_interval 10_000
   # Check the pending request of devices that requested already
-  @pending_ttl_interval 300_000
+  # @pending_ttl_interval 300_000
+  @pending_ttl_interval 30_000
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -304,18 +306,11 @@ defmodule Sentinel.Servers.Whitelist do
   def get_whitelist_page(offset, limit),
     do: GenServer.call(__MODULE__, {:get_whitelist_page, offset, limit})
 
-  def add_device_access(domain, %{type: type, ttl: ttl}) when type === "system",
+  def add_device_access(%{hostname: _hostname, ip: _ip, user: _mac_addr, ttl: _ttl, status: _status} = data),
     do:
       GenServer.call(
         __MODULE__,
-        {:add_device_access, %{domain: domain, type: type, user: "-", ttl: ttl}}
-      )
-
-  def add_device_access(domain, %{type: type, user: mac_addr, ttl: ttl}) when type === "user",
-    do:
-      GenServer.call(
-        __MODULE__,
-        {:add_device_access, %{domain: domain, type: type, user: mac_addr, ttl: ttl}}
+        {:add_device_access, data}
       )
 
   def remove_domain(domain, %{type: type}) when type === "system",
