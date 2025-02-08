@@ -29,6 +29,11 @@ defmodule Sentinel.Application do
       {Session, []}
     ]
 
+    # async startup of iptables and the needed base firewall settings
+    Task.start(fn ->
+      Iptables.reset()
+    end)
+
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Sentinel.Supervisor]
