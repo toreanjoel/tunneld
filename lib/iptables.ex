@@ -13,45 +13,20 @@ defmodule Iptables do
   Flush iptables and reinitialize firewall rules.
   """
   def reset() do
-    flush()  # Clear existing firewall rules
+    flush()
 
-    # Enable IP forwarding
     System.cmd("sysctl", ["-w", "net.ipv4.ip_forward=1"])
 
-    # Block all forwarding by default
     System.cmd("iptables", ["-P", "FORWARD", "DROP"])
 
-    # Allow Wi-Fi clients to access Sentinel UI
     System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-d", @sentinel_ip, "-j", "ACCEPT"])
-
-    # Allow Wi-Fi clients to communicate with each other (optional)
     System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-o", @wifi_interface, "-j", "ACCEPT"])
 
-    # Enable NAT for whitelisted devices
     System.cmd("iptables", ["-t", "nat", "-A", "POSTROUTING", "-o", @internet_interface, "-j", "MASQUERADE"])
     System.cmd("iptables", ["-t", "nat", "-A", "POSTROUTING", "-o", @vpn_interface, "-j", "MASQUERADE"])
 
-    # 🔥 **Fix: Block Captive Portal DNS Requests in `INPUT` (not NAT)**
-    Enum.each([
-      "connectivitycheck.gstatic.com",
-      "connectivitycheck.android.com",
-      "captive.apple.com",
-      "msftconnecttest.com",
-      "nmcheck.gnome.org"
-    ], fn url ->
-      System.cmd("iptables", ["-I", "INPUT", "-p", "udp", "--dport", "53", "-m", "string", "--string", url, "--algo", "bm", "-j", "DROP"])
-      System.cmd("iptables", ["-I", "INPUT", "-p", "tcp", "--dport", "53", "-m", "string", "--string", url, "--algo", "bm", "-j", "DROP"])
-    end)
-
-    # 🔥 **Fix: Redirect Captive Portal HTTP Traffic in `nat PREROUTING`**
-    System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "80", "-j", "DNAT", "--to-destination", @sentinel_ip])
-
-    # 🔥 **Fix: Block HTTPS to Force Captive Portal Detection (Move from `nat` to `filter`)**
-    System.cmd("iptables", ["-I", "FORWARD", "-p", "tcp", "--dport", "443", "-j", "REJECT"])
-
-    IO.puts("Iptables reset: Captive Portal Enabled. Internet blocked by default. Only Sentinel UI is accessible.")
+    IO.puts("Iptables reset: All traffic blocked except access to Sentinel UI.")
   end
-
 
   @doc """
   Flush all iptables rules.
@@ -115,11 +90,8 @@ defmodule Iptables do
   Grant a device (by MAC and IP) internet access by allowing FORWARD and POSTROUTING.
   """
   def grant_access(ip, mac) do
-    # Allow the device to forward traffic to the internet
-    System.cmd("iptables", ["-I", "FORWARD", "-m", "mac", "--mac-source", mac, "-s", ip, "-j", "ACCEPT"])
-
-    # Enable NAT for the device
-    System.cmd("iptables", ["-t", "nat", "-I", "POSTROUTING", "-s", ip, "-j", "MASQUERADE"])
+    System.cmd("iptables", ["-A", "FORWARD", "-s", ip, "-m", "mac", "--mac-source", mac, "-j", "ACCEPT"])
+    System.cmd("iptables", ["-t", "nat", "-A", "POSTROUTING", "-s", ip, "-j", "MASQUERADE"])
 
     IO.puts("Granted internet access to #{ip} (MAC: #{mac})")
   end
@@ -128,13 +100,9 @@ defmodule Iptables do
   Revoke a device's internet access (block MAC and IP).
   """
   def revoke_access(ip, mac) do
-    # Remove forwarding rule
-    System.cmd("iptables", ["-D", "FORWARD", "-m", "mac", "--mac-source", mac, "-s", ip, "-j", "ACCEPT"])
-
-    # Remove NAT rule
+    System.cmd("iptables", ["-D", "FORWARD", "-s", ip, "-m", "mac", "--mac-source", mac, "-j", "ACCEPT"])
     System.cmd("iptables", ["-t", "nat", "-D", "POSTROUTING", "-s", ip, "-j", "MASQUERADE"])
 
     IO.puts("Revoked internet access for #{ip} (MAC: #{mac})")
   end
-
 end
