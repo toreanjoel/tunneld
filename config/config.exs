@@ -72,7 +72,7 @@ config :sentinel, :fs,
   blacklist: "/blacklist.json",
   whitelist: "/whitelist.json"
 
-config :sentinel, version: "0.1.1"
+config :sentinel, version: "0.1.2"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
