@@ -188,10 +188,7 @@ defmodule Sentinel.Servers.Logs do
     # Dynamically resolve the path to the logs directory one level up
     log_file = Path.expand("../logs/" <> @log_file, File.cwd!())
 
-    case System.cmd("sh", [
-           "-c",
-           "cat #{log_file} | grep -E 'query\\[A\\].*#{ip}' | tail -n 1000 | tac"
-         ]) do
+    case System.cmd("sh", ["-c", "tail -n 1000 #{log_file} | grep -E 'query\\[A\\].*#{ip}'"]) do
       {output, 0} ->
         String.split(output, "\n", trim: true)
 
