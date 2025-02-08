@@ -89,7 +89,7 @@ defmodule Sentinel.Servers.Whitelist do
   end
 
   # Request to remove the domains from the blacklist and from iptables
-  def handle_call({:remove_device_access, %{mac: mac }}, _from, state) do
+  def handle_call({:remove_device_access, %{mac: mac}}, _from, state) do
     # Read from the blacklist file
     {_, data} = read_file()
 
