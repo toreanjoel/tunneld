@@ -99,19 +99,14 @@ defmodule Sentinel.Servers.Whitelist do
     # We check if there was something found and try and remove it
     if not Enum.empty?(policy) do
       # Check if the entry already exists
-      if has_policy?(policy) do
-        IO.inspect("Removing policy from iptables: #{inspect(policy)}")
+      IO.inspect("Removing policy from iptables: #{inspect(policy)}")
+      case write_file do
+        :ok ->
+          # We remove the item to iptables
+          remove_policy(policy)
 
-        case write_file do
-          :ok ->
-            # We remove the item to iptables
-            remove_policy(policy)
-
-          {:error, err} ->
-            {:error, "Failed to remove domain to blacklist: #{inspect(err)}"}
-        end
-      else
-        IO.inspect("No policy found to remove from iptables: #{inspect(policy)}")
+        {:error, err} ->
+          {:error, "Failed to revoke device access: #{inspect(err)}"}
       end
     end
 
