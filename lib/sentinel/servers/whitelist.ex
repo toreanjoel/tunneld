@@ -49,7 +49,7 @@ defmodule Sentinel.Servers.Whitelist do
 
   # Here we grant the device access to the internet
   def handle_call(
-        {:add_device_access, %{hostname: hostname, ip: ip, user: mac_addr, ttl: ttl, status: status}},
+        {:add_device_access, %{hostname: hostname, ip: ip, mac: mac, ttl: ttl, status: status}},
         _from,
         state
       ) do
@@ -67,7 +67,7 @@ defmodule Sentinel.Servers.Whitelist do
       policy = %{
         "hostname" => hostname,
         "ip" => ip,
-        "mac_addr" => mac_addr,
+        "mac" => mac,
         "ttl" => ttl,
         "status" => status
       }
@@ -89,20 +89,20 @@ defmodule Sentinel.Servers.Whitelist do
   end
 
   # Request to remove the domains from the blacklist and from iptables
-  def handle_call({:remove_domain, %{hostname: hostname, ip: ip, user: mac_addr, ttl: ttl, status: status}}, _from, state) do
+  def handle_call({:remove_domain, %{hostname: hostname, ip: ip, user: mac, ttl: ttl, status: status}}, _from, state) do
     # Read from the blacklist file
     {_, data} = read_file()
 
     # Get all items that need to be removed
     policy =
       Enum.filter(data, fn policy ->
-        policy["hostname"] === hostname and policy["mac_addr"] === mac_addr
+        policy["hostname"] === hostname and policy["mac"] === mac
       end) |> Enum.at(0)
 
     # Update the file to new data set
     updated_whitelist =
       Enum.reject(data, fn policy ->
-        policy["hostname"] === hostname and policy["mac_addr"] === mac_addr
+        policy["hostname"] === hostname and policy["mac"] === mac
       end)
 
     write_file = File.write(path(), Jason.encode!(updated_whitelist))
@@ -222,7 +222,7 @@ defmodule Sentinel.Servers.Whitelist do
       # sudo iptables -t mangle -I PREROUTING -m mac --mac-source [MAC] -d [DOMAIN] -j DROP
       exit_code =
         if policy["type"] === "user" do
-          {_output, exit_code} = Iptables.has_user_entry?(policy["ip"], policy["mac_addr"])
+          {_output, exit_code} = Iptables.has_user_entry?(policy["ip"], policy["mac"])
           exit_code
         else
           {_output, exit_code} = Iptables.has_system_entry?(policy["ip"])
@@ -246,7 +246,7 @@ defmodule Sentinel.Servers.Whitelist do
       IO.inspect("Adding policy to iptables: #{inspect(policy)}")
 
       if policy["type"] === "user" do
-        Iptables.add_user_entry(policy["ip"], policy["mac_addr"])
+        Iptables.add_user_entry(policy["ip"], policy["mac"])
         {:ok, "Policy Added"}
       else
         Iptables.add_system_entry(policy["ip"])
@@ -261,7 +261,7 @@ defmodule Sentinel.Servers.Whitelist do
       :ok
     else
       if policy["type"] === "user" do
-        Iptables.remove_user_entry(policy["ip"], policy["mac_addr"])
+        Iptables.remove_user_entry(policy["ip"], policy["mac"])
         {:ok, "Policy Removed"}
       else
         Iptables.remove_system_entry(policy["ip"])
@@ -306,7 +306,7 @@ defmodule Sentinel.Servers.Whitelist do
   def get_whitelist_page(offset, limit),
     do: GenServer.call(__MODULE__, {:get_whitelist_page, offset, limit})
 
-  def add_device_access(%{hostname: _hostname, ip: _ip, user: _mac_addr, ttl: _ttl, status: _status} = data),
+  def add_device_access(%{hostname: _hostname, ip: _ip, user: _mac, ttl: _ttl, status: _status} = data),
     do:
       GenServer.call(
         __MODULE__,
@@ -316,9 +316,9 @@ defmodule Sentinel.Servers.Whitelist do
   def remove_domain(domain, %{type: type}) when type === "system",
     do: GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, user: "-"}})
 
-  def remove_domain(domain, %{type: type, user: mac_addr}) when type === "user",
+  def remove_domain(domain, %{type: type, mac: mac}) when type === "user",
     do:
-      GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, user: mac_addr}})
+      GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, user: mac}})
 
   @doc """
   Check if the Blacklist file exists

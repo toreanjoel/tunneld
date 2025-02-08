@@ -8,7 +8,7 @@ defmodule Sentinel.Schema.Blacklist do
   schema "blacklists" do
     field :domain, :string
     field :ip, :string
-    field :mac_addr, :string
+    field :mac, :string
     field :ttl, :string
     field :type, :string
 
@@ -18,7 +18,7 @@ defmodule Sentinel.Schema.Blacklist do
   @doc false
   def changeset(blacklist, attrs) do
     blacklist
-    |> cast(attrs, [:domain,:ip,:mac_addr,:ttl,:type])
+    |> cast(attrs, [:domain,:ip,:mac,:ttl,:type])
     # TODO: Add validation for the fields here
     |> validate_required([:domain, :type])
   end

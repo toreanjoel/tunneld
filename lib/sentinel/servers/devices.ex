@@ -71,13 +71,13 @@ defmodule Sentinel.Servers.Devices do
         else: clean_data |> String.split("\n")
 
     Enum.map(leases, fn lease ->
-      [lease_expiry, mac_addr, ip, host_name, client_id] = String.split(lease, " ")
+      [lease_expiry, mac, ip, hostname, client_id] = String.split(lease, " ")
 
       %{
         expiry: lease_expiry,
-        mac_addr: mac_addr,
+        mac: mac,
         ip: ip,
-        host_name: host_name,
+        hostname: hostname,
         client_id: client_id
       }
     end)

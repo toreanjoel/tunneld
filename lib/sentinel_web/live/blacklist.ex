@@ -83,11 +83,11 @@ defmodule SentinelWeb.Live.Blacklist do
               </tr>
             </thead>
             <tbody>
-              <%= for %{"domain" => domain, "ip" => ip, "mac_addr" => mac_addr, "ttl" => ttl, "type" => type} <- @blacklist do %>
+              <%= for %{"domain" => domain, "ip" => ip, "mac" => mac, "ttl" => ttl, "type" => type} <- @blacklist do %>
                 <tr class="hover:bg-gray-50 cursor-pointer">
                   <td class="border border-gray-300 px-4 py-2"><%= domain %></td>
                   <td class="border border-gray-300 px-4 py-2"><%= ip %></td>
-                  <td class="border border-gray-300 px-4 py-2"><%= mac_addr %></td>
+                  <td class="border border-gray-300 px-4 py-2"><%= mac %></td>
                   <td class="border border-gray-300 px-4 py-2 w-2"><%= ttl %></td>
                   <td class="border border-gray-300 px-4 py-2 w-2"><%= type %></td>
                   <td class="border border-gray-300 px-4 py-2 w-2">
@@ -95,7 +95,7 @@ defmodule SentinelWeb.Live.Blacklist do
                       <div
                         phx-click="open_modal"
                         phx-value-domain={domain}
-                        phx-value-mac={mac_addr}
+                        phx-value-mac={mac}
                         phx-value-type={type}
                         class="bg-white hover:bg-gray-200 p-1 rounded cursor-pointer"
                       >
@@ -207,7 +207,7 @@ defmodule SentinelWeb.Live.Blacklist do
         else:
           Blacklist.remove_domain(params["domain"], %{
             type: params["type"],
-            user: params["mac_addr"]
+            mac: params["mac"]
           })
 
     socket =
@@ -253,7 +253,7 @@ defmodule SentinelWeb.Live.Blacklist do
             else:
               Blacklist.add_domain(params["domain"], %{
                 type: params["type"],
-                user: params["mac_addr"],
+                mac: params["mac"],
                 ttl: params["ttl"]
               })
 
@@ -291,8 +291,8 @@ defmodule SentinelWeb.Live.Blacklist do
     {_, devices_state} = Devices.get_state()
 
     devices =
-      Enum.map(devices_state.devices, fn %{host_name: host_name, mac_addr: mac} ->
-        {host_name, mac}
+      Enum.map(devices_state.devices, fn %{hostname: hostname, mac: mac} ->
+        {hostname, mac}
       end)
 
     socket =
@@ -350,11 +350,11 @@ defmodule SentinelWeb.Live.Blacklist do
         <div :if={@blacklist_changeset.changes[:type] == "user"} class="w-full">
           <.input
             label="Mac Address (USER)"
-            name="mac_addr"
-            id="mac_addr"
+            name="mac"
+            id="mac"
             type="select"
             options={@devices}
-            value={@blacklist_changeset.changes[:mac_addr] || ""}
+            value={@blacklist_changeset.changes[:mac] || ""}
             class="mt-2 block w-full rounded-md border border-gray-300 bg-white shadow-sm focus:border-zinc-400 focus:ring-0 sm:text-sm"
           />
           <span class="text-xs text-gray-500 leading-0">
@@ -409,7 +409,7 @@ defmodule SentinelWeb.Live.Blacklist do
         <.button
           phx-click="remove_domain"
           phx-value-domain={@modal.data["domain"]}
-          phx-value-mac_addr={@modal.data["mac"]}
+          phx-value-mac={@modal.data["mac"]}
           phx-value-type={@modal.data["type"]}
           class="bg-blue-500 text-white px-4 py-2 rounded-md"
         >

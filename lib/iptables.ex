@@ -6,7 +6,7 @@ defmodule Iptables do
   @doc """
   Add iptables entry - with user mac address
   """
-  def add_user_entry(ip, mac_addr) do
+  def add_user_entry(ip, mac) do
     System.cmd("iptables", [
       "-t",
       "mangle",
@@ -15,7 +15,7 @@ defmodule Iptables do
       "-m",
       "mac",
       "--mac-source",
-      mac_addr,
+      mac,
       "-d",
       ip,
       "-j",
@@ -23,7 +23,7 @@ defmodule Iptables do
     ])
   end
 
-  def remove_user_entry(ip, mac_addr) do
+  def remove_user_entry(ip, mac) do
     System.cmd("iptables", [
       "-t",
       "mangle",
@@ -32,7 +32,7 @@ defmodule Iptables do
       "-m",
       "mac",
       "--mac-source",
-      mac_addr,
+      mac,
       "-d",
       ip,
       "-j",
@@ -72,7 +72,7 @@ defmodule Iptables do
   @doc """
   Check the existence of the iptables entry
   """
-  def has_user_entry?(ip, mac_addr) do
+  def has_user_entry?(ip, mac) do
     System.cmd("iptables", [
       "-t",
       "mangle",
@@ -81,7 +81,7 @@ defmodule Iptables do
       "-m",
       "mac",
       "--mac-source",
-      mac_addr,
+      mac,
       "-d",
       ip,
       "-j",

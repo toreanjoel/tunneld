@@ -45,7 +45,7 @@ defmodule Sentinel.Servers.Blacklist do
 
   # Here we add the domain to the blacklist
   def handle_call(
-        {:add_domain, %{domain: domain, type: type, user: mac_addr, ttl: ttl}},
+        {:add_domain, %{domain: domain, type: type, mac: mac, ttl: ttl}},
         _from,
         state
       ) do
@@ -70,7 +70,7 @@ defmodule Sentinel.Servers.Blacklist do
         policy = %{
           "type" => type,
           "ip" => ip,
-          "mac_addr" => if(type == "user", do: mac_addr, else: "-"),
+          "mac" => if(type == "user", do: mac, else: "-"),
           "domain" => domain,
           "ttl" => ttl
         }
@@ -94,9 +94,9 @@ defmodule Sentinel.Servers.Blacklist do
     {:reply, {:ok, %{}}, state}
   end
 
-  # Sentinel.Servers.Blacklist.remove_domain("example.com", %{ type: "system", user: "123"})
+  # Sentinel.Servers.Blacklist.remove_domain("example.com", %{ type: "system", mac: "123"})
   # Request to remove the domains from the blacklist and from iptables
-  def handle_call({:remove_domain, %{domain: domain, type: type, user: _mac_addr}}, _from, state) do
+  def handle_call({:remove_domain, %{domain: domain, type: type, mac: _mac}}, _from, state) do
     # Read from the blacklist file
     {_, data} = read_file()
 
@@ -241,7 +241,7 @@ defmodule Sentinel.Servers.Blacklist do
       # sudo iptables -t mangle -I PREROUTING -m mac --mac-source [MAC] -d [DOMAIN] -j DROP
       exit_code =
         if policy["type"] === "user" do
-          {_output, exit_code} = Iptables.has_user_entry?(policy["ip"], policy["mac_addr"])
+          {_output, exit_code} = Iptables.has_user_entry?(policy["ip"], policy["mac"])
           exit_code
         else
           {_output, exit_code} = Iptables.has_system_entry?(policy["ip"])
@@ -265,7 +265,7 @@ defmodule Sentinel.Servers.Blacklist do
       IO.inspect("Adding policy to iptables: #{inspect(policy)}")
 
       if policy["type"] === "user" do
-        Iptables.add_user_entry(policy["ip"], policy["mac_addr"])
+        Iptables.add_user_entry(policy["ip"], policy["mac"])
         {:ok, "Policy Added"}
       else
         Iptables.add_system_entry(policy["ip"])
@@ -280,7 +280,7 @@ defmodule Sentinel.Servers.Blacklist do
       :ok
     else
       if policy["type"] === "user" do
-        Iptables.remove_user_entry(policy["ip"], policy["mac_addr"])
+        Iptables.remove_user_entry(policy["ip"], policy["mac"])
         {:ok, "Policy Removed"}
       else
         Iptables.remove_system_entry(policy["ip"])
@@ -329,22 +329,22 @@ defmodule Sentinel.Servers.Blacklist do
     do:
       GenServer.call(
         __MODULE__,
-        {:add_domain, %{domain: domain, type: type, user: "-", ttl: ttl}}
+        {:add_domain, %{domain: domain, type: type, mac: "-", ttl: ttl}}
       )
 
-  def add_domain(domain, %{type: type, user: mac_addr, ttl: ttl}) when type === "user",
+  def add_domain(domain, %{type: type, mac: mac, ttl: ttl}) when type === "user",
     do:
       GenServer.call(
         __MODULE__,
-        {:add_domain, %{domain: domain, type: type, user: mac_addr, ttl: ttl}}
+        {:add_domain, %{domain: domain, type: type, mac: mac, ttl: ttl}}
       )
 
   def remove_domain(domain, %{type: type}) when type === "system",
-    do: GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, user: "-"}})
+    do: GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, mac: "-"}})
 
-  def remove_domain(domain, %{type: type, user: mac_addr}) when type === "user",
+  def remove_domain(domain, %{type: type, mac: mac}) when type === "user",
     do:
-      GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, user: mac_addr}})
+      GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, mac: mac}})
 
   @doc """
   Check if the Blacklist file exists

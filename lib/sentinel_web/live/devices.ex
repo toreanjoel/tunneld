@@ -72,8 +72,8 @@ defmodule SentinelWeb.Live.Devices do
                 >
                   <td class="border border-gray-300 px-4 py-2"><%= device.ip %></td>
                   <td class="border border-gray-300 px-4 py-2"><%= device.client_id %></td>
-                  <td class="border border-gray-300 px-4 py-2"><%= device.mac_addr %></td>
-                  <td class="border border-gray-300 px-4 py-2"><%= device.host_name %></td>
+                  <td class="border border-gray-300 px-4 py-2"><%= device.mac %></td>
+                  <td class="border border-gray-300 px-4 py-2"><%= device.hostname %></td>
                   <td class="border border-gray-300 px-4 py-2">
                     <%= DateTime.from_unix!(String.to_integer(device.expiry)) |> DateTime.to_string() %>
                   </td>

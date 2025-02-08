@@ -7,42 +7,42 @@ defmodule Sentinel.Servers.FakeData.Blacklist do
       %{
         "domain" => "facebook.com",
         "ip" => "102.132.99.35",
-        "mac_addr" => "123",
+        "mac" => "123",
         "ttl" => "-",
         "type" => "system"
       },
       %{
         "domain" => "example.com",
         "ip" => "23.215.0.138",
-        "mac_addr" => "111",
+        "mac" => "111",
         "ttl" => "-",
         "type" => "system"
       },
       %{
         "domain" => "example.com",
         "ip" => "96.7.128.198",
-        "mac_addr" => "111",
+        "mac" => "111",
         "ttl" => "-",
         "type" => "system"
       },
       %{
         "domain" => "example.com",
         "ip" => "23.215.0.136",
-        "mac_addr" => "111",
+        "mac" => "111",
         "ttl" => "-",
         "type" => "system"
       },
       %{
         "domain" => "example.com",
         "ip" => "23.192.228.84",
-        "mac_addr" => "111",
+        "mac" => "111",
         "ttl" => "-",
         "type" => "system"
       },
       %{
         "domain" => "example.com",
         "ip" => "23.192.228.80",
-        "mac_addr" => "111",
+        "mac" => "111",
         "ttl" => "-",
         "type" => "system"
       },
@@ -51,7 +51,7 @@ defmodule Sentinel.Servers.FakeData.Blacklist do
         "ttl" => "-",
         "domain" => "example.com",
         "ip" => "96.7.128.175",
-        "mac_addr" => "111"
+        "mac" => "111"
       }
     ]
   end
