@@ -31,6 +31,17 @@ defmodule SentinelWeb.Router do
     live "/devices/:ip", Live.DeviceDetails
   end
 
+  # NOTE: This is for the devices that connect to the network, they will try query for captive portal
+  # We will intercept this on the firewall and send the user to the relelvant gateway
+  scope "/", SentinelWeb do
+    live "/generate_204", Live.Login  # Android captive portal check
+    live "/ncsi.txt", Live.Login  # Windows captive portal check
+    live "/hotspot-detect.html", Live.Login  # macOS/iOS captive portal check
+    live "/success.txt", Live.Login  # Some Android versions
+    live "/captive-portal", Live.Login  # Redirect manually to login page
+    live "/", Live.Login  # Main login page
+  end
+
   # controller to manage the file downloads
   scope "/files", SentinelWeb do
     pipe_through [:browser]

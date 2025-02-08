@@ -10,38 +10,49 @@ defmodule Iptables do
   @sentinel_ip "10.0.0.1"   # Sentinel Gateway - This can be a config
 
   @doc """
-  Flush iptables and reinitialize firewall rules with no internet access by default.
+  Flush iptables and reinitialize firewall rules.
   """
   def reset() do
-    flush()  # Clear all iptables rules first
+    flush()  # Clear existing firewall rules
+
+    gateway_ip = get_gateway_ip()
+    IO.puts("Detected Gateway IP: #{gateway_ip}")
 
     # Enable IP forwarding
     System.cmd("sysctl", ["-w", "net.ipv4.ip_forward=1"])
 
-    # Block all forwarding by default (no internet access for any device)
+    # Block all forwarding by default
     System.cmd("iptables", ["-P", "FORWARD", "DROP"])
 
-    # Allow Wi-Fi clients to access Sentinel UI (gateway at @sentinel_ip)
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-d", @sentinel_ip, "-j", "ACCEPT"])
+    # Allow Wi-Fi clients to access Sentinel UI
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-d", gateway_ip, "-j", "ACCEPT"])
 
-    # Allow Wi-Fi clients to communicate within the local network (optional)
+    # Allow Wi-Fi clients to communicate with each other (optional)
     System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-o", @wifi_interface, "-j", "ACCEPT"])
 
-    # Allow NAT for internet access (ONLY for whitelisted devices)
+    # Enable NAT for whitelisted devices
     System.cmd("iptables", ["-t", "nat", "-A", "POSTROUTING", "-o", @internet_interface, "-j", "MASQUERADE"])
     System.cmd("iptables", ["-t", "nat", "-A", "POSTROUTING", "-o", @vpn_interface, "-j", "MASQUERADE"])
 
-    # Redirect DNS requests to dnsmasq (ensures captive portal works)
-    System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-port", "5336"])
-    System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-port", "5336"])
-
-    # Captive Portal Rules (Forcing All HTTP Requests to Sentinel)
+    # Captive portal redirection (HTTP traffic to Sentinel)
     System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "80", "-j", "DNAT", "--to-destination", @sentinel_ip])
 
-    # Block HTTPS so devices detect the captive portal (forces pop-up)
+    # Block HTTPS to force captive portal pop-up
     System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "443", "-j", "REJECT"])
 
-    IO.puts("Iptables reset: Internet blocked for all devices by default. Only Sentinel UI is accessible.")
+    # Redirect captive portal detection URLs
+    captive_urls = [
+      "connectivitycheck.gstatic.com",
+      "captive.apple.com",
+      "msftconnecttest.com",
+      "hotspot-detect.html"
+    ]
+
+    Enum.each(captive_urls, fn url ->
+      System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "80", "-m", "string", "--string", url, "--algo", "bm", "-j", "DNAT", "--to-destination", gateway_ip])
+    end)
+
+    IO.puts("Iptables reset: Captive Portal Enabled. Internet blocked by default. Only Sentinel UI is accessible.")
   end
 
   @doc """
