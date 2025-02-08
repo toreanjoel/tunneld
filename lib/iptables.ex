@@ -15,9 +15,6 @@ defmodule Iptables do
   def reset() do
     flush()  # Clear existing firewall rules
 
-    gateway_ip = get_gateway_ip()
-    IO.puts("Detected Gateway IP: #{gateway_ip}")
-
     # Enable IP forwarding
     System.cmd("sysctl", ["-w", "net.ipv4.ip_forward=1"])
 
@@ -25,7 +22,7 @@ defmodule Iptables do
     System.cmd("iptables", ["-P", "FORWARD", "DROP"])
 
     # Allow Wi-Fi clients to access Sentinel UI
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-d", gateway_ip, "-j", "ACCEPT"])
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-d", @sentinel_ip, "-j", "ACCEPT"])
 
     # Allow Wi-Fi clients to communicate with each other (optional)
     System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-o", @wifi_interface, "-j", "ACCEPT"])
@@ -49,7 +46,7 @@ defmodule Iptables do
     ]
 
     Enum.each(captive_urls, fn url ->
-      System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "80", "-m", "string", "--string", url, "--algo", "bm", "-j", "DNAT", "--to-destination", gateway_ip])
+      System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "80", "-m", "string", "--string", url, "--algo", "bm", "-j", "DNAT", "--to-destination", @sentinel_ip])
     end)
 
     IO.puts("Iptables reset: Captive Portal Enabled. Internet blocked by default. Only Sentinel UI is accessible.")
