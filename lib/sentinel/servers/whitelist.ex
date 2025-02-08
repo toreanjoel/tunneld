@@ -151,9 +151,9 @@ defmodule Sentinel.Servers.Whitelist do
     {_, data} = read_file()
 
     # Loop over the data
-    Enum.each(data, fn _policy ->
+    Enum.each(data, fn policy ->
       # TODO: add the devices that has access persisted to have access
-      IO.inspect("INIT THE DATA IN THE WHITELIST TO THE FIREWALL")
+      add_policy(policy)
     end)
 
     {:noreply, state}
