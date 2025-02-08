@@ -306,7 +306,7 @@ defmodule Sentinel.Servers.Whitelist do
   def get_whitelist_page(offset, limit),
     do: GenServer.call(__MODULE__, {:get_whitelist_page, offset, limit})
 
-  def add_device_access(%{hostname: _hostname, ip: _ip, user: _mac, ttl: _ttl, status: _status} = data),
+  def add_device_access(%{hostname: _hostname, ip: _ip, mac: _mac, ttl: _ttl, status: _status} = data),
     do:
       GenServer.call(
         __MODULE__,
