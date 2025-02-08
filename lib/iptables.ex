@@ -21,7 +21,7 @@ defmodule Iptables do
     # Block all forwarding by default (no internet access for any device)
     System.cmd("iptables", ["-P", "FORWARD", "DROP"])
 
-    # Allow Wi-Fi clients to access Sentinel UI (gateway at 192.168.1.1)
+    # Allow Wi-Fi clients to access Sentinel UI (gateway at @sentinel_ip)
     System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-d", @sentinel_ip, "-j", "ACCEPT"])
 
     # Allow Wi-Fi clients to communicate within the local network (optional)
@@ -34,6 +34,12 @@ defmodule Iptables do
     # Redirect DNS requests to dnsmasq (ensures captive portal works)
     System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-port", "5336"])
     System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-port", "5336"])
+
+    # Captive Portal Rules (Forcing All HTTP Requests to Sentinel)
+    System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "80", "-j", "DNAT", "--to-destination", @sentinel_ip])
+
+    # Block HTTPS so devices detect the captive portal (forces pop-up)
+    System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "443", "-j", "REJECT"])
 
     IO.puts("Iptables reset: Internet blocked for all devices by default. Only Sentinel UI is accessible.")
   end
