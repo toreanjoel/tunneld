@@ -38,15 +38,15 @@ defmodule Iptables do
     System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "443", "-j", "REJECT"])
 
     # Redirect captive portal detection URLs
-    captive_urls = [
+    # Drop captive portal detection requests to force OS to open the login screen
+    Enum.each([
       "connectivitycheck.gstatic.com",
       "captive.apple.com",
       "msftconnecttest.com",
-      "hotspot-detect.html"
-    ]
-
-    Enum.each(captive_urls, fn url ->
-      System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "80", "-m", "string", "--string", url, "--algo", "bm", "-j", "DNAT", "--to-destination", @sentinel_ip])
+      "hotspot-detect.html",
+      "nmcheck.gnome.org"
+    ], fn url ->
+      System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "80", "-m", "string", "--string", url, "--algo", "bm", "-j", "REJECT"])
     end)
 
     IO.puts("Iptables reset: Captive Portal Enabled. Internet blocked by default. Only Sentinel UI is accessible.")
