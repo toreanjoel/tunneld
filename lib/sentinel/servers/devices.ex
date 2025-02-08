@@ -6,7 +6,6 @@ defmodule Sentinel.Servers.Devices do
   require Logger
 
   @interval 10_000
-  @topic "sentinel:devices"
   # TODO: this needs to be added to config?
   @path "/var/lib/misc/dnsmasq.leases"
 
@@ -46,8 +45,6 @@ defmodule Sentinel.Servers.Devices do
       count: devices |> length(),
       devices: devices
     }
-
-    Phoenix.PubSub.broadcast(Sentinel.PubSub, @topic, {:device_info, result})
 
     # Refetch
     sync_devices()

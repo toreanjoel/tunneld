@@ -7,14 +7,12 @@ defmodule SentinelWeb.Live.Devices do
   alias SentinelWeb.Components.Navigation
   alias SentinelWeb.Router.Helpers, as: Routes
 
-  # we check if the user is authenticated
   on_mount SentinelWeb.Hooks.CheckAuth
 
   @doc """
   Initialize the Devices
   """
   def mount(_params, %{"ip" => ip} = _session, socket) do
-    SentinelWeb.Endpoint.subscribe("sentinel:devices")
 
     socket =
       socket
@@ -27,13 +25,6 @@ defmodule SentinelWeb.Live.Devices do
     send(self(), :init)
 
     {:ok, socket}
-  end
-
-  # Unsubscribe from pubsub
-  def terminate(_reason, _state) do
-    SentinelWeb.Endpoint.unsubscribe("sentinel:devices")
-    IO.puts("Unsubscribed from PubSub")
-    :ok
   end
 
   @doc """
@@ -61,6 +52,7 @@ defmodule SentinelWeb.Live.Devices do
                 <th class="border border-gray-300 px-4 py-2 text-left">MAC Address</th>
                 <th class="border border-gray-300 px-4 py-2 text-left">Name</th>
                 <th class="border border-gray-300 px-4 py-2 text-left">Expiry</th>
+                <th class="border border-gray-300 px-4 py-2 text-left w-2">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -76,6 +68,21 @@ defmodule SentinelWeb.Live.Devices do
                   <td class="border border-gray-300 px-4 py-2"><%= device.hostname %></td>
                   <td class="border border-gray-300 px-4 py-2">
                     <%= DateTime.from_unix!(String.to_integer(device.expiry)) |> DateTime.to_string() %>
+                  </td>
+                  <td class="border border-gray-300 px-4 py-2 w-2">
+                    <%= if Enum.any?(@whitelist, fn w -> w["mac"] == device.mac end) do %>
+                      <span class="text-green-600 font-semibold">Access Granted</span>
+                    <% else %>
+                      <button
+                        phx-click="grant_access"
+                        phx-value-ip={device.ip}
+                        phx-value-mac={device.mac}
+                        phx-value-hostname={device.hostname}
+                        class="px-3 py-1 bg-blue-500 text-white rounded"
+                      >
+                        Grant Access
+                      </button>
+                    <% end %>
                   </td>
                 </tr>
               <% end %>
@@ -97,7 +104,7 @@ defmodule SentinelWeb.Live.Devices do
                 <th class="border border-gray-300 px-4 py-2 text-left">MAC Address</th>
                 <th class="border border-gray-300 px-4 py-2 text-left">Name</th>
                 <th class="border border-gray-300 px-4 py-2 text-left">TTL</th>
-                <th class="border border-gray-300 px-4 py-2 text-left">Action</th>
+                <th class="border border-gray-300 px-4 py-2 text-left w-2">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -107,7 +114,7 @@ defmodule SentinelWeb.Live.Devices do
                   <td class="border border-gray-300 px-4 py-2"><%= device["mac"] %></td>
                   <td class="border border-gray-300 px-4 py-2"><%= device["hostname"] %></td>
                   <td class="border border-gray-300 px-4 py-2"><%= device["ttl"] %></td>
-                  <td class="border border-gray-300 px-4 py-2">
+                  <td class="border border-gray-300 px-4 py-2 w-2">
                     <button
                       phx-click="revoke_access"
                       phx-value-mac={device["mac"]}
@@ -138,6 +145,23 @@ defmodule SentinelWeb.Live.Devices do
     {:noreply, push_navigate(socket, to: Routes.live_path(socket, SentinelWeb.Live.DeviceDetails, ip))}
   end
 
+  def handle_event("grant_access", %{"ip" => ip, "mac" => mac, "hostname" => hostname}, socket) do
+    IO.puts("Granting access to #{hostname} (#{ip}, #{mac})")
+
+    # Grant access (adds to whitelist)
+    Whitelist.add_device_access(%{
+      hostname: hostname,
+      ip: ip,
+      mac: mac,
+      ttl: nil, # We need to add a modal to grant timed access
+      status: "granted"
+    })
+
+    send(self(), :init)
+
+    {:noreply, socket}
+  end
+
   def handle_event("revoke_access", %{"mac" => mac}, socket) do
     IO.puts("Revoking access for MAC: #{mac}")
     Whitelist.remove_device_access(mac)
@@ -150,25 +174,12 @@ defmodule SentinelWeb.Live.Devices do
   """
   def handle_info(:init, socket) do
     {_, devices_state} = Devices.get_state()
-    {_, whitelist_data} = Whitelist.get_whitelist_page(0, 100)  # Load all whitelist data
+    {_, whitelist_data} = Whitelist.get_whitelist_page(0, 100)
 
     socket =
       socket
       |> assign(:devices, devices_state.devices)
       |> assign(:count, devices_state.count)
-      |> assign(:whitelist, whitelist_data.data)
-      |> assign(:whitelist_count, length(whitelist_data.data))
-
-    {:noreply, socket}
-  end
-
-  def handle_info({:device_info, msg}, socket) do
-    {_, whitelist_data} = Whitelist.get_whitelist_page(0, 100)
-
-    socket =
-      socket
-      |> assign(:devices, msg.devices)
-      |> assign(:count, msg.count)
       |> assign(:whitelist, whitelist_data.data)
       |> assign(:whitelist_count, length(whitelist_data.data))
 

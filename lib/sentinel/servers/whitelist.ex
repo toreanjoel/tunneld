@@ -48,12 +48,7 @@ defmodule Sentinel.Servers.Whitelist do
   end
 
   # Here we grant the device access to the internet
-  def handle_call(
-        {:add_device_access, %{hostname: hostname, ip: ip, mac: mac, ttl: ttl, status_: status}},
-        _from,
-        state
-      ) do
-
+  def handle_call({:add_device_access, %{hostname: hostname, ip: ip, mac: mac, ttl: ttl, status: status}}, _from, state) do
      # Get current data
       {_, data} = read_file()
 
@@ -134,7 +129,7 @@ defmodule Sentinel.Servers.Whitelist do
 
     IO.inspect("CHECKING USER ACCESS")
     # Restart the ttl cron
-    access_ttl_cron()
+    # access_ttl_cron()
 
     {:noreply, state}
   end
@@ -237,15 +232,8 @@ defmodule Sentinel.Servers.Whitelist do
     if Application.get_env(:sentinel, :mock_data, false) do
       :ok
     else
-      IO.inspect("Adding policy to iptables: #{inspect(policy)}")
-
-      if policy["type"] === "user" do
-        Iptables.add_user_entry(policy["ip"], policy["mac"])
-        {:ok, "Policy Added"}
-      else
-        Iptables.add_system_entry(policy["ip"])
-        {:ok, "Policy Added"}
-      end
+      Iptables.grant_access(policy["ip"], policy["mac"])
+      {:ok, "Policy Added"}
     end
   end
 
@@ -254,13 +242,8 @@ defmodule Sentinel.Servers.Whitelist do
     if Application.get_env(:sentinel, :mock_data, false) do
       :ok
     else
-      if policy["type"] === "user" do
-        Iptables.remove_user_entry(policy["ip"], policy["mac"])
-        {:ok, "Policy Removed"}
-      else
-        Iptables.remove_system_entry(policy["ip"])
-        {:ok, "Policy Removed"}
-      end
+      Iptables.revoke_access(policy["ip"], policy["mac"])
+      {:ok, "Policy Remove"}
     end
   end
 
@@ -300,12 +283,13 @@ defmodule Sentinel.Servers.Whitelist do
   def get_whitelist_page(offset, limit),
     do: GenServer.call(__MODULE__, {:get_whitelist_page, offset, limit})
 
-  def add_device_access(%{hostname: _hostname, ip: _ip, mac: _mac, ttl: _ttl_, status: _status} = data),
-    do:
-      GenServer.call(
-        __MODULE__,
-        {:add_device_access, data}
-      )
+  def add_device_access(%{hostname: _hostname, ip: _ip, mac: _mac, ttl: _ttl, status: _status} = data) do
+    GenServer.call(
+      __MODULE__,
+      {:add_device_access, data}
+    )
+  end
+
 
   def remove_device_access(mac),
     do: GenServer.call(__MODULE__, {:remove_device_access, %{ mac: mac }})
