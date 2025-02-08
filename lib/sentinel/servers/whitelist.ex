@@ -49,7 +49,7 @@ defmodule Sentinel.Servers.Whitelist do
 
   # Here we grant the device access to the internet
   def handle_call(
-        {:add_device_access, %{hostname: hostname, ip: ip, mac: mac, ttl: ttl, status: status}},
+        {:add_device_access, %{hostname: hostname, ip: ip, mac: mac, ttl: ttl, status_: status}},
         _from,
         state
       ) do
@@ -89,22 +89,16 @@ defmodule Sentinel.Servers.Whitelist do
   end
 
   # Request to remove the domains from the blacklist and from iptables
-  def handle_call({:remove_domain, %{hostname: hostname, ip: ip, user: mac, ttl: ttl, status: status}}, _from, state) do
+  def handle_call({:remove_device_access, %{mac: mac }}, _from, state) do
     # Read from the blacklist file
     {_, data} = read_file()
 
     # Get all items that need to be removed
     policy =
-      Enum.filter(data, fn policy ->
-        policy["hostname"] === hostname and policy["mac"] === mac
-      end) |> Enum.at(0)
+      Enum.filter(data, fn policy -> policy["mac"] === mac end) |> Enum.at(0)
 
     # Update the file to new data set
-    updated_whitelist =
-      Enum.reject(data, fn policy ->
-        policy["hostname"] === hostname and policy["mac"] === mac
-      end)
-
+    updated_whitelist = Enum.reject(data, fn policy -> policy["mac"] === mac end)
     write_file = File.write(path(), Jason.encode!(updated_whitelist))
 
     # We check if there was something found and try and remove it
@@ -306,19 +300,16 @@ defmodule Sentinel.Servers.Whitelist do
   def get_whitelist_page(offset, limit),
     do: GenServer.call(__MODULE__, {:get_whitelist_page, offset, limit})
 
-  def add_device_access(%{hostname: _hostname, ip: _ip, mac: _mac, ttl: _ttl, status: _status} = data),
+  def add_device_access(%{hostname: _hostname, ip: _ip, mac: _mac, ttl: _ttl_, status: _status} = data),
     do:
       GenServer.call(
         __MODULE__,
         {:add_device_access, data}
       )
 
-  def remove_domain(domain, %{type: type}) when type === "system",
-    do: GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, user: "-"}})
+  def remove_device_access(mac),
+    do: GenServer.call(__MODULE__, {:remove_device_access, %{ mac: mac }})
 
-  def remove_domain(domain, %{type: type, mac: mac}) when type === "user",
-    do:
-      GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, user: mac}})
 
   @doc """
   Check if the Blacklist file exists
