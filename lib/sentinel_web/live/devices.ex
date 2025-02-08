@@ -52,7 +52,7 @@ defmodule SentinelWeb.Live.Devices do
                 <th class="border border-gray-300 px-4 py-2 text-left">MAC Address</th>
                 <th class="border border-gray-300 px-4 py-2 text-left">Name</th>
                 <th class="border border-gray-300 px-4 py-2 text-left">Expiry</th>
-                <th class="border border-gray-300 px-4 py-2 text-left w-2">Action</th>
+                <th class="border border-gray-300 px-4 py-2 text-left w-3">Action</th>
               </tr>
             </thead>
             <tbody>
@@ -69,7 +69,7 @@ defmodule SentinelWeb.Live.Devices do
                   <td class="border border-gray-300 px-4 py-2">
                     <%= DateTime.from_unix!(String.to_integer(device.expiry)) |> DateTime.to_string() %>
                   </td>
-                  <td class="border border-gray-300 px-4 py-2 w-2">
+                  <td class="border border-gray-300 px-4 py-2 w-3">
                     <%= if Enum.any?(@whitelist, fn w -> w["mac"] == device.mac end) do %>
                       <span class="text-green-600 font-semibold">Access Granted</span>
                     <% else %>
@@ -100,21 +100,17 @@ defmodule SentinelWeb.Live.Devices do
           <table class="table-auto border-collapse border border-gray-200 w-full mt-3">
             <thead>
               <tr class="bg-gray-100">
-                <th class="border border-gray-300 px-4 py-2 text-left">IP</th>
-                <th class="border border-gray-300 px-4 py-2 text-left">MAC Address</th>
                 <th class="border border-gray-300 px-4 py-2 text-left">Name</th>
                 <th class="border border-gray-300 px-4 py-2 text-left">TTL</th>
-                <th class="border border-gray-300 px-4 py-2 text-left w-2">Action</th>
+                <th class="border border-gray-300 px-4 py-2 text-left">Action</th>
               </tr>
             </thead>
             <tbody>
               <%= for device <- @whitelist do %>
                 <tr class="hover:bg-gray-50">
-                  <td class="border border-gray-300 px-4 py-2"><%= device["ip"] %></td>
-                  <td class="border border-gray-300 px-4 py-2"><%= device["mac"] %></td>
                   <td class="border border-gray-300 px-4 py-2"><%= device["hostname"] %></td>
                   <td class="border border-gray-300 px-4 py-2"><%= device["ttl"] %></td>
-                  <td class="border border-gray-300 px-4 py-2 w-2">
+                  <td class="border border-gray-300 px-4 py-2 w-3">
                     <button
                       phx-click="revoke_access"
                       phx-value-mac={device["mac"]}
