@@ -13,25 +13,39 @@ defmodule Iptables do
   Flush iptables and reinitialize firewall rules.
   """
   def reset() do
-    flush()
+    flush_tables()
 
     System.cmd("sysctl", ["-w", "net.ipv4.ip_forward=1"])
 
+    # Block all forwarding by default
     System.cmd("iptables", ["-P", "FORWARD", "DROP"])
 
+    # Allow Wi-Fi clients to access Sentinel UI (gateway)
     System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-d", @sentinel_ip, "-j", "ACCEPT"])
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-o", @wifi_interface, "-j", "ACCEPT"])
 
+    # Allow bidirectional forwarding between Wi-Fi and internet (only for approved devices)
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-o", @internet_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @internet_interface, "-o", @wifi_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
+
+    # Allow bidirectional forwarding between Wi-Fi and VPN
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-o", @vpn_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @vpn_interface, "-o", @wifi_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
+
+    # Enable NAT for whitelisted devices
     System.cmd("iptables", ["-t", "nat", "-A", "POSTROUTING", "-o", @internet_interface, "-j", "MASQUERADE"])
     System.cmd("iptables", ["-t", "nat", "-A", "POSTROUTING", "-o", @vpn_interface, "-j", "MASQUERADE"])
 
-    IO.puts("Iptables reset: All traffic blocked except access to Sentinel UI.")
+    # Redirect all DNS queries to dnsmasq (port 5336)
+    System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-port", "5336"])
+    System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-port", "5336"])
+
+    IO.puts("Iptables reset: All traffic blocked by default. Only Sentinel UI is accessible.")
   end
 
   @doc """
   Flush all iptables rules.
   """
-  def flush() do
+  def flush_tables() do
     System.cmd("iptables", ["-F"])
     System.cmd("iptables", ["-t", "nat", "-F"])
     System.cmd("iptables", ["-t", "mangle", "-F"])
@@ -68,6 +82,7 @@ defmodule Iptables do
     ])
   end
 
+  @spec has_user_entry?(binary(), binary()) :: {any(), non_neg_integer()}
   @doc """
   Check if a user is already blocked.
   """
@@ -90,21 +105,22 @@ defmodule Iptables do
   Grant a device (by MAC and IP) internet access by allowing FORWARD and POSTROUTING.
   """
   def grant_access(ip, mac) do
-    # ✅ Insert at the top (so it's before the drop rule)
-    System.cmd("iptables", ["-I", "FORWARD", "1", "-s", ip, "-m", "mac", "--mac-source", mac, "-j", "ACCEPT"])
+    # Ensure the device can forward traffic through the internet interface
+    System.cmd("iptables", ["-A", "FORWARD", "-s", ip, "-m", "mac", "--mac-source", mac, "-o", @internet_interface, "-j", "ACCEPT"])
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @internet_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
 
-    # ✅ Ensure the device is allowed through NAT
-    System.cmd("iptables", ["-t", "nat", "-I", "POSTROUTING", "1", "-s", ip, "-j", "MASQUERADE"])
+    # Ensure the device is allowed through NAT
+    System.cmd("iptables", ["-t", "nat", "-A", "POSTROUTING", "-s", ip, "-j", "MASQUERADE"])
 
     IO.puts("Granted internet access to #{ip} (MAC: #{mac})")
-end
-
+  end
 
   @doc """
   Revoke a device's internet access (block MAC and IP).
   """
   def revoke_access(ip, mac) do
-    System.cmd("iptables", ["-D", "FORWARD", "-s", ip, "-m", "mac", "--mac-source", mac, "-j", "ACCEPT"])
+    System.cmd("iptables", ["-D", "FORWARD", "-s", ip, "-m", "mac", "--mac-source", mac, "-o", @internet_interface, "-j", "ACCEPT"])
+    System.cmd("iptables", ["-D", "FORWARD", "-i", @internet_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
     System.cmd("iptables", ["-t", "nat", "-D", "POSTROUTING", "-s", ip, "-j", "MASQUERADE"])
 
     IO.puts("Revoked internet access for #{ip} (MAC: #{mac})")

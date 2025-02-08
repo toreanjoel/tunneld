@@ -27,7 +27,7 @@ defmodule Sentinel.Servers.Whitelist do
 
     # delayed start of the ttl check
     access_ttl_cron()
-    request_ttl_cron()
+    # request_ttl_cron()
 
     {:ok, %{}}
   end
