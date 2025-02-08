@@ -90,11 +90,15 @@ defmodule Iptables do
   Grant a device (by MAC and IP) internet access by allowing FORWARD and POSTROUTING.
   """
   def grant_access(ip, mac) do
-    System.cmd("iptables", ["-A", "FORWARD", "-s", ip, "-m", "mac", "--mac-source", mac, "-j", "ACCEPT"])
-    System.cmd("iptables", ["-t", "nat", "-A", "POSTROUTING", "-s", ip, "-j", "MASQUERADE"])
+    # ✅ Insert at the top (so it's before the drop rule)
+    System.cmd("iptables", ["-I", "FORWARD", "1", "-s", ip, "-m", "mac", "--mac-source", mac, "-j", "ACCEPT"])
+
+    # ✅ Ensure the device is allowed through NAT
+    System.cmd("iptables", ["-t", "nat", "-I", "POSTROUTING", "1", "-s", ip, "-j", "MASQUERADE"])
 
     IO.puts("Granted internet access to #{ip} (MAC: #{mac})")
-  end
+end
+
 
   @doc """
   Revoke a device's internet access (block MAC and IP).
