@@ -108,4 +108,31 @@ defmodule Iptables do
       "-t", "mangle", "-C", "PREROUTING", "-d", ip, "-j", "DROP"
     ])
   end
+
+  @doc """
+  Grant a device (by MAC and IP) internet access by allowing FORWARD and POSTROUTING.
+  """
+  def grant_access(ip, mac) do
+    # Allow the device to forward traffic to the internet
+    System.cmd("iptables", ["-I", "FORWARD", "-m", "mac", "--mac-source", mac, "-s", ip, "-j", "ACCEPT"])
+
+    # Enable NAT for the device
+    System.cmd("iptables", ["-t", "nat", "-I", "POSTROUTING", "-s", ip, "-j", "MASQUERADE"])
+
+    IO.puts("Granted internet access to #{ip} (MAC: #{mac})")
+  end
+
+  @doc """
+  Revoke a device's internet access (block MAC and IP).
+  """
+  def revoke_access(ip, mac) do
+    # Remove forwarding rule
+    System.cmd("iptables", ["-D", "FORWARD", "-m", "mac", "--mac-source", mac, "-s", ip, "-j", "ACCEPT"])
+
+    # Remove NAT rule
+    System.cmd("iptables", ["-t", "nat", "-D", "POSTROUTING", "-s", ip, "-j", "MASQUERADE"])
+
+    IO.puts("Revoked internet access for #{ip} (MAC: #{mac})")
+  end
+
 end
