@@ -31,25 +31,27 @@ defmodule Iptables do
     System.cmd("iptables", ["-t", "nat", "-A", "POSTROUTING", "-o", @internet_interface, "-j", "MASQUERADE"])
     System.cmd("iptables", ["-t", "nat", "-A", "POSTROUTING", "-o", @vpn_interface, "-j", "MASQUERADE"])
 
-    # Block captive portal detection **DNS queries** (force OS to detect login page)
+    # 🔥 **Fix: Block Captive Portal DNS Requests in `INPUT` (not NAT)**
     Enum.each([
       "connectivitycheck.gstatic.com",
+      "connectivitycheck.android.com",
       "captive.apple.com",
       "msftconnecttest.com",
       "nmcheck.gnome.org"
     ], fn url ->
-      System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "udp", "--dport", "53", "-m", "string", "--string", url, "--algo", "bm", "-j", "DROP"])
-      System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "53", "-m", "string", "--string", url, "--algo", "bm", "-j", "DROP"])
+      System.cmd("iptables", ["-I", "INPUT", "-p", "udp", "--dport", "53", "-m", "string", "--string", url, "--algo", "bm", "-j", "DROP"])
+      System.cmd("iptables", ["-I", "INPUT", "-p", "tcp", "--dport", "53", "-m", "string", "--string", url, "--algo", "bm", "-j", "DROP"])
     end)
 
-    # Redirect captive portal HTTP checks (force devices to open login page)
+    # 🔥 **Fix: Redirect Captive Portal HTTP Traffic in `nat PREROUTING`**
     System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "80", "-j", "DNAT", "--to-destination", @sentinel_ip])
 
-    # Block HTTPS to force captive portal detection (prevents silent background bypass)
-    System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "443", "-j", "REJECT"])
+    # 🔥 **Fix: Block HTTPS to Force Captive Portal Detection (Move from `nat` to `filter`)**
+    System.cmd("iptables", ["-I", "FORWARD", "-p", "tcp", "--dport", "443", "-j", "REJECT"])
 
     IO.puts("Iptables reset: Captive Portal Enabled. Internet blocked by default. Only Sentinel UI is accessible.")
   end
+
 
   @doc """
   Flush all iptables rules.
