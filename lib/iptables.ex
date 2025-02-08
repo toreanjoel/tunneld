@@ -1,14 +1,16 @@
 defmodule Iptables do
   @moduledoc """
-  Module that will contain helper functions to interact with the firewall rules
+  Module that will contain helper functions to interact with the firewall rules.
+  This ensures all devices are blocked by default except for access to Sentinel.
   """
 
   @internet_interface "eth0"   # Update if different
   @vpn_interface "wg0-mullvad" # VPN interface (if used)
   @wifi_interface "wlan0"      # Wireless interface
+  @sentinel_ip "10.0.0.1"   # Sentinel Gateway - This can be a config
 
   @doc """
-  Flush iptables and reinitialize firewall rules
+  Flush iptables and reinitialize firewall rules with no internet access by default.
   """
   def reset() do
     flush()  # Clear all iptables rules first
@@ -16,26 +18,28 @@ defmodule Iptables do
     # Enable IP forwarding
     System.cmd("sysctl", ["-w", "net.ipv4.ip_forward=1"])
 
-    # Setup NAT for outgoing traffic
+    # Block all forwarding by default (no internet access for any device)
+    System.cmd("iptables", ["-P", "FORWARD", "DROP"])
+
+    # Allow Wi-Fi clients to access Sentinel UI (gateway at 192.168.1.1)
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-d", @sentinel_ip, "-j", "ACCEPT"])
+
+    # Allow Wi-Fi clients to communicate within the local network (optional)
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-o", @wifi_interface, "-j", "ACCEPT"])
+
+    # Allow NAT for internet access (ONLY for whitelisted devices)
     System.cmd("iptables", ["-t", "nat", "-A", "POSTROUTING", "-o", @internet_interface, "-j", "MASQUERADE"])
     System.cmd("iptables", ["-t", "nat", "-A", "POSTROUTING", "-o", @vpn_interface, "-j", "MASQUERADE"])
 
-    # Allow forwarded traffic between interfaces
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-o", @internet_interface, "-j", "ACCEPT"])
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @internet_interface, "-o", @wifi_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
-
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-o", @vpn_interface, "-j", "ACCEPT"])
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @vpn_interface, "-o", @wifi_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
-
-    # Port forward DNS requests to dnsmasq
+    # Redirect DNS requests to dnsmasq (ensures captive portal works)
     System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-port", "5336"])
     System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-port", "5336"])
 
-    IO.puts("Iptables reset and firewall rules initialized.")
+    IO.puts("Iptables reset: Internet blocked for all devices by default. Only Sentinel UI is accessible.")
   end
 
   @doc """
-  Flush all iptables rules
+  Flush all iptables rules.
   """
   def flush() do
     System.cmd("iptables", ["-F"])
@@ -45,7 +49,7 @@ defmodule Iptables do
   end
 
   @doc """
-  Add user MAC entry to block internet access
+  Add user MAC entry to block internet access.
   """
   def add_user_entry(ip, mac) do
     System.cmd("iptables", [
@@ -60,7 +64,7 @@ defmodule Iptables do
   end
 
   @doc """
-  Add system-wide blocking rule
+  Add system-wide blocking rule.
   """
   def add_system_entry(ip) do
     System.cmd("iptables", [
@@ -75,7 +79,7 @@ defmodule Iptables do
   end
 
   @doc """
-  Check if a user is already blocked
+  Check if a user is already blocked.
   """
   def has_user_entry?(ip, mac) do
     System.cmd("iptables", [
@@ -84,7 +88,7 @@ defmodule Iptables do
   end
 
   @doc """
-  Check if a system-wide block exists
+  Check if a system-wide block exists.
   """
   def has_system_entry?(ip) do
     System.cmd("iptables", [
