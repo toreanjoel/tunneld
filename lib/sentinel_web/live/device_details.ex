@@ -78,7 +78,7 @@ defmodule SentinelWeb.Live.DeviceDetails do
     {_, logs} = Sentinel.Servers.Logs.get_device_logs(socket.assigns.ip)
     socket =
       socket
-      |> assign(:logs, logs)
+      |> assign(:logs, logs |> Enum.reverse())
       |> assign(:loading, false)
     {:noreply, socket}
   end

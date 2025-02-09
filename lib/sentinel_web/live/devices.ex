@@ -102,6 +102,9 @@ defmodule SentinelWeb.Live.Devices do
               <tr class="bg-gray-100">
                 <th class="border border-gray-300 px-4 py-2 text-left">Name</th>
                 <th class="border border-gray-300 px-4 py-2 text-left">TTL</th>
+                <th class="border border-gray-300 px-4 py-2 text-left">IP</th>
+                <th class="border border-gray-300 px-4 py-2 text-left">MAC</th>
+                <th class="border border-gray-300 px-4 py-2 text-left">Status</th>
                 <th class="border border-gray-300 px-4 py-2 text-left">Action</th>
               </tr>
             </thead>
@@ -110,6 +113,9 @@ defmodule SentinelWeb.Live.Devices do
                 <tr class="hover:bg-gray-50">
                   <td class="border border-gray-300 px-4 py-2"><%= device["hostname"] %></td>
                   <td class="border border-gray-300 px-4 py-2"><%= device["ttl"] %></td>
+                  <td class="border border-gray-300 px-4 py-2"><%= device["ip"] %></td>
+                  <td class="border border-gray-300 px-4 py-2"><%= device["mac"] %></td>
+                  <td class="border border-gray-300 px-4 py-2"><%= device["status"] %></td>
                   <td class="border border-gray-300 px-4 py-2 w-3">
                     <button
                       phx-click="revoke_access"
@@ -170,7 +176,8 @@ defmodule SentinelWeb.Live.Devices do
   """
   def handle_info(:init, socket) do
     {_, devices_state} = Devices.get_state()
-    {_, whitelist_data} = Whitelist.get_whitelist_page(0, 100)
+    # We are fetching all that is possble with regards to limit on the network assigning of domains
+    {_, whitelist_data} = Whitelist.get_whitelist_page(0, 256)
 
     socket =
       socket
