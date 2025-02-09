@@ -23,12 +23,14 @@ defmodule Iptables do
     # Allow Wi-Fi clients to access Sentinel UI (gateway)
     System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-d", @sentinel_ip, "-j", "ACCEPT"])
 
-    # Allow bidirectional forwarding between Wi-Fi and internet (only for approved devices)
+    # Allow bidirectional forwarding between Wi-Fi and Internet (only for approved devices)
     System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-o", @internet_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
     System.cmd("iptables", ["-A", "FORWARD", "-i", @internet_interface, "-o", @wifi_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
 
+    # Allow outgoing Wi-Fi -> VPN connections (NEW RULE)
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-o", @vpn_interface, "-j", "ACCEPT"])
+
     # Allow bidirectional forwarding between Wi-Fi and VPN
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_interface, "-o", @vpn_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
     System.cmd("iptables", ["-A", "FORWARD", "-i", @vpn_interface, "-o", @wifi_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
 
     # Enable NAT for whitelisted devices
@@ -39,7 +41,9 @@ defmodule Iptables do
     System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-port", "5336"])
     System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-port", "5336"])
 
+
     IO.puts("Iptables reset: All traffic blocked by default. Only Sentinel UI is accessible.")
+
   end
 
   @doc """
