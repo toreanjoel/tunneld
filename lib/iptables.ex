@@ -6,7 +6,7 @@ defmodule Iptables do
 
   @internet_interface "eth0"   # Update if different
   @vpn_interface "wg0-mullvad" # VPN interface (if used)
-  @wifi_interface "wlan0"      # Wireless interface
+  @wifi_interface "wlan1"      # Wireless interface
   @sentinel_ip "10.0.0.1"   # Sentinel Gateway - This can be a config
 
   @doc """
