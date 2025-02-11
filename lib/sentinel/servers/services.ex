@@ -35,13 +35,22 @@ defmodule Sentinel.Servers.Services do
   Get the system logs for the services that we can render
   """
   def handle_call({:get_logs, service}, _from, state) do
-    # TODO: Get the services
-    data = case System.cmd("journalctl", ["-u", service |> to_string, "-n", @service_log_limit, "--no-pager"]) do
-      {resp, 0} -> resp
-      _ -> "There was an error fetching the service logs"
-    end
+    service_atom = service |> String.to_atom
 
-    {:reply, {:ok, data}, state}
+    if service_atom in @services do
+      # TODO: Get the services
+      data = case System.cmd("journalctl", ["-u", service |> to_string, "-n", @service_log_limit, "--no-pager"]) do
+        {resp, 0} -> resp
+        _ -> "There was an error fetching the service logs"
+      end
+
+      # Concert to a list
+      data = data |> String.split("\n") |> Enum.filter(fn item -> item !== "" end) |> Enum.reverse()
+
+      {:reply, {:ok, data}, state}
+    else
+      {:reply, {:error, "Make sure the service selected is allowed"}, state}
+    end
   end
 
   # Restart a service
@@ -97,7 +106,6 @@ defmodule Sentinel.Servers.Services do
   # Get entire state details for the services
   def get_state(), do: GenServer.call(__MODULE__, :get_state)
   def get_logs(service), do: GenServer.call(__MODULE__, {:get_logs, service})
-  def restart_service(service) when service in @services, do: GenServer.cast(__MODULE__, {:restart_service, service})
-  def restart_service(_), do: raise "Restart: Invalid Service"
+  def restart_service(service), do: GenServer.cast(__MODULE__, {:restart_service, service})
 
 end

@@ -79,11 +79,20 @@ defmodule SentinelWeb.Live.Dashboard do
         <hr class="my-3 border-dashed border-gray-300" />
 
         <%!-- Basic badges --%>
+        <div class="py-1 text-xs text-gray-500 text-xs">Click the status badge for more details</div>
         <div class="flex flex-wrap flex-row gap-1 my-2">
-          <.status_badge title="WiFi Access Point" status={@hostapd_status} />
-          <.status_badge title="DNS" status={@dns_status} />
-          <.status_badge title="DoH" status={@dnscrypt_status} />
-          <.status_badge title="Dhcpcd" status={@dnscrypt_status} />
+          <div class="hover:cursor-pointer" phx-click="service_logs" phx-value-id="hostapd">
+            <.status_badge title="WiFi Access Point" status={@hostapd_status} />
+          </div>
+          <div class="hover:cursor-pointer" phx-click="service_logs" phx-value-id="dnsmasq">
+            <.status_badge title="DNS" status={@dns_status} />
+          </div>
+          <div class="hover:cursor-pointer" phx-click="service_logs" phx-value-id="dnscrypt-proxy">
+            <.status_badge title="DoH" status={@dnscrypt_status} />
+          </div>
+          <div class="hover:cursor-pointer" phx-click="service_logs" phx-value-id="dhcpcd">
+            <.status_badge title="Dhcpcd" status={@dnscrypt_status} />
+          </div>
         </div>
 
         <hr class="my-3 border-dashed border-gray-300" />
@@ -119,10 +128,16 @@ defmodule SentinelWeb.Live.Dashboard do
     {:noreply, socket |> push_navigate(to: Routes.live_path(socket, SentinelWeb.Live.Login))}
   end
 
+  # Navigate to the service level logs for the service
+  def handle_event("service_logs", %{"id" => id}, socket) do
+    {:noreply,
+      socket
+      |> push_navigate(to: Routes.live_path(socket, SentinelWeb.Live.ServiceLogs, id))}
+  end
+
   @doc """
   Handle the broadcast messages from the sentinel channel topics
   """
-
   def handle_info({:device_info, msg}, socket) do
     updated_count = Map.merge(socket.assigns.count, %{devices: msg.count})
 
