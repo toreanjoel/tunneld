@@ -6,6 +6,7 @@ defmodule Sentinel.Servers.Services do
   require Logger
 
   @services [:dnsmasq, :dhcpcd, :hostapd, :'dnscrypt-proxy']
+  @service_log_limit "80"
   @interval 30_000
   @topic "sentinel:services"
 
@@ -28,6 +29,19 @@ defmodule Sentinel.Servers.Services do
   def handle_call(:get_state, _from, state) do
     # TODO: Get the services
     {:reply, {:ok, state}, state}
+  end
+
+  @doc """
+  Get the system logs for the services that we can render
+  """
+  def handle_call({:get_logs, service}, _from, state) do
+    # TODO: Get the services
+    data = case System.cmd("journalctl", ["-u", service |> to_string, "-n", @service_log_limit, "--no-pager"]) do
+      {resp, 0} -> resp
+      _ -> "There was an error fetching the service logs"
+    end
+
+    {:reply, {:ok, data}, state}
   end
 
   # Restart a service
@@ -82,6 +96,8 @@ defmodule Sentinel.Servers.Services do
 
   # Get entire state details for the services
   def get_state(), do: GenServer.call(__MODULE__, :get_state)
+  def get_logs(service), do: GenServer.call(__MODULE__, {:get_logs, service})
   def restart_service(service) when service in @services, do: GenServer.cast(__MODULE__, {:restart_service, service})
-  def restart_service(_), do: "Invalid Service"
+  def restart_service(_), do: raise "Restart: Invalid Service"
+
 end
