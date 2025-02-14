@@ -129,4 +129,18 @@ defmodule Iptables do
 
     IO.puts("Revoked internet access for #{ip} (MAC: #{mac})")
   end
+
+  @doc """
+  TODO:
+  This is what we need in order to make direct device connection to other devices on the network.
+  This is not allowed by default but for example if we need to access servers and local servers on devices they need to
+  have their network packets through and recieved and helper functions are needed.
+
+  This will need to be deleted as well if needed.
+  """
+  # Exposes the details of a specific device running something through sentinel (10.0.0.1) - to bypass isolation mode on level 2 AP access
+  # iptables -t nat -A PREROUTING -i wlan1 -d 10.0.0.1 -p tcp --dport 8001 -j DNAT --to-destination 10.0.0.2:8001
+  # iptables -A FORWARD -i wlan1 -o wlan1 -d 10.0.0.2 -p tcp --dport 8001 -j ACCEPT
+
+
 end
