@@ -14,7 +14,20 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        primary: "#eeeeee",
+        primary: "#151718",
+        secondary: "#202226",
+        green: "#4bcc8a",
+        red: "#de5555",
+        yellow: "#f2c353",
+        purple: "#885fee",
+        light_purple: "#9294c0",
+        gray: {
+          "1": "#a6a8b3",
+          "2": "#6b6b6d"
+        }
+      },
+      fontFamily: {
+        space: ["space_mono", "sans-serif"]
       }
     },
   },

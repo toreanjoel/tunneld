@@ -29,10 +29,11 @@ defmodule Sentinel.Application do
       {Session, []}
     ]
 
-    # async startup of iptables and the needed base firewall settings
-    Task.start(fn ->
+    # This should not be async, we want this to complete before any other servers init data
+    # This will prevent race conditions
+    if not Application.get_env(:sentinel, :mock_data, false) do
       Iptables.reset()
-    end)
+    end
 
     # See https://hexdocs.pm/elixir/Supervisor.html
     # for other strategies and supported options

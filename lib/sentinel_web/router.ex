@@ -32,6 +32,13 @@ defmodule SentinelWeb.Router do
     live "/devices/:ip", Live.DeviceDetails
   end
 
+  # The story book used to test the component and UI
+  scope "storybook", SentinelWeb do
+    pipe_through [:browser]
+
+    live "/", Live.Storybook
+  end
+
   # NOTE: This is for the devices that connect to the network, they will try query for captive portal
   # We will intercept this on the firewall and send the user to the relelvant gateway
   scope "/", SentinelWeb do
