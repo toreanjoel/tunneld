@@ -158,19 +158,19 @@ defmodule SentinelWeb.Live.Storybook do
         <!-- Pills - For OS services -->
         <div class="grid grid-cols-2 gap-2">
           <div class="w-[120px] bg-primary flex flex-row gap-3 py-2 px-3 items-center rounded-md hover:bg-secondary cursor-pointer">
-            <div class="w-[8px] h-[8px] rounded-full bg-yellow"></div>
+            <div class="w-[13px] h-[13px] rounded-full bg-yellow"></div>
             <div class="font-main text-sm truncate">DHCP</div>
           </div>
           <div class="w-[120px] bg-primary flex flex-row gap-3 py-2 px-3 items-center rounded-md hover:bg-secondary cursor-pointer">
-            <div class="w-[8px] h-[8px] rounded-full bg-red"></div>
+            <div class="w-[13px] h-[13px] rounded-full bg-red"></div>
             <div class="font-main text-sm truncate">DNS</div>
           </div>
           <div class="w-[120px] bg-primary flex flex-row gap-3 py-2 px-3 items-center rounded-md hover:bg-secondary cursor-pointer">
-            <div class="w-[8px] h-[8px] rounded-full bg-gray-1"></div>
+            <div class="w-[13px] h-[13px] rounded-full bg-gray-1"></div>
             <div class="font-main text-sm truncate">DoH</div>
           </div>
           <div class="w-[120px] bg-primary flex flex-row gap-3 py-2 px-3 items-center rounded-md hover:bg-secondary cursor-pointer">
-            <div class="w-[8px] h-[8px] rounded-full bg-green"></div>
+            <div class="w-[13px] h-[13px] rounded-full bg-green"></div>
             <div class="font-main text-sm truncate">WiFi</div>
           </div>
         </div>
