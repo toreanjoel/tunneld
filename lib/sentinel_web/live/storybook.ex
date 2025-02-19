@@ -13,17 +13,8 @@ defmodule SentinelWeb.Live.Storybook do
 
   def render(assigns) do
     ~H"""
-    <div class="bg-storybook-gradient">
+    <div class="bg-storybook">
       <div class="w-[960px] mx-auto p-4 text-white grid grid-cols-3 gap-4 items-center justify-items-center h-[100vh]">
-        <!-- HEADERS -->
-        <div class="text-center p-5 bg-primary rounded-md">
-          <h1 class="font-main text-[2em]">Header 1</h1>
-          <h2 class="font-main text-[1.5em]">Header 2</h2>
-          <h3 class="font-main text-[1.17em]">Header 3</h3>
-          <h4 class="font-main text-[1em]">Header 4</h4>
-          <h5 class="font-main text-[0.83em]">Header 5</h5>
-          <h6 class="font-main text-[0.67em]">Header 6</h6>
-        </div>
         <!-- DEVICES -->
         <div class="grid grid-cols-2 gap-4">
           <div class="p-2 flex flex-col bg-primary rounded-lg w-[150px] h-[130px] hover:bg-secondary cursor-pointer">
@@ -151,7 +142,7 @@ defmodule SentinelWeb.Live.Storybook do
             <div class="absolute bottom-[5px] right-2 w-[5px] h-[5px] rounded-full bg-gray-1"></div>
           </div>
           <%!-- Add more button --%>
-          <div class="w-[50px] h-[50px] bg-transparent border border-dashed flex items-center justify-center rounded-md hover:bg-secondary cursor-pointer">
+          <div class="w-[50px] h-[50px] opacity-30 bg-transparent border border-dashed flex items-center justify-center rounded-md cursor-pointer">
             <.icon class="w-6 h-6" name="hero-plus" />
           </div>
         </div>
@@ -187,6 +178,135 @@ defmodule SentinelWeb.Live.Storybook do
           <div class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
             <.icon class="w-4 h-4" name="hero-circle-stack" />
             <div class="font-main truncate text-xs">Log Backups</div>
+          </div>
+        </div>
+        <!-- Guage Loader -->
+        <div class="grid grid-cols-2 gap-2">
+          <%!-- CPU Example --%>
+          <div>
+            <%
+              # Set the progress percent (you can change this value)
+              percent = 55
+              radius = 65
+              circumference = 2 * :math.pi() * radius
+              offset = circumference * (1 - percent / 100)
+            %>
+            <div class="bg-primary relative w-[120px] rounded-lg">
+              <svg class="w-full h-full" viewBox="0 0 170 170">
+                <!-- Background circle -->
+                <circle
+                  cx="85"
+                  cy="85"
+                  r={radius}
+                  class="text-transparent"
+                  stroke-width="5"
+                  fill="none"
+                />
+                <!-- Progress circle -->
+                <circle
+                  cx="85"
+                  cy="85"
+                  r={radius}
+                  class="text-yellow"
+                  stroke-width="5"
+                  fill="none"
+                  stroke-dasharray={circumference}
+                  stroke-dashoffset={offset}
+                  stroke-linecap="round"
+                  style="transform: rotate(-90deg); transform-origin: center;"
+                  stroke="currentColor"
+                />
+              </svg>
+              <!-- Hardcoded percent text -->
+              <div class="absolute inset-0 flex flex-col items-center justify-center text-lg text-white">
+                <%= "#{percent}%" %>
+                <div class="text-xs">CPU</div>
+              </div>
+            </div>
+          </div>
+          <%!-- RAM Example --%>
+          <div>
+            <%
+              # Set the progress percent (you can change this value)
+              percent = 80
+              radius = 65
+              circumference = 2 * :math.pi() * radius
+              offset = circumference * (1 - percent / 100)
+            %>
+            <div class="bg-primary relative w-[120px] rounded-lg">
+              <svg class="w-full h-full" viewBox="0 0 170 170">
+                <!-- Background circle -->
+                <circle
+                  cx="85"
+                  cy="85"
+                  r={radius}
+                  class="text-transparent"
+                  stroke-width="5"
+                  fill="none"
+                />
+                <!-- Progress circle -->
+                <circle
+                  cx="85"
+                  cy="85"
+                  r={radius}
+                  class="text-red"
+                  stroke-width="5"
+                  fill="none"
+                  stroke-dasharray={circumference}
+                  stroke-dashoffset={offset}
+                  stroke-linecap="round"
+                  style="transform: rotate(-90deg); transform-origin: center;"
+                  stroke="currentColor"
+                />
+              </svg>
+              <!-- Hardcoded percent text -->
+              <div class="absolute inset-0 flex flex-col items-center justify-center text-lg text-white">
+                <%= "#{percent}%" %>
+                <div class="text-xs">RAM</div>
+              </div>
+            </div>
+          </div>
+          <%!-- Storage Example --%>
+          <div>
+            <%
+              # Set the progress percent (you can change this value)
+              percent = 44
+              radius = 65
+              circumference = 2 * :math.pi() * radius
+              offset = circumference * (1 - percent / 100)
+            %>
+            <div class="bg-primary relative w-[120px] rounded-lg">
+              <svg class="w-full h-full" viewBox="0 0 170 170">
+                <!-- Background circle -->
+                <circle
+                  cx="85"
+                  cy="85"
+                  r={radius}
+                  class="text-transparent"
+                  stroke-width="5"
+                  fill="none"
+                />
+                <!-- Progress circle -->
+                <circle
+                  cx="85"
+                  cy="85"
+                  r={radius}
+                  class="text-green"
+                  stroke-width="5"
+                  fill="none"
+                  stroke-dasharray={circumference}
+                  stroke-dashoffset={offset}
+                  stroke-linecap="round"
+                  style="transform: rotate(-90deg); transform-origin: center;"
+                  stroke="currentColor"
+                />
+              </svg>
+              <!-- Hardcoded percent text -->
+              <div class="absolute inset-0 flex flex-col items-center justify-center text-lg text-white">
+                <%= "#{percent}%" %>
+                <div class="text-xs">Storage</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
