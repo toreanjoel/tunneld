@@ -13,20 +13,20 @@ defmodule SentinelWeb.Live.Storybook do
 
   def render(assigns) do
     ~H"""
-    <div class="bg-storybook-gradient">
-      <div class="w-[960px] mx-auto p-4 text-white grid grid-cols-2 gap-4 items-center justify-items-center h-[100vh]">
+    <div class="bg-storybook">
+      <div class="w-[960px] mx-auto p-4 text-white grid grid-cols-3 gap-4 items-center justify-items-center h-[100vh]">
         <!-- HEADERS -->
         <div class="text-center p-5 bg-primary rounded-md">
-          <h1 class="font-space text-[2em]">Header 1</h1>
-          <h2 class="font-space text-[1.5em]">Header 2</h2>
-          <h3 class="font-space text-[1.17em]">Header 3</h3>
-          <h4 class="font-space text-[1em]">Header 4</h4>
-          <h5 class="font-space text-[0.83em]">Header 5</h5>
-          <h6 class="font-space text-[0.67em]">Header 6</h6>
+          <h1 class="font-main text-[2em]">Header 1</h1>
+          <h2 class="font-main text-[1.5em]">Header 2</h2>
+          <h3 class="font-main text-[1.17em]">Header 3</h3>
+          <h4 class="font-main text-[1em]">Header 4</h4>
+          <h5 class="font-main text-[0.83em]">Header 5</h5>
+          <h6 class="font-main text-[0.67em]">Header 6</h6>
         </div>
         <!-- DEVICES -->
         <div class="grid grid-cols-2 gap-4">
-          <div class="p-2 flex flex-col bg-primary rounded-lg w-[150px] h-[130px]">
+          <div class="p-2 flex flex-col bg-primary rounded-lg w-[150px] h-[130px] hover:bg-secondary cursor-pointer">
             <div class="flex flex-row">
               <div class="grow">
                 <.icon class="w-6 h-6 text-gray-1" name="hero-computer-desktop" />
@@ -46,10 +46,10 @@ defmodule SentinelWeb.Live.Storybook do
               </label>
             </div>
             <div class="grow" />
-            <div class="font-space text-sm">_TrojanMorse</div>
-            <div class="text-xs font-space">aa:bb:cc:dd:ee:ff</div>
+            <div class="font-main text-sm">_TrojanMorse</div>
+            <div class="text-xs font-main">aa:bb:cc:dd:ee:ff</div>
           </div>
-          <div class="p-2 flex flex-col bg-primary rounded-lg w-[150px] h-[130px]">
+          <div class="p-2 flex flex-col bg-primary rounded-lg w-[150px] h-[130px] hover:bg-secondary cursor-pointer">
             <div class="flex flex-row">
               <div class="grow">
                 <.icon class="w-6 h-6 text-gray-1" name="hero-tv" />
@@ -69,10 +69,10 @@ defmodule SentinelWeb.Live.Storybook do
               </label>
             </div>
             <div class="grow" />
-            <div class="font-space text-sm">LG TV</div>
-            <div class="text-xs font-space">aa:bb:cc:dd:ee:ff</div>
+            <div class="font-main text-sm">LG TV</div>
+            <div class="text-xs font-main">aa:bb:cc:dd:ee:ff</div>
           </div>
-          <div class="p-2 flex flex-col bg-primary rounded-lg w-[150px] h-[130px]">
+          <div class="p-2 flex flex-col bg-primary rounded-lg w-[150px] h-[130px] hover:bg-secondary cursor-pointer">
             <div class="flex flex-row">
               <div class="grow">
                 <.icon class="w-6 h-6 text-gray-1" name="hero-device-phone-mobile" />
@@ -92,10 +92,10 @@ defmodule SentinelWeb.Live.Storybook do
               </label>
             </div>
             <div class="grow" />
-            <div class="font-space text-sm">Note 20</div>
-            <div class="text-xs font-space">aa:bb:cc:dd:ee:ff</div>
+            <div class="font-main text-sm">Note 20</div>
+            <div class="text-xs font-main">aa:bb:cc:dd:ee:ff</div>
           </div>
-          <div class="p-2 flex flex-col bg-primary rounded-lg w-[150px] h-[130px]">
+          <div class="p-2 flex flex-col bg-primary rounded-lg w-[150px] h-[130px] hover:bg-secondary cursor-pointer">
             <div class="flex flex-row">
               <div class="grow">
                 <.icon class="w-6 h-6 text-gray-1" name="hero-computer-desktop" />
@@ -115,8 +115,8 @@ defmodule SentinelWeb.Live.Storybook do
               </label>
             </div>
             <div class="grow" />
-            <div class="font-space text-sm">Mac M1</div>
-            <div class="text-xs font-space">aa:bb:cc:dd:ee:ff</div>
+            <div class="font-main text-sm">Mac M1</div>
+            <div class="text-xs font-main">aa:bb:cc:dd:ee:ff</div>
           </div>
         </div>
         <!-- PALLET -->
@@ -134,25 +134,55 @@ defmodule SentinelWeb.Live.Storybook do
         </div>
         <!-- EDGE NODES -->
         <div class="grid grid-cols-4 gap-2">
-          <div class="relative w-[50px] h-[50px] p-2 bg-primary flex items-center justify-center rounded-md">
+          <div class="relative w-[50px] h-[50px] p-2 bg-primary flex items-center justify-center rounded-md hover:bg-secondary cursor-pointer">
             <.icon class="w-6 h-6" name="hero-cpu-chip" />
             <div class="absolute bottom-[5px] right-2 w-[5px] h-[5px] rounded-full bg-yellow"></div>
           </div>
-          <div class="relative w-[50px] h-[50px] p-2 bg-primary flex items-center justify-center rounded-md">
+          <div class="relative w-[50px] h-[50px] p-2 bg-primary flex items-center justify-center rounded-md hover:bg-secondary cursor-pointer">
             <.icon class="w-6 h-6" name="hero-circle-stack" />
             <div class="absolute bottom-[5px] right-2 w-[5px] h-[5px] rounded-full bg-green"></div>
           </div>
-          <div class="relative w-[50px] h-[50px] p-2 bg-primary flex items-center justify-center rounded-md">
+          <div class="relative w-[50px] h-[50px] p-2 bg-primary flex items-center justify-center rounded-md hover:bg-secondary cursor-pointer">
             <.icon class="w-6 h-6" name="hero-globe-alt" />
             <div class="absolute bottom-[5px] right-2 w-[5px] h-[5px] rounded-full bg-red"></div>
           </div>
-          <div class="relative w-[50px] h-[50px] p-2 bg-primary flex items-center justify-center rounded-md">
+          <div class="relative w-[50px] h-[50px] p-2 bg-primary flex items-center justify-center rounded-md hover:bg-secondary cursor-pointer">
             <.icon class="w-6 h-6" name="hero-computer-desktop" />
             <div class="absolute bottom-[5px] right-2 w-[5px] h-[5px] rounded-full bg-gray-1"></div>
           </div>
           <%!-- Add more button --%>
-          <div class="w-[50px] h-[50px] bg-transparent border border-dashed flex items-center justify-center rounded-md">
+          <div class="w-[50px] h-[50px] bg-transparent border border-dashed flex items-center justify-center rounded-md hover:bg-secondary cursor-pointer">
             <.icon class="w-6 h-6" name="hero-plus" />
+          </div>
+        </div>
+        <!-- Pills - For OS services -->
+        <div class="grid grid-cols-2 gap-2">
+          <div class="w-[120px] bg-primary flex flex-row gap-3 py-2 px-3 items-center rounded-md hover:bg-secondary cursor-pointer">
+            <div class="w-[8px] h-[8px] rounded-full bg-yellow"></div>
+            <div class="font-main text-sm truncate">DHCP</div>
+          </div>
+          <div class="w-[120px] bg-primary flex flex-row gap-3 py-2 px-3 items-center rounded-md hover:bg-secondary cursor-pointer">
+            <div class="w-[8px] h-[8px] rounded-full bg-red"></div>
+            <div class="font-main text-sm truncate">DNS</div>
+          </div>
+          <div class="w-[120px] bg-primary flex flex-row gap-3 py-2 px-3 items-center rounded-md hover:bg-secondary cursor-pointer">
+            <div class="w-[8px] h-[8px] rounded-full bg-gray-1"></div>
+            <div class="font-main text-sm truncate">DoH</div>
+          </div>
+          <div class="w-[120px] bg-primary flex flex-row gap-3 py-2 px-3 items-center rounded-md hover:bg-secondary cursor-pointer">
+            <div class="w-[8px] h-[8px] rounded-full bg-green"></div>
+            <div class="font-main text-sm truncate">WiFi</div>
+          </div>
+        </div>
+        <!-- Links & Link w/ Icon -->
+        <div class="grid grid-cols-2 gap-2">
+          <div class="flex flex-row gap-1 items-center justify-center opacity-75 hover:opacity-100 hover:bg-secondary p-2 transition-all ease-in-out cursor-pointer rounded-md duration-150">
+            <.icon class="w-4 h-4" name="hero-list-bullet" />
+            <div class="font-main truncate">View All</div>
+          </div>
+          <div class="flex flex-row gap-1 items-center justify-center opacity-75 hover:opacity-100 hover:bg-secondary p-2 transition-all ease-in-out cursor-pointer rounded-md duration-150">
+            <.icon class="w-4 h-4" name="hero-no-symbol" />
+            <div class="font-main truncate">Block List</div>
           </div>
         </div>
       </div>

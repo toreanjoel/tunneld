@@ -27,7 +27,7 @@ module.exports = {
         }
       },
       fontFamily: {
-        space: ["space_mono", "sans-serif"]
+        main: ["sans-serif"]
       }
     },
   },

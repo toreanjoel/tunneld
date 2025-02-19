@@ -2,13 +2,6 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
-@font-face {
-  font-family: 'space_mono';
-  src: url('../fonts/Space_Mono/SpaceMono-Regular.ttf') format('truetype');
-  font-weight: normal;
-  font-style: normal;
-}
-
 /* TODO: Make separate utils and component files */
 @layer utilities {
   .bg-grid {
@@ -19,7 +12,7 @@
   }
 
   .bg-storybook {
-    background: #3A3A3A;
+    background: #000;
   }
   .bg-storybook-gradient {
     background: linear-gradient(135deg, #313d51 0%, #557797 100%);
