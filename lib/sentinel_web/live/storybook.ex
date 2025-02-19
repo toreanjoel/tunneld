@@ -13,10 +13,15 @@ defmodule SentinelWeb.Live.Storybook do
 
   def render(assigns) do
     ~H"""
-    <div class="bg-storybook">
-      <div class="w-[960px] mx-auto p-4 text-white grid grid-cols-3 gap-4 items-center justify-items-center h-[100vh]">
+    <div class="text-white p-10">
+      <div class="grid lg:grid-cols-3 md:grid-cols-2 grid-cols-1 gap-4 items-center justify-items-center">
+        <!-- Top Title -->
+        <div class="py-2">
+          <div class="text-6xl font-medium bg-gradient-to-r from-white to-white bg-clip-text text-transparent">Heading</div>
+          <div class="text-2xl">Sub text will go here</div>
+        </div>
         <!-- DEVICES -->
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-4">
           <div class="p-2 flex flex-col bg-primary rounded-lg w-[150px] h-[130px] hover:bg-secondary cursor-pointer">
             <div class="flex flex-row">
               <div class="grow">
@@ -37,8 +42,8 @@ defmodule SentinelWeb.Live.Storybook do
               </label>
             </div>
             <div class="grow" />
-            <div class="font-main text-sm">_TrojanMorse</div>
-            <div class="text-xs font-main">aa:bb:cc:dd:ee:ff</div>
+            <div class="text-sm">_TrojanMorse</div>
+            <div class="text-xs">aa:bb:cc:dd:ee:ff</div>
           </div>
           <div class="p-2 flex flex-col bg-primary rounded-lg w-[150px] h-[130px] hover:bg-secondary cursor-pointer">
             <div class="flex flex-row">
@@ -60,8 +65,8 @@ defmodule SentinelWeb.Live.Storybook do
               </label>
             </div>
             <div class="grow" />
-            <div class="font-main text-sm">LG TV</div>
-            <div class="text-xs font-main">aa:bb:cc:dd:ee:ff</div>
+            <div class="text-sm">LG TV</div>
+            <div class="text-xs">aa:bb:cc:dd:ee:ff</div>
           </div>
           <div class="p-2 flex flex-col bg-primary rounded-lg w-[150px] h-[130px] hover:bg-secondary cursor-pointer">
             <div class="flex flex-row">
@@ -83,8 +88,8 @@ defmodule SentinelWeb.Live.Storybook do
               </label>
             </div>
             <div class="grow" />
-            <div class="font-main text-sm">Note 20</div>
-            <div class="text-xs font-main">aa:bb:cc:dd:ee:ff</div>
+            <div class="text-sm">Note 20</div>
+            <div class="text-xs">aa:bb:cc:dd:ee:ff</div>
           </div>
           <div class="p-2 flex flex-col bg-primary rounded-lg w-[150px] h-[130px] hover:bg-secondary cursor-pointer">
             <div class="flex flex-row">
@@ -106,8 +111,8 @@ defmodule SentinelWeb.Live.Storybook do
               </label>
             </div>
             <div class="grow" />
-            <div class="font-main text-sm">Mac M1</div>
-            <div class="text-xs font-main">aa:bb:cc:dd:ee:ff</div>
+            <div class="text-sm">Mac M1</div>
+            <div class="text-xs">aa:bb:cc:dd:ee:ff</div>
           </div>
         </div>
         <!-- PALLET -->
@@ -147,41 +152,41 @@ defmodule SentinelWeb.Live.Storybook do
           </div>
         </div>
         <!-- Pills - For OS services -->
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-cols-2 md:grid-cols-2 gap-2">
           <div class="w-[120px] bg-primary flex flex-row gap-3 py-2 px-3 items-center rounded-md hover:bg-secondary cursor-pointer">
             <div class="w-[13px] h-[13px] rounded-full bg-yellow"></div>
-            <div class="font-main text-sm truncate">DHCP</div>
+            <div class="text-sm truncate">DHCP</div>
           </div>
           <div class="w-[120px] bg-primary flex flex-row gap-3 py-2 px-3 items-center rounded-md hover:bg-secondary cursor-pointer">
             <div class="w-[13px] h-[13px] rounded-full bg-red"></div>
-            <div class="font-main text-sm truncate">DNS</div>
+            <div class="text-sm truncate">DNS</div>
           </div>
           <div class="w-[120px] bg-primary flex flex-row gap-3 py-2 px-3 items-center rounded-md hover:bg-secondary cursor-pointer">
             <div class="w-[13px] h-[13px] rounded-full bg-gray-1"></div>
-            <div class="font-main text-sm truncate">DoH</div>
+            <div class="text-sm truncate">DoH</div>
           </div>
           <div class="w-[120px] bg-primary flex flex-row gap-3 py-2 px-3 items-center rounded-md hover:bg-secondary cursor-pointer">
             <div class="w-[13px] h-[13px] rounded-full bg-green"></div>
-            <div class="font-main text-sm truncate">WiFi</div>
+            <div class="text-sm truncate">WiFi</div>
           </div>
         </div>
         <!-- Links & Link w/ Icon -->
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
           <div class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
             <.icon class="w-4 h-4" name="hero-list-bullet" />
-            <div class="font-main truncate text-xs">View All</div>
+            <div class="truncate text-xs">View All</div>
           </div>
           <div class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
             <.icon class="w-4 h-4" name="hero-no-symbol" />
-            <div class="font-main truncate text-xs">Block List</div>
+            <div class="truncate text-xs">Block List</div>
           </div>
           <div class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
             <.icon class="w-4 h-4" name="hero-circle-stack" />
-            <div class="font-main truncate text-xs">Log Backups</div>
+            <div class="truncate text-xs">Log Backups</div>
           </div>
         </div>
         <!-- Guage Loader -->
-        <div class="grid grid-cols-2 gap-2">
+        <div class="grid grid-cols-2 md:grid-cols-2 gap-2">
           <%!-- CPU Example --%>
           <div>
             <%

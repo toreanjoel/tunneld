@@ -11,9 +11,6 @@
     background-size: 150px 150px;
   }
 
-  .bg-storybook {
-    background: #000;
-  }
   .bg-storybook-gradient {
     background: linear-gradient(135deg, #313d51 0%, #557797 100%);
   }

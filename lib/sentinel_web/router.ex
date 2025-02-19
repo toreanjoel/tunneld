@@ -10,6 +10,15 @@ defmodule SentinelWeb.Router do
     plug :put_secure_browser_headers
   end
 
+  pipeline :browser_storybook do
+    plug :accepts, ["html"]
+    plug :fetch_session
+    plug :fetch_live_flash
+    plug :put_root_layout, html: {SentinelWeb.Layouts, :storybook}
+    plug :protect_from_forgery
+    plug :put_secure_browser_headers
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
   end
@@ -33,10 +42,10 @@ defmodule SentinelWeb.Router do
   end
 
   # The story book used to test the component and UI
-  scope "storybook", SentinelWeb do
-    pipe_through [:browser]
+  scope "/", SentinelWeb do
+    pipe_through [:browser_storybook]
 
-    live "/", Live.Storybook
+    live "/storybook", Live.Storybook
   end
 
   # NOTE: This is for the devices that connect to the network, they will try query for captive portal

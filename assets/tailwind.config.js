@@ -25,9 +25,6 @@ module.exports = {
           "1": "#a6a8b3",
           "2": "#6b6b6d"
         }
-      },
-      fontFamily: {
-        main: ["sans-serif"]
       }
     },
   },
