@@ -175,14 +175,18 @@ defmodule SentinelWeb.Live.Storybook do
           </div>
         </div>
         <!-- Links & Link w/ Icon -->
-        <div class="grid grid-cols-2 gap-2">
-          <div class="flex flex-row gap-1 items-center justify-center opacity-75 hover:opacity-100 hover:bg-secondary p-2 transition-all ease-in-out cursor-pointer rounded-md duration-150">
+        <div class="grid grid-cols-3 gap-2">
+          <div class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
             <.icon class="w-4 h-4" name="hero-list-bullet" />
-            <div class="font-main truncate">View All</div>
+            <div class="font-main truncate text-xs">View All</div>
           </div>
-          <div class="flex flex-row gap-1 items-center justify-center opacity-75 hover:opacity-100 hover:bg-secondary p-2 transition-all ease-in-out cursor-pointer rounded-md duration-150">
+          <div class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
             <.icon class="w-4 h-4" name="hero-no-symbol" />
-            <div class="font-main truncate">Block List</div>
+            <div class="font-main truncate text-xs">Block List</div>
+          </div>
+          <div class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
+            <.icon class="w-4 h-4" name="hero-circle-stack" />
+            <div class="font-main truncate text-xs">Backups</div>
           </div>
         </div>
       </div>
