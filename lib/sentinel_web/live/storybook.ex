@@ -150,6 +150,10 @@ defmodule SentinelWeb.Live.Storybook do
             <.icon class="w-6 h-6" name="hero-computer-desktop" />
             <div class="absolute bottom-[5px] right-2 w-[5px] h-[5px] rounded-full bg-gray-1"></div>
           </div>
+          <%!-- Add more button --%>
+          <div class="w-[50px] h-[50px] bg-transparent border border-dashed flex items-center justify-center rounded-md">
+            <.icon class="w-6 h-6" name="hero-plus" />
+          </div>
         </div>
       </div>
     </div>
