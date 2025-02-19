@@ -13,7 +13,7 @@ defmodule SentinelWeb.Live.Storybook do
 
   def render(assigns) do
     ~H"""
-    <div class="bg-storybook">
+    <div class="bg-storybook-gradient">
       <div class="w-[960px] mx-auto p-4 text-white grid grid-cols-3 gap-4 items-center justify-items-center h-[100vh]">
         <!-- HEADERS -->
         <div class="text-center p-5 bg-primary rounded-md">
