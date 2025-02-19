@@ -175,7 +175,7 @@ defmodule SentinelWeb.Live.Storybook do
           </div>
         </div>
         <!-- Links & Link w/ Icon -->
-        <div class="grid grid-cols-3 gap-2">
+        <div class="grid grid-cols-2 gap-2">
           <div class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
             <.icon class="w-4 h-4" name="hero-list-bullet" />
             <div class="font-main truncate text-xs">View All</div>
@@ -186,7 +186,7 @@ defmodule SentinelWeb.Live.Storybook do
           </div>
           <div class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
             <.icon class="w-4 h-4" name="hero-circle-stack" />
-            <div class="font-main truncate text-xs">Backups</div>
+            <div class="font-main truncate text-xs">Log Backups</div>
           </div>
         </div>
       </div>
