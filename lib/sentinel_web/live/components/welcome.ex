@@ -13,11 +13,11 @@ defmodule SentinelWeb.Live.Components.Welcome do
   """
   def render(assigns) do
     ~H"""
-    <div class="p-5 sm:p-8 md:p-10">
-      <div class="text-7xl font-medium bg-gradient-to-r from-gray-1 to-white bg-clip-text text-transparent">
-        Welcome
+    <div class="p-5">
+      <div class="text-6xl font-medium bg-gradient-to-r from-slate-300 to-slate-600 bg-clip-text text-transparent">
+        sentinel.local
       </div>
-      <div class="mt-3 text-2xl text-gray-1">...</div>
+      <%!-- <div class="my-3 text-3xl text-white font-medium">Some information here about the overview</div> --%>
     </div>
     """
   end

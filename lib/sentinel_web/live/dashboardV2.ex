@@ -3,8 +3,13 @@ defmodule SentinelWeb.Live.DashboardV2 do
   Dashboard V2 Page
   """
   use SentinelWeb, :live_view
+
   alias SentinelWeb.Live.Components.{
-    Welcome
+    Welcome,
+    Resources,
+    Services,
+    Nodes,
+    Devices
   }
 
   # TODO: uncomment the line below to add auth into the system
@@ -32,7 +37,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
   """
   def render(assigns) do
     ~H"""
-    <div class="relative flex flex-row flex-1 h-screen text-white">
+    <div class="relative flex flex-row flex-1 h-screen text-white overflow-auto bg-primary">
       <!-- Fixed width left column -->
       <%= nav(assigns) %>
       <!-- Flexible middle column -->
@@ -47,23 +52,21 @@ defmodule SentinelWeb.Live.DashboardV2 do
   # ---- Views :: Components For Dashboard----
   #
 
-  @spec sidebar(%{:sidebar => %{ is_open: boolean(), details: atom()}, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  @spec sidebar(%{:sidebar => %{is_open: boolean(), details: atom()}, optional(any()) => any()}) ::
+          Phoenix.LiveView.Rendered.t()
   @doc """
   The sidebar used for details around the selected conted
   """
   def sidebar(%{sidebar: sidebar} = assigns) do
-    # set the assigns to render in the markup
-    assigns =
-      assigns
-      |> assign(sidebar: sidebar)
+    assigns = assign(assigns, :sidebar, sidebar)
 
     ~H"""
     <!-- Right panel: always visible on medium+ screens -->
-    <div class="w-[30%] max-w-[600px] bg-primary hidden lg:block">
+    <div class="w-[30%] max-w-[600px] bg-secondary hidden lg:block">
       <%= @sidebar.details %>
     </div>
     <!-- Right panel for small screens when toggled -->
-    <div :if={@sidebar.is_open} class="absolute inset-0 bg-primary lg:hidden z-10">
+    <div :if={@sidebar.is_open} class="fixed inset-0 bg-primary lg:hidden z-10">
       <!-- Close button in the overlay -->
       <button phx-click="toggle_sidebar" class="absolute top-4 right-4 bg-secondary p-2">
         Close
@@ -81,7 +84,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
   """
   def main(assigns) do
     ~H"""
-    <div class="flex-1 flex flex-col bg-secondary h-full">
+    <div class="flex-1 flex flex-col h-full">
       <div class="h-[100px]">
         <!-- Toggle button for small screens only -->
         <button phx-click="toggle_sidebar" class="lg:hidden bg-secondary p-2 m-2">
@@ -89,22 +92,22 @@ defmodule SentinelWeb.Live.DashboardV2 do
         </button>
       </div>
       <div class="border-2 border-solid border-primary"></div>
-      <div class="flex flex-col flex-1">
+      <div class="flex flex-col mx-auto">
         <%!-- Welcome section --%>
         <div>
           <.live_component id="welcome" module={Welcome} />
         </div>
         <%!-- Resources, Nodes and Services  --%>
-        <div class="flex flex-col md:flex-row w-full h-full bg-opacity-40 bg-black">
-          <div class="md:w-[50%] grow">Resources</div>
-          <div class="md:w-[50%] flex flex-col grow">
-            <div class="flex-1 grow">Nodes</div>
-            <div class="flex-1 grow">Services</div>
+        <div class="flex flex-col md:flex-row w-full h-full">
+          <div class="flex-1"><.live_component id="resources" module={Resources} /></div>
+          <div class="flex-1">
+            <.live_component id="nodes" module={Nodes} />
+            <.live_component id="services" module={Services} />
           </div>
         </div>
         <%!-- Devices --%>
         <div class="min-h-[200px]">
-          Devices
+          <.live_component id="devices" module={Devices} />
         </div>
       </div>
     </div>
@@ -117,7 +120,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
   """
   def nav(assigns) do
     ~H"""
-    <div class="w-[50px] bg-primary flex flex-col justify-between p-3">
+    <div class="sticky top-0 w-[50px] bg-secondary flex flex-col justify-between p-3">
       <div class="grow" />
       <div class="flex items-center justify-center cursor-pointer">
         <.icon class="w-6 text-gray-2" name="hero-arrow-left-start-on-rectangle" />
@@ -130,7 +133,8 @@ defmodule SentinelWeb.Live.DashboardV2 do
   # ---- Events :: Client Side Interaction ----
   #
 
-  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) :: {:noreply, Phoenix.LiveView.Socket.t()}
+  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   @doc """
   Toggle the right panel visibility on small screens.
   """
