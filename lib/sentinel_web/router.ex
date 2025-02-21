@@ -19,6 +19,15 @@ defmodule SentinelWeb.Router do
     plug :put_secure_browser_headers
   end
 
+   pipeline :browser_dashboard do
+    plug :accepts, ["html"]
+    plug :fetch_session
+    plug :fetch_live_flash
+    plug :put_root_layout, html: {SentinelWeb.Layouts, :dashboard}
+    plug :protect_from_forgery
+    plug :put_secure_browser_headers
+  end
+
   pipeline :api do
     plug :accepts, ["json"]
   end
@@ -47,6 +56,14 @@ defmodule SentinelWeb.Router do
 
     live "/storybook", Live.Storybook
   end
+
+  # Sentinel Dashboard UI
+  scope "/", SentinelWeb do
+    pipe_through [:browser_dashboard]
+
+    live "/v2/dashboard", Live.DashboardV2
+  end
+
 
   # NOTE: This is for the devices that connect to the network, they will try query for captive portal
   # We will intercept this on the firewall and send the user to the relelvant gateway
