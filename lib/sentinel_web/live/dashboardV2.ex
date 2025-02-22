@@ -2,7 +2,6 @@ defmodule SentinelWeb.Live.DashboardV2 do
   @moduledoc """
   Dashboard V2 Page
   """
-alias Phoenix.LiveView
   use SentinelWeb, :live_view
   alias SentinelWeb.Live.Components.Sidebar.Details, as: SidebarDetails
 
