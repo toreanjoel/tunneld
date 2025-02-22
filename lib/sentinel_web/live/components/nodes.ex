@@ -8,12 +8,14 @@ defmodule SentinelWeb.Live.Components.Nodes do
     # Example list of nodes, each with a type and a status.
     socket =
       socket
-      |> assign(nodes: [
-        %{type: "cpu", status: "active"},
-        %{type: "storage", status: "warning"},
-        %{type: "vpn", status: "active"},
-        %{type: "pc", status: "offline"}
-      ])
+      |> assign(
+        nodes: [
+          %{type: "cpu", status: "active"},
+          %{type: "storage", status: "warning"},
+          %{type: "vpn", status: "active"},
+          %{type: "pc", status: "offline"}
+        ]
+      )
 
     {:ok, socket}
   end
@@ -24,12 +26,16 @@ defmodule SentinelWeb.Live.Components.Nodes do
   def render(assigns) do
     ~H"""
     <div class="p-5">
-      <div class="mb-8 text-2xl text-gray-1 font-medium">Nodes</div>
-      <div class="flex flex-wrap gap-1 items-center justify-start">
+      <div class="mb-5">
+        <div class="text-xl text-gray-1 font-medium">Nodes</div>
+        <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
+      </div>
+      <div class="flex flex-wrap gap-3 items-center justify-start">
         <%= for node <- @nodes do %>
-          <div class="border-2 border-secondary relative w-[120px] md:w-[75px]  h-[120px] md:h-[75px]  p-2 bg-primary flex items-center justify-center rounded-md hover:bg-secondary cursor-pointer">
+          <div class="relative w-[120px] md:w-[75px] h-[120px] md:h-[75px] p-2 bg-secondary flex items-center justify-center rounded-md hover:bg-secondary cursor-pointer">
             <.icon class="w-10 h-10" name={get_icon(node.type)} />
-            <div class={"absolute bottom-[5px] right-2 w-[10px] h-[10px] rounded-full " <> get_status_color(node.status)}></div>
+            <div class={"absolute bottom-[5px] right-2 w-[10px] h-[10px] rounded-full " <> get_status_color(node.status)}>
+            </div>
           </div>
         <% end %>
       </div>

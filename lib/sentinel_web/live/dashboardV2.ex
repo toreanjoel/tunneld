@@ -62,7 +62,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
 
     ~H"""
     <!-- Right panel: always visible on medium+ screens -->
-    <div class="w-[30%] max-w-[600px] bg-secondary hidden lg:block">
+    <div class="sticky inset-0 w-[30%] max-w-[600px] bg-secondary hidden lg:block">
       <%= @sidebar.details %>
     </div>
     <!-- Right panel for small screens when toggled -->
@@ -84,27 +84,36 @@ defmodule SentinelWeb.Live.DashboardV2 do
   """
   def main(assigns) do
     ~H"""
-    <div class="flex-1 flex flex-col h-full">
-      <div class="h-[100px]">
-        <!-- Toggle button for small screens only -->
-        <button phx-click="toggle_sidebar" class="lg:hidden bg-secondary p-2 m-2">
-          Open Sidebar
-        </button>
+    <div class="flex-1 flex flex-col">
+      <div class=" flex flex-row">
+        <div class="flex-1">
+          <!-- Toggle button for small screens only -->
+          <button phx-click="toggle_sidebar" class="lg:hidden bg-secondary p-2 m-2">
+            Open Sidebar
+          </button>
+        </div>
+        <div phx-click="toggle_sidebar" class="relative m-5 p-2 rounded-md hover:bg-secondary cursor-pointer">
+          <div class="absolute right-[10px] top-[8px] w-[8px] h-[8px] rounded-full bg-blue-800" />
+          <.icon name="hero-bell" class="h-15 w-15" />
+        </div>
       </div>
-      <div class="border-2 border-solid border-primary"></div>
-      <div class="flex flex-col mx-auto">
+      <div class="flex flex-col mx-auto max-w-[1280px]">
         <%!-- Welcome section --%>
         <div>
           <.live_component id="welcome" module={Welcome} />
         </div>
+        <%!-- Divider --%>
+        <div class="border-t-2 border-dashed border-secondary" />
         <%!-- Resources, Nodes and Services  --%>
-        <div class="flex flex-col md:flex-row w-full h-full">
+        <div class="flex flex-col md:flex-row w-full">
           <div class="flex-1"><.live_component id="resources" module={Resources} /></div>
           <div class="flex-1">
             <.live_component id="nodes" module={Nodes} />
             <.live_component id="services" module={Services} />
           </div>
         </div>
+        <%!-- Divider --%>
+        <div class="border-t-2 border-dashed border-secondary" />
         <%!-- Devices --%>
         <div class="min-h-[200px]">
           <.live_component id="devices" module={Devices} />

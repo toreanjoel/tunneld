@@ -33,7 +33,19 @@ defmodule SentinelWeb.Live.Components.Resources do
 
     ~H"""
     <div class="p-5">
-      <div class="mb-8 text-2xl text-gray-1 font-medium">Resources</div>
+    <div class="mb-5 flex flex-row">
+        <div class="flex-1">
+          <div class="text-xl text-gray-1 font-medium">Resources</div>
+          <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
+        </div>
+        <div class="grid grid-cols-1 gap-2">
+          <div class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
+            <.icon class="w-4 h-4" name="hero-circle-stack" />
+            <div class="truncate text-xs text-gray-1">Log Backups</div>
+          </div>
+        </div>
+      </div>
+
       <div class="flex items-center justify-center">
         <!-- 1 col on small screens, 2 on md, 3 on lg -->
         <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
@@ -46,7 +58,6 @@ defmodule SentinelWeb.Live.Components.Resources do
                   cx="85"
                   cy="85"
                   r={@radius}
-                  class="text-transparent"
                   stroke-width="5"
                   fill="none"
                 />
@@ -57,7 +68,7 @@ defmodule SentinelWeb.Live.Components.Resources do
                   r={@radius}
                   class={get_percent_color(percent)}
                   stroke-width="10"
-                  fill="none"
+                  fill="#202226"
                   stroke-dasharray={@circumference}
                   stroke-dashoffset={@circumference * (1 - percent / 100)}
                   stroke-linecap="round"
