@@ -66,8 +66,8 @@ defmodule SentinelWeb.Live.Components.Devices do
   end
 
   # Return the appropriate icon name based on the device type.
-  defp get_device_icon("tv"), do: "hero-tv"             # Adjust to the actual icon name for TV
-  defp get_device_icon("phone"), do: "hero-phone"         # Adjust to the actual icon name for Phone
-  defp get_device_icon("pc"), do: "hero-computer-desktop" # Adjust to the actual icon name for PC
-  defp get_device_icon(_), do: "hero-question-mark-circle" # Fallback icon
+  defp get_device_icon("tv"), do: "hero-tv"
+  defp get_device_icon("phone"), do: "hero-phone"
+  defp get_device_icon("pc"), do: "hero-computer-desktop"
+  defp get_device_icon(_), do: "hero-question-mark-circle"
 end
