@@ -33,7 +33,7 @@ defmodule SentinelWeb.Live.Components.Resources do
 
     ~H"""
     <div class="p-5">
-      <div class="mb-5 flex flex-row">
+      <div class="mb-5 flex flex-col">
         <div class="text-xl text-gray-1 font-medium">Resources</div>
         <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
       </div>
