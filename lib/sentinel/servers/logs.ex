@@ -10,7 +10,11 @@ defmodule Sentinel.Servers.Logs do
   @six_hours 21_600_000 # 6h
   @one_day 86_400 # 1d in seconds so we can make sure it works
 
-  @topic "sentinel:logs"
+  @broadcast_topic "component:details"
+  @component_desktop_id "sidebar_details_desktop"
+  @component_mobile_id "sidebar_details_mobile"
+  @component_module SentinelWeb.Live.Components.Sidebar.Details
+
   @log_file "_data.log"
 
   def start_link(_) do
@@ -23,7 +27,6 @@ defmodule Sentinel.Servers.Logs do
   def init(_) do
     archived_files = fetch_archived_files()
 
-    # Trigger the start of the processes that will run after set time to cleanup over time
     archive_log_file()
     cleanup_archived_files()
 
@@ -31,7 +34,7 @@ defmodule Sentinel.Servers.Logs do
      %{
        archived: %{
          files: archived_files,
-         count: archived_files |> length()
+         count: length(archived_files)
        }
      }}
   end
@@ -42,14 +45,21 @@ defmodule Sentinel.Servers.Logs do
 
     archived_result = %{
       files: archived_files,
-      count: archived_files |> length()
+      count: length(archived_files)
     }
 
-    # sync and return the archived logs data
-    Phoenix.PubSub.broadcast(Sentinel.PubSub, @topic, {:archived_files, archived_result})
-
-    # Refetch - recheck - this will start the process to check all the time if this function is called once, we can remove this for now
-    # sync_archived_files()
+    # Broadcast the new data structure for the sidebar component - desktop
+    Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic, %{
+      id: @component_desktop_id,
+      module: @component_module,
+      data: %{logs: archived_result}
+    })
+    # Broadcast the new data structure for the sidebar component - mobile
+    Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic, %{
+      id: @component_mobile_id,
+      module: @component_module,
+      data: %{logs: archived_result}
+    })
 
     {:noreply, state}
   end
@@ -124,12 +134,8 @@ defmodule Sentinel.Servers.Logs do
   end
 
   # Get all of the log information from the log file
-  def handle_call({:get_state, refetch}, _from, state) when refetch === true do
+  def handle_call(:init_state, _from, state) do
     send(self(), :sync)
-    {:reply, {:ok, state}, state}
-  end
-
-  def handle_call({:get_state, _refetch}, _from, state) do
     {:reply, {:ok, state}, state}
   end
 
@@ -236,8 +242,7 @@ defmodule Sentinel.Servers.Logs do
   end
 
   # Get entire state details for the logs
-  def get_state(), do: GenServer.call(__MODULE__, {:get_state, false})
-  def init_state(), do: GenServer.call(__MODULE__, {:get_state, true})
+  def init_state(), do: GenServer.call(__MODULE__, :init_state)
   def get_device_logs(ip), do: GenServer.call(__MODULE__, {:get_device_logs, ip})
   def delete_log_file(file), do: GenServer.call(__MODULE__, {:delete_log_file, file})
 end

@@ -6,7 +6,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
 
   def mount(socket) do
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(Sentinel.PubSub, "component:sidebar")
+      Phoenix.PubSub.subscribe(Sentinel.PubSub, "component:details")
     end
     {:ok, socket}
   end

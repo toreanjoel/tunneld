@@ -4,7 +4,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
   """
   use SentinelWeb, :live_view
   alias SentinelWeb.Live.Components.Sidebar.Details, as: SidebarDetails
-
+  alias Sentinel.Servers.{Logs}
   alias SentinelWeb.Live.Components.{
     Welcome,
     Resources,
@@ -161,6 +161,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
       "blacklist" ->
         :blacklist
       "logs" ->
+        Logs.init_state()
         :logs
       _ ->
         :system_overview
