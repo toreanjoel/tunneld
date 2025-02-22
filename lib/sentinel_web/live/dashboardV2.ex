@@ -3,6 +3,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
   Dashboard V2 Page
   """
   use SentinelWeb, :live_view
+  alias SentinelWeb.Live.Components.Sidebar.Details, as: SidebarDetails
 
   alias SentinelWeb.Live.Components.{
     Welcome,
@@ -25,7 +26,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
       |> assign(
         sidebar: %{
           is_open: false,
-          details: nil
+          view: :system_overview
         }
       )
 
@@ -37,7 +38,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
   """
   def render(assigns) do
     ~H"""
-    <div class="relative flex flex-row flex-1 h-screen text-white overflow-auto bg-primary">
+    <div class="relative flex flex-row flex-1 h-screen text-white bg-primary">
       <!-- Fixed width left column -->
       <%= nav(assigns) %>
       <!-- Flexible middle column -->
@@ -62,17 +63,19 @@ defmodule SentinelWeb.Live.DashboardV2 do
 
     ~H"""
     <!-- Right panel: always visible on medium+ screens -->
-    <div class="sticky inset-0 w-[30%] max-w-[600px] bg-secondary hidden lg:block">
-      <%= @sidebar.details %>
+    <div class="sticky inset-0 w-[30%] max-w-[600px] bg-primary hidden lg:block p-3">
+      <div class="bg-secondary h-full rounded-lg p-2">
+        <.live_component id="sidebar_details_desktop" module={SidebarDetails} view={@sidebar.view} />
+      </div>
     </div>
     <!-- Right panel for small screens when toggled -->
     <div :if={@sidebar.is_open} class="fixed inset-0 bg-primary lg:hidden z-10">
-      <!-- Close button in the overlay -->
-      <button phx-click="toggle_sidebar" class="absolute top-4 right-4 bg-secondary p-2">
-        Close
-      </button>
-      <div class="p-4">
-        <%= @sidebar.details %>
+      <div class="p-4 h-full">
+        <!-- Toggle button for small screens only -->
+        <button phx-click="toggle_sidebar" class="lg:hidden bg-secondary p-2 m-2">
+          Close
+        </button>
+        <.live_component id="sidebar_details_mobile" module={SidebarDetails} view={@sidebar.view} />
       </div>
     </div>
     """
@@ -84,16 +87,14 @@ defmodule SentinelWeb.Live.DashboardV2 do
   """
   def main(assigns) do
     ~H"""
-    <div class="flex-1 flex flex-col">
-      <div class=" flex flex-row">
-        <div class="flex-1">
-          <!-- Toggle button for small screens only -->
-          <button phx-click="toggle_sidebar" class="lg:hidden bg-secondary p-2 m-2">
-            Open Sidebar
-          </button>
-        </div>
-        <div phx-click="toggle_sidebar" class="relative m-5 p-2 rounded-md hover:bg-secondary cursor-pointer">
-          <div class="absolute right-[10px] top-[8px] w-[8px] h-[8px] rounded-full bg-blue-800" />
+    <div class="flex-1 flex flex-col p-5 system-scroll">
+      <div class="flex flex-row h-[30px]">
+        <div class="flex-1" />
+        <div
+          phx-click="toggle_sidebar"
+          class="relative rounded-md hover:bg-secondary cursor-pointer"
+        >
+          <div class="absolute right-0 top-0 w-[8px] h-[8px] rounded-full bg-blue-800" />
           <.icon name="hero-bell" class="h-15 w-15" />
         </div>
       </div>
@@ -105,7 +106,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
         <%!-- Resources, Nodes and Services  --%>
-        <div class="flex flex-col md:flex-row w-full">
+        <div class="flex flex-col md:flex-row w-full gap-6">
           <div class="flex-1"><.live_component id="resources" module={Resources} /></div>
           <div class="flex-1">
             <.live_component id="nodes" module={Nodes} />
@@ -152,7 +153,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
 
     sidebar = %{
       is_open: !Map.get(sidebar, :is_open),
-      details: !Map.get(sidebar, :details)
+      view: !Map.get(sidebar, :view)
     }
 
     {:noreply, assign(socket, :sidebar, sidebar)}

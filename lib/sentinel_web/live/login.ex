@@ -49,10 +49,6 @@ defmodule SentinelWeb.Live.Login do
           </span>
           <h1 class="text-3xl font-bold my-4">sentinel.local</h1>
         </div>
-        <%!-- application version --%>
-        <span class="text-xs">
-          <%= Application.get_env(:sentinel, :version) %>
-        </span>
       </div>
       <!-- Form wrapper -->
       <div class="lg:w-2/5 w-full flex items-center justify-center p-8">

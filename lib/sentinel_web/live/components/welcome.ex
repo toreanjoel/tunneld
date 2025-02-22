@@ -17,7 +17,9 @@ defmodule SentinelWeb.Live.Components.Welcome do
       <div class="text-6xl font-medium bg-gradient-to-r from-slate-300 to-slate-600 bg-clip-text text-transparent">
         sentinel.local
       </div>
-      <%!-- <div class="my-3 text-3xl text-white font-medium">Some information here about the overview</div> --%>
+      <div class="text-lg text-gray-2 font-light">
+        <%= Application.get_env(:sentinel, :version) %>
+      </div>
     </div>
     """
   end

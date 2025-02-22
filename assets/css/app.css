@@ -3,6 +3,7 @@
 @import "tailwindcss/utilities";
 
 /* TODO: Make separate utils and component files */
+
 @layer utilities {
   .bg-grid {
     background-image:
@@ -13,5 +14,12 @@
 
   .bg-storybook-gradient {
     background: linear-gradient(135deg, #313d51 0%, #557797 100%);
+  }
+
+  /* The scroll styles */
+  .system-scroll {
+    overflow-y: scroll;
+    scrollbar-color: #1b1b1b transparent;
+    scrollbar-width: 5px;
   }
 }

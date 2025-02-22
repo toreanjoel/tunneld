@@ -33,22 +33,14 @@ defmodule SentinelWeb.Live.Components.Resources do
 
     ~H"""
     <div class="p-5">
-    <div class="mb-5 flex flex-row">
-        <div class="flex-1">
-          <div class="text-xl text-gray-1 font-medium">Resources</div>
-          <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
-        </div>
-        <div class="grid grid-cols-1 gap-2">
-          <div class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
-            <.icon class="w-4 h-4" name="hero-circle-stack" />
-            <div class="truncate text-xs text-gray-1">Log Backups</div>
-          </div>
-        </div>
+      <div class="mb-5 flex flex-row">
+        <div class="text-xl text-gray-1 font-medium">Resources</div>
+        <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
       </div>
 
       <div class="flex items-center justify-center">
         <!-- 1 col on small screens, 2 on md, 3 on lg -->
-        <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-2">
+        <div class="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-2">
           <%= for {resource, percent} <- @resources do %>
             <!-- On small screens: full width; on md and above, limit width -->
             <div class="bg-primary relative w-full md:max-w-[200px] rounded-lg">
@@ -77,9 +69,9 @@ defmodule SentinelWeb.Live.Components.Resources do
                 />
               </svg>
               <!-- Percentage and label -->
-              <div class="absolute inset-0 flex flex-col items-center justify-center text-5xl md:text-lg text-white">
+              <div class="absolute inset-0 flex flex-col items-center justify-center text-3xl md:text-lg text-white">
                 <%= "#{percent}%" %>
-                <div class="text-2xl md:text-xs"><%= String.upcase(to_string(resource)) %></div>
+                <div class="text-xl md:text-xs"><%= String.upcase(to_string(resource)) %></div>
               </div>
             </div>
           <% end %>

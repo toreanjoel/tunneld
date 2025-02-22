@@ -11,8 +11,9 @@ defmodule SentinelWeb.Live.Components.Devices do
         devices: [
           %{type: "tv", name: "LG TV", mac: "aa:bb:cc:dd:ee:ff", access: true},
           %{type: "phone", name: "Note 20", mac: "aa:bb:cc:dd:ee:ff", access: true},
-          %{type: "pc", name: "Mac M1", mac: "aa:bb:cc:dd:ee:ff", access: false}
-          # %{type: "pc", name: "kathy", mac: "aa:bb:cc:dd:ee:ff", access: true}
+          %{type: "pc", name: "Mac M1", mac: "aa:bb:cc:dd:ee:ff", access: false},
+          %{type: "tv", name: "LG TV", mac: "aa:bb:cc:dd:ee:ff", access: true},
+          %{type: "pc", name: "kathy", mac: "aa:bb:cc:dd:ee:ff", access: true}
         ]
       )
 
@@ -30,20 +31,20 @@ defmodule SentinelWeb.Live.Components.Devices do
           <div class="text-xl text-gray-1 font-medium">Devices</div>
           <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
         </div>
-        <div class="grid grid-cols-2 gap-2">
-          <div class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
-            <.icon class="w-4 h-4" name="hero-list-bullet" />
-            <div class="truncate text-xs text-gray-1">All Devices</div>
-          </div>
+        <div class="grid grid-cols-2 gap-1">
           <div class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
             <.icon class="w-4 h-4" name="hero-no-symbol" />
             <div class="truncate text-xs text-gray-1">Block List</div>
           </div>
+          <div class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
+            <.icon class="w-4 h-4" name="hero-circle-stack" />
+            <div class="truncate text-xs text-gray-1">Log Backups</div>
+          </div>
         </div>
       </div>
-      <div class="flex flex-col md:flex-row gap-3">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <%= for device <- @devices do %>
-          <div class="p-4 flex flex-col bg-secondary rounded-lg w-[100%] md:w-[150px] h-[130px] hover:bg-secondary cursor-pointer">
+          <div class="p-4 flex flex-col bg-secondary rounded-lg w-[100%] h-[130px] hover:bg-secondary cursor-pointer">
             <div class="flex flex-row">
               <div class="grow">
                 <.icon class="w-6 h-6 text-gray-1" name={get_device_icon(device.type)} />

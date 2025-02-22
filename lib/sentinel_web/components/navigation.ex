@@ -45,9 +45,6 @@ defmodule SentinelWeb.Components.Navigation do
             <.icon name="hero-arrow-right-end-on-rectangle" class="h-5 w-5" />
           </div>
         </div>
-        <span class="text-[10px] text-gray-500 pt-3">
-          v: <%= Application.get_env(:sentinel, :version) %>
-        </span>
       </div>
 
       <!-- Centered, scrollable main section -->
