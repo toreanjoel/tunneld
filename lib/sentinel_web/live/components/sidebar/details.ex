@@ -82,7 +82,9 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
     <div class="h-full flex flex-col items-center justify-center system-scroll h-full">
       <h1 class="text-2xl font-light text-gray-2 my-4 text-center">logs</h1>
 
-      <%!-- TODO: add overflow here for content --%>
+      <pre class="text-sm text-white">
+        <%= inspect(@data.logs, pretty: true) %>
+      </pre>
     </div>
     """
   end
