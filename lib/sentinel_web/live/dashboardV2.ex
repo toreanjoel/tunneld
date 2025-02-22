@@ -2,6 +2,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
   @moduledoc """
   Dashboard V2 Page
   """
+alias Phoenix.LiveView
   use SentinelWeb, :live_view
   alias SentinelWeb.Live.Components.Sidebar.Details, as: SidebarDetails
 
@@ -143,8 +144,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
   # ---- Events :: Client Side Interaction ----
   #
 
-  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
-          {:noreply, Phoenix.LiveView.Socket.t()}
+  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) :: {:noreply, Phoenix.LiveView.Socket.t()}
   @doc """
   Toggle the right panel visibility on small screens.
   """
@@ -157,5 +157,18 @@ defmodule SentinelWeb.Live.DashboardV2 do
     }
 
     {:noreply, assign(socket, :sidebar, sidebar)}
+  end
+
+  #
+  # ---- handle component updated message :: Client Side Interaction ----
+  #
+
+  @spec handle_info(%{ id: String.t(), module: atom(), data: map()}, Phoenix.LiveView.Socket.t()) :: {:noreply, Phoenix.LiveView.Socket.t()}
+  @doc """
+  This will have the parent dashboard view be responsible for sending update messages to components
+  """
+  def handle_info(%{id: id, module: module, data: data}, socket) do
+    send_update(module, id: id, data: data)
+    {:noreply, socket}
   end
 end

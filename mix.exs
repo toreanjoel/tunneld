@@ -19,7 +19,7 @@ defmodule Sentinel.MixProject do
   def application do
     [
       mod: {Sentinel.Application, []},
-      extra_applications: [:logger, :runtime_tools]
+      extra_applications: [:logger, :runtime_tools, :os_mon]
     ]
   end
 

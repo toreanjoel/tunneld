@@ -7,7 +7,14 @@ defmodule SentinelWeb.Live.Components.Resources do
   # The constant for the gauge radius
   @radius 65
 
-  def update(_assigns, socket) do
+  def mount(socket) do
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Sentinel.PubSub, "component:resources")
+    end
+    {:ok, socket}
+  end
+
+  def update(assigns, socket) do
     socket =
       socket
       |> assign(
@@ -17,6 +24,7 @@ defmodule SentinelWeb.Live.Components.Resources do
           storage: Enum.random(1..100)
         }
       )
+      |> assign(data: Map.get(assigns, :data, %{}))
 
     {:ok, socket}
   end

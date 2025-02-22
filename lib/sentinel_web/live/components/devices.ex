@@ -4,7 +4,14 @@ defmodule SentinelWeb.Live.Components.Devices do
   """
   use SentinelWeb, :live_component
 
-  def update(_, socket) do
+  def mount(socket) do
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Sentinel.PubSub, "component:devices")
+    end
+    {:ok, socket}
+  end
+
+  def update(assigns, socket) do
     socket =
       socket
       |> assign(
@@ -16,6 +23,7 @@ defmodule SentinelWeb.Live.Components.Devices do
           %{type: "pc", name: "kathy", mac: "aa:bb:cc:dd:ee:ff", access: true}
         ]
       )
+      |> assign(data: Map.get(assigns, :data, %{}))
 
     {:ok, socket}
   end

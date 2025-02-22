@@ -4,15 +4,18 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
   """
   use SentinelWeb, :live_component
 
-  @doc """
-  Base init for the component details view
-  """
-  def update(assigns, socket) do
+  def mount(socket) do
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Sentinel.PubSub, "component:sidebar")
+    end
+    {:ok, socket}
+  end
+
+  def update(%{ view: view } = assigns, socket) do
     socket =
       socket
-      |> assign(view: assigns.view)
-
-    # Based on the view we can hook and join channels for live events if needed
+      |> assign(view: view)
+      |> assign(data: Map.get(assigns, :data, %{}))
 
     {:ok, socket}
   end

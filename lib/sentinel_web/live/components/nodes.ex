@@ -4,7 +4,14 @@ defmodule SentinelWeb.Live.Components.Nodes do
   """
   use SentinelWeb, :live_component
 
-  def update(_, socket) do
+  def mount(socket) do
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Sentinel.PubSub, "component:nodes")
+    end
+    {:ok, socket}
+  end
+
+  def update(assigns, socket) do
     # Example list of nodes, each with a type and a status.
     socket =
       socket
@@ -16,6 +23,7 @@ defmodule SentinelWeb.Live.Components.Nodes do
           %{type: "pc", status: "offline"}
         ]
       )
+      |> assign(data: Map.get(assigns, :data, %{}))
 
     {:ok, socket}
   end

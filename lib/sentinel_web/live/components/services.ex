@@ -4,8 +4,15 @@ defmodule SentinelWeb.Live.Components.Services do
   """
   use SentinelWeb, :live_component
 
-  def mount(_, _, socket) do
+  def mount(socket) do
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Sentinel.PubSub, "component:services")
+    end
     {:ok, socket}
+  end
+
+  def update(assigns, socket) do
+    {:ok, socket |> assign(data: Map.get(assigns, :data, %{}))}
   end
 
   @doc """
