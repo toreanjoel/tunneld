@@ -52,13 +52,13 @@ defmodule Sentinel.Servers.Logs do
     Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic, %{
       id: @component_desktop_id,
       module: @component_module,
-      data: %{logs: archived_result}
+      data: archived_result
     })
     # Broadcast the new data structure for the sidebar component - mobile
     Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic, %{
       id: @component_mobile_id,
       module: @component_module,
-      data: %{logs: archived_result}
+      data: archived_result
     })
 
     {:noreply, state}
@@ -171,6 +171,19 @@ defmodule Sentinel.Servers.Logs do
           end
         end)
       end
+
+    # Broadcast the new data structure for the sidebar component - desktop
+    Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic, %{
+      id: @component_desktop_id,
+      module: @component_module,
+      data: logs
+    })
+    # Broadcast the new data structure for the sidebar component - mobile
+    Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic, %{
+      id: @component_mobile_id,
+      module: @component_module,
+      data: logs
+    })
 
     {:reply, {:ok, logs}, state}
   end

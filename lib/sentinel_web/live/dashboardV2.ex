@@ -4,7 +4,6 @@ defmodule SentinelWeb.Live.DashboardV2 do
   """
   use SentinelWeb, :live_view
   alias SentinelWeb.Live.Components.Sidebar.Details, as: SidebarDetails
-  alias Sentinel.Servers.{Logs}
   alias SentinelWeb.Live.Components.{
     Welcome,
     Resources,
@@ -69,10 +68,10 @@ defmodule SentinelWeb.Live.DashboardV2 do
       </div>
     </div>
     <!-- Right panel for small screens when toggled -->
-    <div :if={@sidebar.is_open} class="fixed inset-0 bg-primary lg:hidden z-10">
+    <div :if={@sidebar.is_open} class="fixed inset-0 bg-secondary lg:hidden z-10">
       <div class="p-4 h-full">
         <!-- Toggle button for small screens only -->
-        <button phx-click="close_details" class="lg:hidden bg-secondary p-2 m-2">
+        <button phx-click="close_details" class="lg:hiddeny p-2 m-2">
           Close
         </button>
         <.live_component id="sidebar_details_mobile" module={SidebarDetails} view={@sidebar.view} />
@@ -155,13 +154,15 @@ defmodule SentinelWeb.Live.DashboardV2 do
       "node" ->
         :node
       "service" ->
+        Sentinel.Servers.Services.get_service_logs(id)
         :service
       "device" ->
+        Sentinel.Servers.Logs.get_device_logs(id)
         :device
       "blacklist" ->
         :blacklist
       "logs" ->
-        Logs.init_state()
+        Sentinel.Servers.Logs.init_state()
         :logs
       _ ->
         :system_overview

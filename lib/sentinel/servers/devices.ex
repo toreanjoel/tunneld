@@ -6,7 +6,6 @@ defmodule Sentinel.Servers.Devices do
   require Logger
 
   @interval 10_000
-  # TODO: this needs to be added to config?
   @path "/var/lib/misc/dnsmasq.leases"
 
   def start_link(_) do
@@ -21,34 +20,30 @@ defmodule Sentinel.Servers.Devices do
     {:ok, %{}}
   end
 
-  @doc """
-  Get all of the information from the devices and leases
-  Note: for now the user needs to get everything
-  """
-  def handle_call(:get_state, _from, state) do
-    # TODO: Get the devices
-    {:reply, {:ok, state}, state}
-  end
-
-  # we get the current devices connected to the network
-  def handle_call(:get_devices, _from, state) do
+  # Get the current devices connected to the network
+  def handle_call(:init_state, _from, state) do
     leases = fetch_devices()
     state = Map.put(state, :leases, leases)
     {:reply, {:ok, leases}, state}
   end
 
-  # get the data and restart sync
+  # Get the data and restart sync
   def handle_info(:sync, state) do
-    # TODO: Here we get the logs and also any specific information we want to broadcast i.e count of devices
     devices = fetch_devices()
     result = %{
-      count: devices |> length(),
+      count: length(devices),
       devices: devices
     }
 
-    # Refetch
-    sync_devices()
+    # Broadcast to the live view (or parent) so it can update the Devices component.
+    # Use an id that matches the one used in your live_component render.
+    Phoenix.PubSub.broadcast(Sentinel.PubSub, "component:devices", %{
+      id: "devices", # Make sure this matches your component's id.
+      module: SentinelWeb.Live.Components.Devices,
+      data: result
+    })
 
+    sync_devices()
     {:noreply, Map.merge(state, result)}
   end
 
@@ -57,30 +52,42 @@ defmodule Sentinel.Servers.Devices do
     :timer.send_after(@interval, :sync)
   end
 
-  # get the current devices connected to the network
   def fetch_devices() do
-      {data, _} = if Application.get_env(:sentinel, :mock_data, false), do: Sentinel.Servers.FakeData.Devices.get_data(), else: System.cmd("cat", [@path])
-      clean_data = data |> String.trim
+    {data, _} =
+      if Application.get_env(:sentinel, :mock_data, false) do
+        Sentinel.Servers.FakeData.Devices.get_data()
+      else
+        System.cmd("cat", [@path])
+      end
 
+    clean_data = String.trim(data)
     leases =
       if clean_data == "",
         do: [],
-        else: clean_data |> String.split("\n")
+        else: String.split(clean_data, "\n")
+
+    # Read whitelist policies
+    whitelist =
+      case Sentinel.Servers.Whitelist.read_file() do
+        {:ok, policies} -> policies
+        _ -> []
+      end
 
     Enum.map(leases, fn lease ->
       [lease_expiry, mac, ip, hostname, client_id] = String.split(lease, " ")
-
+      access = Enum.any?(whitelist, fn policy -> policy["mac"] == mac end)
       %{
         expiry: lease_expiry,
         mac: mac,
         ip: ip,
         hostname: hostname,
-        client_id: client_id
+        client_id: client_id,
+        type: "",       # You can later determine type dynamically if needed.
+        access: access  # This will be true if the device is in the whitelist.
       }
     end)
   end
 
-  # Get entire state details for the devices
-  def get_state(), do: GenServer.call(__MODULE__, :get_state)
-  def get_devices(), do: GenServer.call(__MODULE__, :get_devices)
+
+  def init_state(), do: GenServer.call(__MODULE__, :init_state)
 end
