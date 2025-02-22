@@ -20,13 +20,67 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
     {:ok, socket}
   end
 
-  # Render the Empty state of the view
-  @spec render(%{:view => :system_overview | boolean(), optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
-  def render(%{ view: view } = assigns) when view in [:system_overview, false, true] do
+  @spec render(%{:view => :system_overview, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{ view: :system_overview } = assigns) do
     ~H"""
     <div class="h-full flex flex-col items-center justify-center system-scroll h-full">
       <.icon class="w-[50px] h-[50px] text-green" name="hero-shield-check" />
       <h1 class="text-2xl font-light text-gray-2 my-4 text-center">System is running as expected.</h1>
+
+      <%!-- TODO: add overflow here for content --%>
+    </div>
+    """
+  end
+
+  @spec render(%{:view => :node, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{ view: :node } = assigns) do
+    ~H"""
+    <div class="h-full flex flex-col items-center justify-center system-scroll h-full">
+      <h1 class="text-2xl font-light text-gray-2 my-4 text-center">node</h1>
+
+      <%!-- TODO: add overflow here for content --%>
+    </div>
+    """
+  end
+
+  @spec render(%{:view => :service, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{ view: :service } = assigns) do
+    ~H"""
+    <div class="h-full flex flex-col items-center justify-center system-scroll h-full">
+      <h1 class="text-2xl font-light text-gray-2 my-4 text-center">service</h1>
+
+      <%!-- TODO: add overflow here for content --%>
+    </div>
+    """
+  end
+
+  @spec render(%{:view => :device, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{ view: :device } = assigns) do
+    ~H"""
+    <div class="h-full flex flex-col items-center justify-center system-scroll h-full">
+      <h1 class="text-2xl font-light text-gray-2 my-4 text-center">device</h1>
+
+      <%!-- TODO: add overflow here for content --%>
+    </div>
+    """
+  end
+
+  @spec render(%{:view => :blacklist, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{ view: :blacklist } = assigns) do
+    ~H"""
+    <div class="h-full flex flex-col items-center justify-center system-scroll h-full">
+      <h1 class="text-2xl font-light text-gray-2 my-4 text-center">blacklist</h1>
+
+      <%!-- TODO: add overflow here for content --%>
+    </div>
+    """
+  end
+
+  @spec render(%{:view => :logs, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{ view: :logs } = assigns) do
+    ~H"""
+    <div class="h-full flex flex-col items-center justify-center system-scroll h-full">
+      <h1 class="text-2xl font-light text-gray-2 my-4 text-center">logs</h1>
 
       <%!-- TODO: add overflow here for content --%>
     </div>

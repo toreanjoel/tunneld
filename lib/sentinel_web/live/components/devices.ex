@@ -40,11 +40,11 @@ defmodule SentinelWeb.Live.Components.Devices do
           <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
         </div>
         <div class="grid grid-cols-2 gap-1">
-          <div class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
+          <div phx-click="show_details" phx-value-type={"blacklist"} phx-value-id={"_"} class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
             <.icon class="w-4 h-4" name="hero-no-symbol" />
             <div class="truncate text-xs text-gray-1">Block List</div>
           </div>
-          <div class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
+          <div phx-click="show_details" phx-value-type={"logs"} phx-value-id={"_"} class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
             <.icon class="w-4 h-4" name="hero-circle-stack" />
             <div class="truncate text-xs text-gray-1">Log Backups</div>
           </div>
@@ -52,7 +52,7 @@ defmodule SentinelWeb.Live.Components.Devices do
       </div>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <%= for device <- @devices do %>
-          <div class="p-4 flex flex-col bg-secondary rounded-lg w-[100%] h-[130px] hover:bg-secondary cursor-pointer">
+          <div phx-click="show_details" phx-value-type={"device"} phx-value-id={device.mac} class="p-4 flex flex-col bg-secondary rounded-lg w-[100%] h-[130px] hover:bg-secondary cursor-pointer">
             <div class="flex flex-row">
               <div class="grow">
                 <.icon class="w-6 h-6 text-gray-1" name={get_device_icon(device.type)} />

@@ -17,10 +17,10 @@ defmodule SentinelWeb.Live.Components.Nodes do
       socket
       |> assign(
         nodes: [
-          %{type: "cpu", status: "active"},
-          %{type: "storage", status: "warning"},
-          %{type: "vpn", status: "active"},
-          %{type: "pc", status: "offline"}
+          %{id: "id1", type: "cpu", status: "active"},
+          %{id: "id2", type: "storage", status: "warning"},
+          %{id: "id3", type: "vpn", status: "active"},
+          %{id: "id4", type: "pc", status: "offline"}
         ]
       )
       |> assign(data: Map.get(assigns, :data, %{}))
@@ -40,7 +40,7 @@ defmodule SentinelWeb.Live.Components.Nodes do
       </div>
       <div class="flex flex-wrap gap-3 items-center justify-start">
         <%= for node <- @nodes do %>
-          <div class="relative w-[120px] md:w-[75px] h-[120px] md:h-[75px] p-2 bg-secondary flex items-center justify-center rounded-md hover:bg-secondary cursor-pointer">
+          <div phx-click="show_details" phx-value-type={"node"} phx-value-id={node.id} class="relative w-[120px] md:w-[75px] h-[120px] md:h-[75px] p-2 bg-secondary flex items-center justify-center rounded-md hover:bg-secondary cursor-pointer">
             <.icon class="w-10 h-10" name={get_icon(node.type)} />
             <div class={"absolute bottom-[5px] right-2 w-[10px] h-[10px] rounded-full " <> get_status_color(node.status)}>
             </div>

@@ -72,7 +72,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
     <div :if={@sidebar.is_open} class="fixed inset-0 bg-primary lg:hidden z-10">
       <div class="p-4 h-full">
         <!-- Toggle button for small screens only -->
-        <button phx-click="toggle_sidebar" class="lg:hidden bg-secondary p-2 m-2">
+        <button phx-click="close_details" class="lg:hidden bg-secondary p-2 m-2">
           Close
         </button>
         <.live_component id="sidebar_details_mobile" module={SidebarDetails} view={@sidebar.view} />
@@ -91,7 +91,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
       <div class="flex flex-row h-[30px]">
         <div class="flex-1" />
         <div
-          phx-click="toggle_sidebar"
+          phx-click="show_details"
           class="relative rounded-md hover:bg-secondary cursor-pointer"
         >
           <div class="absolute right-0 top-0 w-[8px] h-[8px] rounded-full bg-blue-800" />
@@ -145,14 +145,38 @@ defmodule SentinelWeb.Live.DashboardV2 do
 
   @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) :: {:noreply, Phoenix.LiveView.Socket.t()}
   @doc """
-  Toggle the right panel visibility on small screens.
+  Render Sidebar content
   """
-  def handle_event("toggle_sidebar", _value, socket) do
-    %{sidebar: sidebar} = socket.assigns
+  def handle_event("show_details", %{ "id" => id, "type" => type}, socket) do
+    # we need to check the types where we want to request data from
+    # Here we tell the GenServers to do the work
+    # The broadcast here will be to the component:sidebar - we will render accordingly and replace data
+    view = case type do
+      "node" ->
+        :node
+      "service" ->
+        :service
+      "device" ->
+        :device
+      "blacklist" ->
+        :blacklist
+      "logs" ->
+        :logs
+      _ ->
+        :system_overview
+    end
 
     sidebar = %{
-      is_open: !Map.get(sidebar, :is_open),
-      view: !Map.get(sidebar, :view)
+      is_open: true,
+      view: view
+    }
+
+    {:noreply, assign(socket, :sidebar, sidebar)}
+  end
+  def handle_event("close_details", _, socket) do
+    sidebar = %{
+      is_open: false,
+      view: Map.get(socket.assigns.sidebar, :view)
     }
 
     {:noreply, assign(socket, :sidebar, sidebar)}
