@@ -22,4 +22,9 @@
     scrollbar-color: #1b1b1b transparent;
     scrollbar-width: 5px;
   }
+
+  /* SVG animation transition */
+  .animate-dashoffset {
+    transition: stroke-dashoffset 1s ease-in-out;
+  }
 }

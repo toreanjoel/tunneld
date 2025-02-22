@@ -1,6 +1,24 @@
 defmodule SentinelWeb.Live.Components.Resources do
   @moduledoc """
   Resources of the devices and available resources
+
+  Example of how the data will be sent but will be sent with real data using os_mon
+
+  alias SentinelWeb.Live.Components.Resources, as: Resources
+
+    data = %{
+      resources: %{
+        cpu: Enum.random(1..100),
+        mem: Enum.random(1..100),
+        storage: Enum.random(1..100)
+      }
+    }
+
+    id = "resources"
+    module = Resources
+
+
+    Phoenix.PubSub.broadcast(Sentinel.PubSub, "component:resources", %{id: id, module: module, data: data})
   """
   use SentinelWeb, :live_component
 
@@ -18,11 +36,11 @@ defmodule SentinelWeb.Live.Components.Resources do
     socket =
       socket
       |> assign(
-        resources: %{
+        %{resources: %{
           cpu: Enum.random(1..100),
           mem: Enum.random(1..100),
           storage: Enum.random(1..100)
-        }
+        }}
       )
       |> assign(data: Map.get(assigns, :data, %{}))
 
@@ -66,7 +84,7 @@ defmodule SentinelWeb.Live.Components.Resources do
                   cx="85"
                   cy="85"
                   r={@radius}
-                  class={get_percent_color(percent)}
+                  class={get_percent_color(percent) <> " animate-dashoffset"}
                   stroke-width="10"
                   fill="#202226"
                   stroke-dasharray={@circumference}
