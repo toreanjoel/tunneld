@@ -288,20 +288,20 @@ defmodule SentinelWeb.Live.Blacklist do
   # get the blacklist for the current blacklist connect
   def handle_info(:init, socket) do
     {_, blacklist} = Blacklist.get_blacklist_page(0, @page_size)
-    # {_, devices_state} = Devices.get_state()
+    {_, devices_state} = Devices.get_state()
 
-    # devices =
-    #   Enum.map(devices_state.devices, fn %{hostname: hostname, mac: mac} ->
-    #     {hostname, mac}
-    #   end)
+    devices =
+      Enum.map(devices_state.devices, fn %{hostname: hostname, mac: mac} ->
+        {hostname, mac}
+      end)
 
     socket =
       socket
-      # |> assign(:blacklist, blacklist.data)
-      # |> assign(:has_more_data, blacklist.has_more_data)
-      # |> assign(:curr_page, blacklist.curr_page)
-      # |> assign(:count, blacklist.data |> length)
-      # |> assign(:devices, devices)
+      |> assign(:blacklist, blacklist.data)
+      |> assign(:has_more_data, blacklist.has_more_data)
+      |> assign(:curr_page, blacklist.curr_page)
+      |> assign(:count, blacklist.data |> length)
+      |> assign(:devices, devices)
 
     {:noreply, socket}
   end
