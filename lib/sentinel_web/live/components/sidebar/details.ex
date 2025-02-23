@@ -17,13 +17,15 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
 
   def update(assigns, socket) do
     view = Map.get(assigns, :view, socket.assigns[:view] || :system_overview)
-    new_data = Map.get(assigns, :data, [])
+    new_data = Map.get(assigns, :data, %{})
+
 
     socket =
       socket
       |> assign(view: view)
       |> assign(data: new_data)
 
+    IO.inspect(socket)
     {:ok, socket}
   end
 
@@ -49,13 +51,20 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
 
   @spec render(%{:view => :service, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :service} = assigns) do
+    data = Map.get(assigns, :data)
+    logs = Map.get(data, :logs, [])
+
+    assigns =
+      assigns
+      |> assign(logs: logs)
+
     ~H"""
     <div class="h-full flex flex-col items-center justify-center system-scroll h-full">
-      <p :if={@data |> length == 0} class="text-gray-500">No Service Logs</p>
-      <div :if={@data |> length > 0} class="overflow-x-auto">
+      <p :if={@logs |> length == 0} class="text-gray-500">No Service Logs</p>
+      <div :if={@logs |> length > 0} class="overflow-x-auto">
         <table class="table-auto w-full">
           <tbody>
-            <%= for log <- @data do %>
+            <%= for log <- @logs do %>
               <tr>
                 <td class="px-4 py-2">
                   <%= log %>
@@ -71,6 +80,13 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
 
   @spec render(%{:view => :device, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :device} = assigns) do
+    data = Map.get(assigns, :data)
+    logs = Map.get(data, :logs, [])
+
+    assigns =
+      assigns
+      |> assign(logs: logs)
+
     ~H"""
     <div class="h-full flex flex-col system-scroll">
       <table class="table-auto border-collapse w-full">
@@ -82,7 +98,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
           </tr>
         </thead>
         <tbody>
-          <%= for log <- @data do %>
+          <%= for log <- @data[:devices] do %>
             <tr>
               <td><%= log.time %></td>
               <td><%= log.query_type %></td>
@@ -108,11 +124,18 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
 
   @spec render(%{:view => :logs, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :logs} = assigns) do
+    data = Map.get(assigns, :data)
+    logs = Map.get(data, :logs, [])
+
+    assigns =
+      assigns
+      |> assign(logs: logs)
+
     ~H"""
     <div class="h-full flex flex-col system-scroll">
       <div class="text-left w-full flex flex-col">
-        <p :if={Map.get(@data, :count, 0) == 0}>No Logs Archived</p>
-        <div :if={Map.get(@data, :count, 0) > 0} class="overflow-x-auto">
+        <p :if={Map.get(@data[:logs] |> length, :count, 0) == 0}>No Logs Archived</p>
+        <div :if={Map.get(@data[:logs] |> length, :count, 0) > 0} class="overflow-x-auto">
           <table class="table-auto border-collapse w-full">
             <thead>
               <tr class="bg-secondary">
@@ -121,7 +144,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
               </tr>
             </thead>
             <tbody>
-              <%= for log_file <- Map.get(@data, :files, []) do %>
+              <%= for log_file <- Map.get(@data[:logs], :files, []) do %>
                 <tr phx-value-name={if log_file !== "_data.log", do: log_file, else: nil}>
                   <td class="px-4 py-2">
                     <%= log_file %> <%= if log_file === "_data.log", do: "(active)" %>

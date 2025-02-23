@@ -7,8 +7,7 @@ defmodule Sentinel.Servers.Services do
 
   @services [:dnsmasq, :dhcpcd, :hostapd, :'dnscrypt-proxy']
   @service_log_limit "80"
-  @interval 30_000
-  @topic "sentinel:services"
+  @interval 10_000
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -40,14 +39,18 @@ defmodule Sentinel.Servers.Services do
       Phoenix.PubSub.broadcast(Sentinel.PubSub, "component:details", %{
         id: "sidebar_details_desktop",
         module: SentinelWeb.Live.Components.Sidebar.Details,
-        data: data
+        data: %{
+          logs: data
+        }
       })
 
       # Broadcast to sidebar details for mobile:
       Phoenix.PubSub.broadcast(Sentinel.PubSub, "component:details", %{
         id: "sidebar_details_mobile",
         module: SentinelWeb.Live.Components.Sidebar.Details,
-        data: data
+        data: %{
+          logs: data
+        }
       })
 
       {:reply, {:ok, data}, state}
@@ -74,8 +77,12 @@ defmodule Sentinel.Servers.Services do
     Phoenix.PubSub.broadcast(Sentinel.PubSub, "component:services", %{
       id: "services",
       module: SentinelWeb.Live.Components.Services,
-      data: result
+      data: %{
+        status: result
+      }
     })
+
+    IO.inspect("checking services")
 
     sync_services()
     {:noreply, Map.merge(state, result)}

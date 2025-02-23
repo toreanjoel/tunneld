@@ -14,16 +14,9 @@ defmodule SentinelWeb.Live.Components.Devices do
   end
 
   def update(assigns, socket) do
-    new_devices =
-      assigns
-      |> Map.get(:data, %{})
-      |> Map.get(:devices, [])
-
     socket =
       socket
-      |> assign(devices: new_devices)
       |> assign(data: Map.get(assigns, :data, %{}))
-
     {:ok, socket}
   end
 
@@ -50,7 +43,7 @@ defmodule SentinelWeb.Live.Components.Devices do
         </div>
       </div>
       <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <%= for device <- @devices do %>
+        <%= for device <- Map.get(@data, :devices, []) do %>
           <div phx-click="show_details" phx-value-type="device" phx-value-id={device.ip} class="p-4 flex flex-col bg-secondary rounded-lg w-full h-[130px] hover:bg-secondary cursor-pointer">
             <div class="flex flex-row">
               <div class="grow">
@@ -80,8 +73,8 @@ defmodule SentinelWeb.Live.Components.Devices do
   Handle toggle event for granting/revoking access.
   """
   def handle_event("toggle_access", %{"mac" => mac}, socket) do
-    device = Enum.find(socket.assigns.devices, fn d -> d.mac == mac end)
-
+    data = socket.assigns.data
+    device = Enum.find(data.devices, fn d -> d.mac == mac end)
     if device do
       if device.access do
         IO.puts("Revoking access for device with MAC: #{mac}")
