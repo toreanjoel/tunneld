@@ -89,7 +89,8 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
 
     ~H"""
     <div class="h-full flex flex-col system-scroll">
-      <table class="table-auto border-collapse w-full">
+      <p :if={@logs |> length() == 0}>No Logs Archived</p>
+      <table :if={!(@logs |> length() == 0)} class="table-auto border-collapse w-full">
         <thead>
           <tr>
             <th class="text-left">Time</th>
@@ -98,7 +99,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
           </tr>
         </thead>
         <tbody>
-          <%= for log <- @data[:devices] do %>
+          <%= for log <- @logs do %>
             <tr>
               <td><%= log.time %></td>
               <td><%= log.query_type %></td>
@@ -125,17 +126,18 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
   @spec render(%{:view => :logs, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :logs} = assigns) do
     data = Map.get(assigns, :data)
-    logs = Map.get(data, :logs, [])
+    logs = Map.get(data, :logs, %{})
 
     assigns =
       assigns
-      |> assign(logs: logs)
+      |> assign(files: Map.get(logs, :files, []))
+      |> assign(count: Map.get(logs, :count, 0))
 
     ~H"""
     <div class="h-full flex flex-col system-scroll">
       <div class="text-left w-full flex flex-col">
-        <p :if={Map.get(@data[:logs] |> length, :count, 0) == 0}>No Logs Archived</p>
-        <div :if={Map.get(@data[:logs] |> length, :count, 0) > 0} class="overflow-x-auto">
+        <p :if={@count == 0}>No Logs Archived</p>
+        <div :if={@count > 0} class="overflow-x-auto">
           <table class="table-auto border-collapse w-full">
             <thead>
               <tr class="bg-secondary">
@@ -144,7 +146,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
               </tr>
             </thead>
             <tbody>
-              <%= for log_file <- Map.get(@data[:logs], :files, []) do %>
+              <%= for log_file <- @files do %>
                 <tr phx-value-name={if log_file !== "_data.log", do: log_file, else: nil}>
                   <td class="px-4 py-2">
                     <%= log_file %> <%= if log_file === "_data.log", do: "(active)" %>

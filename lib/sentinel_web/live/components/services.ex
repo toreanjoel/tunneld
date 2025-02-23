@@ -26,8 +26,6 @@ defmodule SentinelWeb.Live.Components.Services do
       assigns
       |> assign(status: status)
 
-    IO.inspect(assigns, label: "__SERVICE_STATUS__")
-
     ~H"""
     <div class="p-5">
       <div class="mb-5">

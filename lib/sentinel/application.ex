@@ -5,7 +5,7 @@ defmodule Sentinel.Application do
 
   use Application
   alias Sentinel.Servers.FakeData.Whitelist
-  alias Sentinel.Servers.{Auth, Session, Services, Logs, Devices, Blacklist, Whitelist}
+  alias Sentinel.Servers.{Auth, Session, Services, Logs, Devices, Blacklist, Whitelist, Resources}
 
   @impl true
   def start(_type, _args) do
@@ -20,6 +20,7 @@ defmodule Sentinel.Application do
       # {Sentinel.Worker, arg},
       # Start to serve requests, typically the last entry
       SentinelWeb.Endpoint,
+      {Resources, []},
       {Services, []},
       {Logs, []},
       {Devices, []},

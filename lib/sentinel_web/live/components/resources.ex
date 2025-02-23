@@ -35,13 +35,6 @@ defmodule SentinelWeb.Live.Components.Resources do
   def update(assigns, socket) do
     socket =
       socket
-      |> assign(
-        %{resources: %{
-          cpu: Enum.random(1..100),
-          mem: Enum.random(1..100),
-          storage: Enum.random(1..100)
-        }}
-      )
       |> assign(data: Map.get(assigns, :data, %{}))
 
     {:ok, socket}
@@ -51,9 +44,17 @@ defmodule SentinelWeb.Live.Components.Resources do
   Render the resource usage as gauges.
   """
   def render(assigns) do
+    data = Map.get(assigns, :data)
+    resources = Map.get(data, :resources, %{
+      cpu: 0,
+      mem: 0,
+      storage: 0
+    })
+
     # Calculate the circumference for the progress circles
     assigns =
       assigns
+      |> assign(resources: resources)
       |> assign(radius: @radius)
       |> assign(circumference: 2 * :math.pi() * @radius)
 
@@ -65,7 +66,6 @@ defmodule SentinelWeb.Live.Components.Resources do
       </div>
 
       <div class="flex items-center justify-center">
-        <!-- 1 col on small screens, 2 on md, 3 on lg -->
         <div class="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-2">
           <%= for {resource, percent} <- @resources do %>
             <!-- On small screens: full width; on md and above, limit width -->

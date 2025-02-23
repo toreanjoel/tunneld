@@ -82,8 +82,6 @@ defmodule Sentinel.Servers.Services do
       }
     })
 
-    IO.inspect("checking services")
-
     sync_services()
     {:noreply, Map.merge(state, result)}
   end
