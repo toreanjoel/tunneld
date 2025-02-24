@@ -66,12 +66,12 @@ defmodule SentinelWeb.Live.Components.Devices do
 
       <%!-- Loading indicator --%>
       <div :if={@loading} class="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div class="p-4 flex flex-col border border-dashed border-secondary rounded-lg w-full h-[130px]">
+        <div class="p-4 flex flex-col bg-secondary rounded-lg w-full h-[130px] opacity-10">
           <div class="grow">
-            <.icon class="w-10 h-10 text-secondary" name="hero-computer-desktop" />
+            <.icon class="w-10 h-10 text-white" name="hero-computer-desktop" />
           </div>
           <div class="grow" />
-          <div class="text-sm text-secondary">Scanning Devices...</div>
+          <div class="text-md text-white">Scanning Devices...</div>
         </div>
       </div>
 

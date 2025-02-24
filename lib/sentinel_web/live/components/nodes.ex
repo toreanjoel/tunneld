@@ -40,8 +40,8 @@ defmodule SentinelWeb.Live.Components.Nodes do
         <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
       </div>
       <div class="flex flex-wrap gap-3 items-center justify-start">
-        <div class="w-[120px] md:w-[75px] h-[120px] md:h-[75px] border border-dashed border-secondary flex items-center justify-center rounded-md">
-          <.icon class="w-10 h-10 text-secondary" name="hero-cpu-chip" />
+        <div class="w-[120px] md:w-[75px] h-[120px] md:h-[75px] bg-secondary flex items-center justify-center rounded-md opacity-10">
+          <.icon class="w-10 h-10 text-white" name="hero-cpu-chip" />
         </div>
 
 
