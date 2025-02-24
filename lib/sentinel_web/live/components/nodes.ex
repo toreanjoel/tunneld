@@ -8,6 +8,7 @@ defmodule SentinelWeb.Live.Components.Nodes do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Sentinel.PubSub, "component:nodes")
     end
+
     {:ok, socket}
   end
 
@@ -39,13 +40,24 @@ defmodule SentinelWeb.Live.Components.Nodes do
         <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
       </div>
       <div class="flex flex-wrap gap-3 items-center justify-start">
-        <%= for node <- @nodes do %>
-          <div phx-click="show_details" phx-value-type={"node"} phx-value-id={node.id} class="relative w-[120px] md:w-[75px] h-[120px] md:h-[75px] p-2 bg-secondary flex items-center justify-center rounded-md hover:bg-secondary cursor-pointer">
+        <div class="w-[120px] md:w-[75px] h-[120px] md:h-[75px] border border-dashed border-secondary flex items-center justify-center rounded-md">
+          <.icon class="w-10 h-10 text-secondary" name="hero-cpu-chip" />
+        </div>
+
+
+        <%!-- We will only render nodes once they connect, this needs to be messages from the channel --%>
+        <%!-- <%= for node <- @nodes do %>
+          <div
+            phx-click="show_details"
+            phx-value-type="node"
+            phx-value-id={node.id}
+            class="relative w-[120px] md:w-[75px] h-[120px] md:h-[75px] p-2 bg-secondary flex items-center justify-center rounded-md hover:bg-secondary cursor-pointer"
+          >
             <.icon class="w-10 h-10" name={get_icon(node.type)} />
             <div class={"absolute bottom-[5px] right-2 w-[10px] h-[10px] rounded-full " <> get_status_color(node.status)}>
             </div>
           </div>
-        <% end %>
+        <% end %> --%>
       </div>
     </div>
     """

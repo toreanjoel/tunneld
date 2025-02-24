@@ -19,7 +19,6 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
     view = Map.get(assigns, :view, socket.assigns[:view] || :system_overview)
     new_data = Map.get(assigns, :data, %{})
 
-
     socket =
       socket
       |> assign(view: view)
@@ -53,15 +52,17 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
   def render(%{view: :service} = assigns) do
     data = Map.get(assigns, :data)
     logs = Map.get(data, :logs, [])
+    count = length(logs)
 
     assigns =
       assigns
       |> assign(logs: logs)
+      |> assign(count: count)
 
     ~H"""
-    <div class="h-full flex flex-col items-center justify-center system-scroll h-full">
-      <p :if={@logs |> length == 0} class="text-gray-500">No Service Logs</p>
-      <div :if={@logs |> length > 0} class="overflow-x-auto">
+    <div class="table-auto border-collapse w-full">
+      <p :if={@count == 0}>No Service Logs</p>
+      <div :if={@count > 0} class="overflow-x-auto">
         <table class="table-auto w-full">
           <tbody>
             <%= for log <- @logs do %>
@@ -82,15 +83,17 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
   def render(%{view: :device} = assigns) do
     data = Map.get(assigns, :data)
     logs = Map.get(data, :logs, [])
+    count = length(logs)
 
     assigns =
       assigns
       |> assign(logs: logs)
+      |> assign(count: count)
 
     ~H"""
     <div class="h-full flex flex-col system-scroll">
-      <p :if={@logs |> length() == 0}>No Logs Archived</p>
-      <table :if={!(@logs |> length() == 0)} class="table-auto border-collapse w-full">
+      <p :if={@count == 0}>No Logs Archived</p>
+      <table :if={!(@count == 0)} class="table-auto border-collapse w-full">
         <thead>
           <tr>
             <th class="text-left">Time</th>
@@ -114,11 +117,56 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
 
   @spec render(%{:view => :blacklist, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :blacklist} = assigns) do
-    ~H"""
-    <div class="h-full flex flex-col items-center justify-center system-scroll h-full">
-      <h1 class="text-2xl font-light text-gray-2 my-4 text-center">blacklist</h1>
+    data = Map.get(assigns, :data)
+    blacklist = Map.get(data, :blacklist, [])
+    count = length(blacklist)
 
-      <%!-- TODO: add overflow here for content --%>
+    assigns =
+      assigns
+      |> assign(blacklist: blacklist)
+      |> assign(count: count)
+
+    ~H"""
+    <div class="h-full flex flex-col system-scroll">
+      <p :if={@count == 0}>No domains blocked</p>
+      <div :if={@count > 0} class="overflow-x-auto">
+        <table class="table-auto border-collapse w-full">
+          <thead>
+            <tr>
+              <th class="text-left">Domain</th>
+              <th class="text-left">IP</th>
+              <th class="text-left">Mac Address (USER)</th>
+              <th class="text-left">TTL</th>
+              <th class="text-left">Type</th>
+              <th class="text-left">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            <%= for %{"domain" => domain, "ip" => ip, "mac" => mac, "ttl" => ttl, "type" => type} <- @blacklist do %>
+              <tr>
+                <td class="px-4 py-2"><%= domain %></td>
+                <td class="px-4 py-2"><%= ip %></td>
+                <td class="px-4 py-2"><%= mac %></td>
+                <td class="w-2"><%= ttl %></td>
+                <td class="w-2"><%= type %></td>
+                <td class="w-2">
+                  <div class="flex flex-row gap-2">
+                    <div
+                      phx-click="open_modal"
+                      phx-value-domain={domain}
+                      phx-value-mac={mac}
+                      phx-value-type={type}
+                      class="cursor-pointer"
+                    >
+                      <.icon name="hero-no-symbol" class="h-5 w-5" />
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            <% end %>
+          </tbody>
+        </table>
+      </div>
     </div>
     """
   end
@@ -141,8 +189,8 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
           <table class="table-auto border-collapse w-full">
             <thead>
               <tr class="bg-secondary">
-                <th class="px-4 py-2 text-left">Name</th>
-                <th class="px-4 py-2 text-left w-2">Action</th>
+                <th class="text-left">Name</th>
+                <th class="text-left w-2">Action</th>
               </tr>
             </thead>
             <tbody>

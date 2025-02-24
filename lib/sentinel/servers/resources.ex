@@ -5,7 +5,7 @@ defmodule Sentinel.Servers.Resources do
   use GenServer
   require Logger
 
-  @interval 5_000  # 1 minute in milliseconds
+  @interval 5_000
 
   # Public API to start the GenServer
   def start_link(_) do
@@ -39,7 +39,7 @@ defmodule Sentinel.Servers.Resources do
 
   def get_resources do
     # Get CPU usage as a percentage (e.g., 50.0 means 50% CPU used).
-    cpu = :cpu_sup.util() |> Float.round(2)
+    cpu = :cpu_sup.util() |> Float.round(1)
 
     # Get memory usage data.
     mem_data = :memsup.get_system_memory_data() |> Enum.into(%{})
@@ -48,7 +48,7 @@ defmodule Sentinel.Servers.Resources do
     free_mem  = Map.get(mem_data, :available_memory, 0)
     used_mem  = total_mem - free_mem
     # This computes the percentage of memory used.
-    mem_percent = used_mem / total_mem * 100 |> Float.round(2)
+    mem_percent = used_mem / total_mem * 100 |> Float.round(1)
 
     # Get disk usage for the root filesystem.
     # The command returns a string like "50%\n".

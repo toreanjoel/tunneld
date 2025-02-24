@@ -160,6 +160,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
         Sentinel.Servers.Logs.get_device_logs(id)
         :device
       "blacklist" ->
+        Sentinel.Servers.Blacklist.init_state()
         :blacklist
       "logs" ->
         Sentinel.Servers.Logs.init_state()
