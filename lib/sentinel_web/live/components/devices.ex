@@ -101,7 +101,7 @@ defmodule SentinelWeb.Live.Components.Devices do
               </label>
             </div>
             <div class="grow" />
-            <div class="text-sm"><%= device.hostname %></div>
+            <div class="text-sm truncate"><%= device.hostname %></div>
             <div class="text-xs"><%= device.ip %></div>
             <div class="text-xs"><%= device.mac %></div>
           </div>

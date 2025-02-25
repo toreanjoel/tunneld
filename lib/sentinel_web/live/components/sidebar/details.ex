@@ -32,7 +32,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
           Phoenix.LiveView.Rendered.t()
   def render(%{view: :system_overview} = assigns) do
     ~H"""
-    <div class="h-full flex flex-col items-center justify-center system-scroll h-full">
+    <div class="h-full flex flex-col items-center justify-center p-3 h-full">
       <.icon class="w-[50px] h-[50px] text-green" name="hero-shield-check" />
       <h1 class="text-2xl font-light text-gray-2 my-4 text-center">System is running as expected.</h1>
     </div>
@@ -42,7 +42,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
   @spec render(%{:view => :node, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :node} = assigns) do
     ~H"""
-    <div class="h-full flex flex-col items-center justify-center system-scroll h-full">
+    <div class="h-full flex flex-col items-center justify-center p-3 h-full">
       <h1 class="text-2xl font-light text-gray-2 my-4 text-center">node</h1>
     </div>
     """
@@ -60,24 +60,22 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
       |> assign(count: count)
 
     ~H"""
-    <div class="table-auto border-collapse w-full">
-      <p :if={@count == 0}>No Service Logs</p>
-      <div :if={@count > 0} class="overflow-x-auto">
-        <table class="table-auto w-full">
-          <tbody>
-            <%= for log <- @logs do %>
-              <tr>
-                <td class="px-4 py-2">
-                  <%= log %>
-                </td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
+    <div class="bg-secondary p-2 h-full">
+      <div class={"h-full flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
+        <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">No Service Logs</h1>
+
+        <div :if={@count > 0} class="space-y-3">
+          <%= for log <- @logs do %>
+            <div class="flex flex-col p-3 my-2 bg-primary rounded-lg font-light">
+              <div class="text-sm"><%= log %></div>
+            </div>
+          <% end %>
+        </div>
       </div>
     </div>
     """
   end
+
 
   @spec render(%{:view => :device, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :device} = assigns) do
@@ -91,26 +89,20 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
       |> assign(count: count)
 
     ~H"""
-    <div class="h-full flex flex-col system-scroll">
-      <p :if={@count == 0}>No Logs Archived</p>
-      <table :if={!(@count == 0)} class="table-auto border-collapse w-full">
-        <thead>
-          <tr>
-            <th class="text-left">Time</th>
-            <th class="text-left">Query Type</th>
-            <th class="text-left">Domain</th>
-          </tr>
-        </thead>
-        <tbody>
+    <div class="bg-secondary p-2 h-full">
+      <div class={"h-full flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
+        <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">No Device Logs</h1>
+
+        <div :if={!(@count == 0)}>
           <%= for log <- @logs do %>
-            <tr>
-              <td><%= log.time %></td>
-              <td><%= log.query_type %></td>
-              <td><%= log.domain %></td>
-            </tr>
+            <div class="flex flex-col p-3 my-2 bg-primary rounded-lg font-light">
+              <div class="text-sm truncate"><span class="font-bold">Domain:</span> <%= log.domain %></div>
+              <div class="text-sm truncate"><span class="font-bold">Time:</span> <%= log.time %></div>
+              <div class="text-sm truncate"><span class="font-bold">Query Type:</span> <%= log.query_type %></div>
+            </div>
           <% end %>
-        </tbody>
-      </table>
+        </div>
+      </div>
     </div>
     """
   end
@@ -127,45 +119,33 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
       |> assign(count: count)
 
     ~H"""
-    <div class="h-full flex flex-col system-scroll">
-      <p :if={@count == 0}>No domains blocked</p>
-      <div :if={@count > 0} class="overflow-x-auto">
-        <table class="table-auto border-collapse w-full">
-          <thead>
-            <tr>
-              <th class="text-left">Domain</th>
-              <th class="text-left">IP</th>
-              <th class="text-left">Mac Address (USER)</th>
-              <th class="text-left">TTL</th>
-              <th class="text-left">Type</th>
-              <th class="text-left">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            <%= for %{"domain" => domain, "ip" => ip, "mac" => mac, "ttl" => ttl, "type" => type} <- @blacklist do %>
-              <tr>
-                <td class="px-4 py-2"><%= domain %></td>
-                <td class="px-4 py-2"><%= ip %></td>
-                <td class="px-4 py-2"><%= mac %></td>
-                <td class="w-2"><%= ttl %></td>
-                <td class="w-2"><%= type %></td>
-                <td class="w-2">
-                  <div class="flex flex-row gap-2">
-                    <div
-                      phx-click="open_modal"
-                      phx-value-domain={domain}
-                      phx-value-mac={mac}
-                      phx-value-type={type}
-                      class="cursor-pointer"
-                    >
-                      <.icon name="hero-no-symbol" class="h-5 w-5" />
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            <% end %>
-          </tbody>
-        </table>
+    <div class="bg-secondary p-2 h-full">
+      <div class={"h-full flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
+        <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">No Domains Blocked</h1>
+
+        <div :if={@count > 0} class="space-y-3">
+          <%= for %{"domain" => domain, "ip" => ip, "mac" => mac, "ttl" => ttl, "type" => type} <- @blacklist do %>
+            <div class="flex flex-col p-3 my-2 bg-primary rounded-lg font-light">
+              <div class="text-sm truncate"><span class="font-bold">Domain:</span> <%= domain %></div>
+              <div class="text-sm truncate"><span class="font-bold">IP:</span> <%= ip %></div>
+              <div class="text-sm truncate"><span class="font-bold">MAC Address (USER):</span> <%= mac %></div>
+              <div class="text-sm truncate"><span class="font-bold">TTL:</span> <%= ttl %></div>
+              <div class="text-sm truncate"><span class="font-bold">Type:</span> <%= type %></div>
+
+              <div class="flex justify-end mt-2">
+                <div
+                  phx-click="open_modal"
+                  phx-value-domain={domain}
+                  phx-value-mac={mac}
+                  phx-value-type={type}
+                  class="cursor-pointer text-red-500"
+                >
+                  <.icon name="hero-no-symbol" class="h-5 w-5" />
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
       </div>
     </div>
     """
@@ -182,45 +162,37 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
       |> assign(count: Map.get(logs, :count, 0))
 
     ~H"""
-    <div class="h-full flex flex-col system-scroll">
-      <div class="text-left w-full flex flex-col">
-        <p :if={@count == 0}>No Logs Archived</p>
-        <div :if={@count > 0} class="overflow-x-auto">
-          <table class="table-auto border-collapse w-full">
-            <thead>
-              <tr class="bg-secondary">
-                <th class="text-left">Name</th>
-                <th class="text-left w-2">Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              <%= for log_file <- @files do %>
-                <tr phx-value-name={if log_file !== "_data.log", do: log_file, else: nil}>
-                  <td class="px-4 py-2">
-                    <%= log_file %> <%= if log_file === "_data.log", do: "(active)" %>
-                  </td>
-                  <td class="px-4 py-2">
-                    <div class="flex flex-row gap-2">
-                      <a
-                        href={Routes.file_download_path(@socket, :download, log_file)}
-                        class="cursor-pointer"
-                      >
-                        <.icon name="hero-arrow-down-tray" class="h-5 w-5" />
-                      </a>
-                      <div
-                        :if={log_file !== "_data.log"}
-                        phx-click="open_modal"
-                        phx-value-file={log_file}
-                        class="cursor-pointer"
-                      >
-                        <.icon name="hero-no-symbol" class="h-5 w-5" />
-                      </div>
-                    </div>
-                  </td>
-                </tr>
-              <% end %>
-            </tbody>
-          </table>
+    <div class="bg-secondary p-2 h-full">
+      <div class={"h-full flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
+        <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">No Logs Archived</h1>
+
+        <div :if={@count > 0} class="space-y-3">
+          <%= for log_file <- @files do %>
+            <div class="flex flex-col p-3 my-2 bg-primary rounded-lg font-light">
+              <div class="text-sm truncate">
+                <span class="font-bold">Name:</span> <%= log_file %>
+                <%= if log_file === "_data.log", do: "(active)" %>
+              </div>
+
+              <div class="flex justify-end mt-2 space-x-3">
+                <a
+                  href={Routes.file_download_path(@socket, :download, log_file)}
+                  class="cursor-pointer text-blue-500"
+                >
+                  <.icon name="hero-arrow-down-tray" class="h-5 w-5" />
+                </a>
+
+                <div
+                  :if={log_file !== "_data.log"}
+                  phx-click="open_modal"
+                  phx-value-file={log_file}
+                  class="cursor-pointer text-red-500"
+                >
+                  <.icon name="hero-no-symbol" class="h-5 w-5" />
+                </div>
+              </div>
+            </div>
+          <% end %>
         </div>
       </div>
     </div>

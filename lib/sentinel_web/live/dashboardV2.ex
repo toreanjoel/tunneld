@@ -62,13 +62,13 @@ defmodule SentinelWeb.Live.DashboardV2 do
 
     ~H"""
     <!-- Right panel: always visible on medium+ screens -->
-    <div class="sticky inset-0 w-[30%] max-w-[600px] bg-primary hidden lg:block p-3">
-      <div class="bg-secondary h-full rounded-lg p-2">
+    <div class="sticky inset-0 w-[30%] max-w-[600px] hidden lg:block m-[15px] px-[25px] py-[20px] rounded-lg system-scroll bg-secondary">
+      <div class="h-full">
         <.live_component id="sidebar_details_desktop" module={SidebarDetails} view={@sidebar.view} />
       </div>
     </div>
     <!-- Right panel for small screens when toggled -->
-    <div :if={@sidebar.is_open} class="fixed inset-0 bg-secondary lg:hidden z-10">
+    <div :if={@sidebar.is_open} class="fixed inset-0 bg-secondary lg:hidden z-10 system-scroll">
       <div class="p-4 h-full">
         <!-- Toggle button for small screens only -->
         <button phx-click="close_details" class="lg:hiddeny p-2 m-2">
@@ -90,7 +90,9 @@ defmodule SentinelWeb.Live.DashboardV2 do
       <div class="flex flex-row h-[30px]">
         <div class="flex-1" />
         <div
-          phx-click="show_details"
+            phx-click="show_details"
+            phx-value-type="overview"
+            phx-value-id="_"
           class="relative rounded-md hover:bg-secondary cursor-pointer"
         >
           <div class="absolute right-0 top-0 w-[8px] h-[8px] rounded-full bg-blue-800" />

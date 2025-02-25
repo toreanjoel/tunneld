@@ -18,7 +18,8 @@
 
   /* The scroll styles */
   .system-scroll {
-    overflow-y: scroll;
+    overflow-y: overlay;
+    overflow-x: hidden;
     scrollbar-color: #1b1b1b transparent;
     scrollbar-width: 5px;
   }
