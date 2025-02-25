@@ -19,9 +19,10 @@ defmodule SentinelWeb.Live.DashboardV2 do
   @doc """
   Initialize the dashboard with sidebar set to false.
   """
-  def mount(_params, _session, socket) do
+  def mount(_params, %{"ip" => ip} = _session, socket) do
     socket =
       socket
+      |> assign(:ip, ip)
       |> assign(
         sidebar: %{
           is_open: false,
@@ -178,6 +179,10 @@ defmodule SentinelWeb.Live.DashboardV2 do
 
     {:noreply, assign(socket, :sidebar, sidebar)}
   end
+
+  #
+  # Close the details bar (relevant when we are in mobile mode)
+  #
   def handle_event("close_details", _, socket) do
     sidebar = %{
       is_open: false,
@@ -185,6 +190,15 @@ defmodule SentinelWeb.Live.DashboardV2 do
     }
 
     {:noreply, assign(socket, :sidebar, sidebar)}
+  end
+
+  #
+  # Log out of the sentinel dashboard
+  #
+  def handle_event("logout", _, socket) do
+    # TODO: we need to consider doing a modal over here
+    Session.delete(socket.assigns.ip)
+    {:noreply, socket |> push_navigate(to: Routes.live_path(socket, SentinelWeb.Live.Login))}
   end
 
   #
