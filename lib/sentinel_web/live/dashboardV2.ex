@@ -4,6 +4,8 @@ defmodule SentinelWeb.Live.DashboardV2 do
   """
   use SentinelWeb, :live_view
   alias SentinelWeb.Live.Components.Sidebar.Details, as: SidebarDetails
+  alias Sentinel.Servers.{ Session }
+  alias SentinelWeb.Router.Helpers, as: Routes
   alias SentinelWeb.Live.Components.{
     Welcome,
     Resources,
