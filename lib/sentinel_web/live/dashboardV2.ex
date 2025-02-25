@@ -11,7 +11,8 @@ defmodule SentinelWeb.Live.DashboardV2 do
     Resources,
     Services,
     Nodes,
-    Devices
+    Devices,
+    Modal
   }
 
   # TODO: uncomment the line below to add auth into the system
@@ -29,6 +30,14 @@ defmodule SentinelWeb.Live.DashboardV2 do
     socket =
       socket
       |> assign(:ip, ip)
+      |> assign(
+        modal: %{
+          show: false,
+          title: nil,
+          body: nil,
+          action_title: nil,
+          action: nil,
+        })
       |> assign(
         sidebar: %{
           is_open: false,
@@ -51,6 +60,17 @@ defmodule SentinelWeb.Live.DashboardV2 do
       <%= main(assigns) %>
       <!-- Sidebar for more details -->
       <%= sidebar(assigns) %>
+      <%!-- Modal to render confirmations and show data --%>
+      <.live_component
+        :if={@modal.show}
+        module={Modal}
+        id="generic_modal"
+        title={@modal.title}
+        body={@modal.body}
+        action_title={@modal.action_title}
+        action={@modal.action}
+      />
+
     </div>
     """
   end
@@ -97,9 +117,9 @@ defmodule SentinelWeb.Live.DashboardV2 do
       <div class="flex flex-row h-[30px]">
         <div class="flex-1" />
         <div
-            phx-click="show_details"
-            phx-value-type="overview"
-            phx-value-id="_"
+          phx-click="show_details"
+          phx-value-type="overview"
+          phx-value-id="_"
           class="relative rounded-md hover:bg-secondary cursor-pointer"
         >
           <div class="absolute right-0 top-0 w-[8px] h-[8px] rounded-full bg-blue-800" />
@@ -142,6 +162,36 @@ defmodule SentinelWeb.Live.DashboardV2 do
       <div class="grow" />
       <div class="flex items-center justify-center cursor-pointer">
         <.icon class="w-6 text-gray-2" name="hero-arrow-left-start-on-rectangle" />
+      </div>
+    </div>
+    """
+  end
+
+
+  @spec render_modal(atom(), Phoenix.LiveView.Socket.assigns()) :: Phoenix.LiveView.Rendered.t()
+  #
+  # Render the modal content
+  #
+  def render_modal(:confirm_removal, assigns) do
+    ~H"""
+    <div class="flex flex-col w-full gap-3">
+      <h2 class="text-2xl font-bold">Are you sure?</h2>
+      <div class="w-full">
+        <span class="text-xs text-gray-500 leading-0">
+          Are you sure you want to remove this file?
+        </span>
+      </div>
+      <!-- Action Buttons -->
+      <div class="flex w-full justify-end gap-4 mt-3">
+        <.button
+          phx-click="modal_action"
+          class="bg-blue-500 text-white px-4 py-2 rounded-md"
+        >
+          Delete
+        </.button>
+        <.button phx-click="modal_cancel" class="bg-red-500 text-white px-4 py-2 rounded-md">
+          Cancel
+        </.button>
       </div>
     </div>
     """
@@ -208,6 +258,42 @@ defmodule SentinelWeb.Live.DashboardV2 do
   end
 
   #
+  # Open the modal
+  #
+  def handle_event("open_modal", %{"title" => title, "body" => body, "action_title" => action_title, "action" => action}, socket) do
+    modal_data = %{
+      show: true,
+      title: title,
+      body: body,
+      action_title: action_title,
+      action: Jason.decode!(action)
+    }
+
+    {:noreply, assign(socket, :modal, modal_data)}
+  end
+
+  #
+  # Close the modal
+  #
+  def handle_event("close_modal", _params, socket) do
+    {:noreply, assign(socket, modal: %{show: false, type: nil, file: nil})}
+  end
+
+  #
+  # Handle the modal action passed - this comes from the generated modal data
+  #
+  def handle_event("execute_modal_action", %{"type" => type, "data" => data}, socket) do
+    decoded_data = Jason.decode!(data)
+
+    # TODO: add the actions here that we do based on the modal action types
+    case type do
+      _ -> IO.inspect("HANDLE ACTION: Type: #{type}, DATA: #{inspect(decoded_data)}")
+    end
+
+    {:noreply, assign(socket, modal: %{show: false})}
+  end
+
+  #
   # ---- handle component updated message :: Client Side Interaction ----
   #
 
@@ -223,13 +309,22 @@ defmodule SentinelWeb.Live.DashboardV2 do
   #
   # Handle recieving a notification event to show the notification popup
   #
-  def handle_info(%{ type: type, message: message}, socket) do
-    type = if type in [:info, :error] do
-      type
-    else
-      :info
-    end
-    IO.inspect("GOT MESSAGE")
-    {:noreply, socket |> put_flash(type, message)}
+  def handle_info(%{type: type, message: message}, socket) do
+    type = if type in [:info, :error], do: type, else: :info
+
+    # Set the flash message
+    socket = put_flash(socket, type, message)
+
+    # Schedule flash removal after 3 seconds (3000 ms)
+    Process.send_after(self(), :clear_flash, 3000)
+
+    {:noreply, socket}
+  end
+
+  #
+  # Handle clearing the flash after the delay
+  #
+  def handle_info(:clear_flash, socket) do
+    {:noreply, clear_flash(socket)}
   end
 end

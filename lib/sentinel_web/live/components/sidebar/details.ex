@@ -182,10 +182,13 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
                   <.icon name="hero-arrow-down-tray" class="h-5 w-5" />
                 </a>
 
+                <%!-- TODO: change this so we only see this when we have files to be deleted  --%>
                 <div
-                  :if={log_file !== "_data.log"}
                   phx-click="open_modal"
-                  phx-value-file={log_file}
+                  phx-value-title={"log_file"}
+                  phx-value-body={"BODT"}
+                  phx-value-action_title={"DELETE!"}
+                  phx-value-action={Jason.encode!(%{"type" => :backup_file_delete, "data" => %{ "file" => "DELETE"}})}
                   class="cursor-pointer text-red-500"
                 >
                   <.icon name="hero-no-symbol" class="h-5 w-5" />
