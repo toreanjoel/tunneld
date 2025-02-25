@@ -203,9 +203,11 @@ defmodule Sentinel.Servers.Logs do
 
     case File.rm(path) do
       :ok ->
+        Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :info, message: "File deleted successfully"})
         {:reply, {:ok, "File deleted successfully"}, state}
 
       {:error, reason} ->
+        Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :info, message: "Failed to delete file: #{inspect(reason)}"})
         {:reply, {:error, "Failed to delete file: #{inspect(reason)}"}, state}
     end
   end

@@ -30,7 +30,8 @@ defmodule Sentinel.Servers.Services do
     if service_atom in @services do
       data = case System.cmd("journalctl", ["-u", service |> to_string, "-n", @service_log_limit, "--no-pager"]) do
         {resp, 0} -> resp
-        _ -> "There was an error fetching the service logs"
+        _ ->
+          "There was an error fetching the service logs"
       end
 
       data = data |> String.split("\n") |> Enum.filter(fn item -> item !== "" end) |> Enum.reverse()
@@ -55,15 +56,19 @@ defmodule Sentinel.Servers.Services do
 
       {:reply, {:ok, data}, state}
     else
+      Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :error, message: "Make sure the service selected is allowed"})
       {:reply, {:error, "Make sure the service selected is allowed"}, state}
     end
   end
 
   # Restart a service
   def handle_cast({:restart_service, service}, state) do
+    service_name = service |> to_string
+
     Task.start(fn ->
-      System.cmd("systemctl", ["restart", service |> to_string])
+      System.cmd("systemctl", ["restart", service_name])
     end)
+    Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :error, message: "Restarting serice: #{service_name}"})
     {:noreply, state}
   end
 

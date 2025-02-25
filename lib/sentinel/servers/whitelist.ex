@@ -75,15 +75,17 @@ defmodule Sentinel.Servers.Whitelist do
         :ok ->
           # We add the item to iptables
           # TODO: maybe try do this first and then write to file? - could have errors
+          Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :info, message: "Internet granted for device: #{mac}"})
           add_policy(policy)
 
         {:error, err} ->
+          Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :error, message: "Failed to add user internet: #{inspect(err)}"})
           {:error, "Failed to add user internet: #{inspect(err)}"}
       end
     {:reply, {:ok, %{}}, state}
   end
 
-  # Request to remove the domains from the blacklist and from iptables
+  # Remove device access to the internet
   def handle_call({:remove_device_access, %{mac: mac}}, _from, state) do
     # Read from the blacklist file
     {_, data} = read_file()
@@ -97,15 +99,17 @@ defmodule Sentinel.Servers.Whitelist do
     write_file = File.write(path(), Jason.encode!(updated_whitelist))
 
     # We check if there was something found and try and remove it
-    if not Enum.empty?(policy) do
+    if not is_nil(policy) and not Enum.empty?(policy) do
       # Check if the entry already exists
       IO.inspect("Removing policy from iptables: #{inspect(policy)}")
       case write_file do
         :ok ->
           # We remove the item to iptables
+          Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :info, message: "Internet revoked for device: #{mac}"})
           remove_policy(policy)
 
         {:error, err} ->
+          Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :error, message: "Failed to revoke device access: #{inspect(err)}"})
           {:error, "Failed to revoke device access: #{inspect(err)}"}
       end
     end

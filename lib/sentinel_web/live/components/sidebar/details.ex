@@ -64,7 +64,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
       <div class={"h-full flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
         <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">No Service Logs</h1>
 
-        <div :if={@count > 0} class="space-y-3">
+        <div :if={@count > 0}>
           <%= for log <- @logs do %>
             <div class="flex flex-col p-3 my-2 bg-primary rounded-lg font-light">
               <div class="text-sm"><%= log %></div>
@@ -123,7 +123,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
       <div class={"h-full flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
         <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">No Domains Blocked</h1>
 
-        <div :if={@count > 0} class="space-y-3">
+        <div :if={@count > 0}>
           <%= for %{"domain" => domain, "ip" => ip, "mac" => mac, "ttl" => ttl, "type" => type} <- @blacklist do %>
             <div class="flex flex-col p-3 my-2 bg-primary rounded-lg font-light">
               <div class="text-sm truncate"><span class="font-bold">Domain:</span> <%= domain %></div>
@@ -166,7 +166,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
       <div class={"h-full flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
         <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">No Logs Archived</h1>
 
-        <div :if={@count > 0} class="space-y-3">
+        <div :if={@count > 0}>
           <%= for log_file <- @files do %>
             <div class="flex flex-col p-3 my-2 bg-primary rounded-lg font-light">
               <div class="text-sm truncate">
@@ -177,7 +177,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
               <div class="flex justify-end mt-2 space-x-3">
                 <a
                   href={Routes.file_download_path(@socket, :download, log_file)}
-                  class="cursor-pointer text-blue-500"
+                  class="cursor-pointer"
                 >
                   <.icon name="hero-arrow-down-tray" class="h-5 w-5" />
                 </a>

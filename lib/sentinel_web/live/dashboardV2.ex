@@ -22,6 +22,10 @@ defmodule SentinelWeb.Live.DashboardV2 do
   Initialize the dashboard with sidebar set to false.
   """
   def mount(_params, %{"ip" => ip} = _session, socket) do
+    if connected?(socket) do
+      Phoenix.PubSub.subscribe(Sentinel.PubSub, "notifications")
+    end
+
     socket =
       socket
       |> assign(:ip, ip)
@@ -214,5 +218,18 @@ defmodule SentinelWeb.Live.DashboardV2 do
   def handle_info(%{id: id, module: module, data: data}, socket) do
     send_update(module, id: id, data: data)
     {:noreply, socket}
+  end
+
+  #
+  # Handle recieving a notification event to show the notification popup
+  #
+  def handle_info(%{ type: type, message: message}, socket) do
+    type = if type in [:info, :error] do
+      type
+    else
+      :info
+    end
+    IO.inspect("GOT MESSAGE")
+    {:noreply, socket |> put_flash(type, message)}
   end
 end

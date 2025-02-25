@@ -87,8 +87,10 @@ defmodule Sentinel.Servers.Blacklist do
 
         case write_file do
           :ok ->
+            Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :info, message: "Domain added successfully: #{domain}"})
             add_policy(policy)
           {:error, err} ->
+            Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :error, message: "Failed to add domain to blacklist: #{inspect(err)}"})
             {:error, "Failed to add domain to blacklist: #{inspect(err)}"}
         end
       end)
@@ -113,8 +115,12 @@ defmodule Sentinel.Servers.Blacklist do
       if has_policy?(policy) do
         IO.inspect("Removing policy from iptables: #{inspect(policy)}")
         case write_file do
-          :ok -> remove_policy(policy)
-          {:error, err} -> {:error, "Failed to remove domain from blacklist: #{inspect(err)}"}
+          :ok ->
+            Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :info, message: "Domain removed successfully: #{domain}"})
+            remove_policy(policy)
+            {:error, err} ->
+            Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :error, message: "Failed to remove domain from blacklist: #{inspect(err)}"})
+            {:error, "Failed to remove domain from blacklist: #{inspect(err)}"}
         end
       else
         IO.inspect("No policy found to remove from iptables: #{inspect(policy)}")
