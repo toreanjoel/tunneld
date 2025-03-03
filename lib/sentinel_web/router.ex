@@ -64,13 +64,6 @@ defmodule SentinelWeb.Router do
     live "/v2/dashboard", Live.DashboardV2
   end
 
-
-  # NOTE: This is for the devices that connect to the network, they will try query for captive portal
-  # We will intercept this on the firewall and send the user to the relelvant gateway
-  scope "/", SentinelWeb do
-    get "/generate_204", CaptivePortalController, :force_captive_portal
-  end
-
   # controller to manage the file downloads
   scope "/files", SentinelWeb do
     pipe_through [:browser]
@@ -89,7 +82,6 @@ defmodule SentinelWeb.Router do
 
     scope "/dev" do
       pipe_through :browser
-
       live_dashboard "/dashboard", metrics: SentinelWeb.Telemetry
     end
   end

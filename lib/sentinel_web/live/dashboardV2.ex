@@ -17,7 +17,6 @@ defmodule SentinelWeb.Live.DashboardV2 do
 
   # TODO: uncomment the line below to add auth into the system
   # on_mount SentinelWeb.Hooks.CheckAuth
-
   @spec mount(map(), map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
   @doc """
   Initialize the dashboard with sidebar set to false.
@@ -70,7 +69,6 @@ defmodule SentinelWeb.Live.DashboardV2 do
         action_title={@modal.action_title}
         action={@modal.action}
       />
-
     </div>
     """
   end
@@ -78,7 +76,6 @@ defmodule SentinelWeb.Live.DashboardV2 do
   #
   # ---- Views :: Components For Dashboard----
   #
-
   @spec sidebar(%{:sidebar => %{is_open: boolean(), details: atom()}, optional(any()) => any()}) ::
           Phoenix.LiveView.Rendered.t()
   @doc """
@@ -200,7 +197,6 @@ defmodule SentinelWeb.Live.DashboardV2 do
   #
   # ---- Events :: Client Side Interaction ----
   #
-
   @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) :: {:noreply, Phoenix.LiveView.Socket.t()}
   @doc """
   Render Sidebar content
@@ -296,7 +292,6 @@ defmodule SentinelWeb.Live.DashboardV2 do
   #
   # ---- handle component updated message :: Client Side Interaction ----
   #
-
   @spec handle_info(%{ id: String.t(), module: atom(), data: map()}, Phoenix.LiveView.Socket.t()) :: {:noreply, Phoenix.LiveView.Socket.t()}
   @doc """
   This will have the parent dashboard view be responsible for sending update messages to components
