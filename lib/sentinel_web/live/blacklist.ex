@@ -18,9 +18,6 @@ defmodule SentinelWeb.Live.Blacklist do
   Initialize the Blacklist
   """
   def mount(_params, %{"ip" => ip} = _session, socket) do
-    blacklist_changeset =
-      BlacklistSchema.changeset(%BlacklistSchema{}, %{})
-
     socket =
       socket
       |> assign(:ip, ip)
@@ -29,7 +26,7 @@ defmodule SentinelWeb.Live.Blacklist do
       |> assign(:curr_page, 0)
       |> assign(:count, 0)
       |> assign(:devices, [])
-      |> assign(blacklist_changeset: blacklist_changeset)
+      |> assign(blacklist_changeset: %{})
       |> assign(modal: %{show: false, type: nil, data: nil})
       |> assign(errors: [])
 
@@ -241,7 +238,7 @@ defmodule SentinelWeb.Live.Blacklist do
 
   # Add a domain to the blacklist
   def handle_event("add_domain", params, socket) do
-    changeset = BlacklistSchema.changeset(%BlacklistSchema{}, params)
+    changeset = %{}
 
     case changeset.valid? do
       true ->

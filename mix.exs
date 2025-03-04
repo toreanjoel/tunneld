@@ -55,7 +55,8 @@ defmodule Sentinel.MixProject do
       {:bandit, "~> 1.2"},
       {:dns_cluster, "~> 0.1.1"},
       {:dns, "~> 2.4.0"},
-      {:bcrypt_elixir, "~> 3.0"}
+      {:bcrypt_elixir, "~> 3.0"},
+      {:ex_json_schema, "~> 0.10.2"}
     ]
   end
 

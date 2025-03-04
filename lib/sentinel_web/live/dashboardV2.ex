@@ -4,15 +4,17 @@ defmodule SentinelWeb.Live.DashboardV2 do
   """
   use SentinelWeb, :live_view
   alias SentinelWeb.Live.Components.Sidebar.Details, as: SidebarDetails
-  alias Sentinel.Servers.{ Session }
+  alias Sentinel.Servers.{Session}
   alias SentinelWeb.Router.Helpers, as: Routes
+
   alias SentinelWeb.Live.Components.{
     Welcome,
     Resources,
     Services,
     Nodes,
     Devices,
-    Modal
+    Modal,
+    JsonSchemaRenderer
   }
 
   # TODO: uncomment the line below to add auth into the system
@@ -35,8 +37,9 @@ defmodule SentinelWeb.Live.DashboardV2 do
           title: nil,
           body: nil,
           action_title: nil,
-          action: nil,
-        })
+          action: nil
+        }
+      )
       |> assign(
         sidebar: %{
           is_open: false,
@@ -111,6 +114,20 @@ defmodule SentinelWeb.Live.DashboardV2 do
   def main(assigns) do
     ~H"""
     <div class="flex-1 flex flex-col p-5 system-scroll">
+      <%!-- <.live_component
+        id="test_schema"
+        schema={Sentinel.Schema.Blacklist.data(:user)}
+        values={
+          %{
+            "mac" => [
+              "hostname1 - b2:11:11:11:11:11",
+              "hostname2 - 22:22:22:22:22:20"
+            ]
+          }
+        }
+        module={JsonSchemaRenderer}
+      /> --%>
+
       <div class="flex flex-row h-[30px]">
         <div class="flex-1" />
         <div
@@ -164,7 +181,6 @@ defmodule SentinelWeb.Live.DashboardV2 do
     """
   end
 
-
   @spec render_modal(atom(), Phoenix.LiveView.Socket.assigns()) :: Phoenix.LiveView.Rendered.t()
   #
   # Render the modal content
@@ -180,10 +196,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
       </div>
       <!-- Action Buttons -->
       <div class="flex w-full justify-end gap-4 mt-3">
-        <.button
-          phx-click="modal_action"
-          class="bg-blue-500 text-white px-4 py-2 rounded-md"
-        >
+        <.button phx-click="modal_action" class="bg-blue-500 text-white px-4 py-2 rounded-md">
           Delete
         </.button>
         <.button phx-click="modal_cancel" class="bg-red-500 text-white px-4 py-2 rounded-md">
@@ -197,32 +210,39 @@ defmodule SentinelWeb.Live.DashboardV2 do
   #
   # ---- Events :: Client Side Interaction ----
   #
-  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) :: {:noreply, Phoenix.LiveView.Socket.t()}
+  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   @doc """
   Render Sidebar content
   """
-  def handle_event("show_details", %{ "id" => id, "type" => type}, socket) do
+  def handle_event("show_details", %{"id" => id, "type" => type}, socket) do
     # we need to check the types where we want to request data from
     # Here we tell the GenServers to do the work
     # The broadcast here will be to the component:sidebar - we will render accordingly and replace data
-    view = case type do
-      "node" ->
-        :node
-      "service" ->
-        Sentinel.Servers.Services.get_service_logs(id)
-        :service
-      "device" ->
-        Sentinel.Servers.Logs.get_device_logs(id)
-        :device
-      "blacklist" ->
-        Sentinel.Servers.Blacklist.init_state()
-        :blacklist
-      "logs" ->
-        Sentinel.Servers.Logs.init_state()
-        :logs
-      _ ->
-        :system_overview
-    end
+    view =
+      case type do
+        "node" ->
+          :node
+
+        "service" ->
+          Sentinel.Servers.Services.get_service_logs(id)
+          :service
+
+        "device" ->
+          Sentinel.Servers.Logs.get_device_logs(id)
+          :device
+
+        "blacklist" ->
+          Sentinel.Servers.Blacklist.init_state()
+          :blacklist
+
+        "logs" ->
+          Sentinel.Servers.Logs.init_state()
+          :logs
+
+        _ ->
+          :system_overview
+      end
 
     sidebar = %{
       is_open: true,
@@ -256,7 +276,11 @@ defmodule SentinelWeb.Live.DashboardV2 do
   #
   # Open the modal
   #
-  def handle_event("open_modal", %{"title" => title, "body" => body, "action_title" => action_title, "action" => action}, socket) do
+  def handle_event(
+        "open_modal",
+        %{"title" => title, "body" => body, "action_title" => action_title, "action" => action},
+        socket
+      ) do
     modal_data = %{
       show: true,
       title: title,
@@ -292,7 +316,8 @@ defmodule SentinelWeb.Live.DashboardV2 do
   #
   # ---- handle component updated message :: Client Side Interaction ----
   #
-  @spec handle_info(%{ id: String.t(), module: atom(), data: map()}, Phoenix.LiveView.Socket.t()) :: {:noreply, Phoenix.LiveView.Socket.t()}
+  @spec handle_info(%{id: String.t(), module: atom(), data: map()}, Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   @doc """
   This will have the parent dashboard view be responsible for sending update messages to components
   """
