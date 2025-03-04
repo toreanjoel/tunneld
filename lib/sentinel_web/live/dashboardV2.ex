@@ -13,8 +13,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
     Services,
     Nodes,
     Devices,
-    Modal,
-    JsonSchemaRenderer
+    Modal
   }
 
   # TODO: uncomment the line below to add auth into the system
@@ -114,20 +113,6 @@ defmodule SentinelWeb.Live.DashboardV2 do
   def main(assigns) do
     ~H"""
     <div class="flex-1 flex flex-col p-5 system-scroll">
-      <%!-- <.live_component
-        id="test_schema"
-        schema={Sentinel.Schema.Blacklist.data(:user)}
-        values={
-          %{
-            "mac" => [
-              "hostname1 - b2:11:11:11:11:11",
-              "hostname2 - 22:22:22:22:22:20"
-            ]
-          }
-        }
-        module={JsonSchemaRenderer}
-      /> --%>
-
       <div class="flex flex-row h-[30px]">
         <div class="flex-1" />
         <div
@@ -284,6 +269,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
     modal_data = %{
       show: true,
       title: title,
+      # Handle function or string
       body: body,
       action_title: action_title,
       action: Jason.decode!(action)

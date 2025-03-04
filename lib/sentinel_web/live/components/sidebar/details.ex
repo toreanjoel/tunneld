@@ -62,7 +62,9 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
     ~H"""
     <div class="bg-secondary p-2 h-full">
       <div class={"h-full flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
-        <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">No Service Logs</h1>
+        <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">
+          No Service Logs
+        </h1>
 
         <div :if={@count > 0}>
           <%= for log <- @logs do %>
@@ -75,7 +77,6 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
     </div>
     """
   end
-
 
   @spec render(%{:view => :device, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :device} = assigns) do
@@ -91,14 +92,20 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
     ~H"""
     <div class="bg-secondary p-2 h-full">
       <div class={"h-full flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
-        <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">No Device Logs</h1>
+        <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">
+          No Device Logs
+        </h1>
 
         <div :if={!(@count == 0)}>
           <%= for log <- @logs do %>
             <div class="flex flex-col p-3 my-2 bg-primary rounded-lg font-light">
-              <div class="text-sm truncate"><span class="font-bold">Domain:</span> <%= log.domain %></div>
+              <div class="text-sm truncate">
+                <span class="font-bold">Domain:</span> <%= log.domain %>
+              </div>
               <div class="text-sm truncate"><span class="font-bold">Time:</span> <%= log.time %></div>
-              <div class="text-sm truncate"><span class="font-bold">Query Type:</span> <%= log.query_type %></div>
+              <div class="text-sm truncate">
+                <span class="font-bold">Query Type:</span> <%= log.query_type %>
+              </div>
             </div>
           <% end %>
         </div>
@@ -121,14 +128,33 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
     ~H"""
     <div class="bg-secondary p-2 h-full">
       <div class={"h-full flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
-        <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">No Domains Blocked</h1>
+        <%!-- TEST --%>
+        <.live_component
+          id={DateTime.utc_now()}
+          module={SentinelWeb.Live.Components.JsonSchemaRenderer}
+          schema={Sentinel.Schema.Blacklist.data(:system)}
+          values={
+            %{
+              "mac" => [
+                "hostname1 - b2:11:11:11:11:11",
+                "hostname2 - 22:22:22:22:22:20"
+              ]
+            }
+          }
+        />
+
+        <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">
+          No Domains Blocked
+        </h1>
 
         <div :if={@count > 0}>
           <%= for %{"domain" => domain, "ip" => ip, "mac" => mac, "ttl" => ttl, "type" => type} <- @blacklist do %>
             <div class="flex flex-col p-3 my-2 bg-primary rounded-lg font-light">
               <div class="text-sm truncate"><span class="font-bold">Domain:</span> <%= domain %></div>
               <div class="text-sm truncate"><span class="font-bold">IP:</span> <%= ip %></div>
-              <div class="text-sm truncate"><span class="font-bold">MAC Address (USER):</span> <%= mac %></div>
+              <div class="text-sm truncate">
+                <span class="font-bold">MAC Address (USER):</span> <%= mac %>
+              </div>
               <div class="text-sm truncate"><span class="font-bold">TTL:</span> <%= ttl %></div>
               <div class="text-sm truncate"><span class="font-bold">Type:</span> <%= type %></div>
 
@@ -164,7 +190,9 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
     ~H"""
     <div class="bg-secondary p-2 h-full">
       <div class={"h-full flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
-        <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">No Logs Archived</h1>
+        <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">
+          No Logs Archived
+        </h1>
 
         <div :if={@count > 0}>
           <%= for log_file <- @files do %>
@@ -185,10 +213,12 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
                 <%!-- TODO: change this so we only see this when we have files to be deleted  --%>
                 <div
                   phx-click="open_modal"
-                  phx-value-title={"log_file"}
-                  phx-value-body={"BODT"}
-                  phx-value-action_title={"DELETE!"}
-                  phx-value-action={Jason.encode!(%{"type" => :backup_file_delete, "data" => %{ "file" => "DELETE"}})}
+                  phx-value-title="log_file"
+                  phx-value-body="BODT"
+                  phx-value-action_title="DELETE!"
+                  phx-value-action={
+                    Jason.encode!(%{"type" => :backup_file_delete, "data" => %{"file" => "DELETE"}})
+                  }
                   class="cursor-pointer text-red-500"
                 >
                   <.icon name="hero-no-symbol" class="h-5 w-5" />
