@@ -34,9 +34,8 @@ defmodule SentinelWeb.Live.DashboardV2 do
         modal: %{
           show: false,
           title: nil,
-          body: nil,
-          action_title: nil,
-          action: nil
+          body: %{},
+          actions: nil,
         }
       )
       |> assign(
@@ -68,8 +67,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
         id="generic_modal"
         title={@modal.title}
         body={@modal.body}
-        action_title={@modal.action_title}
-        action={@modal.action}
+        actions={@modal.actions}
       />
     </div>
     """
@@ -261,20 +259,14 @@ defmodule SentinelWeb.Live.DashboardV2 do
   #
   # Open the modal
   #
-  def handle_event(
-        "open_modal",
-        %{"title" => title, "body" => body, "action_title" => action_title, "action" => action},
-        socket
-      ) do
+  def handle_event("open_modal", params, socket) do
+    actions = if params["modal_actions"], do: Jason.decode!(params["modal_actions"]), else: nil
     modal_data = %{
       show: true,
-      title: title,
-      # Handle function or string
-      body: body,
-      action_title: action_title,
-      action: Jason.decode!(action)
+      title: params["modal_title"] || nil,
+      body: Jason.decode!(params["modal_body"]) || %{},
+      actions: actions
     }
-
     {:noreply, assign(socket, :modal, modal_data)}
   end
 
@@ -282,28 +274,13 @@ defmodule SentinelWeb.Live.DashboardV2 do
   # Close the modal
   #
   def handle_event("close_modal", _params, socket) do
-    {:noreply, assign(socket, modal: %{show: false, type: nil, file: nil})}
-  end
-
-  #
-  # Handle the modal action passed - this comes from the generated modal data
-  #
-  def handle_event("execute_modal_action", %{"type" => type, "data" => data}, socket) do
-    decoded_data = Jason.decode!(data)
-
-    # TODO: add the actions here that we do based on the modal action types
-    case type do
-      _ -> IO.inspect("HANDLE ACTION: Type: #{type}, DATA: #{inspect(decoded_data)}")
-    end
-
-    {:noreply, assign(socket, modal: %{show: false})}
+    {:noreply, assign(socket, modal: %{show: false, title: nil, body: %{}, actions: nil})}
   end
 
   #
   # ---- handle component updated message :: Client Side Interaction ----
   #
-  @spec handle_info(%{id: String.t(), module: atom(), data: map()}, Phoenix.LiveView.Socket.t()) ::
-          {:noreply, Phoenix.LiveView.Socket.t()}
+  @spec handle_info(%{id: String.t(), module: atom(), data: map()}, Phoenix.LiveView.Socket.t()) :: {:noreply, Phoenix.LiveView.Socket.t()}
   @doc """
   This will have the parent dashboard view be responsible for sending update messages to components
   """
@@ -333,4 +310,5 @@ defmodule SentinelWeb.Live.DashboardV2 do
   def handle_info(:clear_flash, socket) do
     {:noreply, clear_flash(socket)}
   end
+
 end

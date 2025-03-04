@@ -128,21 +128,6 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
     ~H"""
     <div class="bg-secondary p-2 h-full">
       <div class={"h-full flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
-        <%!-- TEST --%>
-        <.live_component
-          id={DateTime.utc_now()}
-          module={SentinelWeb.Live.Components.JsonSchemaRenderer}
-          schema={Sentinel.Schema.Blacklist.data(:system)}
-          values={
-            %{
-              "mac" => [
-                "hostname1 - b2:11:11:11:11:11",
-                "hostname2 - 22:22:22:22:22:20"
-              ]
-            }
-          }
-        />
-
         <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">
           No Domains Blocked
         </h1>
@@ -213,11 +198,12 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
                 <%!-- TODO: change this so we only see this when we have files to be deleted  --%>
                 <div
                   phx-click="open_modal"
-                  phx-value-title="log_file"
-                  phx-value-body="BODT"
-                  phx-value-action_title="DELETE!"
-                  phx-value-action={
-                    Jason.encode!(%{"type" => :backup_file_delete, "data" => %{"file" => "DELETE"}})
+                  phx-value-modal_body={
+                    Jason.encode!(%{
+                      "type" => "schema",
+                      "data" => Sentinel.Schema.Blacklist.data(:system),
+                      "default_values" => %{}
+                    })
                   }
                   class="cursor-pointer text-red-500"
                 >

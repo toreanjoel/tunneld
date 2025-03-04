@@ -42,7 +42,6 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
   def render(assigns) do
     ~H"""
     <form
-      class="bg-secondary p-6 rounded-lg shadow-md w-full max-w-lg"
       phx-target={@myself}
       phx-change="validate"
       phx-submit="submit"
@@ -96,12 +95,15 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
         <% end %>
       </ul>
 
-      <button
-        type="submit"
-        class="bg-purple text-white px-4 py-2 rounded-lg w-full font-semibold hover:bg-light_purple transition duration-200"
-      >
-        Submit
-      </button>
+      <div class="flex flex-row">
+        <div class="grow w-full" />
+        <button
+          type="submit"
+          class="bg-purple text-white px-4 py-2 rounded-lg font-semibold hover:bg-light_purple transition duration-200"
+        >
+          Submit
+        </button>
+      </div>
     </form>
     """
   end
