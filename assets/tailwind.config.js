@@ -20,7 +20,7 @@ module.exports = {
         red: "#de5555",
         yellow: "#f2c353",
         purple: "#885fee",
-        light_purple: "#9294c0",
+        light_purple: "#656679",
         gray: {
           "1": "#a6a8b3",
           "2": "#6b6b6d"
