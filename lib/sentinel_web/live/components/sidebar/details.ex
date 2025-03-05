@@ -68,7 +68,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
 
         <div :if={@count > 0}>
           <%= for log <- @logs do %>
-            <div class="flex flex-col p-3 my-2 bg-primary rounded-lg font-light">
+            <div class="flex flex-col p-3 mb-2 bg-primary rounded-lg font-light">
               <div class="text-sm"><%= log %></div>
             </div>
           <% end %>
@@ -98,7 +98,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
 
         <div :if={!(@count == 0)}>
           <%= for log <- @logs do %>
-            <div class="flex flex-col p-3 my-2 bg-primary rounded-lg font-light">
+            <div class="flex flex-col p-3 mb-2 bg-primary rounded-lg font-light">
               <div class="text-sm truncate">
                 <span class="font-bold">Domain:</span> <%= log.domain %>
               </div>
@@ -172,7 +172,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
 
         <div :if={@count > 0}>
           <%= for %{"domain" => domain, "ip" => ip, "mac_addr" => mac, "ttl" => ttl, "type" => type} <- @blacklist do %>
-            <div class="flex flex-col p-3 my-2 bg-primary rounded-lg font-light">
+            <div class="flex flex-col p-3 mb-2 bg-primary rounded-lg font-light">
               <div class="text-sm truncate"><span class="font-bold">Domain:</span> <%= domain %></div>
               <div class="text-sm truncate"><span class="font-bold">IP:</span> <%= ip %></div>
               <div class="text-sm truncate">
@@ -233,7 +233,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
 
         <div :if={@count > 0}>
           <%= for log_file <- @files do %>
-            <div class="flex flex-col p-3 my-2 bg-primary rounded-lg font-light">
+            <div class="flex flex-col p-3 mb-2 bg-primary rounded-lg font-light">
               <div class="text-sm truncate">
                 <span class="font-bold">Name:</span> <%= log_file %>
                 <%= if log_file === "_data.log", do: "(active)" %>
@@ -282,7 +282,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
   #
   defp sidebar_header(assigns) do
     ~H"""
-      <div class="min-h-[200px] bg-primary bg-gradient-to-r from-primary to-light_purple rounded-md p-3">
+      <div class="min-h-[200px] bg-opacity-[0.5] bg-primary bg-gradient-to-r from-gray-700 to-slate-900 rounded-md p-3">
         <div class="text-2xl font-medium">Header</div>
         <div class="text-lg">Some description comes here about the current context we are viewing of the sidebar</div>
       </div>
