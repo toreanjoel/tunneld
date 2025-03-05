@@ -164,32 +164,6 @@ defmodule SentinelWeb.Live.DashboardV2 do
     """
   end
 
-  @spec render_modal(atom(), Phoenix.LiveView.Socket.assigns()) :: Phoenix.LiveView.Rendered.t()
-  #
-  # Render the modal content
-  #
-  def render_modal(:confirm_removal, assigns) do
-    ~H"""
-    <div class="flex flex-col w-full gap-3">
-      <h2 class="text-2xl font-bold">Are you sure?</h2>
-      <div class="w-full">
-        <span class="text-xs text-gray-500 leading-0">
-          Are you sure you want to remove this file?
-        </span>
-      </div>
-      <!-- Action Buttons -->
-      <div class="flex w-full justify-end gap-4 mt-3">
-        <.button phx-click="modal_action" class="bg-blue-500 text-white px-4 py-2 rounded-md">
-          Delete
-        </.button>
-        <.button phx-click="modal_cancel" class="bg-red-500 text-white px-4 py-2 rounded-md">
-          Cancel
-        </.button>
-      </div>
-    </div>
-    """
-  end
-
   #
   # ---- Events :: Client Side Interaction ----
   #

@@ -15,13 +15,13 @@ defmodule SentinelWeb.Live.Components.Modal do
           <.icon name="hero-x-mark-solid" class="h-5 w-5" />
         </div>
 
-        <h2 class="text-2xl"><%= @title %></h2>
+        <h2 class="text-xl py-2"><%= @title %></h2>
 
         <!-- Render the dynamic body -->
-        <%= render_body(assigns, @body) %>
+        <div class="text-sm"><%= render_body(assigns, @body) %></div>
 
         <!-- Modal Actions -->
-        <div :if={not is_nil(@actions)} class="flex justify-end space-x-3">
+        <div :if={@body["type"] !== "schema"} class="flex justify-end space-x-3 pt-2">
           <button
             :if={@actions["title"]}
             phx-click="action"
@@ -45,6 +45,8 @@ defmodule SentinelWeb.Live.Components.Modal do
   def handle_event("action", %{"type" => type, "data" => data}, socket) do
     decoded_data = Jason.decode!(data)
     # TODO: add the actions here that we do based on the modal action types
+    IO.inspect(decoded_data, label: "CUSTOM_ACTION")
+    raise "custom action?"
     case type do
       _ -> IO.inspect("HANDLE ACTION: Type: #{type}, DATA: #{inspect(decoded_data)}")
     end
@@ -54,8 +56,11 @@ defmodule SentinelWeb.Live.Components.Modal do
 
   #
   # This is the renderer that will either use the schema or the string
-  #
-  defp render_body(_assigns, %{"type" => "string", "data" => data, "default_values" => _}), do: data
+  # TODO: if string and using normal actions, we need to try execute the function
+  defp render_body(_assigns, %{"type" => "string", "data" => data}) do
+    data
+  end
+
   defp render_body(assigns, %{"type" => "schema", "data" => data, "default_values" => default_values}) do
     # Reassign the default values so we can access it in the html
     assigns =

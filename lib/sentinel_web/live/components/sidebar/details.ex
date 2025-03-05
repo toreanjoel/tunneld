@@ -198,11 +198,17 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
                 <%!-- TODO: change this so we only see this when we have files to be deleted  --%>
                 <div
                   phx-click="open_modal"
+                  phx-value-modal_title="Remove Archived Backup?"
                   phx-value-modal_body={
                     Jason.encode!(%{
-                      "type" => "schema",
-                      "data" => Sentinel.Schema.Blacklist.data(:system),
-                      "default_values" => %{}
+                      "type" => "string",
+                      "data" => "Are you sure you want to remove the file?"
+                    })
+                  }
+                  phx-value-modal_actions={
+                    Jason.encode!(%{
+                      "title" => "Remove",
+                      "payload" => %{ "type" => "backup_file_delete", "data" => %{"file" => "DELETE"}}
                     })
                   }
                   class="cursor-pointer text-red-500"
