@@ -119,7 +119,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
           phx-value-id="_"
           class="relative rounded-md hover:bg-secondary cursor-pointer"
         >
-          <div class="absolute right-0 top-0 w-[10px] h-[10px] rounded-full bg-yellow animate-ping" />
+          <div class="absolute right-0 top-0 w-[10px] h-[10px] rounded-full bg-yellow" />
           <.icon name="hero-bell" class="h-15 w-15" />
         </div>
       </div>
