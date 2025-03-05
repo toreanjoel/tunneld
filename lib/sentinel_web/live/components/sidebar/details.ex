@@ -282,7 +282,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
   #
   defp sidebar_header(assigns) do
     ~H"""
-      <div class="min-h-[200px] bg-primary bg-gradient-to-r from-primary to-light_purple rounded-md p-3">
+      <div class="min-h-[200px] bg-primary bg-gradient-to-r from-secondary via-primary to-light_purple rounded-md p-3">
         <div class="text-2xl font-medium">Header</div>
         <div class="text-lg">Some description comes here about the current context we are viewing of the sidebar</div>
       </div>
