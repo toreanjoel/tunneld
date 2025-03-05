@@ -86,7 +86,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
 
     ~H"""
     <!-- Right panel: always visible on medium+ screens -->
-    <div class="sticky inset-0 w-[30%] max-w-[600px] hidden lg:block rounded-lg system-scroll bg-secondary">
+    <div class="sticky inset-0 w-[30%] max-w-[600px] hidden lg:block rounded-lg system-scroll bg-secondary m-5">
       <div class="h-full">
         <.live_component id="sidebar_details_desktop" module={SidebarDetails} view={@sidebar.view} />
       </div>

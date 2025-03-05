@@ -127,13 +127,51 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
 
     ~H"""
     <div class="bg-secondary p-2 h-full">
+      <%!-- Sidebar header that will house metadat?  --%>
+      <%= sidebar_header(assigns) %>
+
+      <div class="flex flex-row gap-1 justify-end my-2">
+        <%!-- Actions to take --%>
+        <div
+          phx-click="open_modal"
+          phx-value-modal_title="Domain to block for the entire system"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "schema",
+              "data" => Sentinel.Schema.Blacklist.data(:system),
+              "default_values" => %{}
+            })
+          }
+          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+        >
+          <.icon class="w-4 h-4" name="hero-no-symbol" />
+          <div class="truncate text-xs text-gray-1">System Block</div>
+        </div>
+
+        <div
+          phx-click="open_modal"
+          phx-value-modal_title="Domain to block for a user"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "schema",
+              "data" => Sentinel.Schema.Blacklist.data(:user),
+              "default_values" => %{}
+            })
+          }
+          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+        >
+          <.icon class="w-4 h-4" name="hero-no-symbol" />
+          <div class="truncate text-xs text-gray-1">Device Block</div>
+        </div>
+      </div>
+
       <div class={"h-full flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
         <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">
           No Domains Blocked
         </h1>
 
         <div :if={@count > 0}>
-          <%= for %{"domain" => domain, "ip" => ip, "mac" => mac, "ttl" => ttl, "type" => type} <- @blacklist do %>
+          <%= for %{"domain" => domain, "ip" => ip, "mac_addr" => mac, "ttl" => ttl, "type" => type} <- @blacklist do %>
             <div class="flex flex-col p-3 my-2 bg-primary rounded-lg font-light">
               <div class="text-sm truncate"><span class="font-bold">Domain:</span> <%= domain %></div>
               <div class="text-sm truncate"><span class="font-bold">IP:</span> <%= ip %></div>
@@ -143,12 +181,26 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
               <div class="text-sm truncate"><span class="font-bold">TTL:</span> <%= ttl %></div>
               <div class="text-sm truncate"><span class="font-bold">Type:</span> <%= type %></div>
 
+              <div class="divider" />
               <div class="flex justify-end mt-2">
                 <div
                   phx-click="open_modal"
-                  phx-value-domain={domain}
-                  phx-value-mac={mac}
-                  phx-value-type={type}
+                  phx-value-modal_title="Remove Domain Blocked?"
+                  phx-value-modal_body={
+                    Jason.encode!(%{
+                      "type" => "string",
+                      "data" => "Are you sure you want to remove the blocked domain?"
+                    })
+                  }
+                  phx-value-modal_actions={
+                    Jason.encode!(%{
+                      "title" => "Remove",
+                      "payload" => %{
+                        "type" => "blocked_domain_remove",
+                        "data" => %{"domain" => domain, "mac" => mac, "type" => type}
+                      }
+                    })
+                  }
                   class="cursor-pointer text-red-500"
                 >
                   <.icon name="hero-no-symbol" class="h-5 w-5" />
@@ -208,7 +260,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
                   phx-value-modal_actions={
                     Jason.encode!(%{
                       "title" => "Remove",
-                      "payload" => %{ "type" => "backup_file_delete", "data" => %{"file" => "DELETE"}}
+                      "payload" => %{"type" => "backup_file_delete", "data" => %{"file" => "DELETE"}}
                     })
                   }
                   class="cursor-pointer text-red-500"
@@ -221,6 +273,19 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
         </div>
       </div>
     </div>
+    """
+  end
+
+  #
+  # Sidebar header componen
+  # Contains information around the sidebar context, will take params but this will be specific to sidebar
+  #
+  defp sidebar_header(assigns) do
+    ~H"""
+      <div class="min-h-[200px] bg-purple rounded-md p-3">
+        <div class="text-2xl font-medium">Header</div>
+        <div class="text-lg">Some description comes here about the current context we are viewing of the sidebar</div>
+      </div>
     """
   end
 end

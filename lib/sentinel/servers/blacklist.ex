@@ -188,6 +188,8 @@ defmodule Sentinel.Servers.Blacklist do
       module: @component_module,
       data: %{blacklist: data}
     }
+
+    IO.inspect(payload, label: "__PAYLOAD__")
     Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic, payload)
 
     payload_mobile = Map.put(payload, :id, @component_mobile_id)

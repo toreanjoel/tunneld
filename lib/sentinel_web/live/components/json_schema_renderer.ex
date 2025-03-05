@@ -51,7 +51,7 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
           <label class="block text-light_purple text-sm font-semibold mb-1">
             <%= field.name %>
           </label>
-          <label :if={field.description} class="block text-gray-2 text-xs font-semibold mb-1">
+          <label :if={field.description} class="block text-gray-1 text-xs font-semibold mb-1">
             <%= field.description %>
           </label>
 
@@ -59,7 +59,7 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
             <!-- Select Dropdown for Enum Fields -->
             <select
               name={"form[#{field.name}]"}
-              class="bg-primary border border-gray-2 rounded-md px-3 py-2 text-gray-1 w-full"
+              class="bg-primary border border-gray-2 rounded-md px-3 py-2 w-full"
             >
               <%= for option <- field.enum do %>
                 <option value={option} selected={Map.get(@changeset, field.name, "") == option}>
@@ -75,14 +75,14 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
                   type="text"
                   name={"form[#{field.name}]"}
                   value={Map.get(@changeset, field.name, "")}
-                  class="bg-primary border border-gray-2 rounded-md px-3 py-2 text-gray-1 w-full focus:ring-2 focus:ring-purple transition duration-200"
+                  class="bg-primary border border-gray-2 rounded-md px-3 py-2 w-full focus:ring-2 focus:ring-purple transition duration-200"
                 />
               <% "integer" -> %>
                 <input
                   type="number"
                   name={"form[#{field.name}]"}
                   value={Map.get(@changeset, field.name, "")}
-                  class="bg-primary border border-gray-2 rounded-md px-3 py-2 text-gray-1 w-full focus:ring-2 focus:ring-purple transition duration-200"
+                  class="bg-primary border border-gray-2 rounded-md px-3 py-2 w-full focus:ring-2 focus:ring-purple transition duration-200"
                 />
             <% end %>
           <% end %>
@@ -142,7 +142,7 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
   #
   defp clean_errors(errors) do
     Enum.map(errors, fn {field, msg} ->
-      "#{msg |> String.replace("#/", "") |> String.capitalize()} :: #{field}}"
+      "#{msg |> String.replace("#/", "") |> String.capitalize()} :: #{field}"
     end)
   end
 end
