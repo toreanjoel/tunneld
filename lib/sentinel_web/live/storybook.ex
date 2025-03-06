@@ -152,7 +152,7 @@ defmodule SentinelWeb.Live.Storybook do
             <div class="absolute bottom-[5px] right-2 w-[5px] h-[5px] rounded-full bg-gray-1"></div>
           </div>
           <%!-- Add more button --%>
-          <div phx-click="open_modal" class="w-[50px] h-[50px] opacity-30 bg-transparent border border-dashed flex items-center justify-center rounded-md cursor-pointer">
+          <div phx-click="modal_open" class="w-[50px] h-[50px] opacity-30 bg-transparent border border-dashed flex items-center justify-center rounded-md cursor-pointer">
             <.icon class="w-6 h-6" name="hero-plus" />
           </div>
         </div>
@@ -324,7 +324,7 @@ defmodule SentinelWeb.Live.Storybook do
           <div phx-click="trigger_loader" class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
             <div class="truncate text-xs">Show Loader</div>
           </div>
-          <div phx-click="open_modal" class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
+          <div phx-click="modal_open" class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150">
             <div class="truncate text-xs">Show Modal</div>
           </div>
         </div>
@@ -346,8 +346,8 @@ defmodule SentinelWeb.Live.Storybook do
             <p class="my-2 text-sm">This is the modal description.</p>
             <div class="py-2" />
             <div class="flex justify-end space-x-3">
-              <%!-- <button phx-click="close_modal" class="px-2 py-2 bg-gray-2 rounded-md text-sm">Cancel</button> --%>
-              <div phx-click="close_modal" class="flex items-center justify-center gap-1 bg-secondary hover:bg-opacity-60 p-3 cursor-pointer rounded-md">
+              <%!-- <button phx-click="modal_close" class="px-2 py-2 bg-gray-2 rounded-md text-sm">Cancel</button> --%>
+              <div phx-click="modal_close" class="flex items-center justify-center gap-1 bg-secondary hover:bg-opacity-60 p-3 cursor-pointer rounded-md">
                 <div class="truncate text-xs">Cancel</div>
               </div>
               <div phx-click="submit_modal" class="flex items-center justify-center gap-1 bg-green hover:bg-opacity-60 p-3 cursor-pointer rounded-md">
@@ -384,16 +384,16 @@ defmodule SentinelWeb.Live.Storybook do
   COMPONENT: Modal
   Open the modal component
   """
-  def handle_event("open_modal", _, socket) do
+  def handle_event("modal_open", _, socket) do
     socket = assign(socket, :modal_open, true)
     {:noreply, socket}
   end
 
   @doc """
   COMPONENT: Modal
-  The event: close_modal for the modal interaction
+  The event: modal_close for the modal interaction
   """
-  def handle_event("close_modal", _, socket) do
+  def handle_event("modal_close", _, socket) do
     socket = assign(socket, :modal_open, false)
     {:noreply, socket}
   end

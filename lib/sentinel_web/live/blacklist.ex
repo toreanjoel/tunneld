@@ -51,7 +51,7 @@ defmodule SentinelWeb.Live.Blacklist do
             List of domains that are blocked from being accessed. This is blocking system wide or per device.
           </div>
           <div
-            phx-click="open_modal"
+            phx-click="modal_open"
             class="cursor-pointer hover:bg-white p-1 hover:rounded-lg transition-all duration-500"
           >
             <.icon name="hero-plus-circle" class="h-5 w-5" />
@@ -90,7 +90,7 @@ defmodule SentinelWeb.Live.Blacklist do
                   <td class="border border-gray-300 px-4 py-2 w-2">
                     <div class="flex flex-row gap-2">
                       <div
-                        phx-click="open_modal"
+                        phx-click="modal_open"
                         phx-value-domain={domain}
                         phx-value-mac={mac}
                         phx-value-type={type}
@@ -178,19 +178,19 @@ defmodule SentinelWeb.Live.Blacklist do
 
   # Open the modal
   def handle_event(
-        "open_modal",
+        "modal_open",
         %{"domain" => _domain, "mac" => _mac, "type" => _type} = params,
         socket
       ) do
     {:noreply, assign(socket, modal: %{show: true, type: :confirm, data: params})}
   end
 
-  def handle_event("open_modal", _params, socket) do
+  def handle_event("modal_open", _params, socket) do
     {:noreply, assign(socket, modal: %{show: true, type: :add_domain, data: nil})}
   end
 
   # Close the modal
-  def handle_event("close_modal", _params, socket) do
+  def handle_event("modal_close", _params, socket) do
     {:noreply, assign(socket, modal: %{show: false, type: nil, data: nil})}
   end
 
@@ -383,7 +383,7 @@ defmodule SentinelWeb.Live.Blacklist do
           <.button type="submit" class="bg-blue-500 text-white px-4 py-2 rounded-md">
             Add
           </.button>
-          <.button phx-click="close_modal" class="bg-red-500 text-white px-4 py-2 rounded-md">
+          <.button phx-click="modal_close" class="bg-red-500 text-white px-4 py-2 rounded-md">
             Close
           </.button>
         </div>
@@ -412,7 +412,7 @@ defmodule SentinelWeb.Live.Blacklist do
         >
           Remove
         </.button>
-        <.button phx-click="close_modal" class="bg-red-500 text-white px-4 py-2 rounded-md">
+        <.button phx-click="modal_close" class="bg-red-500 text-white px-4 py-2 rounded-md">
           Cancel
         </.button>
       </div>

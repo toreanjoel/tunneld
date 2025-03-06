@@ -48,7 +48,7 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
     >
       <%= for field <- @fields do %>
         <div class="mb-4">
-          <label class="block text-purple text-sm font-semibold mb-1">
+          <label class="block text-gray-1 text-sm font-semibold mb-1">
             <%= field.name %>
           </label>
           <label :if={field.description} class="block text-gray-1 text-xs font-semibold mb-1">

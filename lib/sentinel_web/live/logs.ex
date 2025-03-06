@@ -88,7 +88,7 @@ defmodule SentinelWeb.Live.Logs do
                       </a>
                       <div
                         :if={log_file !== @active_log_file}
-                        phx-click="open_modal"
+                        phx-click="modal_open"
                         phx-value-file={log_file}
                         class="bg-white hover:bg-gray-200 p-1 rounded cursor-pointer"
                       >
@@ -137,12 +137,12 @@ defmodule SentinelWeb.Live.Logs do
   end
 
   # Open the modal
-  def handle_event("open_modal", %{"file" => file}, socket) do
+  def handle_event("modal_open", %{"file" => file}, socket) do
     {:noreply, assign(socket, modal: %{show: true, type: :confirm_removal, file: file})}
   end
 
   # Close the modal
-  def handle_event("close_modal", _params, socket) do
+  def handle_event("modal_close", _params, socket) do
     {:noreply, assign(socket, modal: %{show: false, type: nil, file: nil})}
   end
 
@@ -193,7 +193,7 @@ defmodule SentinelWeb.Live.Logs do
         >
           Delete
         </.button>
-        <.button phx-click="close_modal" class="bg-red-500 text-white px-4 py-2 rounded-md">
+        <.button phx-click="modal_close" class="bg-red-500 text-white px-4 py-2 rounded-md">
           Cancel
         </.button>
       </div>

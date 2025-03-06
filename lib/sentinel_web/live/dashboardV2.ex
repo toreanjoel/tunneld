@@ -233,7 +233,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
   #
   # Open the modal
   #
-  def handle_event("open_modal", params, socket) do
+  def handle_event("modal_open", params, socket) do
     actions = if params["modal_actions"], do: Jason.decode!(params["modal_actions"]), else: nil
     modal_data = %{
       show: true,
@@ -247,7 +247,23 @@ defmodule SentinelWeb.Live.DashboardV2 do
   #
   # Close the modal
   #
-  def handle_event("close_modal", _params, socket) do
+  def handle_event("modal_close", _params, socket) do
+    {:noreply, assign(socket, modal: %{show: false, title: nil, body: %{}, actions: nil})}
+  end
+
+    #
+  # Handle the modal action passed - this comes from the generated modal data
+  # TODO: this needs to be expanded on but the the actions should not be in here
+  #
+  def handle_event("modal_action", %{"type" => type, "data" => data}, socket) do
+    decoded_data = Jason.decode!(data)
+    case type do
+      "blocked_domain_remove" ->
+        Sentinel.Servers.Blacklist.remove_domain(decoded_data["domain"], %{type: decoded_data["type"]})
+
+      _ -> IO.inspect("HANDLE ACTION: Type: #{type}, DATA: #{inspect(decoded_data)}")
+    end
+
     {:noreply, assign(socket, modal: %{show: false, title: nil, body: %{}, actions: nil})}
   end
 
@@ -268,13 +284,10 @@ defmodule SentinelWeb.Live.DashboardV2 do
   #
   def handle_info(%{type: type, message: message}, socket) do
     type = if type in [:info, :error], do: type, else: :info
-
     # Set the flash message
     socket = put_flash(socket, type, message)
-
     # Schedule flash removal after 3 seconds (3000 ms)
     Process.send_after(self(), :clear_flash, 3000)
-
     {:noreply, socket}
   end
 

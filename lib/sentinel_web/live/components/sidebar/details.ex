@@ -133,7 +133,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
       <div class="flex flex-row gap-1 justify-end my-2">
         <%!-- Actions to take --%>
         <div
-          phx-click="open_modal"
+          phx-click="modal_open"
           phx-value-modal_title="Domain to block for the entire system"
           phx-value-modal_body={
             Jason.encode!(%{
@@ -149,7 +149,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
         </div>
 
         <div
-          phx-click="open_modal"
+          phx-click="modal_open"
           phx-value-modal_title="Domain to block for a user"
           phx-value-modal_body={
             Jason.encode!(%{
@@ -184,7 +184,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
               <div class="divider" />
               <div class="flex justify-end mt-2">
                 <div
-                  phx-click="open_modal"
+                  phx-click="modal_open"
                   phx-value-modal_title="Remove Domain Blocked?"
                   phx-value-modal_body={
                     Jason.encode!(%{
@@ -249,7 +249,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
 
                 <%!-- TODO: change this so we only see this when we have files to be deleted  --%>
                 <div
-                  phx-click="open_modal"
+                  phx-click="modal_open"
                   phx-value-modal_title="Remove Archived Backup?"
                   phx-value-modal_body={
                     Jason.encode!(%{

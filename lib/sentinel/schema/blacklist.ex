@@ -26,7 +26,7 @@ defmodule Sentinel.Schema.Blacklist do
           "description" => "The MAC address of the user to be blacklisted (only required for user-level blocking)"
         },
         "ttl" => %{
-          "type" => "integer",
+          "type" => "string",
           "description" => "Time-to-live (TTL) for the blacklist entry (in minutes)",
           "minimum" => 1
         }
@@ -47,7 +47,7 @@ defmodule Sentinel.Schema.Blacklist do
           "minLength" => 1
         },
         "ttl" => %{
-          "type" => "integer",
+          "type" => "string",
           "description" => "Time-to-live (TTL) for the blacklist entry (in minutes)",
           "minimum" => 1
         }
