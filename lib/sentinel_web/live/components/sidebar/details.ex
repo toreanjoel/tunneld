@@ -24,7 +24,6 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
       |> assign(view: view)
       |> assign(data: new_data)
 
-    IO.inspect(socket)
     {:ok, socket}
   end
 
