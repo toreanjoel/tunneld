@@ -25,6 +25,7 @@ defmodule SentinelWeb.Live.DashboardV2 do
   def mount(_params, %{"ip" => ip} = _session, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Sentinel.PubSub, "notifications")
+      Phoenix.PubSub.subscribe(Sentinel.PubSub, "modal:form:action")
     end
 
     socket =
@@ -251,21 +252,6 @@ defmodule SentinelWeb.Live.DashboardV2 do
     {:noreply, assign(socket, modal: %{show: false, title: nil, body: %{}, actions: nil})}
   end
 
-    #
-  # Handle the modal action passed - this comes from the generated modal data
-  # TODO: this needs to be expanded on but the the actions should not be in here
-  #
-  def handle_event("modal_action", %{"type" => type, "data" => data}, socket) do
-    decoded_data = Jason.decode!(data)
-    case type do
-      "blocked_domain_remove" ->
-        Sentinel.Servers.Blacklist.remove_domain(decoded_data["domain"], %{type: decoded_data["type"]})
-      _ -> IO.inspect("HANDLE ACTION: Type: #{type}, DATA: #{inspect(decoded_data)}")
-    end
-
-    {:noreply, assign(socket, modal: %{show: false, title: nil, body: %{}, actions: nil})}
-  end
-
   #
   # ---- handle component updated message :: Client Side Interaction ----
   #
@@ -288,6 +274,25 @@ defmodule SentinelWeb.Live.DashboardV2 do
     # Schedule flash removal after 3 seconds (3000 ms)
     Process.send_after(self(), :clear_flash, 3000)
     {:noreply, socket}
+  end
+
+  #
+  # handle the actions from the schema form
+  #
+  def handle_info(%{action: action, data: data} = payload, socket) do
+    case action do
+      "blocked_domain_remove" ->
+        decoded_data = Jason.decode!(data)
+        IO.inspect(payload, label: "blocked_domain_remove")
+      "block_domain_system" ->
+        IO.inspect(payload, label: "block_domain_system")
+      "block_domain_user" ->
+        IO.inspect(payload, label: "block_domain_user")
+        _ ->
+        IO.inspect("other")
+    end
+
+    {:noreply, assign(socket, modal: %{show: false, title: nil, body: %{}, actions: nil})}
   end
 
   #

@@ -32,7 +32,7 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
         }
       end)
 
-    {:ok, assign(socket, schema: schema, fields: fields, changeset: values, errors: nil)}
+    {:ok, assign(socket, action: assigns.action, schema: schema, fields: fields, changeset: values, errors: nil)}
   end
 
   @doc """
@@ -41,11 +41,7 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
   @spec render(map()) :: Phoenix.LiveView.Rendered.t()
   def render(assigns) do
     ~H"""
-    <form
-      phx-target={@myself}
-      phx-change="validate"
-      phx-submit="submit"
-    >
+    <form phx-target={@myself} phx-submit="submit">
       <%= for field <- @fields do %>
         <div class="mb-4">
           <label class="block text-gray-1 text-sm font-semibold mb-1">
@@ -109,27 +105,18 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
   end
 
   @doc """
-  Validates the form input on change.
-  """
-  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) :: {:noreply, Phoenix.LiveView.Socket.t()}
-  def handle_event("validate", %{"form" => params}, socket) do
-    case Validator.validate(socket.assigns.schema, params) do
-      :ok ->
-        {:noreply, assign(socket, changeset: params, errors: nil)}
-
-      {:error, errors} ->
-        {:noreply, assign(socket, changeset: params, errors: clean_errors(errors))}
-    end
-  end
-
-  @doc """
   Submits the form after validation.
   """
   @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) :: {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_event("submit", %{"form" => params}, socket) do
     case Validator.validate(socket.assigns.schema, params) do
       :ok ->
-        IO.inspect(params, label: "__DATA_SUBMIT__")
+        # Send this back to the parent live view that handles the event already
+        Phoenix.PubSub.broadcast(Sentinel.PubSub, "modal:form:action", %{
+          action: socket.assigns.action,
+          data: params
+        })
+
         {:noreply, assign(socket, changeset: params, errors: nil)}
 
       {:error, errors} ->

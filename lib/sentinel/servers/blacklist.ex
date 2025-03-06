@@ -32,20 +32,6 @@ defmodule Sentinel.Servers.Blacklist do
     {:ok, %{}}
   end
 
-  # Existing paginated API remains unchanged
-  def handle_call({:get_blacklist_page, offset, limit}, _from, state) do
-    result = fetch_blacklist(offset, limit)
-    check_ahead = fetch_blacklist(offset + limit, limit)
-
-    result = %{
-      data: result,
-      has_more_data: !Enum.empty?(check_ahead),
-      curr_page: offset
-    }
-
-    {:reply, {:ok, result}, state}
-  end
-
   # Here we add the domain to the blacklist
   def handle_call({:add_domain, %{domain: domain, type: type, mac: mac, ttl: ttl}}, _from, state) do
     {ip_str, _} = System.cmd("dig", ["+short", domain])
@@ -194,38 +180,10 @@ defmodule Sentinel.Servers.Blacklist do
       data: %{blacklist: data}
     }
 
-    IO.inspect(payload, label: "__PAYLOAD__")
     Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic, payload)
 
     payload_mobile = Map.put(payload, :id, @component_mobile_id)
     Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic, payload_mobile)
-  end
-
-  # Legacy: we fetch the user blacklist file data with pagination (still available if needed)
-  defp fetch_blacklist(offset, limit) do
-    if Application.get_env(:sentinel, :mock_data, false) do
-      Sentinel.Servers.FakeData.Blacklist.get_data()
-    else
-      try do
-        {_, data} = read_file()
-        Enum.slice(data, offset, limit)
-      rescue
-        _ -> []
-      end
-    end
-  end
-
-  def count_blacklist() do
-    try do
-      if Application.get_env(:sentinel, :mock_data, false) do
-        Sentinel.Servers.FakeData.Blacklist.get_data() |> length
-      else
-        {_, data} = read_file()
-        length(data)
-      end
-    rescue
-      _ -> 0
-    end
   end
 
   # Here we check if the policy exists in the iptables

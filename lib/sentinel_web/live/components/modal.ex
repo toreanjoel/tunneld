@@ -24,6 +24,7 @@ defmodule SentinelWeb.Live.Components.Modal do
         <div :if={@body["type"] !== "schema"} class="flex justify-end space-x-3 pt-2">
           <button
             :if={@actions["title"]}
+            phx-target={@myself}
             phx-click="modal_action"
             phx-value-type={@actions["payload"]["type"]}
             phx-value-data={Jason.encode!(@actions["payload"]["data"])}
@@ -38,26 +39,42 @@ defmodule SentinelWeb.Live.Components.Modal do
   end
 
   #
+  # Handle the modal action passed - this comes from the generated modal data
+  # TODO: this needs to be expanded on but the the actions should not be in here
+  #
+  @impl true
+  def handle_event("modal_action", %{"type" => action, "data" => data}, socket) do
+    Phoenix.PubSub.broadcast(Sentinel.PubSub, "modal:form:action", %{
+      action: action,
+      data: data
+    })
+
+    {:noreply, socket}
+  end
+
+  #
   # This is the renderer that will either use the schema or the string
   # TODO: if string and using normal actions, we need to try execute the function
   defp render_body(_assigns, %{"type" => "string", "data" => data}) do
     data
   end
 
-  defp render_body(assigns, %{"type" => "schema", "data" => data, "default_values" => default_values}) do
+  defp render_body(assigns, %{"type" => "schema", "data" => data, "default_values" => default_values, "action" => action}) do
     # Reassign the default values so we can access it in the html
     assigns =
       assigns
       |> assign(data: data)
       |> assign(default_values: default_values)
+      |> assign(action: action)
 
     ~H"""
       <div>
-      <.live_component
+        <.live_component
           id={DateTime.utc_now()}
           module={SentinelWeb.Live.Components.JsonSchemaRenderer}
           schema={@data}
           values={@default_values}
+          action={@action}
         />
       </div>
     """

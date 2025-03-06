@@ -32,7 +32,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
           Phoenix.LiveView.Rendered.t()
   def render(%{view: :system_overview} = assigns) do
     ~H"""
-    <div class="h-full flex flex-col items-center justify-center p-3 h-full">
+    <div class="flex flex-col items-center justify-center p-3 h-full">
       <.icon class="w-[50px] h-[50px] text-green" name="hero-shield-check" />
       <h1 class="text-2xl font-light text-gray-2 my-4 text-center">System is running as expected.</h1>
     </div>
@@ -42,7 +42,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
   @spec render(%{:view => :node, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :node} = assigns) do
     ~H"""
-    <div class="h-full flex flex-col items-center justify-center p-3 h-full">
+    <div class="flex flex-col items-center justify-center p-3 h-full">
       <h1 class="text-2xl font-light text-gray-2 my-4 text-center">node</h1>
     </div>
     """
@@ -61,7 +61,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
 
     ~H"""
     <div class="bg-secondary p-2 h-full">
-      <div class={"h-full flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
+      <div class={"flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
         <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">
           No Service Logs
         </h1>
@@ -91,7 +91,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
 
     ~H"""
     <div class="bg-secondary p-2 h-full">
-      <div class={"h-full flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
+      <div class={"flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
         <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">
           No Device Logs
         </h1>
@@ -139,7 +139,8 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
             Jason.encode!(%{
               "type" => "schema",
               "data" => Sentinel.Schema.Blacklist.data(:system),
-              "default_values" => %{}
+              "default_values" => %{},
+              "action" => "block_domain_system"
             })
           }
           class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
@@ -155,7 +156,8 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
             Jason.encode!(%{
               "type" => "schema",
               "data" => Sentinel.Schema.Blacklist.data(:user),
-              "default_values" => %{}
+              "default_values" => %{},
+              "action" => "block_domain_user"
             })
           }
           class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
@@ -165,7 +167,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
         </div>
       </div>
 
-      <div class={"h-full flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
+      <div class={"flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
         <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">
           No Domains Blocked
         </h1>
@@ -226,7 +228,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
 
     ~H"""
     <div class="bg-secondary p-2 h-full">
-      <div class={"h-full flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
+      <div class={"flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
         <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">
           No Logs Archived
         </h1>
@@ -282,10 +284,12 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
   #
   defp sidebar_header(assigns) do
     ~H"""
-      <div class="min-h-[200px] bg-primary bg-gradient-to-r from-purple to-primary rounded-md p-3">
-        <div class="text-2xl font-medium">Header</div>
-        <div class="text-lg">Some description comes here about the current context we are viewing of the sidebar</div>
+    <div class="min-h-[200px] bg-primary bg-gradient-to-r from-purple to-primary rounded-md p-3">
+      <div class="text-2xl font-medium">Header</div>
+      <div class="text-lg">
+        Some description comes here about the current context we are viewing of the sidebar
       </div>
+    </div>
     """
   end
 end

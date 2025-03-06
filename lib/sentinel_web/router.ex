@@ -41,20 +41,7 @@ defmodule SentinelWeb.Router do
     pipe_through [:browser, :set_ip]
 
     live "/", Live.Login
-    live "/dashboard", Live.Dashboard
-    live "/blacklist", Live.Blacklist
-    live "/logs", Live.Logs
-    live "/logs/service/:service", Live.ServiceLogs
-    live "/settings", Live.Settings
-    live "/devices", Live.Devices
-    live "/devices/:ip", Live.DeviceDetails
-  end
-
-  # The story book used to test the component and UI
-  scope "/", SentinelWeb do
-    pipe_through [:browser_storybook]
-
-    live "/storybook", Live.Storybook
+    live "/dashboard", Live.DashboardV2
   end
 
   # Sentinel Dashboard UI
