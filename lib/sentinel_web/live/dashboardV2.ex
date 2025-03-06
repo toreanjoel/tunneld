@@ -1,4 +1,4 @@
-defmodule SentinelWeb.Live.DashboardV2 do
+defmodule SentinelWeb.Live.Dashboard do
   @moduledoc """
   Dashboard V2 Page
   """

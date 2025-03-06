@@ -41,14 +41,7 @@ defmodule SentinelWeb.Router do
     pipe_through [:browser, :set_ip]
 
     live "/", Live.Login
-    live "/dashboard", Live.DashboardV2
-  end
-
-  # Sentinel Dashboard UI
-  scope "/", SentinelWeb do
-    pipe_through [:browser_dashboard]
-
-    live "/v2/dashboard", Live.DashboardV2
+    live "/dashboard", Live.Dashboard
   end
 
   # controller to manage the file downloads
