@@ -140,7 +140,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
               "type" => "schema",
               "data" => Sentinel.Schema.Blacklist.data(:system),
               "default_values" => %{},
-              "action" => "block_domain_system"
+              "action" => "add_system_domain_block"
             })
           }
           class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
@@ -157,7 +157,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
               "type" => "schema",
               "data" => Sentinel.Schema.Blacklist.data(:user),
               "default_values" => %{},
-              "action" => "block_domain_user"
+              "action" => "add_user_domain_block"
             })
           }
           class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
@@ -198,7 +198,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
                     Jason.encode!(%{
                       "title" => "Remove",
                       "payload" => %{
-                        "type" => "blocked_domain_remove",
+                        "type" => "remove_blocked_domain",
                         "data" => %{"domain" => domain, "mac" => mac, "type" => type}
                       }
                     })

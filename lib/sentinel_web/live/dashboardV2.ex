@@ -279,17 +279,22 @@ defmodule SentinelWeb.Live.DashboardV2 do
   #
   # handle the actions from the schema form
   #
-  def handle_info(%{action: action, data: data} = payload, socket) do
+  def handle_info(%{action: action, data: data}, socket) do
     case action do
-      "blocked_domain_remove" ->
+      "remove_blocked_domain" ->
         decoded_data = Jason.decode!(data)
-        IO.inspect(payload, label: "blocked_domain_remove")
-      "block_domain_system" ->
-        IO.inspect(payload, label: "block_domain_system")
-      "block_domain_user" ->
-        IO.inspect(payload, label: "block_domain_user")
+        case decoded_data["type"] do
+          "user" ->
+            Sentinel.Servers.Blacklist.remove_domain(decoded_data["domain"], %{type: decoded_data["type"], mac: decoded_data["mac"]})
+          _ ->
+            Sentinel.Servers.Blacklist.remove_domain(decoded_data["domain"], %{type: decoded_data["type"]})
+        end
+      "add_user_domain_block" ->
+        Sentinel.Servers.Blacklist.add_domain(data["domain"], %{ type: "user", mac: data["mac"], ttl: data["ttl"] })
+      "add_system_domain_block" ->
+        Sentinel.Servers.Blacklist.add_domain(data["domain"], %{ type: "system", ttl: data["ttl"] })
         _ ->
-        IO.inspect("other")
+        Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :error, message: "Action doesnt exist and cant be handled"})
     end
 
     {:noreply, assign(socket, modal: %{show: false, title: nil, body: %{}, actions: nil})}
