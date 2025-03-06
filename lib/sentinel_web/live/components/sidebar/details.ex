@@ -171,7 +171,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
         </h1>
 
         <div :if={@count > 0}>
-          <%= for %{"domain" => domain, "ip" => ip, "mac_addr" => mac, "ttl" => ttl, "type" => type} <- @blacklist do %>
+          <%= for %{"domain" => domain, "ip" => ip, "mac" => mac, "ttl" => ttl, "type" => type} <- @blacklist do %>
             <div class="flex flex-col p-3 mb-2 bg-primary rounded-lg font-light">
               <div class="text-sm truncate"><span class="font-bold">Domain:</span> <%= domain %></div>
               <div class="text-sm truncate"><span class="font-bold">IP:</span> <%= ip %></div>

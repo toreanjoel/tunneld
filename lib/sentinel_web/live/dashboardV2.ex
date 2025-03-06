@@ -260,7 +260,6 @@ defmodule SentinelWeb.Live.DashboardV2 do
     case type do
       "blocked_domain_remove" ->
         Sentinel.Servers.Blacklist.remove_domain(decoded_data["domain"], %{type: decoded_data["type"]})
-
       _ -> IO.inspect("HANDLE ACTION: Type: #{type}, DATA: #{inspect(decoded_data)}")
     end
 

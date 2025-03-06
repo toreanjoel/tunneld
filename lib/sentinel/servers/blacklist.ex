@@ -46,17 +46,6 @@ defmodule Sentinel.Servers.Blacklist do
     {:reply, {:ok, result}, state}
   end
 
-  # New handler for init_state: read the full file and broadcast it.
-  def handle_call(:init_state, _from, state) do
-    case read_file() do
-      {:ok, data} ->
-        broadcast_blacklist(data)
-        {:reply, {:ok, data}, state}
-      {:error, reason} ->
-        {:reply, {:error, reason}, state}
-    end
-  end
-
   # Here we add the domain to the blacklist
   def handle_call({:add_domain, %{domain: domain, type: type, mac: mac, ttl: ttl}}, _from, state) do
     {ip_str, _} = System.cmd("dig", ["+short", domain])
@@ -89,6 +78,7 @@ defmodule Sentinel.Servers.Blacklist do
           :ok ->
             Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :info, message: "Domain added successfully: #{domain}"})
             add_policy(policy)
+            init_state()
           {:error, err} ->
             Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :error, message: "Failed to add domain to blacklist: #{inspect(err)}"})
             {:error, "Failed to add domain to blacklist: #{inspect(err)}"}
@@ -118,6 +108,7 @@ defmodule Sentinel.Servers.Blacklist do
           :ok ->
             Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :info, message: "Domain removed successfully: #{domain}"})
             remove_policy(policy)
+            init_state()
             {:error, err} ->
             Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :error, message: "Failed to remove domain from blacklist: #{inspect(err)}"})
             {:error, "Failed to remove domain from blacklist: #{inspect(err)}"}
@@ -128,6 +119,18 @@ defmodule Sentinel.Servers.Blacklist do
     end)
 
     {:reply, {:ok, %{}}, state}
+  end
+
+  # New handler for init_state: read the full file and broadcast it.
+  def handle_call(:init_state, _from, state) do
+    case read_file() do
+      {:ok, data} ->
+        broadcast_blacklist(data)
+      {:error, reason} ->
+        IO.inspect("Failed to initialize blacklist state: #{inspect(reason)}")
+    end
+
+    {:noreply, state}
   end
 
   # Process the list of items in the blacklist and check if the ttl is expired
@@ -152,7 +155,9 @@ defmodule Sentinel.Servers.Blacklist do
         if has_policy?(policy) do
           IO.inspect("Removing policy from iptables: #{inspect(policy)}")
           case write_file do
-            :ok -> remove_policy(policy)
+            :ok ->
+              remove_policy(policy)
+              init_state()
             {:error, err} -> {:error, "Failed to remove domain from blacklist: #{inspect(err)}"}
           end
         else
@@ -296,9 +301,6 @@ defmodule Sentinel.Servers.Blacklist do
     end
   end
 
-  def get_blacklist_page(offset, limit),
-    do: GenServer.call(__MODULE__, {:get_blacklist_page, offset, limit})
-
   def add_domain(domain, %{type: type, ttl: ttl}) when type === "system" do
     GenServer.call(__MODULE__, {:add_domain, %{domain: domain, type: type, mac: "-", ttl: ttl}})
   end
@@ -315,7 +317,7 @@ defmodule Sentinel.Servers.Blacklist do
     GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, mac: mac}})
   end
 
-  def init_state(), do: GenServer.call(__MODULE__, :init_state)
+  def init_state(), do: GenServer.cast(__MODULE__, :init_state)
 
   @doc """
   Check if the Blacklist file exists.
