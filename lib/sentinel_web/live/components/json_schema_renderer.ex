@@ -33,8 +33,6 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
         }
       end)
 
-
-    IO.inspect(fields, label: "FIELDS")
     {:ok, assign(socket, action: assigns.action, schema: schema, fields: fields, changeset: values, errors: nil)}
   end
 
