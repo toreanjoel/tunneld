@@ -251,6 +251,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
 
                 <%!-- TODO: change this so we only see this when we have files to be deleted  --%>
                 <div
+                  :if={log_file !== "_data.log"}
                   phx-click="modal_open"
                   phx-value-modal_title="Remove Archived Backup?"
                   phx-value-modal_body={
