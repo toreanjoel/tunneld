@@ -262,7 +262,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
                   phx-value-modal_actions={
                     Jason.encode!(%{
                       "title" => "Remove",
-                      "payload" => %{"type" => "backup_file_delete", "data" => %{"file" => "DELETE"}}
+                      "payload" => %{"type" => "backup_file_delete", "data" => %{"file" => log_file}}
                     })
                   }
                   class="cursor-pointer text-red-500"

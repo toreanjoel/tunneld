@@ -293,6 +293,9 @@ defmodule SentinelWeb.Live.DashboardV2 do
         Sentinel.Servers.Blacklist.add_domain(data["domain"], %{ type: "user", mac: data["mac"], ttl: data["ttl"] })
       "add_system_domain_block" ->
         Sentinel.Servers.Blacklist.add_domain(data["domain"], %{ type: "system", ttl: data["ttl"] })
+      "backup_file_delete" ->
+        decoded_data = Jason.decode!(data)
+        Sentinel.Servers.Logs.delete_log_file(decoded_data["file"])
         _ ->
         Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :error, message: "Action doesnt exist and cant be handled"})
     end

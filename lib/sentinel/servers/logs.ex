@@ -137,12 +137,6 @@ defmodule Sentinel.Servers.Logs do
     {:noreply, state}
   end
 
-  # Get all of the log information from the log file
-  def handle_call(:init_state, _from, state) do
-    send(self(), :sync)
-    {:reply, {:ok, state}, state}
-  end
-
   # Get all of the log information from the log file for a specific device
   def handle_call({:get_device_logs, ip}, _from, state) do
     logs =
@@ -204,12 +198,20 @@ defmodule Sentinel.Servers.Logs do
     case File.rm(path) do
       :ok ->
         Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :info, message: "File deleted successfully"})
+        init_state()
         {:reply, {:ok, "File deleted successfully"}, state}
 
       {:error, reason} ->
         Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :info, message: "Failed to delete file: #{inspect(reason)}"})
+        init_state()
         {:reply, {:error, "Failed to delete file: #{inspect(reason)}"}, state}
     end
+  end
+
+  # Get all of the log information from the log file
+  def handle_cast(:init_state, state) do
+    send(self(), :sync)
+    {:noreply, state}
   end
 
   # filter by IP
@@ -265,7 +267,7 @@ defmodule Sentinel.Servers.Logs do
   end
 
   # Get entire state details for the logs
-  def init_state(), do: GenServer.call(__MODULE__, :init_state)
+  def init_state(), do: GenServer.cast(__MODULE__, :init_state)
   def get_device_logs(ip), do: GenServer.call(__MODULE__, {:get_device_logs, ip})
   def delete_log_file(file), do: GenServer.call(__MODULE__, {:delete_log_file, file})
 end
