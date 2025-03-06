@@ -43,11 +43,11 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
     ~H"""
     <form phx-target={@myself} phx-submit="submit">
       <%= for field <- @fields do %>
-        <div class="mb-4">
-          <label class="block text-gray-1 text-sm font-semibold mb-1">
+        <div class="mb-4 capitalize">
+          <label class="block text-white text-sm font-semibold mb-1">
             <%= field.name %>
           </label>
-          <label :if={field.description} class="block text-gray-1 text-xs font-semibold mb-1">
+          <label :if={field.description} class="block text-white text-xs font-semibold mb-1">
             <%= field.description %>
           </label>
 
@@ -55,7 +55,7 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
             <!-- Select Dropdown for Enum Fields -->
             <select
               name={"form[#{field.name}]"}
-              class="bg-primary border border-gray-2 rounded-md px-3 py-2 w-full"
+              class="bg-primary rounded-md px-3 py-2 w-full"
             >
               <%= for option <- field.enum do %>
                 <option value={option} selected={Map.get(@changeset, field.name, "") == option}>
@@ -71,14 +71,14 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
                   type="text"
                   name={"form[#{field.name}]"}
                   value={Map.get(@changeset, field.name, "")}
-                  class="bg-primary border border-gray-2 rounded-md px-3 py-2 w-full focus:ring-2 focus:ring-purple transition duration-200"
+                  class="bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200"
                 />
               <% "integer" -> %>
                 <input
                   type="number"
                   name={"form[#{field.name}]"}
                   value={Map.get(@changeset, field.name, "")}
-                  class="bg-primary border border-gray-2 rounded-md px-3 py-2 w-full focus:ring-2 focus:ring-purple transition duration-200"
+                  class="bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200"
                 />
             <% end %>
           <% end %>
