@@ -122,7 +122,7 @@ defmodule Sentinel.Servers.Blacklist do
   end
 
   # New handler for init_state: read the full file and broadcast it.
-  def handle_call(:init_state, _from, state) do
+  def handle_cast(:init_state, state) do
     case read_file() do
       {:ok, data} ->
         broadcast_blacklist(data)
