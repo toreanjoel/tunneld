@@ -16,8 +16,9 @@ defmodule SentinelWeb.Live.Dashboard do
     Modal
   }
 
-  # TODO: uncomment the line below to add auth into the system
-  # on_mount SentinelWeb.Hooks.CheckAuth
+  # auth check if this page needs to be behind auth
+  on_mount SentinelWeb.Hooks.CheckAuth
+
   @spec mount(map(), map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
   @doc """
   Initialize the dashboard with sidebar set to false.
@@ -158,7 +159,7 @@ defmodule SentinelWeb.Live.Dashboard do
     ~H"""
     <div class="sticky top-0 w-[50px] bg-secondary flex flex-col justify-between p-3">
       <div class="grow" />
-      <div class="flex items-center justify-center cursor-pointer">
+      <div phx-click="logout" class="flex items-center justify-center cursor-pointer">
         <.icon class="w-6 text-gray-2" name="hero-arrow-left-start-on-rectangle" />
       </div>
     </div>
@@ -226,7 +227,6 @@ defmodule SentinelWeb.Live.Dashboard do
   # Log out of the sentinel dashboard
   #
   def handle_event("logout", _, socket) do
-    # TODO: we need to consider doing a modal over here
     Session.delete(socket.assigns.ip)
     {:noreply, socket |> push_navigate(to: Routes.live_path(socket, SentinelWeb.Live.Login))}
   end

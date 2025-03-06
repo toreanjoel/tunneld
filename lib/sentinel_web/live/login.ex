@@ -48,52 +48,21 @@ defmodule SentinelWeb.Live.Login do
         </div>
       </div>
 
-
-      <!-- Form wrapper -->
       <div class="lg:w-2/5 w-full flex items-center justify-center p-8">
-        <%!-- <.simple_form for={@form} id="login_form" phx-submit="login" class="w-full max-w-sm">
-          <h1 class="text-3xl font-bold mb-4 text-center">sentinel.local</h1>
-          <.input field={@form[:user]} label="Name" class="mb-4" />
-          <.input field={@form[:pass]} label="Password" type="password" class="mb-6" />
-          <:actions>
-            <.button class="w-full">Login</.button>
-          </:actions>
-        </.simple_form> --%>
-          <!-- Login Form -->
-          <div class="w-full max-w-sm">
-            <.live_component
-              id={DateTime.utc_now()}
-              module={SentinelWeb.Live.Components.JsonSchemaRenderer}
-              schema={Sentinel.Schema.Login.data()}
-              action="login"
-            />
-          </div>
+        <!-- Login Form -->
+        <div class="w-full max-w-sm">
+          <h1 class="text-3xl text-white font-bold mb-4 text-center">sentinel.local</h1>
+          <.live_component
+            id={DateTime.utc_now()}
+            module={SentinelWeb.Live.Components.JsonSchemaRenderer}
+            schema={Sentinel.Schema.Login.data()}
+            action="login"
+          />
+        </div>
       </div>
     </div>
     """
   end
-
-  @doc """
-  Handle form validation on input change
-  """
-  # def handle_event("login", %{"user" => user, "pass" => pass}, socket) do
-  #   can_login = auth_check(%{ user: user, pass: pass}, socket)
-  #   if can_login do
-  #     Session.create(socket.assigns.ip)
-
-  #     {:noreply,
-  #      socket
-  #      |> put_flash(:info, "Logged In!")
-  #      |> push_navigate(to: Routes.live_path(socket, SentinelWeb.Live.DashboardV2))}
-  #   else
-
-  #     socket = socket |> put_flash(:error, "Invalid Credentials")
-  #     # We clear the flash after 3 seconds
-  #     Process.send_after(self(), :clear_flash, 3000)
-  #     {:noreply, socket}
-  #   end
-
-  # end
 
   #
   # clear the flash messages
@@ -103,13 +72,34 @@ defmodule SentinelWeb.Live.Login do
     {:noreply, clear_flash(socket)}
   end
 
-    #
+  #
+  # Check if the user details are correct to log into the system
+  #
+  def handle_info(%{ can_login: can_login}, socket) do
+    if can_login do
+      Session.create(socket.assigns.ip)
+
+      {:noreply,
+       socket
+       |> put_flash(:info, "Logged In!")
+       |> push_navigate(to: Routes.live_path(socket, SentinelWeb.Live.Dashboard))}
+    else
+
+      socket = socket |> put_flash(:error, "Invalid Credentials")
+      # We clear the flash after 3 seconds
+      Process.send_after(self(), :clear_flash, 3000)
+      {:noreply, socket}
+    end
+  end
+
+  #
   # handle the actions from the schema form
   #
   def handle_info(%{action: action, data: data}, socket) do
+    # We dont validate with the schema as we dont want to give hints away
     case action do
       "login" ->
-        send(self(), %{"can_login" => auth_check(data, socket)})
+        send(self(), %{can_login: auth_check(data, socket)})
         _ ->
         socket = socket |> put_flash(:error, "Invalid Credentials")
         # We clear the flash after 3 seconds

@@ -28,10 +28,13 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
           type: props["type"],
           description: props["description"],
           # Prioritize enums passed in `values` (dynamic injection)
-          enum: Map.get(values, key, props["enum"])
+          enum: Map.get(values, key, props["enum"]),
+          format: props["format"]
         }
       end)
 
+
+    IO.inspect(fields, label: "FIELDS")
     {:ok, assign(socket, action: assigns.action, schema: schema, fields: fields, changeset: values, errors: nil)}
   end
 
@@ -67,8 +70,9 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
             <!-- Input Fields -->
             <%= case field.type do %>
               <% "string" -> %>
+                <% input_type = if field.format === "password", do: "password", else: "text" %>
                 <input
-                  type="text"
+                  type={input_type}
                   name={"form[#{field.name}]"}
                   value={Map.get(@changeset, field.name, "")}
                   class="bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200"

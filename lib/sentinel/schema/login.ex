@@ -19,6 +19,7 @@ defmodule Sentinel.Schema.Login do
         },
         "password" => %{
           "type" => "string",
+          "format" => "password",
           "description" => "Password associated with the user account",
         }
       },
