@@ -92,7 +92,7 @@ defmodule SentinelWeb.Live.Dashboard do
       </div>
     </div>
     <!-- Right panel for small screens when toggled -->
-    <div :if={@sidebar.is_open} class="fixed inset-0 bg-secondary lg:hidden z-10 system-scroll">
+    <div :if={@sidebar.is_open} class="fixed inset-0 bg-secondary lg:hidden z-1 system-scroll">
       <div class="p-4 h-full">
         <!-- Toggle button for small screens only -->
         <button phx-click="close_details" class="lg:hiddeny p-2 m-2">
