@@ -19,6 +19,7 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
     schema = Schema.resolve(assigns.schema)
     # Defaults to empty if not provided
     values = Map.get(assigns, :values, %{})
+    loading = Map.get(assigns, :loading, false)
 
     fields =
       assigns.schema["properties"]
@@ -33,7 +34,14 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
         }
       end)
 
-    {:ok, assign(socket, action: assigns.action, schema: schema, fields: fields, changeset: values, errors: nil)}
+    {:ok, socket
+      |> assign(loading: loading)
+      |> assign(action: assigns.action)
+      |> assign(schema: schema)
+      |> assign(fields: fields)
+      |> assign(changeset: values)
+      |> assign(errors: nil)
+    }
   end
 
   @doc """
@@ -97,9 +105,13 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
         <div class="grow w-full" />
         <button
           type="submit"
-          class="bg-purple text-white px-4 py-2 rounded-lg font-semibold hover:bg-light_purple transition duration-200"
+          class={"
+            #{if not @loading, do: "bg-purple hover:bg-light_purple", else: "bg-light_purple"}
+            text-white px-4 py-2 rounded-lg font-semibold
+            transition duration-200"
+          }
         >
-          Submit
+          <%= if @loading, do: "Loading...", else: "Submit" %>
         </button>
       </div>
     </form>

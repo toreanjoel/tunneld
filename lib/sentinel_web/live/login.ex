@@ -20,6 +20,7 @@ defmodule SentinelWeb.Live.Login do
 
     socket =
       socket
+      |> assign(:loading, false)
       |> assign(:ip, ip)
       |> assign(:info_content, "127.0.0.1")
 
@@ -56,6 +57,7 @@ defmodule SentinelWeb.Live.Login do
             id={DateTime.utc_now()}
             module={SentinelWeb.Live.Components.JsonSchemaRenderer}
             schema={Sentinel.Schema.Login.data()}
+            loading={@loading}
             action="login"
           />
         </div>
@@ -78,42 +80,49 @@ defmodule SentinelWeb.Live.Login do
   def handle_info(%{ can_login: can_login}, socket) do
     if can_login do
       Session.create(socket.assigns.ip)
-
+      send(self(), %{loading: false})
       {:noreply,
        socket
-       |> put_flash(:info, "Logged In!")
        |> push_navigate(to: Routes.live_path(socket, SentinelWeb.Live.Dashboard))}
     else
 
       socket = socket |> put_flash(:error, "Invalid Credentials")
       # We clear the flash after 3 seconds
       Process.send_after(self(), :clear_flash, 3000)
+      send(self(), %{loading: false})
       {:noreply, socket}
     end
   end
 
   #
-  # handle the actions from the schema form
+  # async handle the submit and loading of the form
   #
-  def handle_info(%{action: action, data: data}, socket) do
-    # We dont validate with the schema as we dont want to give hints away
-    case action do
-      "login" ->
-        send(self(), %{can_login: auth_check(data, socket)})
-        _ ->
-        socket = socket |> put_flash(:error, "Invalid Credentials")
-        # We clear the flash after 3 seconds
-        Process.send_after(self(), :clear_flash, 3000)
-        {:noreply, socket}
-    end
-
+  def handle_info(%{action: _action, data: _data} = payload, socket) do
+    send(self(), %{loading: true})
+    send(self(), %{action: payload})
     {:noreply, socket}
+  end
+
+  #
+  # Try to authorize the user - login action for the json form
+  #
+  def handle_info(%{action: %{action: "login", data: data}}, socket) do
+    # We dont validate with the schema as we dont want to give hints away
+    send(self(), %{can_login: auth_check(data, socket)})
+    {:noreply, socket}
+  end
+
+  #
+  # toggle loading
+  #
+  def handle_info(%{loading: loading}, socket) do
+    {:noreply, socket |> assign(loading: loading)}
   end
 
   #
   # Auth Check - user against configured details
   #
-  @spec auth_check(String.t(), String.t()) :: boolean()
+  @spec auth_check(map(), Phoenix.LiveView.Socket.t()) :: boolean()
   defp auth_check(%{"name" => user, "password" => pass}, socket) do
     {_status, auth} = Auth.read_file()
 
