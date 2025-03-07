@@ -95,9 +95,9 @@ defmodule SentinelWeb.Live.Components.Resources do
                 />
               </svg>
               <!-- Percentage and label -->
-              <div class="absolute inset-0 flex flex-col items-center justify-center text-3xl md:text-lg text-white">
+              <div class="absolute inset-0 flex flex-col items-center justify-center text-2xl md:text-lg text-white">
                 <%= "#{percent}%" %>
-                <div class="text-xl md:text-xs"><%= String.upcase(to_string(resource)) %></div>
+                <div class="text-xs"><%= String.upcase(to_string(resource)) %></div>
               </div>
             </div>
           <% end %>
