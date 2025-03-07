@@ -103,9 +103,7 @@ defmodule Sentinel.Servers.Services do
       is_active = String.trim(output) == "active"
 
       if !is_active do
-        Task.start(fn ->
-          System.cmd("systemctl", ["start", service |> to_string])
-        end)
+        System.cmd("systemctl", ["start", service |> to_string])
       end
 
       is_active
