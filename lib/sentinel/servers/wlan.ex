@@ -25,25 +25,28 @@ defmodule Sentinel.Servers.Wlan do
   #     psk="YourPassword"
   #     key_mgmt=WPA-PSK
   #     auth_alg=OPEN
-  # }' | tee /etc/wpa_supplicant/wpa_supplicant-wlan1.conf > /dev/null
+  # }' | tee /etc/wpa_supplicant/wpa_supplicant-[interface].conf > /dev/null
 
   # ------ important functions ----
 
+  # TOOD: ifconfig can be used to enabled and disable the dvices
+  # ifconfig [interface] down
+
   # check if the device is connected to a router
-  # iw dev wlan1 link
+  # iw dev [interface] link
 
   # getting the list wlan devices - this can be used to know what device you want to setup as the ap vs client
   # iw dev
 
   # Scanning for SSIDs
-  # iw dev wlan1 scan | grep SSID
+  # iw dev [interface] scan | grep SSID
 
   # add details for the SSID of choice
   # config needs to be made that will be writted to
-  # wpa_passphrase "YourSSID" "YourPassword" > /etc/wpa_supplicant/wpa_supplicant-wlan1.conf
+  # wpa_passphrase "YourSSID" "YourPassword" > /etc/wpa_supplicant/wpa_supplicant-[interface].conf
 
   # Restart the wpa_supplicant service after writing to it with the details (starting)
-  # wpa_supplicant -B -i wlan1 -c /etc/wpa_supplicant/wpa_supplicant-wlan1.conf
+  # wpa_supplicant -B -i [interface] -c /etc/wpa_supplicant/wpa_supplicant-[interface].conf
 
   # Stopping the connection to the wifi connection
   # pkill wpa_supplicant
