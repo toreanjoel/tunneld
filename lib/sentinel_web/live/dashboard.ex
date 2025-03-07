@@ -56,8 +56,6 @@ defmodule SentinelWeb.Live.Dashboard do
   def render(assigns) do
     ~H"""
     <div class="relative flex flex-row flex-1 h-screen text-white bg-primary">
-      <!-- Fixed width left column -->
-      <%= nav(assigns) %>
       <!-- Flexible middle column -->
       <%= main(assigns) %>
       <!-- Sidebar for more details -->
@@ -114,6 +112,9 @@ defmodule SentinelWeb.Live.Dashboard do
     ~H"""
     <div class="flex-1 flex flex-col p-5 system-scroll">
       <div class="flex flex-row h-[30px]">
+        <!-- Fixed width left column -->
+        <%= nav(assigns) %>
+
         <div class="flex-1" />
         <div
           phx-click="show_details"
@@ -157,12 +158,9 @@ defmodule SentinelWeb.Live.Dashboard do
   """
   def nav(assigns) do
     ~H"""
-    <div class="sticky top-0 w-[50px] bg-secondary flex flex-col justify-between p-3">
-      <div class="grow" />
       <div phx-click="logout" class="flex items-center justify-center cursor-pointer">
         <.icon class="w-6 text-gray-2" name="hero-arrow-left-start-on-rectangle" />
       </div>
-    </div>
     """
   end
 
@@ -309,5 +307,4 @@ defmodule SentinelWeb.Live.Dashboard do
   def handle_info(:clear_flash, socket) do
     {:noreply, clear_flash(socket)}
   end
-
 end

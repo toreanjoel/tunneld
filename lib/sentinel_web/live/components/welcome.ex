@@ -22,8 +22,8 @@ defmodule SentinelWeb.Live.Components.Welcome do
     assigns = assigns |> assign(version: Map.get(assigns.data, :version, Application.get_env(:sentinel, :version)))
 
     ~H"""
-    <div class="p-5">
-      <div class="text-6xl font-medium bg-gradient-to-r from-slate-300 to-slate-600 bg-clip-text text-transparent">
+    <div class="py-5">
+      <div class="text-4xl font-medium bg-gradient-to-r from-slate-300 to-slate-600 bg-clip-text text-transparent">
         sentinel.local
       </div>
       <div class="text-lg text-gray-2 font-light">

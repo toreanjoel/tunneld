@@ -10,11 +10,11 @@ defmodule SentinelWeb.Live.NotFound do
   """
   def render(assigns) do
     ~H"""
-    <div class="flex flex-col items-center justify-center">
-        <p class="text-2xl font-bold text-zinc-900">Page Not Found</p>
-        <.button class="mt-4" phx-click="go_back">
+    <div class="h-screen bg-primary flex flex-col items-center justify-center">
+        <p class="text-2xl font-bold text-gray-1">Page Not Found</p>
+        <button class="mt-4 px-3 py-2 rounded-md font-bold text-white hover:bg-light_purple bg-purple" phx-click="go_back">
           Back
-        </.button>
+        </button>
     </div>
     """
   end
