@@ -20,6 +20,9 @@ defmodule Iptables do
 
     # Block all forwarding by default
     System.cmd("iptables", ["-P", "FORWARD", "DROP"])
+    # Block non-whitelisted users from VPN access
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_ap_interface, "-o", @vpn_interface, "-j", "DROP"])
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @eth_ap_interface, "-o", @vpn_interface, "-j", "DROP"])
 
     # Allow clients to access Sentinel UI (gateway)
     System.cmd("iptables", ["-A", "FORWARD", "-i", @eth_ap_interface, "-d", @sentinel_ip, "-j", "ACCEPT"])
@@ -46,10 +49,6 @@ defmodule Iptables do
     # Redirect all DNS queries to dnsmasq (port 5336)
     System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-port", "5336"])
     System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-port", "5336"])
-
-    # Block non-whitelisted users from VPN access
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_ap_interface, "-o", @vpn_interface, "-j", "DROP"])
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @eth_ap_interface, "-o", @vpn_interface, "-j", "DROP"])
 
     IO.puts("Iptables reset: All traffic blocked by default. Only Sentinel UI is accessible.")
   end
