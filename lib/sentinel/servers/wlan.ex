@@ -29,6 +29,10 @@ defmodule Sentinel.Servers.Wlan do
 
   # ------ important functions ----
 
+  # TO make sure the internet is going to work
+  # sudo dhcpcd -k wlan1  # Release any existing IP
+  # sudo dhcpcd wlan1      # Request a new DHCP lease
+
   # TOOD: ifconfig can be used to enabled and disable the dvices
   # ifconfig [interface] down
 
