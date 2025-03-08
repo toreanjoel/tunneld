@@ -31,11 +31,11 @@ defmodule Iptables do
     System.cmd("iptables", ["-A", "FORWARD", "-i", @eth_ap_interface, "-o", @internet_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
     System.cmd("iptables", ["-A", "FORWARD", "-i", @internet_interface, "-o", @eth_ap_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
 
-    # Allow outgoing Wi-Fi -> VPN connections (NEW RULE) - this will need to be removed for a sentry later
+    # Allow outgoing Wi-Fi -> VPN connections (this will need to be removed for a sentry later)
     System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_ap_interface, "-o", @vpn_interface, "-j", "ACCEPT"])
     System.cmd("iptables", ["-A", "FORWARD", "-i", @eth_ap_interface, "-o", @vpn_interface, "-j", "ACCEPT"])
 
-    # Allow bidirectional forwarding between Wi-Fi and VPN - this will need to be removed for a sentry later
+    # Allow bidirectional forwarding between Wi-Fi and VPN (this will need to be removed for a sentry later)
     System.cmd("iptables", ["-A", "FORWARD", "-i", @vpn_interface, "-o", @wifi_ap_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
     System.cmd("iptables", ["-A", "FORWARD", "-i", @vpn_interface, "-o", @eth_ap_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
 
@@ -47,9 +47,11 @@ defmodule Iptables do
     System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-port", "5336"])
     System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-port", "5336"])
 
+    # Block non-whitelisted users from VPN access
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @wifi_ap_interface, "-o", @vpn_interface, "-j", "DROP"])
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @eth_ap_interface, "-o", @vpn_interface, "-j", "DROP"])
 
     IO.puts("Iptables reset: All traffic blocked by default. Only Sentinel UI is accessible.")
-
   end
 
   @doc """
@@ -116,11 +118,12 @@ defmodule Iptables do
   """
   def grant_access(ip, mac) do
     # Ensure the device can forward traffic through the internet interface
-    System.cmd("iptables", ["-A", "FORWARD", "-s", ip, "-m", "mac", "--mac-source", mac, "-o", @internet_interface, "-j", "ACCEPT"])
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @internet_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
+    System.cmd("iptables", ["-I", "FORWARD", "1", "-s", ip, "-m", "mac", "--mac-source", mac, "-o", @internet_interface, "-j", "ACCEPT"])
+    System.cmd("iptables", ["-I", "FORWARD", "1", "-s", ip, "-m", "mac", "--mac-source", mac, "-o", @vpn_interface, "-j", "ACCEPT"])
+    System.cmd("iptables", ["-I", "FORWARD", "1", "-i", @internet_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
 
     # Ensure the device is allowed through NAT
-    System.cmd("iptables", ["-t", "nat", "-A", "POSTROUTING", "-s", ip, "-j", "MASQUERADE"])
+    System.cmd("iptables", ["-I", "POSTROUTING", "1", "-t", "nat", "-s", ip, "-j", "MASQUERADE"])
 
     IO.puts("Granted internet access to #{ip} (MAC: #{mac})")
   end
@@ -130,8 +133,9 @@ defmodule Iptables do
   """
   def revoke_access(ip, mac) do
     System.cmd("iptables", ["-D", "FORWARD", "-s", ip, "-m", "mac", "--mac-source", mac, "-o", @internet_interface, "-j", "ACCEPT"])
+    System.cmd("iptables", ["-D", "FORWARD", "-s", ip, "-m", "mac", "--mac-source", mac, "-o", @vpn_interface, "-j", "ACCEPT"])
     System.cmd("iptables", ["-D", "FORWARD", "-i", @internet_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
-    System.cmd("iptables", ["-t", "nat", "-D", "POSTROUTING", "-s", ip, "-j", "MASQUERADE"])
+    System.cmd("iptables", ["-D", "POSTROUTING", "-t", "nat", "-s", ip, "-j", "MASQUERADE"])
 
     IO.puts("Revoked internet access for #{ip} (MAC: #{mac})")
   end
