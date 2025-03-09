@@ -58,9 +58,10 @@ defmodule Sentinel.Application do
   #
   def bridge_interfaces do
     commands = [
-      "ip link add name br0 type bridge",
       "ip link set eth0 master br0",
+      "ip link set wlan0 master br0",
       "ip link set eth0 up",
+      "ip link set wlan0 up",
       "ip link set br0 up"
     ]
 
