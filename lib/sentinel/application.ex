@@ -33,7 +33,7 @@ defmodule Sentinel.Application do
     # This should not be async, we want this to complete before any other servers init data
     # This will prevent race conditions
     if not Application.get_env(:sentinel, :mock_data, false) do
-      bridge_interfaces()
+      # bridge_interfaces()
       Iptables.reset()
     end
 
