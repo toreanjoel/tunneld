@@ -6,7 +6,7 @@ defmodule Iptables do
 
   @internet_interface "wlan1"
   @vpn_interface "wg0-mullvad"
-  @eth0_interface "eth0"
+  @eth0_interface "br0"
   @wlan0_interface "wlan0"
   @gateway "10.0.0.1"
 

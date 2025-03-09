@@ -33,7 +33,9 @@ defmodule Sentinel.Application do
     # This should not be async, we want this to complete before any other servers init data
     # This will prevent race conditions
     if not Application.get_env(:sentinel, :mock_data, false) do
-      # bridge_interfaces()
+      Task.start(fn ->
+        bridge_interfaces()
+      end)
       Iptables.reset()
     end
 
@@ -72,5 +74,7 @@ defmodule Sentinel.Application do
         {error_msg, exit_code} -> IO.puts("Error (#{exit_code}): #{cmd}\n#{error_msg}")
       end
     end)
+
+    Sentinel.Servers.Services.restart_service(:dhcpcd)
   end
 end
