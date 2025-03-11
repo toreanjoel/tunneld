@@ -34,9 +34,6 @@ defmodule Sentinel.Application do
     # This should not be async, we want this to complete before any other servers init data
     # This will prevent race conditions
     if not Application.get_env(:sentinel, :mock_data, false) do
-      Task.start(fn ->
-        bridge_interfaces()
-      end)
       Iptables.reset()
     end
 
@@ -53,29 +50,5 @@ defmodule Sentinel.Application do
   def config_change(changed, _new, removed) do
     SentinelWeb.Endpoint.config_change(changed, removed)
     :ok
-  end
-
-  #
-  # Setup the basic bridge setup on startup in order to link the wlan and eth interfaces
-  # This is used in order to get the linking of interfaces and we need to make these variables
-  #
-  def bridge_interfaces do
-    commands = [
-      "ip link add name br0 type bridge",
-      "ip link set eth0 master br0",
-      "ip link set wlan0 master br0",
-      "ip link set eth0 up",
-      "ip link set wlan0 up",
-      "ip link set br0 up"
-    ]
-
-    Enum.each(commands, fn cmd ->
-      case System.cmd("sudo", String.split(cmd, " ")) do
-        {output, 0} -> IO.puts("Success: #{cmd}\n#{output}")
-        {error_msg, exit_code} -> IO.puts("Error (#{exit_code}): #{cmd}\n#{error_msg}")
-      end
-    end)
-
-    Sentinel.Servers.Services.restart_service(:dhcpcd)
   end
 end
