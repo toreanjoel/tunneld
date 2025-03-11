@@ -45,10 +45,6 @@ defmodule SentinelWeb.Live.Components.Services do
           <div class={"w-[13px] h-[13px] rounded-full #{status(Map.get(@status, :"dnscrypt-proxy", false))}"}></div>
           <div class="text-sm truncate">DoH</div>
         </div>
-        <div phx-click="show_details" phx-value-type={"service"} phx-value-id={"hostapd"} class="bg-primary flex flex-row gap-3 py-2 px-3 items-center rounded-md hover:bg-secondary cursor-pointer">
-          <div class={"w-[13px] h-[13px] rounded-full #{status(Map.get(@status, :hostapd, false))}"}></div>
-          <div class="text-sm truncate">WiFi</div>
-        </div>
       </div>
     </div>
     """
