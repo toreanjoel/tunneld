@@ -101,6 +101,9 @@ defmodule Sentinel.Servers.Wlan do
     # Overwrite the wpa_supplicant.conf file
     :ok = File.write(@wpa_config, new_config)
 
+    # init with removing any cache or stored info on the prev used config
+    init_wp_supplicant()
+
     # Reconnect to last known network setup
     System.cmd("wpa_cli", ["-i", @interface, "reconnect"])
 
@@ -182,7 +185,7 @@ defmodule Sentinel.Servers.Wlan do
 
     # Kill existing wpa_supplicant
     System.cmd("pkill", ["-f", "wpa_supplicant"])
-    Process.sleep(4000)  # Wait 2 seconds for the process to fully terminate
+    Process.sleep(2000)  # Wait 2 seconds for the process to fully terminate
 
     # Restart wpa_supplicant
     {_, exit_code} = System.cmd("wpa_supplicant", ["-B", "-i", @interface, "-c", @wpa_config])
