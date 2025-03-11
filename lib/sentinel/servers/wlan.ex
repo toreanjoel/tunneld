@@ -177,8 +177,40 @@ defmodule Sentinel.Servers.Wlan do
   end
 
   # we reinit the wp supplicant on startup initially
-  defp init_wp_supplicant() do
-    System.cmd("pkill", ["wpa_supplicant"])
-    System.cmd("wpa_supplicant", ["-B", "-i", @interface, "-c", @wpa_config])
+  def init_wp_supplicant() do
+    Logger.info("Restarting wpa_supplicant...")
+
+    # Kill existing wpa_supplicant
+    System.cmd("pkill", ["-f", "wpa_supplicant"])
+    Process.sleep(4000)  # Wait 2 seconds for the process to fully terminate
+
+    # Restart wpa_supplicant
+    {_, exit_code} = System.cmd("wpa_supplicant", ["-B", "-i", @interface, "-c", @wpa_config])
+
+    if exit_code == 0 do
+      Logger.info("wpa_supplicant restarted successfully")
+      wait_for_wpa_cli_ready()  # Ensure wpa_cli is ready before proceeding
+    else
+      Logger.error("Failed to restart wpa_supplicant")
+    end
+  end
+
+  # Ensures wpa_cli is available before proceeding
+  defp wait_for_wpa_cli_ready(attempts \\ 5) do
+    {output, exit_code} = System.cmd("wpa_cli", ["status"])
+
+    if exit_code == 0 and String.contains?(output, "wpa_state") do
+      Logger.info("wpa_cli is ready")
+      :ok
+    else
+      if attempts > 0 do
+        Logger.warn("wpa_cli not ready, retrying...")
+        Process.sleep(2000)
+        wait_for_wpa_cli_ready(attempts - 1)
+      else
+        Logger.error("Failed to detect wpa_cli readiness after multiple attempts")
+        :error
+      end
+    end
   end
 end
