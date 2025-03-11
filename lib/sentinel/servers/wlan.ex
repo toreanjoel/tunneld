@@ -1,65 +1,177 @@
 defmodule Sentinel.Servers.Wlan do
   @moduledoc """
-  The wlan server that will be used to get details and interact with the wlan interface of the operating system
+  The wlan server that will be used to get details and interact with the wlan interface of the operating system.
   """
   use GenServer
   require Logger
 
+
+  # Define the Wi-Fi interface used for internet
+  @interface "wlan1"
+  @wpa_config "/etc/wpa_supplicant/wpa_supplicant.conf"
+  @conn_interval_checker 15_000
+
+  @doc "Starts the GenServer"
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 
-  @doc """
-  Init and check auth files
-  """
   def init(_) do
+    # We make sure the WP Supplicant is running
+    System.cmd("wpa_supplicant", ["-B", "-i", @interface, "-c", @wpa_config])
+    send(self(), :check_connection)
     {:ok, %{}}
   end
 
-  #  echo 'ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
-  # update_config=1
-  # country=ZA
+  # Scans for networks
+  def handle_call(:scan, _from, state) do
+    Logger.info("Scanning for Wi-Fi networks...")
+    System.cmd("wpa_cli", ["scan"])
+    # Wait for scan results
+    Process.sleep(3000)
+    {:reply, :ok, state}
+  end
 
-  # network={
-  #     ssid="YourSSID"
-  #     psk="YourPassword"
-  #     key_mgmt=WPA-PSK
-  #     auth_alg=OPEN
-  # }' | tee /etc/wpa_supplicant/wpa_supplicant-[interface].conf > /dev/null
+  # Fetches scan results and parses SSIDs
+  def handle_call(:scan_results, _from, state) do
+    {output, _} = System.cmd("wpa_cli", ["scan_results"])
 
-  # ------ important functions ----
+    networks =
+      output
+      |> String.split("\n")
+      |> Enum.map(&parse_scan_result/1)
+      |> Enum.drop(1)
+      |> Enum.reject(&is_nil/1)
 
-  # TO make sure the internet is going to work
-  # sudo dhcpcd -k wlan1  # Release any existing IP
-  # sudo dhcpcd wlan1      # Request a new DHCP lease
+    {:reply, networks, state}
+  end
 
-  # TOOD: ifconfig can be used to enabled and disable the dvices
-  # ifconfig [interface] down
+  # Checks if a Wi-Fi network is open or secured
+  def handle_call({:network_security, ssid}, _from, state) do
+    {output, _} = System.cmd("wpa_cli", ["scan_results"])
 
-  # check if the device is connected to a router
-  # iw dev [interface] link
+    security_flags =
+      output
+      |> String.split("\n")
+      |> Enum.find(fn line -> String.contains?(line, ssid) end)
 
-  # getting the list wlan devices - this can be used to know what device you want to setup as the ap vs client
-  # iw dev
+    is_secure =
+      case security_flags do
+        nil ->
+          {:error, "SSID not found"}
 
-  # Scanning for SSIDs
-  # iw dev [interface] scan | grep SSID
+        _ ->
+          if String.contains?(security_flags, "[WPA") or String.contains?(security_flags, "[WEP") do
+            {:secure, true}
+          else
+            {:secure, false}
+          end
+      end
 
-  # add details for the SSID of choice
-  # config needs to be made that will be writted to
-  # wpa_passphrase "YourSSID" "YourPassword" > /etc/wpa_supplicant/wpa_supplicant-[interface].conf
+    {:reply, is_secure, state}
+  end
 
-  # Restart the wpa_supplicant service after writing to it with the details (starting)
-  # wpa_supplicant -B -i [interface] -c /etc/wpa_supplicant/wpa_supplicant-[interface].conf
+  # Disconenct from the current connected wireless network
+  def handle_call(:disconnect, _from, state) do
+    # Disconnect from current network
+    System.cmd("wpa_cli", ["-i", @interface, "disconnect"])
 
-  # Stopping the connection to the wifi connection
-  # pkill wpa_supplicant
+    Logger.info("Disconencted from network")
+    {:reply, :ok, state}
+  end
 
-  # -------------------------------
+  # Connects to a Wi-Fi network and overwrites config
+  def handle_cast({:connect, ssid, password}, state) do
+    Logger.info("Connecting to Wi-Fi: #{ssid}...")
 
-  # Config helper - we need to set the wlan configuration on the env variables and runtime config?
-  # defp config_fs(), do: Application.get_env(:sentinel, :fs)
-  # defp config_fs(key), do: config_fs()[key]
-  # defp config_auth(), do: Application.get_env(:sentinel, :auth)
-  # defp config_auth(key), do: config_auth()[key]
+    new_config = """
+    country=ZA
+    ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+    update_config=1
+
+    network={
+        ssid="#{ssid}"
+        psk="#{password}"
+        auth_alg=OPEN
+        key_mgmt=WPA-PSK
+    }
+    """
+
+    # Overwrite the wpa_supplicant.conf file
+    :ok = File.write(@wpa_config, new_config)
+
+    # Reconnect to last known network setup
+    System.cmd("wpa_cli", ["-i", @interface, "reconnect"])
+
+    # Request new DHCP lease to get an IP
+    System.cmd("dhcpcd", [@interface])
+
+    {:noreply, state}
+  end
+
+  # check the connection status of the current interface
+  def handle_info(:check_connection, state) do
+    check_connection()
+    Process.send_after(self(), :check_connection, @conn_interval_checker)
+    {:noreply, state}
+  end
+
+  @doc "Scans for available Wi-Fi networks"
+  def scan_networks() do
+    GenServer.call(__MODULE__, :scan)
+  end
+
+  @doc "Retrieves scanned Wi-Fi networks"
+  def get_scan_results() do
+    GenServer.call(__MODULE__, :scan_results)
+  end
+
+  @doc "Checks if a Wi-Fi network requires a password"
+  def get_network_security(ssid) do
+    GenServer.call(__MODULE__, {:network_security, ssid})
+  end
+
+  @doc "Connects to a Wi-Fi network with a password (overwrites config)"
+  def connect_with_pass(ssid, password) do
+    GenServer.cast(__MODULE__, {:connect, ssid, password})
+  end
+
+  @doc "Disconnect from the current connected wireless network"
+  def disconnect() do
+    GenServer.call(__MODULE__, :disconnect)
+  end
+
+  # parse the scan results that we get back from the network scanning
+  defp parse_scan_result(line) do
+    case String.split(line) do
+      [_bssid, _freq, signal, flags | rest] ->
+        ssid = Enum.join(rest, " ")
+
+        %{ssid: ssid, security: flags, signal: signal, open: is_open_network?(flags)}
+
+      _ ->
+        nil
+    end
+  end
+
+  # We check if the network is a open network or not
+  def is_open_network?(flags) do
+    # An open network will only have [ESS] and no WPA/WEP
+    not String.contains?(flags, "[WPA") and not String.contains?(flags, "[WEP]")
+  end
+
+  # Get the current connection status
+  defp check_connection do
+    {output, _} = System.cmd("iw", ["dev", @interface, "link"])
+
+    is_connected =
+      case output |> String.trim() do
+        "Not connected." -> false
+        _ -> true
+      end
+
+    IO.inspect("Connection: #{inspect(is_connected)}")
+
+    if(is_connected, do: :connected, else: :disconnected)
+  end
 end
