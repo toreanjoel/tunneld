@@ -41,8 +41,8 @@ defmodule Sentinel.Servers.Wlan do
       output
       |> String.split("\n")
       |> Enum.map(&parse_scan_result/1)
-      |> Enum.drop(1)
       |> Enum.reject(&is_nil/1)
+      |> Enum.filter(fn i -> i.security !== "/" end)
 
     {:reply, networks, state}
   end
@@ -207,7 +207,6 @@ defmodule Sentinel.Servers.Wlan do
       :ok
     else
       if attempts > 0 do
-        Logger.warn("wpa_cli not ready, retrying...")
         Process.sleep(2000)
         wait_for_wpa_cli_ready(attempts - 1)
       else
