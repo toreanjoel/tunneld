@@ -5,6 +5,7 @@ defmodule Sentinel.Servers.Wlan do
   use GenServer
   require Logger
 
+  # TODO: Add the dynamic from config for the interface and the broadcasting to the UI
 
   # Define the Wi-Fi interface used for internet
   @interface "wlan1"
