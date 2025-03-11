@@ -19,7 +19,7 @@ defmodule Sentinel.Servers.Wlan do
 
   def init(_) do
     # We make sure the WP Supplicant is running
-    System.cmd("wpa_supplicant", ["-B", "-i", @interface, "-c", @wpa_config])
+    init_wp_supplicant()
     send(self(), :check_connection)
     {:ok, %{}}
   end
@@ -174,5 +174,11 @@ defmodule Sentinel.Servers.Wlan do
     IO.inspect("Connection: #{inspect(is_connected)}")
 
     if(is_connected, do: :connected, else: :disconnected)
+  end
+
+  # we reinit the wp supplicant on startup initially
+  defp init_wp_supplicant() do
+    System.cmd("pkill", ["wpa_supplicant"])
+    System.cmd("wpa_supplicant", ["-B", "-i", @interface, "-c", @wpa_config])
   end
 end
