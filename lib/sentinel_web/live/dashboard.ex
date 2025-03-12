@@ -116,14 +116,29 @@ defmodule SentinelWeb.Live.Dashboard do
         <%= nav(assigns) %>
 
         <div class="flex-1" />
-        <div
-          phx-click="show_details"
-          phx-value-type="overview"
-          phx-value-id="_"
-          class="relative rounded-md hover:bg-secondary cursor-pointer"
-        >
-          <div class="absolute right-0 top-0 w-[10px] h-[10px] rounded-full bg-yellow" />
-          <.icon name="hero-bell" class="h-15 w-15" />
+
+        <div class="flex flex-row gap-2">
+          <%!-- Internet Access Placeholder --%>
+          <div phx-click="show_details" phx-value-type="_" phx-value-id={"_"} class="bg-secondary flex flex-row gap-3 py-2 px-3 items-center rounded-md cursor-pointer">
+            <%!-- We need to use icon here --%>
+            Internet Access
+          </div>
+
+          <%!-- VPN Placeholder --%>
+          <div phx-click="show_details" phx-value-type="_" phx-value-id={"_"} class="bg-secondary flex flex-row gap-3 py-2 px-3 items-center rounded-md cursor-pointer">
+            <%!-- We need to use icon here --%>
+            VPN
+          </div>
+
+          <div
+            phx-click="show_details"
+            phx-value-type="overview"
+            phx-value-id="_"
+            class="relative rounded-md hover:bg-secondary cursor-pointer"
+          >
+            <div class="absolute right-0 top-0 w-[10px] h-[10px] rounded-full bg-yellow" />
+            <.icon name="hero-bell" class="h-15 w-15" />
+          </div>
         </div>
       </div>
       <div class="flex flex-col mx-auto max-w-[1280px]">
