@@ -36,7 +36,7 @@ defmodule SentinelWeb.Live.Components.Nodes do
     ~H"""
     <div class="p-5">
       <div class="mb-5">
-        <div class="text-xl text-gray-1 font-medium">Nodes</div>
+        <div class="text-xl text-gray-1 font-medium">Tunneled Services</div>
         <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
       </div>
       <div class="flex flex-wrap gap-3 items-center justify-start">

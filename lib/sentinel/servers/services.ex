@@ -5,7 +5,7 @@ defmodule Sentinel.Servers.Services do
   use GenServer
   require Logger
 
-  @services [:dnsmasq, :dhcpcd, :'dnscrypt-proxy']
+  @services [:dnsmasq, :dhcpcd, :'dnscrypt-proxy', :cloudflared]
   @service_log_limit "80"
   @interval 10_000
 
