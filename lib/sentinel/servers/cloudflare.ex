@@ -4,8 +4,6 @@ defmodule Sentinel.Servers.Cloudflare do
 
   Features:
     • Creates a dedicated tunnel for each subdomain.
-    • Persists tunnel+subdomain info in a JSON file.
-    • On startup, reads the file and reconnects any existing tunnels.
     • Provides functions to create, route, run, and delete tunnels.
 
   We use:
@@ -76,32 +74,8 @@ defmodule Sentinel.Servers.Cloudflare do
   @impl true
   def init(_opts) do
     Logger.info("Starting Cloudflare Tunnel GenServer...")
-
-    # Ensure the file exists
-    create_file_if_missing()
-
-    # Read existing data from file
-    case read_file() do
-      {:ok, tunnels} ->
-        Logger.info("Loaded tunnel data from file: #{inspect(tunnels)}")
-
-        state = %{
-          # subdomain => Port (the OS process handle)
-          running_tunnels: %{},
-          # list of maps: [%{"subdomain"=>..., "tunnel_name"=>..., "local_server"=>...}, ...]
-          records: tunnels
-        }
-
-        # For each record, re-create environment
-        Enum.each(tunnels, &do_restore_tunnel/1)
-
-        {:ok, state}
-
-      {:error, reason} ->
-        Logger.error("Failed to load existing tunnel data: #{reason}")
-        state = %{running_tunnels: %{}, records: []}
-        {:ok, state}
-    end
+    state = %{running_tunnels: %{}, records: []}
+    {:ok, state}
   end
 
   @impl true
@@ -113,19 +87,12 @@ defmodule Sentinel.Servers.Cloudflare do
     else
       # Create a unique tunnel name from the subdomain
       tunnel_name = tunnel_name_for(subdomain)
-
-      # 1) create the tunnel if missing
       unless tunnel_exists?(tunnel_name) do
         do_create_tunnel(tunnel_name)
       end
 
-      # 2) add DNS route
       do_add_dns_route(tunnel_name, subdomain)
-
-      # 3) run tunnel with local_server as the actual address
       port = do_run_tunnel(tunnel_name, local_server)
-
-      # 4) store record in file + memory
       record = %{
         "subdomain" => subdomain,
         "tunnel_name" => tunnel_name,
@@ -135,8 +102,6 @@ defmodule Sentinel.Servers.Cloudflare do
       new_records = [record | state.records]
       new_running = Map.put(state.running_tunnels, subdomain, port)
       new_state = %{state | running_tunnels: new_running, records: new_records}
-
-      write_file(new_records)
       {:reply, :ok, new_state}
     end
   end
@@ -150,19 +115,11 @@ defmodule Sentinel.Servers.Cloudflare do
 
       record ->
         tunnel_name = record["tunnel_name"]
-
-        # 1) stop local process if running
         new_state = stop_local_tunnel(subdomain, state)
-
-        # 2) cleanup + delete the tunnel in Cloudflare
         do_cleanup_tunnel(tunnel_name)
         do_delete_tunnel(tunnel_name)
-
-        # 3) remove from file
         pruned_records = Enum.reject(new_state.records, &(&1["subdomain"] == subdomain))
         final_state = %{new_state | records: pruned_records}
-        write_file(pruned_records)
-
         {:reply, :ok, final_state}
     end
   end
@@ -181,23 +138,6 @@ defmodule Sentinel.Servers.Cloudflare do
   # ----------------------------------------------------------------
   # Internal logic
   # ----------------------------------------------------------------
-
-  defp do_restore_tunnel(%{
-         "subdomain" => subdomain,
-         "tunnel_name" => tunnel_name,
-         "local_server" => local_server
-       }) do
-    # create if missing
-    unless tunnel_exists?(tunnel_name) do
-      do_create_tunnel(tunnel_name)
-    end
-
-    # route
-    do_add_dns_route(tunnel_name, subdomain)
-
-    # run
-    do_run_tunnel(tunnel_name, local_server)
-  end
 
   defp stop_local_tunnel(subdomain, state) do
     case Map.fetch(state.running_tunnels, subdomain) do
