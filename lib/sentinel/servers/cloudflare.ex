@@ -157,7 +157,30 @@ defmodule Sentinel.Servers.Cloudflare do
     {:reply, subs, state}
   end
 
-  # ----------------------------------------------------------------Gen
+  # ---------------------------------------------------------------
+  # handle info messages
+  # ----------------------------------------------------------------
+
+  @impl true
+  def handle_info({_port, {:data, _data}}, state) do
+    # Just discard it silently
+    # Logger.debug("cloudflared output: #{inspect(data)}") # or comment out if you don't want it
+    {:noreply, state}
+  end
+
+  def handle_info({port, {:exit_status, code}}, state) do
+    Logger.warn("cloudflared process exited with status #{code} (port #{inspect(port)})")
+    # Possibly remove from running_tunnels map, etc.
+    {:noreply, state}
+  end
+
+  # Catch anything else you haven't matched
+  def handle_info(msg, state) do
+    Logger.warn("Unhandled message: #{inspect(msg)}")
+    {:noreply, state}
+  end
+
+  # ---------------------------------------------------------------
   # Internal logic
   # ----------------------------------------------------------------
 
@@ -181,6 +204,7 @@ defmodule Sentinel.Servers.Cloudflare do
 
   defp do_create_tunnel(tunnel_name) do
     Logger.info("Creating tunnel: #{tunnel_name}")
+
     {output, exit_code} =
       System.cmd("cloudflared", ["tunnel", "create", tunnel_name], stderr_to_stdout: true)
 
@@ -193,6 +217,7 @@ defmodule Sentinel.Servers.Cloudflare do
 
   defp do_add_dns_route(tunnel_name, subdomain) do
     Logger.info("Adding DNS route: #{subdomain} -> #{tunnel_name}")
+
     {output, exit_code} =
       System.cmd("cloudflared", ["tunnel", "route", "dns", tunnel_name, subdomain],
         stderr_to_stdout: true
@@ -207,20 +232,27 @@ defmodule Sentinel.Servers.Cloudflare do
 
   defp do_run_tunnel(tunnel_name, local_server) do
     Logger.info("Running tunnel: #{tunnel_name} with --url #{local_server}...")
+
     Port.open({:spawn_executable, System.find_executable("cloudflared")}, [
       :binary,
       :exit_status,
       :hide,
       :use_stdio,
       args: [
-        "tunnel", "run",
-        "--loglevel", "fatal", # will make the logs less "chatty"
-        "--url", local_server, tunnel_name]
+        "tunnel",
+        "run",
+        # will make the logs less "chatty"
+        "--loglevel", "fatal",
+        "--url",
+        local_server,
+        tunnel_name
+      ]
     ])
   end
 
   defp do_cleanup_tunnel(tunnel_name) do
     Logger.info("Cleaning up stale connections for tunnel: #{tunnel_name}")
+
     {output, exit_code} =
       System.cmd("cloudflared", ["tunnel", "cleanup", tunnel_name], stderr_to_stdout: true)
 
@@ -233,6 +265,7 @@ defmodule Sentinel.Servers.Cloudflare do
 
   defp do_delete_tunnel(tunnel_name) do
     Logger.info("Deleting tunnel: #{tunnel_name}")
+
     {output, exit_code} =
       System.cmd("cloudflared", ["tunnel", "delete", tunnel_name], stderr_to_stdout: true)
 
@@ -266,6 +299,7 @@ defmodule Sentinel.Servers.Cloudflare do
       case File.write(path(), "[]") do
         :ok ->
           Logger.info("Created tunnel data file.")
+
         {:error, reason} ->
           Logger.error("Failed to create tunnel data file: #{inspect(reason)}")
       end
@@ -277,7 +311,9 @@ defmodule Sentinel.Servers.Cloudflare do
       {:ok, data} ->
         case Jason.decode(data) do
           {:ok, decoded} ->
-            {:ok, decoded} # expecting a list of records
+            # expecting a list of records
+            {:ok, decoded}
+
           {:error, err} ->
             {:error, "Failed to decode file: #{inspect(err)}"}
         end
@@ -289,8 +325,11 @@ defmodule Sentinel.Servers.Cloudflare do
 
   defp write_file(records) when is_list(records) do
     json = Jason.encode!(records)
+
     case File.write(path(), json) do
-      :ok -> :ok
+      :ok ->
+        :ok
+
       {:error, reason} ->
         Logger.error("Failed to write to data file: #{inspect(reason)}")
     end
