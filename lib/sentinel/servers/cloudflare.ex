@@ -68,6 +68,7 @@ defmodule Sentinel.Servers.Cloudflare do
 
     ingress =
       Map.get(parsed, "ingress", []) ++ [%{"hostname" => name, "service" => "http://#{address}"}]
+      |> Enum.reverse()
 
     update_config(Map.put(parsed, "ingress", ingress))
 
