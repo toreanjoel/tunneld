@@ -212,7 +212,10 @@ defmodule Sentinel.Servers.Cloudflare do
       :exit_status,
       :hide,
       :use_stdio,
-      args: ["tunnel", "run", "--url", local_server, tunnel_name]
+      args: [
+        "tunnel", "run",
+        "--loglevel", "fatal", # will make the logs less "chatty"
+        "--url", local_server, tunnel_name]
     ])
   end
 
