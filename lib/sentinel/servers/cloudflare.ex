@@ -14,7 +14,6 @@ defmodule Sentinel.Servers.Cloudflare do
 
   @default_tunnel_name "sentinel-tunnel"
 
-  # Public API: Start the GenServer
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
@@ -101,7 +100,11 @@ defmodule Sentinel.Servers.Cloudflare do
     Logger.info("Adding service: #{name} -> #{address}")
 
     parsed = read_config()
-    ingress = parsed["ingress"] ++ [%{"hostname" => name, "service" => "http://#{address}"}]
+
+    # Always use Map.get with default `[]`
+    ingress =
+      Map.get(parsed, "ingress", []) ++ [%{"hostname" => name, "service" => "http://#{address}"}]
+      |> Enum.reverse()
 
     update_config(Map.put(parsed, "ingress", ingress))
 
@@ -142,7 +145,7 @@ defmodule Sentinel.Servers.Cloudflare do
 
     System.cmd("cloudflared", ["tunnel", "--config", state.config_path, "run"])
     # Allow time to restart
-    Process.sleep(2000)
+    Process.sleep(5000)
 
     {:noreply, state}
   end
@@ -239,16 +242,49 @@ defmodule Sentinel.Servers.Cloudflare do
     end
   end
 
-  defp read_config do
+  def read_config do
     case File.read(path()) do
-      {:ok, content} -> YamlElixir.read_from_string(content) |> elem(1)
-      _ -> %{"ingress" => []}
+      {:ok, content} ->
+        case YamlElixir.read_from_string(content) do
+          {:ok, parsed} ->
+            # Ensure ingress exists and is always a list
+            Map.update(parsed, "ingress", [], fn
+              nil -> []
+              ingress -> ingress
+            end)
+
+          _ ->
+            %{"ingress" => []}
+        end
+
+      _ ->
+        %{"ingress" => []}
     end
   end
 
   defp update_config(new_config) do
-    yaml_content = map_to_yaml(new_config)
+    # Ensure the last rule is a catch-all redirect
+    ingress = Map.get(new_config, "ingress", [])
+
+    final_ingress =
+      case List.last(ingress) do
+        %{"service" => _} -> ingress
+        _ -> ingress ++ [%{"service" => "http_status:404"}]
+      end
+
+    updated_config = Map.put(new_config, "ingress", final_ingress)
+
+    yaml_content = map_to_yaml(updated_config)
     File.write!(path(), yaml_content)
+  end
+
+  defp map_to_yaml(%{"tunnel" => tunnel, "ingress" => ingress}) do
+    """
+    tunnel: #{tunnel}
+    ingress:
+    #{Enum.map_join(ingress, "\n", &format_ingress_entry/1)}
+    """
+    |> String.trim()
   end
 
   defp ping_service(address) do
