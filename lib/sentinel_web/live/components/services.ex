@@ -34,7 +34,7 @@ defmodule SentinelWeb.Live.Components.Services do
         <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
       </div>
 
-      <div :if={@loading} class="grid grid-cols-2 xl:grid-cols-2 gap-2">
+      <div :if={@loading} class="grid grid-cols-2 xl:grid-cols-3 gap-2">
         <div class="flex flex-row gap-3 py-2 px-3 items-center rounded-md bg-secondary opacity-20">
           <div class="text-sm truncate text-gray-1">Checking Services</div>
         </div>

@@ -70,7 +70,8 @@ config :sentinel, :fs,
   root: "/data",
   auth: "/auth.json",
   blacklist: "/blacklist.json",
-  whitelist: "/whitelist.json"
+  whitelist: "/whitelist.json",
+  cloudflared: "/cloudflare_conf.yml"
 
 config :sentinel, version: "0.1.3"
 

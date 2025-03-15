@@ -5,7 +5,7 @@ defmodule Sentinel.Application do
 
   use Application
   alias Sentinel.Servers.FakeData.Whitelist
-  alias Sentinel.Servers.{Auth, Session, Services, Logs, Devices, Blacklist, Whitelist, Resources, Wlan}
+  alias Sentinel.Servers.{Auth, Session, Services, Logs, Devices, Blacklist, Whitelist, Resources, Wlan, Cloudflare}
 
   @impl true
   def start(_type, _args) do
@@ -28,7 +28,8 @@ defmodule Sentinel.Application do
       {Blacklist, []},
       {Whitelist, []},
       {Session, []},
-      {Wlan, []}
+      {Wlan, []},
+      {Cloudflare, []},
     ]
 
     # This should not be async, we want this to complete before any other servers init data
