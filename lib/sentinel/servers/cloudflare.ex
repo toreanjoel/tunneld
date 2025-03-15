@@ -40,7 +40,7 @@ defmodule Sentinel.Servers.Cloudflare do
       add_host("127.0.0.1:4000", "myapp.example.com")
   """
   def add_host(local_server, subdomain) do
-    GenServer.call(__MODULE__, {:add_host, local_server, subdomain})
+    GenServer.cast(__MODULE__, {:add_host, local_server, subdomain})
   end
 
   @doc """
@@ -50,7 +50,7 @@ defmodule Sentinel.Servers.Cloudflare do
   Also calls 'cloudflared tunnel cleanup' first to remove stale connections.
   """
   def remove_host(subdomain) do
-    GenServer.call(__MODULE__, {:remove_host, subdomain})
+    GenServer.cast(__MODULE__, {:remove_host, subdomain})
   end
 
   @doc """
@@ -74,25 +74,56 @@ defmodule Sentinel.Servers.Cloudflare do
   @impl true
   def init(_opts) do
     Logger.info("Starting Cloudflare Tunnel GenServer...")
-    state = %{running_tunnels: %{}, records: []}
-    {:ok, state}
+
+    # Ensure the file exists
+    create_file_if_missing()
+
+    # Read existing data from file
+    case read_file() do
+      {:ok, tunnels} ->
+        Logger.info("Loaded tunnel data from file: #{inspect(tunnels)}")
+
+        state = %{
+          # subdomain => Port (the OS process handle)
+          running_tunnels: %{},
+          # list of maps: [%{"subdomain"=>..., "tunnel_name"=>..., "local_server"=>...}, ...]
+          records: tunnels
+        }
+
+        # For each record, re-create environment
+        Enum.each(tunnels, &do_restore_tunnel/1)
+
+        {:ok, state}
+
+      {:error, reason} ->
+        Logger.error("Failed to load existing tunnel data: #{reason}")
+        state = %{running_tunnels: %{}, records: []}
+        {:ok, state}
+    end
   end
 
   @impl true
-  def handle_call({:add_host, local_server, subdomain}, _from, state) do
+  def handle_cast({:add_host, local_server, subdomain}, state) do
     # If subdomain already exists, skip
     if Enum.any?(state.records, &(&1["subdomain"] == subdomain)) do
       Logger.warn("Subdomain #{subdomain} is already known; skipping new tunnel.")
-      {:reply, :ok, state}
+      {:noreply, state}
     else
       # Create a unique tunnel name from the subdomain
       tunnel_name = tunnel_name_for(subdomain)
+
+      # 1) create the tunnel if missing
       unless tunnel_exists?(tunnel_name) do
         do_create_tunnel(tunnel_name)
       end
 
+      # 2) add DNS route
       do_add_dns_route(tunnel_name, subdomain)
+
+      # 3) run tunnel with local_server as the actual address
       port = do_run_tunnel(tunnel_name, local_server)
+
+      # 4) store record in file + memory
       record = %{
         "subdomain" => subdomain,
         "tunnel_name" => tunnel_name,
@@ -102,25 +133,35 @@ defmodule Sentinel.Servers.Cloudflare do
       new_records = [record | state.records]
       new_running = Map.put(state.running_tunnels, subdomain, port)
       new_state = %{state | running_tunnels: new_running, records: new_records}
-      {:reply, :ok, new_state}
+
+      write_file(new_records)
+      {:noreply, new_state}
     end
   end
 
   @impl true
-  def handle_call({:remove_host, subdomain}, _from, state) do
+  def handle_cast({:remove_host, subdomain}, state) do
     case Enum.find(state.records, &(&1["subdomain"] == subdomain)) do
       nil ->
         Logger.warn("No record found for subdomain=#{subdomain}")
-        {:reply, :ok, state}
+        {:noreply, state}
 
       record ->
         tunnel_name = record["tunnel_name"]
+
+        # 1) stop local process if running
         new_state = stop_local_tunnel(subdomain, state)
+
+        # 2) cleanup + delete the tunnel in Cloudflare
         do_cleanup_tunnel(tunnel_name)
         do_delete_tunnel(tunnel_name)
+
+        # 3) remove from file
         pruned_records = Enum.reject(new_state.records, &(&1["subdomain"] == subdomain))
         final_state = %{new_state | records: pruned_records}
-        {:reply, :ok, final_state}
+        write_file(pruned_records)
+
+        {:noreply, final_state}
     end
   end
 
@@ -135,9 +176,26 @@ defmodule Sentinel.Servers.Cloudflare do
     {:reply, running_subdomains, state}
   end
 
-  # ----------------------------------------------------------------
+  # ----------------------------------------------------------------Gen
   # Internal logic
   # ----------------------------------------------------------------
+
+  defp do_restore_tunnel(%{
+         "subdomain" => subdomain,
+         "tunnel_name" => tunnel_name,
+         "local_server" => local_server
+       }) do
+    # create if missing
+    unless tunnel_exists?(tunnel_name) do
+      do_create_tunnel(tunnel_name)
+    end
+
+    # route
+    do_add_dns_route(tunnel_name, subdomain)
+
+    # run
+    do_run_tunnel(tunnel_name, local_server)
+  end
 
   defp stop_local_tunnel(subdomain, state) do
     case Map.fetch(state.running_tunnels, subdomain) do
