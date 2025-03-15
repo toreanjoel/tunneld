@@ -12,7 +12,7 @@ defmodule Sentinel.Servers.Cloudflare do
   use GenServer
   require Logger
 
-  @default_tunnel_name "sentinel-tunnel"
+  @default_tunnel_name "sentinel-local"
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
