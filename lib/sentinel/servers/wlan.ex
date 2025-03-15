@@ -174,8 +174,6 @@ defmodule Sentinel.Servers.Wlan do
         _ -> true
       end
 
-    IO.inspect("Connection: #{inspect(is_connected)}")
-
     if(is_connected, do: :connected, else: :disconnected)
   end
 
