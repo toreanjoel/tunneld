@@ -33,7 +33,7 @@ defmodule Sentinel.Servers.Blacklist do
   end
 
   # Here we add the domain to the blacklist
-  def handle_call({:add_domain, %{domain: domain, type: type, mac: mac, ttl: ttl}}, _from, state) do
+  def handle_call({:add_domain, %{domain: domain, type: type, mac: mac, ttl: ttl}}, state) do
     {ip_str, _} = System.cmd("dig", ["+short", domain])
 
     if ip_str != "" do
@@ -72,7 +72,7 @@ defmodule Sentinel.Servers.Blacklist do
       end)
     end
 
-    {:reply, {:ok, %{}}, state}
+    {:noreply, state}
   end
 
   # Request to remove the domains from the blacklist and from iptables
@@ -104,7 +104,7 @@ defmodule Sentinel.Servers.Blacklist do
       end
     end)
 
-    {:reply, {:ok, %{}}, state}
+    {:noreply, state}
   end
 
   # New handler for init_state: read the full file and broadcast it.
@@ -260,19 +260,19 @@ defmodule Sentinel.Servers.Blacklist do
   end
 
   def add_domain(domain, %{type: type, ttl: ttl}) when type === "system" do
-    GenServer.call(__MODULE__, {:add_domain, %{domain: domain, type: type, mac: "-", ttl: ttl}})
+    GenServer.cast(__MODULE__, {:add_domain, %{domain: domain, type: type, mac: "-", ttl: ttl}})
   end
 
   def add_domain(domain, %{type: type, mac: mac, ttl: ttl}) when type === "user" do
-    GenServer.call(__MODULE__, {:add_domain, %{domain: domain, type: type, mac: mac, ttl: ttl}})
+    GenServer.cast(__MODULE__, {:add_domain, %{domain: domain, type: type, mac: mac, ttl: ttl}})
   end
 
   def remove_domain(domain, %{type: type}) when type === "system" do
-    GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, mac: "-"}})
+    GenServer.cast(__MODULE__, {:remove_domain, %{domain: domain, type: type, mac: "-"}})
   end
 
   def remove_domain(domain, %{type: type, mac: mac}) when type === "user" do
-    GenServer.call(__MODULE__, {:remove_domain, %{domain: domain, type: type, mac: mac}})
+    GenServer.cast(__MODULE__, {:remove_domain, %{domain: domain, type: type, mac: mac}})
   end
 
   def init_state(), do: GenServer.cast(__MODULE__, :init_state)
