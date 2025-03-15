@@ -9,45 +9,45 @@ defmodule Sentinel.Servers.Cloudflare do
   We use:
     1) cloudflared tunnel create <TUNNEL_NAME>
     2) cloudflared tunnel route dns <TUNNEL_NAME> <SUBDOMAIN>
-    3) cloudflared tunnel run --url <LOCAL_SERVER> <TUNNEL_NAME>
+    3) cloudflared tunnel run --url <LOCAL_SERVER> <TUNNEL_NAME> (in background)
 
   Also includes:
     • cloudflared tunnel cleanup <TUNNEL_NAME> before deletion to remove stale connections.
+
+  Since we launch `cloudflared` in the background via `nohup`, it keeps running
+  even if our Elixir app stops. We only store metadata about subdomains in a file
+  so we can remove them later if desired.
   """
 
   use GenServer
   require Logger
-
-  @doc """
-  Starts the GenServer under a supervisor.
-  On init, we ensure the data file exists, read it,
-  and restore any tunnels.
-  """
-  def start_link(_) do
-    GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
-  end
 
   # ----------------------------------------------------------------
   # Public API
   # ----------------------------------------------------------------
 
   @doc """
-  Creates a brand-new tunnel for `subdomain`, sets up DNS route,
-  and runs it with the local server (ip:port) you provide.
-  Persists the new tunnel in the file so it auto-restores next time.
+  Starts the GenServer under a supervisor.
+  On init, we ensure the data file exists and read it.
+  """
+  def start_link(_) do
+    GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
+  end
 
-  Example usage:
-      add_host("127.0.0.1:4000", "myapp.example.com")
+  @doc """
+  Creates a brand-new tunnel for `subdomain`, sets up a DNS route,
+  and **spawns** cloudflared in the background (nohup).
+
+  Persists the new tunnel record in a JSON file so we can track subdomains.
   """
   def add_host(local_server, subdomain) do
     GenServer.cast(__MODULE__, {:add_host, local_server, subdomain})
   end
 
   @doc """
-  Deletes the tunnel for `subdomain`, removing it from Cloudflare,
-  killing the local process, and removing from the file.
-
-  Also calls 'cloudflared tunnel cleanup' first to remove stale connections.
+  Deletes the tunnel for `subdomain` from Cloudflare (cleanup + delete).
+  Also removes it from the file. Does NOT stop any background OS process
+  you spawned earlier (but you can kill that externally if needed).
   """
   def remove_host(subdomain) do
     GenServer.cast(__MODULE__, {:remove_host, subdomain})
@@ -61,7 +61,7 @@ defmodule Sentinel.Servers.Cloudflare do
   end
 
   # ----------------------------------------------------------------
-  #  GenServer callbacks
+  # GenServer callbacks
   # ----------------------------------------------------------------
 
   @impl true
@@ -73,17 +73,12 @@ defmodule Sentinel.Servers.Cloudflare do
     case read_file() do
       {:ok, tunnels} ->
         Logger.info("Loaded tunnel data from file: #{inspect(tunnels)}")
-
-        state = %{
-          running_tunnels: %{},
-          records: tunnels
-        }
-
+        state = %{records: tunnels}
         {:ok, state}
 
       {:error, reason} ->
         Logger.error("Failed to load existing tunnel data: #{reason}")
-        state = %{running_tunnels: %{}, records: []}
+        state = %{records: []}
         {:ok, state}
     end
   end
@@ -95,7 +90,6 @@ defmodule Sentinel.Servers.Cloudflare do
       Logger.warn("Subdomain #{subdomain} is already known; skipping new tunnel.")
       {:noreply, state}
     else
-      # Create a unique tunnel name from the subdomain
       tunnel_name = tunnel_name_for(subdomain)
 
       # 1) create the tunnel if missing
@@ -106,8 +100,8 @@ defmodule Sentinel.Servers.Cloudflare do
       # 2) add DNS route
       do_add_dns_route(tunnel_name, subdomain)
 
-      # 3) run tunnel with local_server as the actual address
-      port = do_run_tunnel(tunnel_name, local_server)
+      # 3) run tunnel in the background (nohup)
+      do_run_tunnel_in_background(tunnel_name, local_server)
 
       # 4) store record in file + memory
       record = %{
@@ -117,8 +111,7 @@ defmodule Sentinel.Servers.Cloudflare do
       }
 
       new_records = [record | state.records]
-      new_running = Map.put(state.running_tunnels, subdomain, port)
-      new_state = %{state | running_tunnels: new_running, records: new_records}
+      new_state = %{state | records: new_records}
 
       write_file(new_records)
       {:noreply, new_state}
@@ -135,16 +128,15 @@ defmodule Sentinel.Servers.Cloudflare do
       record ->
         tunnel_name = record["tunnel_name"]
 
-        # 1) stop local process if running
-        new_state = stop_local_tunnel(subdomain, state)
-
-        # 2) cleanup + delete the tunnel in Cloudflare
+        # We do NOT kill the OS process here (since it's detached).
+        # If you need to forcibly stop it, you must do so externally (e.g. pkill).
+        # We still do cleanup + delete from CF:
         do_cleanup_tunnel(tunnel_name)
         do_delete_tunnel(tunnel_name)
 
-        # 3) remove from file
-        pruned_records = Enum.reject(new_state.records, &(&1["subdomain"] == subdomain))
-        final_state = %{new_state | records: pruned_records}
+        # Remove from file
+        pruned_records = Enum.reject(state.records, &(&1["subdomain"] == subdomain))
+        final_state = %{state | records: pruned_records}
         write_file(pruned_records)
 
         {:noreply, final_state}
@@ -152,51 +144,12 @@ defmodule Sentinel.Servers.Cloudflare do
   end
 
   def handle_call(:list_hosts, _from, state) do
-    # Return the subdomains from the records
     subs = Enum.map(state.records, & &1["subdomain"])
     {:reply, subs, state}
   end
 
-  # ---------------------------------------------------------------
-  # handle info messages
-  # ----------------------------------------------------------------
-
-  @impl true
-  def handle_info({_port, {:data, _data}}, state) do
-    # Just discard it silently
-    # Logger.debug("cloudflared output: #{inspect(data)}") # or comment out if you don't want it
-    {:noreply, state}
-  end
-
-  def handle_info({port, {:exit_status, code}}, state) do
-    Logger.warn("cloudflared process exited with status #{code} (port #{inspect(port)})")
-    # Possibly remove from running_tunnels map, etc.
-    {:noreply, state}
-  end
-
-  # Catch anything else you haven't matched
-  def handle_info(msg, state) do
-    Logger.warn("Unhandled message: #{inspect(msg)}")
-    {:noreply, state}
-  end
-
-  # ---------------------------------------------------------------
-  # Internal logic
-  # ----------------------------------------------------------------
-
-  defp stop_local_tunnel(subdomain, state) do
-    case Map.fetch(state.running_tunnels, subdomain) do
-      :error ->
-        Logger.warn("No running tunnel for subdomain=#{subdomain}")
-        state
-
-      {:ok, port} ->
-        Logger.info("Stopping local tunnel for subdomain=#{subdomain}")
-        Port.close(port)
-        new_map = Map.delete(state.running_tunnels, subdomain)
-        %{state | running_tunnels: new_map}
-    end
-  end
+  # We no longer have any Port messages to handle (since we used nohup).
+  # So no handle_info clauses needed for port data/exit_status.
 
   # ----------------------------------------------------------------
   # Cloudflared Commands
@@ -230,24 +183,26 @@ defmodule Sentinel.Servers.Cloudflare do
     end
   end
 
-  defp do_run_tunnel(tunnel_name, local_server) do
-    Logger.info("Running tunnel: #{tunnel_name} with --url #{local_server}...")
+  # Instead of opening a Port, we spawn cloudflared via `nohup &`
+  # so it runs detached from Elixir.
+  defp do_run_tunnel_in_background(tunnel_name, local_server) do
+    Logger.info("Launching cloudflared in background: #{tunnel_name} => #{local_server}")
 
-    Port.open({:spawn_executable, System.find_executable("cloudflared")}, [
-      :binary,
-      :exit_status,
-      :hide,
-      :use_stdio,
-      args: [
-        "tunnel",
-        "run",
-        # will make the logs less "chatty"
-        "--loglevel", "fatal",
-        "--url",
-        local_server,
-        tunnel_name
-      ]
-    ])
+    # Build a shell command that backgrounds the process. The logs go to /dev/null
+    # so it's completely detached; customize if you want logs in a file.
+    cmd = """
+    nohup cloudflared tunnel run --url #{local_server} #{tunnel_name} \
+    > /dev/null 2>&1 &
+    """
+
+    # Use System.cmd with "sh -c" to run that command in a shell:
+    {output, exit_code} = System.cmd("sh", ["-c", cmd], stderr_to_stdout: true)
+
+    if exit_code != 0 do
+      Logger.error("Failed to spawn background cloudflared:\n#{inspect(output)}")
+    else
+      Logger.info("cloudflared was launched in background (exit_code=#{exit_code}).")
+    end
   end
 
   defp do_cleanup_tunnel(tunnel_name) do
@@ -280,7 +235,6 @@ defmodule Sentinel.Servers.Cloudflare do
   # Helpers
   # ----------------------------------------------------------------
 
-  # e.g. subdomain="myapp.example.com" => "sentinel-myapp-example-com"
   defp tunnel_name_for(subdomain),
     do: "sentinel-" <> String.replace(subdomain, ".", "-")
 
@@ -290,16 +244,14 @@ defmodule Sentinel.Servers.Cloudflare do
   end
 
   # ----------------------------------------------------------------
-  # File-based persistence (borrowed from your Auth approach)
+  # File-based persistence
   # ----------------------------------------------------------------
 
   defp create_file_if_missing do
     unless file_exists?() do
-      # Create a new file with empty array
       case File.write(path(), "[]") do
         :ok ->
           Logger.info("Created tunnel data file.")
-
         {:error, reason} ->
           Logger.error("Failed to create tunnel data file: #{inspect(reason)}")
       end
@@ -311,13 +263,10 @@ defmodule Sentinel.Servers.Cloudflare do
       {:ok, data} ->
         case Jason.decode(data) do
           {:ok, decoded} ->
-            # expecting a list of records
-            {:ok, decoded}
-
+            {:ok, decoded} # expecting a list of records
           {:error, err} ->
             {:error, "Failed to decode file: #{inspect(err)}"}
         end
-
       {:error, reason} ->
         {:error, "There was a problem reading the file: #{inspect(reason)}"}
     end
@@ -325,11 +274,8 @@ defmodule Sentinel.Servers.Cloudflare do
 
   defp write_file(records) when is_list(records) do
     json = Jason.encode!(records)
-
     case File.write(path(), json) do
-      :ok ->
-        :ok
-
+      :ok -> :ok
       {:error, reason} ->
         Logger.error("Failed to write to data file: #{inspect(reason)}")
     end
@@ -343,7 +289,6 @@ defmodule Sentinel.Servers.Cloudflare do
     "./" <> config_fs(:root) <> config_fs(:tunnels)
   end
 
-  # For example, config :sentinel, :fs => %{ root: "some_dir/", tunnels: "cloudflare_tunnels.json" }
   defp config_fs do
     Application.get_env(:sentinel, :fs)
   end
