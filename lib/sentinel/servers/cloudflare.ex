@@ -22,9 +22,6 @@ defmodule Sentinel.Servers.Cloudflare do
   @impl true
   def init(_) do
     Logger.info("Initializing Cloudflared tunnel manager...")
-
-    # Ensure config exists and load state
-    ensure_config_exists(path())
     state = load_state()
 
     {:ok, state}
@@ -47,7 +44,9 @@ defmodule Sentinel.Servers.Cloudflare do
           {:ok, parsed} -> {:reply, Jason.encode!(parsed), state}
           {:error, _} -> {:reply, Jason.encode!(%{}), state}
         end
-      {:error, _} -> {:reply, Jason.encode!(%{}), state}
+
+      {:error, _} ->
+        {:reply, Jason.encode!(%{}), state}
     end
   end
 
@@ -68,20 +67,27 @@ defmodule Sentinel.Servers.Cloudflare do
 
   @impl true
   def handle_cast({:create_tunnel, name}, state) do
-    Logger.info("Creating tunnel: #{name}")
-
-    # Delete existing tunnel if it exists
     if state.tunnel_id do
-      System.cmd("cloudflared", ["tunnel", "delete", state.tunnel_name])
+      Logger.warn("A tunnel already exists: #{state.tunnel_id}. Not creating a new one.")
+      {:noreply, state}
+    else
+      Logger.info("Creating tunnel: #{name}")
+
+      {output, _exit_code} = System.cmd("cloudflared", ["tunnel", "create", name])
+
+      case Regex.run(~r/Created tunnel .* with id (\S+)/, output) do
+        [_, tunnel_id] ->
+          Logger.info("Tunnel ID: #{tunnel_id}")
+          update_config(%{"tunnel" => name, "ingress" => []})
+
+          new_state = %{state | tunnel_id: tunnel_id, tunnel_name: name, services: %{}}
+          {:noreply, new_state}
+
+        _ ->
+          Logger.error("Failed to extract tunnel ID.")
+          {:noreply, state}
+      end
     end
-
-    {_, id} = System.cmd("cloudflared", ["tunnel", "create", name])
-    new_id = String.trim(id)
-
-    update_config(%{"tunnel" => name, "ingress" => []})
-
-    new_state = %{state | tunnel_id: new_id, tunnel_name: name, services: %{}}
-    {:noreply, new_state}
   end
 
   @impl true
@@ -117,7 +123,7 @@ defmodule Sentinel.Servers.Cloudflare do
     updated_services =
       Enum.map(state.services, fn {name, service} ->
         is_up = ping_service(service.address)
-        {name, %{service | status: (if is_up, do: :up, else: :down)}}
+        {name, %{service | status: if(is_up, do: :up, else: :down)}}
       end)
       |> Enum.into(%{})
 
@@ -126,8 +132,11 @@ defmodule Sentinel.Servers.Cloudflare do
 
   @impl true
   def handle_cast(:restart_tunnel, state) do
-    Logger.info("Restarting Cloudflared service...")
-    System.cmd("systemctl", ["restart", "cloudflared"])
+    Logger.info("Restarting Cloudflared service with config: #{state.config_path}")
+
+    System.cmd("cloudflared", ["tunnel", "--config", state.config_path, "run"])
+    Process.sleep(2000)  # Allow time to restart
+
     {:noreply, state}
   end
 
@@ -178,7 +187,8 @@ defmodule Sentinel.Servers.Cloudflare do
     GenServer.cast(__MODULE__, :ping_services)
   end
 
-  @doc "Manually restarts the Cloudflared tunnel service."
+  @impl true
+  @doc "Restarts Cloudflared service with the correct config file."
   def restart_tunnel() do
     GenServer.cast(__MODULE__, :restart_tunnel)
   end
@@ -188,21 +198,35 @@ defmodule Sentinel.Servers.Cloudflare do
   # -----------------------------
 
   defp load_state() do
-    tunnel_id = System.get_env("CLOUDFLARED_TUNNEL_ID") || nil
-    services = load_services(path())
+    if File.exists?(path()) do
+      parsed = read_config()
 
-    %{
-      tunnel_id: tunnel_id,
-      tunnel_name: @default_tunnel_name,
-      config_path: path(),
-      services: services
-    }
-  end
+      tunnel_id =
+        case parsed do
+          %{"tunnel" => _name} ->
+            # Get the tunnel ID from the credentials file if it exists
+            extract_tunnel_id_from_file()
 
-  defp ensure_config_exists(path) do
-    unless File.exists?(path) do
-      Logger.info("Creating empty config.yml")
-      File.write(path, "tunnel: #{@default_tunnel_name}\ningress: []\n")
+          _ ->
+            nil
+        end
+
+      Logger.info("Loaded tunnel ID: #{tunnel_id || "None"}")
+
+      %{
+        tunnel_id: tunnel_id,
+        tunnel_name: @default_tunnel_name,
+        config_path: path(),
+        services: load_services(path())
+      }
+    else
+      Logger.warn("Config file not found. No tunnel loaded.")
+      %{
+        tunnel_id: nil,
+        tunnel_name: @default_tunnel_name,
+        config_path: path(),
+        services: %{}
+      }
     end
   end
 
@@ -230,7 +254,9 @@ defmodule Sentinel.Servers.Cloudflare do
           {:ok, parsed} -> extract_services(parsed)
           {:error, _} -> %{}
         end
-      {:error, _} -> %{}
+
+      {:error, _} ->
+        %{}
     end
   end
 
@@ -242,7 +268,8 @@ defmodule Sentinel.Servers.Cloudflare do
       if Map.has_key?(entry, "hostname") and Map.has_key?(entry, "service") do
         Map.put(acc, entry["hostname"], %{
           address: entry["service"],
-          status: :unknown  # Default status until we ping it
+          # Default status until we ping it
+          status: :unknown
         })
       else
         acc
@@ -265,6 +292,26 @@ defmodule Sentinel.Servers.Cloudflare do
   defp format_ingress_entry(%{"service" => service}) do
     "  - service: #{service}"
   end
+
+  defp extract_tunnel_id_from_file() do
+    case File.read(path()) do
+      {:ok, content} ->
+        case YamlElixir.read_from_string(content) do
+          {:ok, %{"tunnel" => tunnel_id}} ->
+            Logger.info("Loaded tunnel ID from /data/: #{tunnel_id}")
+            tunnel_id
+
+          _ ->
+            Logger.warn("No tunnel ID found in /data/cloudflare_conf.yml.")
+            nil
+        end
+
+      {:error, reason} ->
+        Logger.error("Failed to read Cloudflared config: #{inspect(reason)}")
+        nil
+    end
+  end
+
 
   # Path helper
   defp path(), do: "./" <> config_fs(:root) <> config_fs(:cloudflared)
