@@ -64,11 +64,13 @@ defmodule Sentinel.Servers.Cloudflare do
   def handle_cast({:add_service, name, address}, state) do
     Logger.info("Adding service: #{name} -> #{address}")
 
+    # Ensure Cloudflare knows about the hostname
+    System.cmd("cloudflared", ["tunnel", "route", "dns", @default_tunnel_name, name])
+
     parsed = read_config()
 
     ingress =
       Map.get(parsed, "ingress", []) ++ [%{"hostname" => name, "service" => "http://#{address}"}]
-      |> Enum.reverse()
 
     update_config(Map.put(parsed, "ingress", ingress))
 
@@ -77,17 +79,27 @@ defmodule Sentinel.Servers.Cloudflare do
   end
 
   @impl true
-  def handle_cast({:remove_service, name}, state) do
-    Logger.info("Removing service: #{name}")
+def handle_cast({:remove_service, name}, state) do
+  Logger.info("Removing service: #{name}")
 
-    parsed = read_config()
-    ingress = Enum.reject(parsed["ingress"], fn s -> s["hostname"] == name end)
+  # Remove the CNAME record from Cloudflare
+  {output, exit_code} = System.cmd("cloudflared", ["tunnel", "route", "dns", "--delete", @default_tunnel_name, name])
 
-    update_config(Map.put(parsed, "ingress", ingress))
-
-    updated_services = Map.delete(state.services, name)
-    {:noreply, %{state | services: updated_services}}
+  if exit_code != 0 do
+    Logger.error("Failed to remove subdomain #{name}. Cloudflared output: #{output}")
+  else
+    Logger.info("Successfully removed subdomain #{name} from Cloudflare.")
   end
+
+  # Remove from config
+  parsed = read_config()
+  ingress = Enum.reject(parsed["ingress"], fn s -> s["hostname"] == name end)
+
+  update_config(Map.put(parsed, "ingress", ingress))
+
+  updated_services = Map.delete(state.services, name)
+  {:noreply, %{state | services: updated_services}}
+end
 
   @impl true
   def handle_cast(:restart_tunnel, state) do
