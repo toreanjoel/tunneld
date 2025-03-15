@@ -199,10 +199,10 @@ defmodule Sentinel.Servers.Cloudflare do
     end
   end
 
-  defp get_existing_tunnel_id() do
+  def get_existing_tunnel_id() do
     {output, _} = System.cmd("cloudflared", ["tunnel", "list"])
 
-    case Regex.run(~r/(\S+)\s+sentinel-local/, output) do
+    case Regex.run(~r/^([a-f0-9\-]+)\s+sentinel-local/m, output) do
       [_, tunnel_id] -> tunnel_id
       _ -> nil
     end
