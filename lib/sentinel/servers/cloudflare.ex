@@ -8,15 +8,14 @@ defmodule Sentinel.Servers.Cloudflare do
     • On startup, reads the file and reconnects any existing tunnels.
     • Provides functions to create, route, run, and delete tunnels.
 
-  Uses three basic commands:
+  We use:
     1) cloudflared tunnel create <TUNNEL_NAME>
     2) cloudflared tunnel route dns <TUNNEL_NAME> <HOSTNAME>
     3) cloudflared tunnel run --url <HOSTNAME> <TUNNEL_NAME>
 
-  Also provides a "delete" command to remove the tunnel.
-
-  The file implementation is borrowed from your Auth approach:
-  we store JSON data so we can re-run all tunnels on reboot.
+  And now also do:
+    • cloudflared tunnel cleanup <TUNNEL_NAME>
+    before deleting a tunnel to avoid the “active connections” issue.
   """
 
   use GenServer
@@ -47,6 +46,8 @@ defmodule Sentinel.Servers.Cloudflare do
   @doc """
   Deletes the tunnel for `hostname`, removing it from Cloudflare,
   killing the local process, and removing from the file.
+
+  Also calls 'cloudflared tunnel cleanup' first to get rid of stale connections.
   """
   def remove_host(hostname) do
     GenServer.call(__MODULE__, {:remove_host, hostname})
@@ -81,15 +82,13 @@ defmodule Sentinel.Servers.Cloudflare do
     case read_file() do
       {:ok, tunnels} ->
         Logger.info("Loaded tunnel data from file: #{inspect(tunnels)}")
-        # We'll store running processes in memory, keyed by hostname.
-        # Data from file is our persistent record of {hostname, tunnel_name, local_url}.
-        # We'll attempt to re-run everything.
+
         state = %{
           running_tunnels: %{},   # hostname => Port
           records: tunnels        # list of maps: [%{"hostname"=>..., "tunnel_name"=>..., "local_url"=>...}, ...]
         }
 
-        # For each record, re-create the environment
+        # For each record, re-create environment
         Enum.each(tunnels, fn record ->
           do_restore_tunnel(record)
         end)
@@ -98,7 +97,6 @@ defmodule Sentinel.Servers.Cloudflare do
 
       {:error, reason} ->
         Logger.error("Failed to load existing tunnel data: #{reason}")
-        # If the file is corrupt or something, just start fresh.
         state = %{
           running_tunnels: %{},
           records: []
@@ -109,45 +107,36 @@ defmodule Sentinel.Servers.Cloudflare do
 
   @impl true
   def handle_call({:add_host, hostname, local_url}, _from, state) do
-    # If we already have a record for this host, no need to recreate everything.
     if Enum.any?(state.records, &(&1["hostname"] == hostname)) do
       Logger.warn("Host #{hostname} is already known; skipping new tunnel.")
       {:reply, :ok, state}
     else
-      # create a unique tunnel name per host
       tunnel_name = tunnel_name_for(hostname)
 
-      # 1) create tunnel
-      if not tunnel_exists?(tunnel_name) do
+      # 1) create
+      unless tunnel_exists?(tunnel_name) do
         do_create_tunnel(tunnel_name)
       end
 
-      # 2) add DNS route
+      # 2) route
       do_add_dns_route(tunnel_name, hostname)
 
-      # 3) run tunnel
+      # 3) run
       port = do_run_tunnel(tunnel_name, hostname)
 
-      # 4) store record in state and file
-      record = %{
-        "hostname" => hostname,
-        "tunnel_name" => tunnel_name,
-        "local_url" => local_url
-      }
+      # 4) update file + state
+      record = %{"hostname" => hostname, "tunnel_name" => tunnel_name, "local_url" => local_url}
       new_records = [record | state.records]
-
       new_running = Map.put(state.running_tunnels, hostname, port)
       new_state = %{state | running_tunnels: new_running, records: new_records}
 
-      # Save to file
       write_file(new_records)
-
       {:reply, :ok, new_state}
     end
   end
 
+  @impl true
   def handle_call({:remove_host, hostname}, _from, state) do
-    # Find record
     case Enum.find(state.records, &(&1["hostname"] == hostname)) do
       nil ->
         Logger.warn("No record found for hostname=#{hostname}")
@@ -155,14 +144,14 @@ defmodule Sentinel.Servers.Cloudflare do
 
       record ->
         tunnel_name = record["tunnel_name"]
-
-        # 1) stop local process if running
+        # 1) stop local process
         new_state = stop_local_tunnel(hostname, state)
 
-        # 2) run `cloudflared tunnel delete <tunnel_name>`
+        # 2) cleanup + delete tunnel
+        do_cleanup_tunnel(tunnel_name)
         do_delete_tunnel(tunnel_name)
 
-        # 3) remove from file records
+        # 3) remove from file
         pruned_records = Enum.reject(new_state.records, &(&1["hostname"] == hostname))
         final_state = %{new_state | records: pruned_records}
         write_file(pruned_records)
@@ -172,7 +161,6 @@ defmodule Sentinel.Servers.Cloudflare do
   end
 
   def handle_call(:list_hosts, _from, state) do
-    # Just return the hostnames from the records
     hostnames = Enum.map(state.records, & &1["hostname"])
     {:reply, hostnames, state}
   end
@@ -183,19 +171,14 @@ defmodule Sentinel.Servers.Cloudflare do
   end
 
   # ----------------------------------------------------------------
-  # Internal logic for creating/managing tunnels
+  # Internal logic
   # ----------------------------------------------------------------
 
-  defp do_restore_tunnel(%{"hostname" => hostname, "tunnel_name" => tunnel_name, "local_url" => local_url}) do
-    # Check if the tunnel exists, create if not
-    if not tunnel_exists?(tunnel_name) do
+  defp do_restore_tunnel(%{"hostname" => hostname, "tunnel_name" => tunnel_name, "local_url" => _url}) do
+    unless tunnel_exists?(tunnel_name) do
       do_create_tunnel(tunnel_name)
     end
-
-    # Add DNS route
     do_add_dns_route(tunnel_name, hostname)
-
-    # run it
     do_run_tunnel(tunnel_name, hostname)
   end
 
@@ -227,12 +210,10 @@ defmodule Sentinel.Servers.Cloudflare do
 
   defp do_add_dns_route(tunnel_name, hostname) do
     Logger.info("Adding DNS route: #{hostname} -> #{tunnel_name}")
-
     {output, exit_code} =
       System.cmd("cloudflared", ["tunnel", "route", "dns", tunnel_name, hostname],
         stderr_to_stdout: true
       )
-
     if exit_code != 0 do
       Logger.error("Failed to add DNS route:\n#{output}")
     else
@@ -240,24 +221,23 @@ defmodule Sentinel.Servers.Cloudflare do
     end
   end
 
-  defp do_run_tunnel(tunnel_name, hostname) do
-    Logger.info("Running tunnel: #{tunnel_name} with --url #{hostname}...")
-    port = Port.open({:spawn_executable, System.find_executable("cloudflared")}, [
-      :binary,
-      :exit_status,
-      :hide,
-      :use_stdio,
-      args: ["tunnel", "run", "--url", hostname, tunnel_name]
-    ])
+  # Called before delete, to remove stale connections if present
+  defp do_cleanup_tunnel(tunnel_name) do
+    Logger.info("Cleaning up stale connections for tunnel: #{tunnel_name}")
+    {output, exit_code} =
+      System.cmd("cloudflared", ["tunnel", "cleanup", tunnel_name], stderr_to_stdout: true)
 
-    port
+    if exit_code != 0 do
+      Logger.warn("Tunnel cleanup error (possibly no stale connections):\n#{output}")
+    else
+      Logger.info("Tunnel `#{tunnel_name}` cleaned up (stale connections removed).")
+    end
   end
 
   defp do_delete_tunnel(tunnel_name) do
     Logger.info("Deleting tunnel: #{tunnel_name}")
     {output, exit_code} =
       System.cmd("cloudflared", ["tunnel", "delete", tunnel_name], stderr_to_stdout: true)
-
     if exit_code != 0 do
       Logger.error("Failed to delete tunnel:\n#{output}")
     else
@@ -265,7 +245,19 @@ defmodule Sentinel.Servers.Cloudflare do
     end
   end
 
-  defp tunnel_name_for(hostname), do: "sentinel-" <> String.replace(hostname, ".", "-")
+  defp do_run_tunnel(tunnel_name, hostname) do
+    Logger.info("Running tunnel: #{tunnel_name} with --url #{hostname}...")
+    Port.open({:spawn_executable, System.find_executable("cloudflared")}, [
+      :binary,
+      :exit_status,
+      :hide,
+      :use_stdio,
+      args: ["tunnel", "run", "--url", hostname, tunnel_name]
+    ])
+  end
+
+  defp tunnel_name_for(hostname),
+    do: "sentinel-" <> String.replace(hostname, ".", "-")
 
   defp tunnel_exists?(tunnel_name) do
     {output, _exit_code} = System.cmd("cloudflared", ["tunnel", "list"], stderr_to_stdout: true)
@@ -306,8 +298,7 @@ defmodule Sentinel.Servers.Cloudflare do
   defp write_file(records) when is_list(records) do
     json = Jason.encode!(records)
     case File.write(path(), json) do
-      :ok ->
-        :ok
+      :ok -> :ok
       {:error, reason} ->
         Logger.error("Failed to write to data file: #{inspect(reason)}")
     end
@@ -318,11 +309,10 @@ defmodule Sentinel.Servers.Cloudflare do
   end
 
   defp path do
-    # Similarly to your Auth example, but for tunnels:
     "./" <> config_fs(:root) <> config_fs(:tunnels)
   end
 
-  # We assume you have a config for :sentinel, :fs => %{ root: "...", auth: "..." }
+  # We assume you have a config for :sentinel, :fs => %{ root: "...", tunnels: "cloudflare_tunnels.json" }
   defp config_fs do
     Application.get_env(:sentinel, :fs)
   end
