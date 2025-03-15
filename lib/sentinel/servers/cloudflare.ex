@@ -60,13 +60,6 @@ defmodule Sentinel.Servers.Cloudflare do
     GenServer.call(__MODULE__, :list_hosts)
   end
 
-  @doc """
-  Returns a list of subdomains that are currently running.
-  """
-  def list_running_tunnels do
-    GenServer.call(__MODULE__, :list_running)
-  end
-
   # ----------------------------------------------------------------
   #  GenServer callbacks
   # ----------------------------------------------------------------
@@ -75,23 +68,16 @@ defmodule Sentinel.Servers.Cloudflare do
   def init(_opts) do
     Logger.info("Starting Cloudflare Tunnel GenServer...")
 
-    # Ensure the file exists
     create_file_if_missing()
 
-    # Read existing data from file
     case read_file() do
       {:ok, tunnels} ->
         Logger.info("Loaded tunnel data from file: #{inspect(tunnels)}")
 
         state = %{
-          # subdomain => Port (the OS process handle)
           running_tunnels: %{},
-          # list of maps: [%{"subdomain"=>..., "tunnel_name"=>..., "local_server"=>...}, ...]
           records: tunnels
         }
-
-        # For each record, re-create environment
-        Enum.each(tunnels, &do_restore_tunnel/1)
 
         {:ok, state}
 
@@ -171,31 +157,9 @@ defmodule Sentinel.Servers.Cloudflare do
     {:reply, subs, state}
   end
 
-  def handle_call(:list_running, _from, state) do
-    running_subdomains = Map.keys(state.running_tunnels)
-    {:reply, running_subdomains, state}
-  end
-
   # ----------------------------------------------------------------Gen
   # Internal logic
   # ----------------------------------------------------------------
-
-  defp do_restore_tunnel(%{
-         "subdomain" => subdomain,
-         "tunnel_name" => tunnel_name,
-         "local_server" => local_server
-       }) do
-    # create if missing
-    unless tunnel_exists?(tunnel_name) do
-      do_create_tunnel(tunnel_name)
-    end
-
-    # route
-    do_add_dns_route(tunnel_name, subdomain)
-
-    # run
-    do_run_tunnel(tunnel_name, local_server)
-  end
 
   defp stop_local_tunnel(subdomain, state) do
     case Map.fetch(state.running_tunnels, subdomain) do
