@@ -121,15 +121,10 @@ defmodule Sentinel.Servers.Cloudflare do
   # HELPER FUNCTIONS
   # -----------------------------
 
-  defp ensure_config_exists() do
+  def ensure_config_exists() do
     unless File.exists?(path()) do
-      Logger.warn("Cloudflare config not found. Creating a new one with defaults.")
-
-      # Try to get tunnel ID from Cloudflare, otherwise use default
-      tunnel_id = get_existing_tunnel_id() || "unknown"
-
       default_config = %{
-        "tunnel" => tunnel_id,
+        "tunnel" => get_existing_tunnel_id(),
         "ingress" => [%{"service" => "http_status:404"}]
       }
 
