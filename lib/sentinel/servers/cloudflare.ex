@@ -24,8 +24,11 @@ defmodule Sentinel.Servers.Cloudflare do
 
     # Ensure config exists before loading state
     ensure_config_exists()
-    state = load_state()
 
+    # Start a background process to check for a valid tunnel ID
+    Process.send_after(self(), :fetch_tunnel_id, 5000)
+
+    state = load_state()
     {:ok, state}
   end
 
@@ -62,7 +65,9 @@ defmodule Sentinel.Servers.Cloudflare do
     Logger.info("Adding service: #{name} -> #{address}")
 
     parsed = read_config()
-    ingress = Map.get(parsed, "ingress", []) ++ [%{"hostname" => name, "service" => "http://#{address}"}]
+
+    ingress =
+      Map.get(parsed, "ingress", []) ++ [%{"hostname" => name, "service" => "http://#{address}"}]
 
     update_config(Map.put(parsed, "ingress", ingress))
 
@@ -88,9 +93,37 @@ defmodule Sentinel.Servers.Cloudflare do
     Logger.info("Restarting Cloudflared service with config: #{state.config_path}")
 
     System.cmd("cloudflared", ["tunnel", "--config", state.config_path, "run"])
-    Process.sleep(5000)  # Allow time to restart
+    # Allow time to restart
+    Process.sleep(5000)
 
     {:noreply, state}
+  end
+
+  # -----------------------------
+  # Messages
+  # -----------------------------
+  @impl true
+  def handle_info(:fetch_tunnel_id, state) do
+    case get_existing_tunnel_id() do
+      nil ->
+        Logger.warn("Tunnel ID still missing, retrying in 5s...")
+        Process.send_after(self(), :fetch_tunnel_id, 5000)
+        {:noreply, state}
+
+      tunnel_id when tunnel_id != state.tunnel_id ->
+        Logger.info("Updating tunnel ID to #{tunnel_id}")
+
+        # Read existing config and update only the tunnel ID
+        parsed = read_config()
+        updated_config = Map.put(parsed, "tunnel", tunnel_id)
+        update_config(updated_config)
+
+        # Update state and stop retrying
+        {:noreply, %{state | tunnel_id: tunnel_id}}
+
+      _ ->
+        {:noreply, state}
+    end
   end
 
   # -----------------------------
@@ -123,8 +156,10 @@ defmodule Sentinel.Servers.Cloudflare do
 
   def ensure_config_exists() do
     unless File.exists?(path()) do
+      Logger.warn("Cloudflare config not found. Initializing with placeholder.")
+
       default_config = %{
-        "tunnel" => get_existing_tunnel_id(),
+        "tunnel" => "unknown",
         "ingress" => [%{"service" => "http_status:404"}]
       }
 
