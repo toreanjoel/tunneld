@@ -71,7 +71,7 @@ config :sentinel, :fs,
   auth: "/auth.json",
   blacklist: "/blacklist.json",
   whitelist: "/whitelist.json",
-  cloudflared: "/cloudflare_conf.yml"
+  tunnels: "/cloudflare_tunnels.json"
 
 config :sentinel, version: "0.1.3"
 

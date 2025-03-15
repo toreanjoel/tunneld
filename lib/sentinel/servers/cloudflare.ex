@@ -1,277 +1,330 @@
 defmodule Sentinel.Servers.Cloudflare do
   @moduledoc """
-  Manages Cloudflare tunnel services.
+  Extended GenServer-based Cloudflare tunnel manager.
 
   Features:
-  - Uses an existing Cloudflare tunnel.
-  - Manages ingress rules (adding/removing services).
-  - Ensures a valid configuration exists on startup.
-  - Restarts Cloudflared when the config is updated.
+    • Creates a dedicated tunnel for each hostname.
+    • Persists tunnel+hostname info in a JSON file.
+    • On startup, reads the file and reconnects any existing tunnels.
+    • Provides functions to create, route, run, and delete tunnels.
+
+  Uses three basic commands:
+    1) cloudflared tunnel create <TUNNEL_NAME>
+    2) cloudflared tunnel route dns <TUNNEL_NAME> <HOSTNAME>
+    3) cloudflared tunnel run --url <HOSTNAME> <TUNNEL_NAME>
+
+  Also provides a "delete" command to remove the tunnel.
+
+  The file implementation is borrowed from your Auth approach:
+  we store JSON data so we can re-run all tunnels on reboot.
   """
 
   use GenServer
   require Logger
 
-  @default_tunnel_name "sentinel-local"
-
+  @doc """
+  Starts the GenServer under a supervisor.
+  On init, we ensure the data file exists, read it,
+  and restore any tunnels.
+  """
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 
-  @impl true
-  def init(_) do
-    Logger.info("Initializing Cloudflared tunnel manager...")
+  # ----------------------------------------------------------------
+  # Public API
+  # ----------------------------------------------------------------
 
-    # Ensure config exists before loading state
-    ensure_config_exists()
-
-    # Start a background process to check for a valid tunnel ID
-    Process.send_after(self(), :fetch_tunnel_id, 5000)
-
-    state = load_state()
-    {:ok, state}
+  @doc """
+  Creates a brand-new tunnel for `hostname`, sets up DNS route,
+  and runs it with the local URL you provide.
+  Persists the new tunnel in the file so it auto-restores next time.
+  """
+  def add_host(hostname, local_url) do
+    GenServer.call(__MODULE__, {:add_host, hostname, local_url})
   end
 
-  # -----------------------------
-  # INTERNAL SERVER CALLBACKS
-  # -----------------------------
-
-  @impl true
-  def handle_call(:get_tunnel_id, _from, state) do
-    {:reply, state.tunnel_id, state}
+  @doc """
+  Deletes the tunnel for `hostname`, removing it from Cloudflare,
+  killing the local process, and removing from the file.
+  """
+  def remove_host(hostname) do
+    GenServer.call(__MODULE__, {:remove_host, hostname})
   end
 
-  @impl true
-  def handle_call(:list_services, _from, state) do
-    {:reply, Map.keys(state.services), state}
+  @doc """
+  Lists all known hostnames currently tracked in the file.
+  """
+  def list_hosts do
+    GenServer.call(__MODULE__, :list_hosts)
   end
 
-  @impl true
-  def handle_call(:get_config_json, _from, state) do
-    case File.read(state.config_path) do
-      {:ok, content} ->
-        case YamlElixir.read_from_string(content) do
-          {:ok, parsed} -> {:reply, Jason.encode!(parsed), state}
-          {:error, _} -> {:reply, Jason.encode!(%{}), state}
-        end
+  @doc """
+  Returns a list of hostnames that are currently running.
+  """
+  def list_running_tunnels do
+    GenServer.call(__MODULE__, :list_running)
+  end
 
-      {:error, _} ->
-        {:reply, Jason.encode!(%{}), state}
+  # ----------------------------------------------------------------
+  #  GenServer callbacks
+  # ----------------------------------------------------------------
+
+  @impl true
+  def init(_opts) do
+    Logger.info("Starting Cloudflare Tunnel GenServer...")
+
+    # Ensure the file exists
+    create_file_if_missing()
+
+    # Read existing data from file
+    case read_file() do
+      {:ok, tunnels} ->
+        Logger.info("Loaded tunnel data from file: #{inspect(tunnels)}")
+        # We'll store running processes in memory, keyed by hostname.
+        # Data from file is our persistent record of {hostname, tunnel_name, local_url}.
+        # We'll attempt to re-run everything.
+        state = %{
+          running_tunnels: %{},   # hostname => Port
+          records: tunnels        # list of maps: [%{"hostname"=>..., "tunnel_name"=>..., "local_url"=>...}, ...]
+        }
+
+        # For each record, re-create the environment
+        Enum.each(tunnels, fn record ->
+          do_restore_tunnel(record)
+        end)
+
+        {:ok, state}
+
+      {:error, reason} ->
+        Logger.error("Failed to load existing tunnel data: #{reason}")
+        # If the file is corrupt or something, just start fresh.
+        state = %{
+          running_tunnels: %{},
+          records: []
+        }
+        {:ok, state}
     end
   end
 
   @impl true
-  def handle_cast({:add_service, name, address}, state) do
-    Logger.info("Adding service: #{name} -> #{address}")
-
-    # Ensure Cloudflare knows about the hostname
-    System.cmd("cloudflared", ["tunnel", "route", "dns", @default_tunnel_name, name])
-
-    parsed = read_config()
-
-    ingress =
-      Map.get(parsed, "ingress", []) ++ [%{"hostname" => name, "service" => "http://#{address}"}]
-
-    update_config(Map.put(parsed, "ingress", ingress))
-
-    updated_services = Map.put(state.services, name, %{address: address, status: :unknown})
-    {:noreply, %{state | services: updated_services}}
-  end
-
-  @impl true
-def handle_cast({:remove_service, name}, state) do
-  Logger.info("Removing service: #{name}")
-
-  # Remove the CNAME record from Cloudflare
-  {output, exit_code} = System.cmd("cloudflared", ["tunnel", "route", "dns", "--delete", @default_tunnel_name, name])
-
-  if exit_code != 0 do
-    Logger.error("Failed to remove subdomain #{name}. Cloudflared output: #{output}")
-  else
-    Logger.info("Successfully removed subdomain #{name} from Cloudflare.")
-  end
-
-  # Remove from config
-  parsed = read_config()
-  ingress = Enum.reject(parsed["ingress"], fn s -> s["hostname"] == name end)
-
-  update_config(Map.put(parsed, "ingress", ingress))
-
-  updated_services = Map.delete(state.services, name)
-  {:noreply, %{state | services: updated_services}}
-end
-
-  @impl true
-  def handle_cast(:restart_tunnel, state) do
-    Logger.info("Restarting Cloudflared service with config: #{state.config_path}")
-
-    System.cmd("cloudflared", ["tunnel", "--config", state.config_path, "run"])
-    # Allow time to restart
-    Process.sleep(5000)
-
-    {:noreply, state}
-  end
-
-  # -----------------------------
-  # Messages
-  # -----------------------------
-  @impl true
-  def handle_info(:fetch_tunnel_id, state) do
-    case get_existing_tunnel_id() do
-      nil ->
-        Logger.warn("Tunnel ID still missing, retrying in 5s...")
-        Process.send_after(self(), :fetch_tunnel_id, 5000)
-        {:noreply, state}
-
-      tunnel_id when tunnel_id != state.tunnel_id ->
-        Logger.info("Updating tunnel ID to #{tunnel_id}")
-
-        # Read existing config and update only the tunnel ID
-        parsed = read_config()
-        updated_config = Map.put(parsed, "tunnel", tunnel_id)
-        update_config(updated_config)
-
-        # Update state and stop retrying
-        {:noreply, %{state | tunnel_id: tunnel_id}}
-
-      _ ->
-        {:noreply, state}
-    end
-  end
-
-  # -----------------------------
-  # SERVICE MANAGEMENT
-  # -----------------------------
-
-  @doc "Adds a new service to the tunnel."
-  def add_service(name, address) do
-    GenServer.cast(__MODULE__, {:add_service, name, address})
-  end
-
-  @doc "Removes a service from the tunnel."
-  def remove_service(name) do
-    GenServer.cast(__MODULE__, {:remove_service, name})
-  end
-
-  @doc "Lists all configured services."
-  def list_services() do
-    GenServer.call(__MODULE__, :list_services)
-  end
-
-  @doc "Restarts Cloudflared service."
-  def restart_tunnel() do
-    GenServer.cast(__MODULE__, :restart_tunnel)
-  end
-
-  # -----------------------------
-  # HELPER FUNCTIONS
-  # -----------------------------
-
-  def ensure_config_exists() do
-    unless File.exists?(path()) do
-      Logger.warn("Cloudflare config not found. Initializing with placeholder.")
-
-      default_config = %{
-        "tunnel" => "unknown",
-        "ingress" => [%{"service" => "http_status:404"}]
-      }
-
-      update_config(default_config)
-    end
-  end
-
-  defp load_state() do
-    parsed = read_config()
-
-    tunnel_id =
-      case parsed do
-        %{"tunnel" => id} -> id
-        _ -> "unknown"
-      end
-
-    Logger.info("Loaded tunnel ID: #{tunnel_id}")
-
-    %{
-      tunnel_id: tunnel_id,
-      tunnel_name: @default_tunnel_name,
-      config_path: path(),
-      services: load_services(parsed)
-    }
-  end
-
-  def read_config do
-    case File.read(path()) do
-      {:ok, content} ->
-        case YamlElixir.read_from_string(content) do
-          {:ok, parsed} -> Map.update(parsed, "ingress", [], fn v -> v || [] end)
-          _ -> %{"ingress" => []}
-        end
-
-      _ ->
-        %{"ingress" => []}
-    end
-  end
-
-  defp update_config(new_config) do
-    ingress = Map.get(new_config, "ingress", [])
-
-    final_ingress =
-      case List.last(ingress) do
-        %{"service" => _} -> ingress
-        _ -> ingress ++ [%{"service" => "http_status:404"}]
-      end
-
-    updated_config = Map.put(new_config, "ingress", final_ingress)
-    yaml_content = map_to_yaml(updated_config)
-    File.write!(path(), yaml_content)
-  end
-
-  defp load_services(parsed) do
-    ingress = Map.get(parsed, "ingress", [])
-
-    if is_list(ingress) do
-      Enum.reduce(ingress, %{}, fn entry, acc ->
-        if Map.has_key?(entry, "hostname") and Map.has_key?(entry, "service") do
-          Map.put(acc, entry["hostname"], %{address: entry["service"], status: :unknown})
-        else
-          acc
-        end
-      end)
+  def handle_call({:add_host, hostname, local_url}, _from, state) do
+    # If we already have a record for this host, no need to recreate everything.
+    if Enum.any?(state.records, &(&1["hostname"] == hostname)) do
+      Logger.warn("Host #{hostname} is already known; skipping new tunnel.")
+      {:reply, :ok, state}
     else
-      %{}
+      # create a unique tunnel name per host
+      tunnel_name = tunnel_name_for(hostname)
+
+      # 1) create tunnel
+      if not tunnel_exists?(tunnel_name) do
+        do_create_tunnel(tunnel_name)
+      end
+
+      # 2) add DNS route
+      do_add_dns_route(tunnel_name, hostname)
+
+      # 3) run tunnel
+      port = do_run_tunnel(tunnel_name, hostname)
+
+      # 4) store record in state and file
+      record = %{
+        "hostname" => hostname,
+        "tunnel_name" => tunnel_name,
+        "local_url" => local_url
+      }
+      new_records = [record | state.records]
+
+      new_running = Map.put(state.running_tunnels, hostname, port)
+      new_state = %{state | running_tunnels: new_running, records: new_records}
+
+      # Save to file
+      write_file(new_records)
+
+      {:reply, :ok, new_state}
     end
   end
 
-  def get_existing_tunnel_id() do
-    {output, _} = System.cmd("cloudflared", ["tunnel", "list"])
+  def handle_call({:remove_host, hostname}, _from, state) do
+    # Find record
+    case Enum.find(state.records, &(&1["hostname"] == hostname)) do
+      nil ->
+        Logger.warn("No record found for hostname=#{hostname}")
+        {:reply, :ok, state}
 
-    case Regex.run(~r/^([a-f0-9\-]+)\s+sentinel-local/m, output) do
-      [_, tunnel_id] -> tunnel_id
-      _ -> nil
+      record ->
+        tunnel_name = record["tunnel_name"]
+
+        # 1) stop local process if running
+        new_state = stop_local_tunnel(hostname, state)
+
+        # 2) run `cloudflared tunnel delete <tunnel_name>`
+        do_delete_tunnel(tunnel_name)
+
+        # 3) remove from file records
+        pruned_records = Enum.reject(new_state.records, &(&1["hostname"] == hostname))
+        final_state = %{new_state | records: pruned_records}
+        write_file(pruned_records)
+
+        {:reply, :ok, final_state}
     end
   end
 
-  defp map_to_yaml(%{"tunnel" => tunnel, "ingress" => ingress}) do
-    """
-    tunnel: #{tunnel}
-    ingress:
-    #{Enum.map_join(ingress, "\n", &format_ingress_entry/1)}
-    """
-    |> String.trim()
+  def handle_call(:list_hosts, _from, state) do
+    # Just return the hostnames from the records
+    hostnames = Enum.map(state.records, & &1["hostname"])
+    {:reply, hostnames, state}
   end
 
-  defp format_ingress_entry(%{"hostname" => hostname, "service" => service}) do
-    "  - hostname: #{hostname}\n    service: #{service}"
+  def handle_call(:list_running, _from, state) do
+    running = Map.keys(state.running_tunnels)
+    {:reply, running, state}
   end
 
-  defp format_ingress_entry(%{"service" => service}) do
-    "  - service: #{service}"
+  # ----------------------------------------------------------------
+  # Internal logic for creating/managing tunnels
+  # ----------------------------------------------------------------
+
+  defp do_restore_tunnel(%{"hostname" => hostname, "tunnel_name" => tunnel_name, "local_url" => local_url}) do
+    # Check if the tunnel exists, create if not
+    if not tunnel_exists?(tunnel_name) do
+      do_create_tunnel(tunnel_name)
+    end
+
+    # Add DNS route
+    do_add_dns_route(tunnel_name, hostname)
+
+    # run it
+    do_run_tunnel(tunnel_name, hostname)
   end
 
-  # Path helper
-  defp path(), do: "./" <> config_fs(:root) <> config_fs(:cloudflared)
+  defp stop_local_tunnel(hostname, state) do
+    case Map.fetch(state.running_tunnels, hostname) do
+      :error ->
+        Logger.warn("No running tunnel for #{hostname}")
+        state
 
-  # Config helper
-  defp config_fs(), do: Application.get_env(:sentinel, :fs)
+      {:ok, port} ->
+        Logger.info("Stopping local tunnel for #{hostname}")
+        Port.close(port)
+        new_map = Map.delete(state.running_tunnels, hostname)
+        %{state | running_tunnels: new_map}
+    end
+  end
+
+  defp do_create_tunnel(tunnel_name) do
+    Logger.info("Creating tunnel: #{tunnel_name}")
+    {output, exit_code} =
+      System.cmd("cloudflared", ["tunnel", "create", tunnel_name], stderr_to_stdout: true)
+
+    if exit_code != 0 do
+      Logger.error("Failed to create tunnel:\n#{output}")
+    else
+      Logger.info("Tunnel `#{tunnel_name}` created successfully.")
+    end
+  end
+
+  defp do_add_dns_route(tunnel_name, hostname) do
+    Logger.info("Adding DNS route: #{hostname} -> #{tunnel_name}")
+
+    {output, exit_code} =
+      System.cmd("cloudflared", ["tunnel", "route", "dns", tunnel_name, hostname],
+        stderr_to_stdout: true
+      )
+
+    if exit_code != 0 do
+      Logger.error("Failed to add DNS route:\n#{output}")
+    else
+      Logger.info("DNS route for #{hostname} added successfully.")
+    end
+  end
+
+  defp do_run_tunnel(tunnel_name, hostname) do
+    Logger.info("Running tunnel: #{tunnel_name} with --url #{hostname}...")
+    port = Port.open({:spawn_executable, System.find_executable("cloudflared")}, [
+      :binary,
+      :exit_status,
+      :hide,
+      :use_stdio,
+      args: ["tunnel", "run", "--url", hostname, tunnel_name]
+    ])
+
+    port
+  end
+
+  defp do_delete_tunnel(tunnel_name) do
+    Logger.info("Deleting tunnel: #{tunnel_name}")
+    {output, exit_code} =
+      System.cmd("cloudflared", ["tunnel", "delete", tunnel_name], stderr_to_stdout: true)
+
+    if exit_code != 0 do
+      Logger.error("Failed to delete tunnel:\n#{output}")
+    else
+      Logger.info("Tunnel `#{tunnel_name}` deleted successfully.")
+    end
+  end
+
+  defp tunnel_name_for(hostname), do: "sentinel-" <> String.replace(hostname, ".", "-")
+
+  defp tunnel_exists?(tunnel_name) do
+    {output, _exit_code} = System.cmd("cloudflared", ["tunnel", "list"], stderr_to_stdout: true)
+    String.contains?(output, tunnel_name)
+  end
+
+  # ----------------------------------------------------------------
+  # File-based persistence (borrowed from your Auth approach)
+  # ----------------------------------------------------------------
+
+  defp create_file_if_missing do
+    unless file_exists?() do
+      # Create a new file with empty array
+      case File.write(path(), "[]") do
+        :ok ->
+          Logger.info("Created tunnel data file.")
+        {:error, reason} ->
+          Logger.error("Failed to create tunnel data file: #{inspect(reason)}")
+      end
+    end
+  end
+
+  defp read_file do
+    case File.read(path()) do
+      {:ok, data} ->
+        case Jason.decode(data) do
+          {:ok, decoded} ->
+            {:ok, decoded} # expecting list
+          {:error, err} ->
+            {:error, "Failed to decode file: #{inspect(err)}"}
+        end
+
+      {:error, reason} ->
+        {:error, "There was a problem reading the file: #{inspect(reason)}"}
+    end
+  end
+
+  defp write_file(records) when is_list(records) do
+    json = Jason.encode!(records)
+    case File.write(path(), json) do
+      :ok ->
+        :ok
+      {:error, reason} ->
+        Logger.error("Failed to write to data file: #{inspect(reason)}")
+    end
+  end
+
+  defp file_exists? do
+    File.exists?(path())
+  end
+
+  defp path do
+    # Similarly to your Auth example, but for tunnels:
+    "./" <> config_fs(:root) <> config_fs(:tunnels)
+  end
+
+  # We assume you have a config for :sentinel, :fs => %{ root: "...", auth: "..." }
+  defp config_fs do
+    Application.get_env(:sentinel, :fs)
+  end
   defp config_fs(key), do: config_fs()[key]
 end
