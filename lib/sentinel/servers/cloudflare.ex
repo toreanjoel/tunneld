@@ -127,10 +127,6 @@ defmodule Sentinel.Servers.Cloudflare do
 
       record ->
         tunnel_name = record["tunnel_name"]
-
-        # We do NOT kill the OS process here (since it's detached).
-        # If you need to forcibly stop it, you must do so externally (e.g. pkill).
-        # We still do cleanup + delete from CF:
         do_cleanup_tunnel(tunnel_name)
         do_delete_tunnel(tunnel_name)
 
@@ -219,10 +215,20 @@ defmodule Sentinel.Servers.Cloudflare do
   end
 
   defp do_delete_tunnel(tunnel_name) do
-    Logger.info("Deleting tunnel: #{tunnel_name}")
+    Logger.info("Stopping tunnel: #{tunnel_name}")
 
-    {output, exit_code} =
-      System.cmd("cloudflared", ["tunnel", "delete", tunnel_name], stderr_to_stdout: true)
+    # Check if process exists before killing
+    {output, _} = System.cmd("pgrep", ["-f", "cloudflared tunnel run --url .* #{tunnel_name}"])
+
+    if String.trim(output) != "" do
+      Logger.info("Killing cloudflared process for tunnel #{tunnel_name}")
+      {_, _} = System.cmd("pkill", ["-f", "cloudflared tunnel run --url .* #{tunnel_name}"])
+    else
+      Logger.warn("No running process found for tunnel #{tunnel_name}")
+    end
+
+    # Proceed with Cloudflare tunnel deletion
+    {output, exit_code} = System.cmd("cloudflared", ["tunnel", "delete", tunnel_name], stderr_to_stdout: true)
 
     if exit_code != 0 do
       Logger.error("Failed to delete tunnel:\n#{output}")
