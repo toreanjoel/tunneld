@@ -119,6 +119,8 @@ defmodule Iptables do
   Drop connections from the main interfaces initially
   """
   defp drop_all_connections() do
+    IO.inspect(@wlan0_interface)
+    IO.inspect(@vpn_interface)
     # Block all forwarding by default
     System.cmd("iptables", ["-P", "FORWARD", "DROP"])
     # Block non-whitelisted users from VPN access
