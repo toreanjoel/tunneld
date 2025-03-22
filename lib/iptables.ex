@@ -4,11 +4,11 @@ defmodule Iptables do
   This ensures all devices are blocked by default except for access to Sentinel.
   """
 
-  @internet_interface Application.compile_env(:sentinel, :network, :wlan)
-  @vpn_interface Application.compile_env(:sentinel, :network, :mullvad)
-  @eth_interface Application.compile_env(:sentinel, :network, :eth)
+  @internet_interface Application.compile_env!(:sentinel, [:network, :wlan])
+  @vpn_interface Application.compile_env!(:sentinel, [:network, :mullvad])
+  @eth_interface Application.compile_env!(:sentinel, [:network, :eth])
   @wlan0_interface "wlan0"
-  @gateway Application.compile_env(:sentinel, :network, :gateway)
+  @gateway Application.compile_env!(:sentinel, [:network, :gateway])
 
   @doc """
   Flush iptables and reinitialize firewall rules.
@@ -119,8 +119,6 @@ defmodule Iptables do
   Drop connections from the main interfaces initially
   """
   defp drop_all_connections() do
-    IO.inspect(@wlan0_interface)
-    IO.inspect(@vpn_interface)
     # Block all forwarding by default
     System.cmd("iptables", ["-P", "FORWARD", "DROP"])
     # Block non-whitelisted users from VPN access
