@@ -250,12 +250,22 @@ defmodule Sentinel.Servers.Blacklist do
   """
   def read_file() do
     case File.read(path()) do
+      {:ok, ""} ->
+        # File exists but is empty, fix it
+        create_file()
+        {:ok, []}
+
       {:ok, data} ->
         case Jason.decode(data) do
-          {:ok, data} -> {:ok, data}
-          {:error, err} -> {:error, "Failed to decode Blacklist file: #{inspect(err)}"}
+          {:ok, decoded} -> {:ok, decoded}
+          {:error, _} ->
+            # Fallback to empty list on decode error
+            create_file()
+            {:ok, []}
         end
-      {:error, reason} -> {:error, "There was a problem reading the file: #{inspect(reason)}"}
+
+      {:error, reason} ->
+        {:error, "There was a problem reading the file: #{inspect(reason)}"}
     end
   end
 
