@@ -73,6 +73,13 @@ config :sentinel, :fs,
   whitelist: "/whitelist.json",
   tunnels: "/cloudflare_tunnels.json"
 
+# TODO: This needs to come from env variables from runtime config
+config :sentinel, :network,
+  wlan: "wlx202351114745",
+  eth: "end0",
+  mullvad: "wg0-mullvad",
+  gateway: "10.0.0.1"
+
 config :sentinel, version: "0.1.3"
 
 # Import environment specific config. This must remain at the bottom

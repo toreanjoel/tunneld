@@ -4,11 +4,11 @@ defmodule Iptables do
   This ensures all devices are blocked by default except for access to Sentinel.
   """
 
-  @internet_interface "wlan1"
-  @vpn_interface "wg0-mullvad"
-  @eth0_interface "eth0"
+  @internet_interface Application.compile_env(:sentinel, :network, :wlan)
+  @vpn_interface Application.compile_env(:sentinel, :network, :mullvad)
+  @eth_interface Application.compile_env(:sentinel, :network, :eth)
   @wlan0_interface "wlan0"
-  @gateway "10.0.0.1"
+  @gateway Application.compile_env(:sentinel, :network, :gateway)
 
   @doc """
   Flush iptables and reinitialize firewall rules.
@@ -123,7 +123,7 @@ defmodule Iptables do
     System.cmd("iptables", ["-P", "FORWARD", "DROP"])
     # Block non-whitelisted users from VPN access
     System.cmd("iptables", ["-A", "FORWARD", "-i", @wlan0_interface, "-o", @vpn_interface, "-j", "DROP"])
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @eth0_interface, "-o", @vpn_interface, "-j", "DROP"])
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @eth_interface, "-o", @vpn_interface, "-j", "DROP"])
   end
 
   @doc """
@@ -131,7 +131,7 @@ defmodule Iptables do
   """
   defp gateway_access() do
     # Allow clients to access Sentinel UI (gateway)
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @eth0_interface, "-d", @gateway, "-j", "ACCEPT"])
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @eth_interface, "-d", @gateway, "-j", "ACCEPT"])
     System.cmd("iptables", ["-A", "FORWARD", "-i", @wlan0_interface, "-d", @gateway, "-j", "ACCEPT"])
   end
 
@@ -141,11 +141,11 @@ defmodule Iptables do
   defp internet_forwarding() do
     # interface > internet
     System.cmd("iptables", ["-A", "FORWARD", "-i", @wlan0_interface, "-o", @internet_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @eth0_interface, "-o", @internet_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @eth_interface, "-o", @internet_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
 
     # internet > interface
     System.cmd("iptables", ["-A", "FORWARD", "-i", @internet_interface, "-o", @wlan0_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @internet_interface, "-o", @eth0_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @internet_interface, "-o", @eth_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
   end
 
   @doc """
@@ -171,10 +171,10 @@ defmodule Iptables do
   defp vpn_forwarding() do
     # Allow outgoing Wi-Fi -> VPN connections (this will need to be removed for a sentry later)
     System.cmd("iptables", ["-A", "FORWARD", "-i", @wlan0_interface, "-o", @vpn_interface, "-j", "ACCEPT"])
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @eth0_interface, "-o", @vpn_interface, "-j", "ACCEPT"])
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @eth_interface, "-o", @vpn_interface, "-j", "ACCEPT"])
 
     # Allow bidirectional forwarding between Wi-Fi and VPN (this will need to be removed for a sentry later)
     System.cmd("iptables", ["-A", "FORWARD", "-i", @vpn_interface, "-o", @wlan0_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @vpn_interface, "-o", @eth0_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
+    System.cmd("iptables", ["-A", "FORWARD", "-i", @vpn_interface, "-o", @eth_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
   end
 end
