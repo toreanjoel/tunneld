@@ -22,8 +22,8 @@ defmodule Sentinel.Servers.Cloudflare do
   use GenServer
   require Logger
 
-  @max_retries 5
-  @retry_delay 1000
+  @max_retries 10
+  @retry_delay 5_000
 
   # ----------------------------------------------------------------
   # Public API
