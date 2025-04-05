@@ -22,6 +22,9 @@ defmodule Sentinel.Servers.Cloudflare do
   use GenServer
   require Logger
 
+  @max_retries 5
+  @retry_delay 1000
+
   # ----------------------------------------------------------------
   # Public API
   # ----------------------------------------------------------------
@@ -32,25 +35,6 @@ defmodule Sentinel.Servers.Cloudflare do
   """
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
-  end
-
-  @doc """
-  Creates a brand-new tunnel for `subdomain`, sets up a DNS route,
-  and **spawns** cloudflared in the background (nohup).
-
-  Persists the new tunnel record in a JSON file so we can track subdomains.
-  """
-  def add_host(local_server, subdomain) do
-    GenServer.cast(__MODULE__, {:add_host, local_server, subdomain})
-  end
-
-  @doc """
-  Deletes the tunnel for `subdomain` from Cloudflare (cleanup + delete).
-  Also removes it from the file. Does NOT stop any background OS process
-  you spawned earlier (but you can kill that externally if needed).
-  """
-  def remove_host(subdomain) do
-    GenServer.cast(__MODULE__, {:remove_host, subdomain})
   end
 
   @doc """
@@ -74,30 +58,22 @@ defmodule Sentinel.Servers.Cloudflare do
       {:ok, tunnels} ->
         Logger.info("Loaded tunnel data from file: #{inspect(tunnels)}")
 
-        # NEW: Restart all known tunnels
         Enum.each(tunnels, fn data ->
           %{
             "tunnel_name" => tunnel_name,
-            "subdomain" => subdomain,
+            "subdomain" => _,
             "local_server" => local_server
           } = data
-
-          Logger.info("Ensuring tunnel #{tunnel_name} is up...")
-
-          if tunnel_exists?(tunnel_name) do
+          retry_until_tunnel_exists(tunnel_name, fn ->
             do_run_tunnel_in_background(tunnel_name, local_server)
-          else
-            Logger.warn("Tunnel #{tunnel_name} is missing (skipped)")
-          end
+          end)
         end)
 
-        state = %{records: tunnels}
-        {:ok, state}
+        {:ok, %{records: tunnels}}
 
       {:error, reason} ->
         Logger.error("Failed to load existing tunnel data: #{reason}")
-        state = %{records: []}
-        {:ok, state}
+        {:ok, %{records: []}}
     end
   end
 
@@ -202,7 +178,8 @@ defmodule Sentinel.Servers.Cloudflare do
   defp do_run_tunnel_in_background(tunnel_name, local_server) do
     Logger.info("Launching cloudflared in background: #{tunnel_name} => #{local_server}")
 
-    {output, _} = System.cmd("pgrep", ["-f", "cloudflared tunnel run --url #{local_server} #{tunnel_name}"])
+    {output, _} =
+      System.cmd("pgrep", ["-f", "cloudflared tunnel run --url #{local_server} #{tunnel_name}"])
 
     if String.trim(output) != "" do
       Logger.info("Tunnel #{tunnel_name} already running.")
@@ -257,6 +234,45 @@ defmodule Sentinel.Servers.Cloudflare do
       Logger.error("Failed to delete tunnel:\n#{output}")
     else
       Logger.info("Tunnel `#{tunnel_name}` deleted successfully.")
+    end
+  end
+
+  @doc """
+  Creates a brand-new tunnel for `subdomain`, sets up a DNS route,
+  and **spawns** cloudflared in the background (nohup).
+
+  Persists the new tunnel record in a JSON file so we can track subdomains.
+  """
+  def add_host(local_server, subdomain) do
+    GenServer.cast(__MODULE__, {:add_host, local_server, subdomain})
+  end
+
+  @doc """
+  Deletes the tunnel for `subdomain` from Cloudflare (cleanup + delete).
+  Also removes it from the file. Does NOT stop any background OS process
+  you spawned earlier (but you can kill that externally if needed).
+  """
+  def remove_host(subdomain) do
+    GenServer.cast(__MODULE__, {:remove_host, subdomain})
+  end
+
+  @doc """
+    Retry make an attempt if the tunnel exists on startup for the host machine.
+    Restart the tunnel services persisted in the file system.
+  """
+  defp retry_until_tunnel_exists(tunnel_name, fun, attempt \\ 1)
+
+  defp retry_until_tunnel_exists(_tunnel_name, _fun, attempt) when attempt > @max_retries do
+    Logger.error("Tunnel did not appear after #{@max_retries} attempts.")
+  end
+
+  defp retry_until_tunnel_exists(tunnel_name, fun, attempt) do
+    if tunnel_exists?(tunnel_name) do
+      fun.()
+    else
+      Logger.warn("Tunnel #{tunnel_name} not found (attempt #{attempt}), retrying...")
+      Process.sleep(@retry_delay)
+      retry_until_tunnel_exists(tunnel_name, fun, attempt + 1)
     end
   end
 
