@@ -73,6 +73,24 @@ defmodule Sentinel.Servers.Cloudflare do
     case read_file() do
       {:ok, tunnels} ->
         Logger.info("Loaded tunnel data from file: #{inspect(tunnels)}")
+
+        # NEW: Restart all known tunnels
+        Enum.each(tunnels, fn data ->
+          %{
+            "tunnel_name" => tunnel_name,
+            "subdomain" => subdomain,
+            "local_server" => local_server
+          } = data
+
+          Logger.info("Ensuring tunnel #{tunnel_name} is up...")
+
+          if tunnel_exists?(tunnel_name) do
+            do_run_tunnel_in_background(tunnel_name, local_server)
+          else
+            Logger.warn("Tunnel #{tunnel_name} is missing (skipped)")
+          end
+        end)
+
         state = %{records: tunnels}
         {:ok, state}
 
@@ -184,20 +202,24 @@ defmodule Sentinel.Servers.Cloudflare do
   defp do_run_tunnel_in_background(tunnel_name, local_server) do
     Logger.info("Launching cloudflared in background: #{tunnel_name} => #{local_server}")
 
-    # Build a shell command that backgrounds the process. The logs go to /dev/null
-    # so it's completely detached; customize if you want logs in a file.
-    cmd = """
-    nohup cloudflared tunnel run --url #{local_server} #{tunnel_name} \
-    > /dev/null 2>&1 &
-    """
+    {output, _} = System.cmd("pgrep", ["-f", "cloudflared tunnel run --url #{local_server} #{tunnel_name}"])
 
-    # Use System.cmd with "sh -c" to run that command in a shell:
-    {output, exit_code} = System.cmd("sh", ["-c", cmd], stderr_to_stdout: true)
-
-    if exit_code != 0 do
-      Logger.error("Failed to spawn background cloudflared:\n#{inspect(output)}")
+    if String.trim(output) != "" do
+      Logger.info("Tunnel #{tunnel_name} already running.")
+      :ok
     else
-      Logger.info("cloudflared was launched in background (exit_code=#{exit_code}).")
+      cmd = """
+      nohup cloudflared tunnel run --url #{local_server} #{tunnel_name} \
+      > /dev/null 2>&1 &
+      """
+
+      {output, exit_code} = System.cmd("sh", ["-c", cmd], stderr_to_stdout: true)
+
+      if exit_code != 0 do
+        Logger.error("Failed to spawn background cloudflared:\n#{inspect(output)}")
+      else
+        Logger.info("cloudflared was launched in background (exit_code=#{exit_code}).")
+      end
     end
   end
 
@@ -228,7 +250,8 @@ defmodule Sentinel.Servers.Cloudflare do
     end
 
     # Proceed with Cloudflare tunnel deletion
-    {output, exit_code} = System.cmd("cloudflared", ["tunnel", "delete", tunnel_name], stderr_to_stdout: true)
+    {output, exit_code} =
+      System.cmd("cloudflared", ["tunnel", "delete", tunnel_name], stderr_to_stdout: true)
 
     if exit_code != 0 do
       Logger.error("Failed to delete tunnel:\n#{output}")
@@ -258,6 +281,7 @@ defmodule Sentinel.Servers.Cloudflare do
       case File.write(path(), "[]") do
         :ok ->
           Logger.info("Created tunnel data file.")
+
         {:error, reason} ->
           Logger.error("Failed to create tunnel data file: #{inspect(reason)}")
       end
@@ -269,10 +293,13 @@ defmodule Sentinel.Servers.Cloudflare do
       {:ok, data} ->
         case Jason.decode(data) do
           {:ok, decoded} ->
-            {:ok, decoded} # expecting a list of records
+            # expecting a list of records
+            {:ok, decoded}
+
           {:error, err} ->
             {:error, "Failed to decode file: #{inspect(err)}"}
         end
+
       {:error, reason} ->
         {:error, "There was a problem reading the file: #{inspect(reason)}"}
     end
@@ -280,8 +307,11 @@ defmodule Sentinel.Servers.Cloudflare do
 
   defp write_file(records) when is_list(records) do
     json = Jason.encode!(records)
+
     case File.write(path(), json) do
-      :ok -> :ok
+      :ok ->
+        :ok
+
       {:error, reason} ->
         Logger.error("Failed to write to data file: #{inspect(reason)}")
     end
