@@ -35,50 +35,62 @@ defmodule Sentinel.Servers.Wlan do
 
   # Fetches scan results and parses SSIDs
   def handle_call(:scan_results, _from, state) do
-    {output, _} = System.cmd("wpa_cli", ["scan_results"])
+    if Application.get_env(:sentinel, :mock_data, false) do
+      {:reply, Sentinel.Servers.FakeData.Wlan.get_data(), state}
+    else
+      {output, _} = System.cmd("wpa_cli", ["scan_results"])
 
-    networks =
-      output
-      |> String.split("\n")
-      |> Enum.map(&parse_scan_result/1)
-      |> Enum.reject(&is_nil/1)
-      |> Enum.filter(fn i -> i.security !== "/" end)
+      networks =
+        output
+        |> String.split("\n")
+        |> Enum.map(&parse_scan_result/1)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.filter(fn i -> i.security !== "/" end)
 
-    {:reply, networks, state}
+      {:reply, networks, state}
+    end
   end
 
   # Checks if a Wi-Fi network is open or secured
   def handle_call({:network_security, ssid}, _from, state) do
-    {output, _} = System.cmd("wpa_cli", ["scan_results"])
+    if Application.get_env(:sentinel, :mock_data, false) do
+      {:reply, {:secure, true}, state}
+    else
+      {output, _} = System.cmd("wpa_cli", ["scan_results"])
 
-    security_flags =
-      output
-      |> String.split("\n")
-      |> Enum.find(fn line -> String.contains?(line, ssid) end)
+      security_flags =
+        output
+        |> String.split("\n")
+        |> Enum.find(fn line -> String.contains?(line, ssid) end)
 
-    is_secure =
-      case security_flags do
-        nil ->
-          {:error, "SSID not found"}
+      is_secure =
+        case security_flags do
+          nil ->
+            {:error, "SSID not found"}
 
-        _ ->
-          if String.contains?(security_flags, "[WPA") or String.contains?(security_flags, "[WEP") do
-            {:secure, true}
-          else
-            {:secure, false}
-          end
-      end
+          _ ->
+            if String.contains?(security_flags, "[WPA") or String.contains?(security_flags, "[WEP") do
+              {:secure, true}
+            else
+              {:secure, false}
+            end
+        end
 
-    {:reply, is_secure, state}
+      {:reply, is_secure, state}
+    end
   end
 
   # Disconenct from the current connected wireless network
   def handle_call(:disconnect, _from, state) do
-    # Disconnect from current network
-    System.cmd("wpa_cli", ["-i", @interface, "disconnect"])
+    if Application.get_env(:sentinel, :mock_data, false) do
+      {:reply, :ok, state}
+    else
+      # Disconnect from current network
+      System.cmd("wpa_cli", ["-i", @interface, "disconnect"])
 
-    Logger.info("Disconencted from network")
-    {:reply, :ok, state}
+      Logger.info("Disconencted from network")
+      {:reply, :ok, state}
+    end
   end
 
   # Connects to a Wi-Fi network and overwrites config
@@ -166,33 +178,41 @@ defmodule Sentinel.Servers.Wlan do
 
   # Get the current connection status
   defp check_connection do
-    {output, _} = System.cmd("iw", ["dev", @interface, "link"])
+    if Application.get_env(:sentinel, :mock_data, false) do
+      :local_development_mode
+    else
+      {output, _} = System.cmd("iw", ["dev", @interface, "link"])
 
-    is_connected =
-      case output |> String.trim() do
-        "Not connected." -> false
-        _ -> true
-      end
+      is_connected =
+        case output |> String.trim() do
+          "Not connected." -> false
+          _ -> true
+        end
 
-    if(is_connected, do: :connected, else: :disconnected)
+      if(is_connected, do: :connected, else: :disconnected)
+    end
   end
 
   # we reinit the wp supplicant on startup initially
   def init_wp_supplicant() do
-    Logger.info("Restarting wpa_supplicant...")
-
-    # Kill existing wpa_supplicant
-    System.cmd("pkill", ["-f", "wpa_supplicant"])
-    Process.sleep(2000)  # Wait 2 seconds for the process to fully terminate
-
-    # Restart wpa_supplicant
-    {_, exit_code} = System.cmd("wpa_supplicant", ["-B", "-i", @interface, "-c", @wpa_config])
-
-    if exit_code == 0 do
-      Logger.info("wpa_supplicant restarted successfully")
-      wait_for_wpa_cli_ready()  # Ensure wpa_cli is ready before proceeding
+    if Application.get_env(:sentinel, :mock_data, false) do
+      :local_development_mode
     else
-      Logger.error("Failed to restart wpa_supplicant")
+      Logger.info("Restarting wpa_supplicant...")
+
+      # Kill existing wpa_supplicant
+      System.cmd("pkill", ["-f", "wpa_supplicant"])
+      Process.sleep(2000)  # Wait 2 seconds for the process to fully terminate
+
+      # Restart wpa_supplicant
+      {_, exit_code} = System.cmd("wpa_supplicant", ["-B", "-i", @interface, "-c", @wpa_config])
+
+      if exit_code == 0 do
+        Logger.info("wpa_supplicant restarted successfully")
+        wait_for_wpa_cli_ready()  # Ensure wpa_cli is ready before proceeding
+      else
+        Logger.error("Failed to restart wpa_supplicant")
+      end
     end
   end
 

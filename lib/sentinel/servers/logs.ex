@@ -103,38 +103,42 @@ defmodule Sentinel.Servers.Logs do
 
   # Handle questions to remove old backup files
   def handle_info(:cleanup_logs, state) do
-    # Define log directory and get list of files
-    log_dir = Path.expand("../logs/", File.cwd!())
+    if Application.get_env(:sentinel, :mock_data, false) do
+      {:noreply, state}
+    else
+      # Define log directory and get list of files
+      log_dir = Path.expand("../logs/", File.cwd!())
 
-    # Get current Unix timestamp
-    current_time = DateTime.utc_now() |> DateTime.to_unix()
+      # Get current Unix timestamp
+      current_time = DateTime.utc_now() |> DateTime.to_unix()
 
-    # Get list of files in the log directory
-    log_files = File.ls!(log_dir)
+      # Get list of files in the log directory
+      log_files = File.ls!(log_dir)
 
-    # Filter and delete old log files
-    Enum.each(log_files, fn filename ->
-      case String.split(filename, ".") do
-        [timestamp_str, "log", "gz"] ->
-          # 3 array means it was a backup that was made
-          timestamp = String.to_integer(timestamp_str)
+      # Filter and delete old log files
+      Enum.each(log_files, fn filename ->
+        case String.split(filename, ".") do
+          [timestamp_str, "log", "gz"] ->
+            # 3 array means it was a backup that was made
+            timestamp = String.to_integer(timestamp_str)
 
-          if current_time - timestamp > (@one_day * 7) do
-            file_path = Path.join(log_dir, filename)
-            case File.rm(file_path) do
-              :ok -> IO.puts("Deleted old log file: #{filename}")
-              {:error, reason} -> IO.puts("Failed to delete #{filename}: #{inspect(reason)}")
+            if current_time - timestamp > (@one_day * 7) do
+              file_path = Path.join(log_dir, filename)
+              case File.rm(file_path) do
+                :ok -> IO.puts("Deleted old log file: #{filename}")
+                {:error, reason} -> IO.puts("Failed to delete #{filename}: #{inspect(reason)}")
+              end
+              :ok
             end
-            :ok
-          end
 
-        _ -> :ok # Skip non-matching files
-      end
-    end)
+          _ -> :ok # Skip non-matching files
+        end
+      end)
 
-    cleanup_archived_files()
+      cleanup_archived_files()
 
-    {:noreply, state}
+      {:noreply, state}
+    end
   end
 
   # Get all of the log information from the log file for a specific device

@@ -125,18 +125,22 @@ defmodule Sentinel.Servers.Blacklist do
 
     items_to_remove =
       Enum.filter(data, fn policy ->
-        policy["ttl"] != "-" and System.os_time(:second) > String.to_integer(policy["ttl"])
+        if policy["ttl"] !== "NULL" do
+          policy["ttl"] != "-" and System.os_time(:second) > String.to_integer(policy["ttl"])
+        end
       end)
 
     updated_blocklist =
       Enum.reject(data, fn policy ->
-        policy["ttl"] != "-" and System.os_time(:second) > String.to_integer(policy["ttl"])
+        if policy["ttl"] !== "NULL" do
+          policy["ttl"] != "-" and System.os_time(:second) > String.to_integer(policy["ttl"])
+        end
       end)
 
     write_file = File.write(path(), Jason.encode!(updated_blocklist))
 
     Enum.each(items_to_remove, fn policy ->
-      if policy["ttl"] != "" do
+      if policy["ttl"] != "" or policy["ttl"] != "NULL" do
         IO.inspect("TTL Expired for #{policy["domain"]}, removing from blacklist")
         if has_policy?(policy) do
           IO.inspect("Removing policy from iptables: #{inspect(policy)}")
