@@ -24,33 +24,6 @@ defmodule Sentinel.Servers.Wlan do
     {:ok, %{}}
   end
 
-  # Scans for networks
-  def handle_call(:scan, _from, state) do
-    Logger.info("Scanning for Wi-Fi networks...")
-    System.cmd("wpa_cli", ["scan"])
-    # Wait for scan results
-    Process.sleep(3000)
-    {:reply, :ok, state}
-  end
-
-  # Fetches scan results and parses SSIDs
-  def handle_call(:scan_results, _from, state) do
-    if Application.get_env(:sentinel, :mock_data, false) do
-      {:reply, Sentinel.Servers.FakeData.Wlan.get_data(), state}
-    else
-      {output, _} = System.cmd("wpa_cli", ["scan_results"])
-
-      networks =
-        output
-        |> String.split("\n")
-        |> Enum.map(&parse_scan_result/1)
-        |> Enum.reject(&is_nil/1)
-        |> Enum.filter(fn i -> i.security !== "/" end)
-
-      {:reply, networks, state}
-    end
-  end
-
   # Checks if a Wi-Fi network is open or secured
   def handle_call({:network_security, ssid}, _from, state) do
     if Application.get_env(:sentinel, :mock_data, false) do
@@ -69,7 +42,8 @@ defmodule Sentinel.Servers.Wlan do
             {:error, "SSID not found"}
 
           _ ->
-            if String.contains?(security_flags, "[WPA") or String.contains?(security_flags, "[WEP") do
+            if String.contains?(security_flags, "[WPA") or
+                 String.contains?(security_flags, "[WEP") do
               {:secure, true}
             else
               {:secure, false}
@@ -88,8 +62,59 @@ defmodule Sentinel.Servers.Wlan do
       # Disconnect from current network
       System.cmd("wpa_cli", ["-i", @interface, "disconnect"])
 
+      Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :info, message: "Disconnected from network"})
       Logger.info("Disconencted from network")
+
+      # send relevant events to the main dashboard
+      check_connection()
       {:reply, :ok, state}
+    end
+  end
+
+  # Scans for networks
+  def handle_cast(:scan, state) do
+    if Application.get_env(:sentinel, :mock_data, false) do
+      {:noreply, Sentinel.Servers.FakeData.Wlan.get_data()}
+    else
+      Logger.info("Scanning for Wi-Fi networks...")
+
+      # scan for networks
+      System.cmd("wpa_cli", ["scan"])
+      {output, _} = System.cmd("wpa_cli", ["scan_results"])
+
+      networks =
+        output
+        |> String.split("\n")
+        |> Enum.map(&parse_scan_result/1)
+        |> Enum.reject(&is_nil/1)
+        |> Enum.filter(fn i -> i.security !== "/" end)
+
+      # attempt to get current network details
+      System.cmd("wpa_cli", ["status"])
+      {status_output, _} = System.cmd("wpa_cli", ["status"])
+
+      # Broadcast to the live view (or parent) so it can update the Devices component.
+      # Use an id that matches the one used in your live_component render.
+      Phoenix.PubSub.broadcast(Sentinel.PubSub, "component:details", %{
+        id: "sidebar_details_desktop",
+        module: SentinelWeb.Live.Components.Sidebar.Details,
+        data: %{
+          networks: networks,
+          info: parse_wpa_status(status_output)
+        }
+      })
+
+      # Broadcast to sidebar details for mobile:
+      Phoenix.PubSub.broadcast(Sentinel.PubSub, "component:details", %{
+        id: "sidebar_details_mobile",
+        module: SentinelWeb.Live.Components.Sidebar.Details,
+        data: %{
+          networks: networks,
+          info: parse_wpa_status(status_output)
+        }
+      })
+
+      {:noreply, state}
     end
   end
 
@@ -122,6 +147,11 @@ defmodule Sentinel.Servers.Wlan do
     # Request new DHCP lease to get an IP
     System.cmd("dhcpcd", [@interface])
 
+    Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :info, message: "Connected to network #{ssid} successfully"})
+
+    # send relevant events to the main dashboard
+    check_connection()
+
     {:noreply, state}
   end
 
@@ -134,12 +164,7 @@ defmodule Sentinel.Servers.Wlan do
 
   @doc "Scans for available Wi-Fi networks"
   def scan_networks() do
-    GenServer.call(__MODULE__, :scan)
-  end
-
-  @doc "Retrieves scanned Wi-Fi networks"
-  def get_scan_results() do
-    GenServer.call(__MODULE__, :scan_results)
+    GenServer.cast(__MODULE__, :scan)
   end
 
   @doc "Checks if a Wi-Fi network requires a password"
@@ -189,6 +214,7 @@ defmodule Sentinel.Servers.Wlan do
           _ -> true
         end
 
+      Phoenix.PubSub.broadcast(Sentinel.PubSub, "status:internet", %{ type: :internet,  status: is_connected})
       if(is_connected, do: :connected, else: :disconnected)
     end
   end
@@ -202,14 +228,16 @@ defmodule Sentinel.Servers.Wlan do
 
       # Kill existing wpa_supplicant
       System.cmd("pkill", ["-f", "wpa_supplicant"])
-      Process.sleep(2000)  # Wait 2 seconds for the process to fully terminate
+      # Wait 2 seconds for the process to fully terminate
+      Process.sleep(2000)
 
       # Restart wpa_supplicant
       {_, exit_code} = System.cmd("wpa_supplicant", ["-B", "-i", @interface, "-c", @wpa_config])
 
       if exit_code == 0 do
         Logger.info("wpa_supplicant restarted successfully")
-        wait_for_wpa_cli_ready()  # Ensure wpa_cli is ready before proceeding
+        # Ensure wpa_cli is ready before proceeding
+        wait_for_wpa_cli_ready()
       else
         Logger.error("Failed to restart wpa_supplicant")
       end
@@ -232,5 +260,20 @@ defmodule Sentinel.Servers.Wlan do
         :error
       end
     end
+  end
+
+  # Parses raw wpa_cli status output into a map
+  def parse_wpa_status(raw) do
+    raw
+    |> String.split("\n")
+    |> Enum.reject(&(&1 == "" or String.starts_with?(&1, "Selected interface")))
+    |> Enum.map(fn line ->
+      case String.split(line, "=", parts: 2) do
+        [key, val] -> {key, val}
+        _ -> nil
+      end
+    end)
+    |> Enum.reject(&is_nil/1)
+    |> Enum.into(%{})
   end
 end

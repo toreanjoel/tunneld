@@ -27,6 +27,7 @@ defmodule SentinelWeb.Live.Dashboard do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Sentinel.PubSub, "notifications")
       Phoenix.PubSub.subscribe(Sentinel.PubSub, "modal:form:action")
+      Phoenix.PubSub.subscribe(Sentinel.PubSub, "status:internet")
     end
 
     socket =
@@ -44,6 +45,11 @@ defmodule SentinelWeb.Live.Dashboard do
         sidebar: %{
           is_open: false,
           view: :system_overview
+        }
+      )
+      |> assign(
+        status: %{
+          internet: false
         }
       )
 
@@ -119,7 +125,8 @@ defmodule SentinelWeb.Live.Dashboard do
 
         <div class="flex flex-row gap-2">
           <%!-- Internet Access Placeholder --%>
-          <div phx-click="show_details" phx-value-type="_" phx-value-id={"_"} class="bg-secondary flex flex-row gap-3 py-2 px-3 items-center rounded-md cursor-pointer">
+          <div phx-click="show_details" phx-value-type="wlan" phx-value-id={"_"}
+            class={"#{if @status.internet, do: "bg-green", else: "bg-red"} flex flex-row gap-3 py-2 px-3 items-center rounded-md cursor-pointer"}>
             <%!-- We need to use icon here --%>
             Internet Access
           </div>
@@ -212,6 +219,10 @@ defmodule SentinelWeb.Live.Dashboard do
           Sentinel.Servers.Logs.init_state()
           :logs
 
+        "wlan" ->
+          Sentinel.Servers.Wlan.scan_networks()
+          :wlan
+
         _ ->
           :system_overview
       end
@@ -259,6 +270,17 @@ defmodule SentinelWeb.Live.Dashboard do
   end
 
   #
+  # Trigger actions
+  #
+  def handle_event("trigger_action", params, socket) do
+    action = params["action"]
+    data = Jason.decode!(params["data"])
+
+    send(self(), %{ action: action, data: data })
+    {:noreply, socket}
+  end
+
+  #
   # Close the modal
   #
   def handle_event("modal_close", _params, socket) do
@@ -274,6 +296,19 @@ defmodule SentinelWeb.Live.Dashboard do
   """
   def handle_info(%{id: id, module: module, data: data}, socket) do
     send_update(module, id: id, data: data)
+    {:noreply, socket}
+  end
+
+  #
+  # Handle recieving event for internet status changes
+  #
+  def handle_info(%{type: :internet, status: status}, socket) do
+    socket =
+      socket
+      |> assign(status: %{
+        internet: status,
+      })
+
     {:noreply, socket}
   end
 
@@ -309,6 +344,13 @@ defmodule SentinelWeb.Live.Dashboard do
       "backup_file_delete" ->
         decoded_data = Jason.decode!(data)
         Sentinel.Servers.Logs.delete_log_file(decoded_data["file"])
+      "connect_to_wireless_network" ->
+        Sentinel.Servers.Wlan.connect_with_pass(data["ssid"], data["password"])
+      "disconnect_from_wireless_network" ->
+        Sentinel.Servers.Wlan.disconnect()
+        Process.send_after(self(), :delayed_scan, 3000)
+      "scan_for_wireless_networks" ->
+        Sentinel.Servers.Wlan.scan_networks()
         _ ->
         Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :error, message: "Action doesnt exist and cant be handled"})
     end
@@ -321,5 +363,14 @@ defmodule SentinelWeb.Live.Dashboard do
   #
   def handle_info(:clear_flash, socket) do
     {:noreply, clear_flash(socket)}
+  end
+
+  #
+  # handle delayed scan for wireless networks
+  #
+  def handle_info(:delayed_scan, socket) do
+    IO.inspect("Staring delayed scan for wireless networks")
+    Sentinel.Servers.Wlan.scan_networks()
+    {:noreply, socket}
   end
 end

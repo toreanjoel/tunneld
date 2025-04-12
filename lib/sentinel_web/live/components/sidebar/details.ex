@@ -47,6 +47,109 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
     """
   end
 
+  @spec render(%{:view => :wlan, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{view: :wlan} = assigns) do
+    data = Map.get(assigns, :data)
+
+    assigns =
+      assigns
+      |> assign(networks: Map.get(data, :networks, []))
+      |> assign(info: Map.get(data, :info, %{}))
+      |> assign(count: data |> List.wrap() |> length())
+
+    ~H"""
+    <div class="bg-secondary p-2 h-full">
+      <%!-- Sidebar header that will house metadat?  --%>
+      <%= sidebar_header(assigns, %{
+        header: "Wireless Network Access",
+        body: "Connect to wireless access points in order to get internet access to your gateway"
+      }) %>
+
+      <pre
+        :if={@info["wpa_state"] !== "COMPLETED" and not Enum.empty?(@info)}
+        class="bg-gray-900 text-gray-100 text-xs p-3 rounded-md overflow-auto"
+      ><%= Jason.encode!(@info, pretty: true) %></pre>
+
+      <div class="flex flex-row gap-1 justify-end my-2">
+        <%!-- Actions to take --%>
+        <div
+          phx-click="trigger_action"
+          phx-value-action="scan_for_wireless_networks"
+          phx-value-data={Jason.encode!(%{})}
+          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+        >
+          <.icon class="w-4 h-4" name="hero-arrow-path" />
+          <div class="truncate text-xs text-gray-1">Refresh</div>
+        </div>
+      </div>
+
+      <div class={"flex flex-col #{if @count== 0, do: "items-center justify-center", else: ""}"}>
+        <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">
+          No Wireless Networks Found
+        </h1>
+
+        <div :if={@count > 0}>
+          <%= for %{ open: open, security: security, signal: signal, ssid: ssid } <- @networks do %>
+            <% current_connected = @info["ssid"] === ssid %>
+
+            <div class={"flex flex-col p-3 mb-2 #{if current_connected, do: "bg-purple", else: "bg-primary"} rounded-lg font-light"}>
+              <div class="text-md truncate"><span class="font-bold">SSID:</span> <%= ssid %></div>
+              <div class="text-sm truncate">
+                <span class="font-bold">Security:</span> <%= security %>
+              </div>
+              <div class="text-sm truncate">
+                <span class="font-bold">Signal:</span> <%= signal %>
+              </div>
+              <div class="text-sm truncate">
+                <span class="font-bold">Open Network:</span> <%= open %>
+              </div>
+
+              <pre
+                :if={current_connected}
+                class="bg-gray-900 text-gray-100 text-xs p-3 rounded-md overflow-auto"
+              ><%= Jason.encode!(@info, pretty: true) %></pre>
+
+              <div class="divider" />
+              <div class="flex justify-end mt-2">
+                <%!-- If we are connected to the network --%>
+                <div
+                  :if={current_connected}
+                  phx-click="trigger_action"
+                  phx-value-action="disconnect_from_wireless_network"
+                  phx-value-data={Jason.encode!(%{})}
+                  class="flex items-center justify-center gap-1 bg-secondary p-2 cursor-pointer rounded-md"
+                >
+                  <div class="truncate text-xs text-gray-1">disconnect</div>
+                </div>
+
+                <%!-- If we are not connected to the network --%>
+                <div
+                  :if={not current_connected}
+                  phx-click="modal_open"
+                  phx-value-modal_title="Connect to wireless network"
+                  phx-value-modal_body={
+                    Jason.encode!(%{
+                      "type" => "schema",
+                      "data" => Sentinel.Schema.Wlan.data(%{title: ssid}),
+                      "default_values" => %{
+                        ssid: [ssid]
+                      },
+                      "action" => "connect_to_wireless_network"
+                    })
+                  }
+                  class="flex items-center justify-center gap-1 bg-secondary p-2 cursor-pointer rounded-md"
+                >
+                  <div class="truncate text-xs text-gray-1">connect</div>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
   @spec render(%{:view => :service, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :service} = assigns) do
     data = Map.get(assigns, :data)
@@ -127,7 +230,10 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
     ~H"""
     <div class="bg-secondary p-2 h-full">
       <%!-- Sidebar header that will house metadat?  --%>
-      <%= sidebar_header(assigns) %>
+      <%= sidebar_header(assigns, %{
+        header: "Blocklist",
+        body: "List of manually blocked domains for connected systems and devices"
+      }) %>
 
       <div class="flex flex-row gap-1 justify-end my-2">
         <%!-- Actions to take --%>
@@ -282,12 +388,17 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
   # Sidebar header componen
   # Contains information around the sidebar context, will take params but this will be specific to sidebar
   #
-  defp sidebar_header(assigns) do
+  defp sidebar_header(assigns, %{header: header, body: body}) do
+    assigns =
+      assigns
+      |> assign(header: header)
+      |> assign(body: body)
+
     ~H"""
-    <div class="min-h-[200px] bg-primary bg-gradient-to-r from-purple to-primary rounded-md p-3">
-      <div class="text-2xl font-medium">Header</div>
-      <div class="text-lg">
-        Some description comes here about the current context we are viewing of the sidebar
+    <div class="min-h-[170px] bg-primary bg-gradient-to-r from-secondary to-primary rounded-md p-3">
+      <div class="text-xl font-medium"><%= @header %></div>
+      <div class="text-sm">
+        <%= @body %>
       </div>
     </div>
     """
