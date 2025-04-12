@@ -104,10 +104,12 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
                 <span class="font-bold">Open Network:</span> <%= open %>
               </div>
 
-              <pre
-                :if={current_connected}
-                class="bg-gray-900 text-gray-100 text-xs p-3 rounded-md overflow-auto"
-              ><%= Jason.encode!(@info, pretty: true) %></pre>
+              <div class="py-2">
+                <pre
+                  :if={current_connected}
+                  class="bg-gray-900 text-gray-100 text-xs p-3 rounded-md overflow-auto"
+                ><%= Jason.encode!(@info, pretty: true) %></pre>
+              </div>
 
               <div class="divider" />
               <div class="flex justify-end mt-2">
