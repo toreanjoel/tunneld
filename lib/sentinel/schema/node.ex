@@ -13,6 +13,15 @@ defmodule Sentinel.Schema.Node do
       "description" => "Add a reference to a device running on the sentinel network",
       "type" => "object",
       "properties" => %{
+        "name" => %{
+          "type" => "string",
+          "description" => "Name the node to make it easy to reference",
+          "minLength" => 1
+        },
+        "icon" => %{
+          "type" => "string",
+          "description" => "Choose an icon to denote with the node",
+        },
         "ip" => %{
           "type" => "string",
           "description" => "IP address of the machine hosting the application",
@@ -23,7 +32,7 @@ defmodule Sentinel.Schema.Node do
           "description" => "The port where the application is accessible from"
         }
       },
-      "required" => ["ip", "port"]
+      "required" => ["ip", "port", "name", "icon"]
     }
   end
 end

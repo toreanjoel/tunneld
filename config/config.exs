@@ -70,7 +70,8 @@ config :sentinel, :fs,
   auth: "/auth.json",
   blacklist: "/blacklist.json",
   whitelist: "/whitelist.json",
-  tunnels: "/cloudflare_tunnels.json"
+  tunnels: "/cloudflare_tunnels.json",
+  nodes: "/nodes.json"
 
 # TODO: This needs to come from env variables from runtime config
 config :sentinel, :network,

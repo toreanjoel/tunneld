@@ -392,6 +392,7 @@ defmodule SentinelWeb.Live.Dashboard do
       #
       "add_node" ->
         # TODO: add the server that will manage the polling and creating of the relevant files for node details
+        IO.inspect(data, label: "__DATA__")
         IO.inspect("ADDING NEW NODE")
 
       _ ->

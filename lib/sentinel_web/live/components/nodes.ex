@@ -48,7 +48,10 @@ defmodule SentinelWeb.Live.Components.Nodes do
             Jason.encode!(%{
               "type" => "schema",
               "data" => Sentinel.Schema.Node.data(:add),
-              "default_values" => %{},
+              "default_values" => %{
+                # These below needs to be more dynamic but this is supported given what we render at the moment
+                "icon" => ["vpn", "storage", "cpu", "pc", "other"]
+              },
               "action" => "add_node"
             })
           }
