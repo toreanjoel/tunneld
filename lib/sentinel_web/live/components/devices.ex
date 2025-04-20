@@ -47,7 +47,7 @@ defmodule SentinelWeb.Live.Components.Devices do
             phx-click="show_details"
             phx-value-type="blacklist"
             phx-value-id="_"
-            class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150"
+            class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
           >
             <.icon class="w-4 h-4" name="hero-no-symbol" />
             <div class="truncate text-xs text-gray-1">Block List</div>
@@ -56,10 +56,10 @@ defmodule SentinelWeb.Live.Components.Devices do
             phx-click="show_details"
             phx-value-type="logs"
             phx-value-id="_"
-            class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150"
+            class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
           >
             <.icon class="w-4 h-4" name="hero-circle-stack" />
-            <div class="truncate text-xs text-gray-1">Log Backups</div>
+            <div class="truncate text-xs">Log Backups</div>
           </div>
         </div>
       </div>
