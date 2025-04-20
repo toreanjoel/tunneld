@@ -64,7 +64,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
           phx-value-modal_body={
             Jason.encode!(%{
               "type" => "string",
-              "data" => "Are you sure you want to remove the node domain?"
+              "data" => "Are you sure you want to remove the node?"
             })
           }
           phx-value-modal_actions={
