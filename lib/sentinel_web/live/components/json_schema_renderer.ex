@@ -118,10 +118,13 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
     case Validator.validate(socket.assigns.schema, params) do
       :ok ->
         # Send this back to the parent live view that handles the event already
-        Phoenix.PubSub.broadcast(Sentinel.PubSub, "modal:form:action", %{
-          action: socket.assigns.action,
-          data: params
-        })
+        send(self(), %{action: socket.assigns.action, data: params})
+
+        # NOTE: This will send to all subscribed and not just the parent, causing rerenders
+        # Phoenix.PubSub.broadcast(Sentinel.PubSub, "modal:form:action", %{
+        #   action: socket.assigns.action,
+        #   data: params
+        # })
 
         {:noreply, assign(socket, changeset: params, errors: nil)}
 

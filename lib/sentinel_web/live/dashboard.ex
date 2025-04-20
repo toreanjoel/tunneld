@@ -26,7 +26,6 @@ defmodule SentinelWeb.Live.Dashboard do
   def mount(_params, %{"ip" => ip} = _session, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Sentinel.PubSub, "notifications")
-      Phoenix.PubSub.subscribe(Sentinel.PubSub, "modal:form:action")
       Phoenix.PubSub.subscribe(Sentinel.PubSub, "status:internet")
     end
 
@@ -398,11 +397,14 @@ defmodule SentinelWeb.Live.Dashboard do
       # Nodes
       #
       "add_node" ->
+        IO.inspect(data, label: "🚨 ADD_NODE received")
+
         Sentinel.Servers.Nodes.add_node(data)
 
       "remove_node" ->
         %{ "id" => id } = Jason.decode!(data)
         Sentinel.Servers.Nodes.remove_node(id)
+
       _ ->
         Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
           type: :error,

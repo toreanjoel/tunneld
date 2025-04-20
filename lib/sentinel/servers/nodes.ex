@@ -62,12 +62,16 @@ defmodule Sentinel.Servers.Nodes do
   # Add node to be persisted
   #
   def handle_cast({:add_node, node}, state) do
-    {_, data} = read_file()
+    nodes =
+      case read_file() do
+        {:ok, list} when is_list(list) -> list
+        _ -> []
+      end
 
-    nodes = data ++ [Map.put(node, "id", DateTime.utc_now() |> DateTime.to_unix() |> to_string)]
+    updated_nodes = nodes ++ [Map.put(node, "id", DateTime.utc_now() |> DateTime.to_unix() |> to_string)]
 
     update_state =
-      case File.write(path(), Jason.encode!(nodes)) do
+      case File.write(path(), Jason.encode!(updated_nodes)) do
         :ok ->
           Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
             type: :info,
@@ -78,7 +82,7 @@ defmodule Sentinel.Servers.Nodes do
           broadcast_nodes()
 
           # updated state
-          Map.put(state, :nodes, nodes)
+          Map.put(state, :nodes, updated_nodes)
 
         {:error, err} ->
           Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
