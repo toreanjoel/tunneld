@@ -128,7 +128,7 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
         # Send this back to the parent live view that handles the event already
         Phoenix.PubSub.broadcast(Sentinel.PubSub, "modal:form:action", %{
           action: socket.assigns.action,
-          data: params
+          data: params,
         })
 
         {:noreply, assign(socket, changeset: params, errors: nil)}

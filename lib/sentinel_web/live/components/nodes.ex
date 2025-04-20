@@ -16,15 +16,6 @@ defmodule SentinelWeb.Live.Components.Nodes do
     # Example list of nodes, each with a type and a status.
     socket =
       socket
-      |> assign(
-        nodes: [
-          %{id: "id1", type: "cpu", status: "active"},
-          %{id: "id2", type: "storage", status: "warning"},
-          %{id: "id3", type: "vpn", status: "active"},
-          %{id: "id4", type: "pc", status: "offline"},
-          %{id: "id4", type: "pc", status: "offline"}
-        ]
-      )
       |> assign(data: Map.get(assigns, :data, %{}))
 
     {:ok, socket}
@@ -34,6 +25,9 @@ defmodule SentinelWeb.Live.Components.Nodes do
   Render the nodes.
   """
   def render(assigns) do
+    assigns = assigns
+    |> assign(nodes: assigns.data)
+
     ~H"""
     <div class="p-5">
       <div class="mb-5 flex flex-row">
@@ -74,8 +68,8 @@ defmodule SentinelWeb.Live.Components.Nodes do
                 phx-value-id={node.id}
                 class="relative w-[100px] md:w-[60px] h-[100px] md:h-[60px] p-2 bg-secondary flex items-center justify-center rounded-md hover:bg-secondary cursor-pointer"
               >
-                <.icon class="w-8 h-8" name={get_icon(node.type)} />
-                <div class={"absolute bottom-[5px] right-2 w-[6px] h-[6px] rounded-full " <> get_status_color(node.status)}>
+                <.icon class="w-8 h-8" name={get_icon(node.icon || "other")} />
+                <div class={"absolute bottom-[5px] right-2 w-[6px] h-[6px] rounded-full " <> get_status_color(node.status || false)}>
                 </div>
               </div>
             <% end %>
@@ -93,8 +87,6 @@ defmodule SentinelWeb.Live.Components.Nodes do
   defp get_icon(_), do: "hero-question-mark-circle"
 
   # Helper function to set a status indicator color based on node status.
-  defp get_status_color("active"), do: "bg-green"
-  defp get_status_color("warning"), do: "bg-yellow"
-  defp get_status_color("offline"), do: "bg-red"
-  defp get_status_color(_), do: "bg-gray-500"
+  defp get_status_color(true), do: "bg-green"
+  defp get_status_color(_), do: "bg-red"
 end

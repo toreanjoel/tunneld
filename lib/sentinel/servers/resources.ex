@@ -5,7 +5,7 @@ defmodule Sentinel.Servers.Resources do
   use GenServer
   require Logger
 
-  @interval 5_000
+  @interval 20_000
 
   # Public API to start the GenServer
   def start_link(_) do

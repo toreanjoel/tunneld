@@ -31,7 +31,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
           Phoenix.LiveView.Rendered.t()
   def render(%{view: :system_overview} = assigns) do
     ~H"""
-    <div class="flex flex-col items-center justify-center p-3 h-full">
+    <div class="flex flex-col items-center justify-center p-5 h-full">
       <.icon class="w-[50px] h-[50px] text-green" name="hero-shield-check" />
       <h1 class="text-2xl font-light text-gray-2 my-4 text-center">System is running as expected.</h1>
     </div>
@@ -40,9 +40,63 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
 
   @spec render(%{:view => :node, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :node} = assigns) do
+    data = Map.get(assigns, :data)
+
+    assigns =
+      assigns
+      |> assign(has_data: !Enum.empty?(data))
+
     ~H"""
-    <div class="flex flex-col items-center justify-center p-3 h-full">
-      <h1 class="text-2xl font-light text-gray-2 my-4 text-center">node</h1>
+    <div class="bg-secondary p-2 h-full">
+      <div :if={@has_data}>
+        <%!-- Sidebar header that will house metadat?  --%>
+        <%= sidebar_header(assigns, %{
+          header: "Node: #{data.name}",
+          body: "The details below contains relevant node details that is being tracked"
+        }) %>
+      </div>
+
+      <div :if={@has_data} class="flex flex-row gap-1 justify-end my-2">
+        <%!-- Actions to take --%>
+        <div
+          phx-click="modal_open"
+          phx-value-modal_title="Remove Node?"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "string",
+              "data" => "Are you sure you want to remove the node domain?"
+            })
+          }
+          phx-value-modal_actions={
+            Jason.encode!(%{
+              "title" => "Remove",
+              "payload" => %{
+                "type" => "remove_node",
+                "data" => %{"id" => data.id}
+              }
+            })
+          }
+          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+        >
+          <.icon name="hero-no-symbol" class="h-5 w-5" />
+          <div class="truncate text-xs text-gray-1">Remove Node</div>
+        </div>
+      </div>
+
+      <div :if={@has_data} class="bg-primary flex flex-row gap-3 py-2 px-3 my-2 items-center rounded-md">
+        <div class={"w-[13px] h-[13px] rounded-full #{status(data.status)}"}></div>
+        <div class="text-sm truncate">Status</div>
+      </div>
+
+      <div class={"flex flex-col #{if !@has_data, do: "items-center justify-center p-3 h-full", else: ""}"}>
+        <h1 :if={!@has_data} class="text-2xl font-light text-gray-2 my-4 text-center">
+          No Node details
+        </h1>
+
+        <div :if={@has_data}>
+          has details
+        </div>
+      </div>
     </div>
     """
   end
@@ -397,7 +451,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
       |> assign(body: body)
 
     ~H"""
-    <div class="min-h-[170px] bg-primary bg-gradient-to-r from-secondary to-primary rounded-md p-3">
+    <div class="bg-primary bg-gradient-to-r from-secondary to-primary rounded-md p-3">
       <div class="text-xl font-medium"><%= @header %></div>
       <div class="text-sm">
         <%= @body %>
@@ -405,4 +459,8 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
     </div>
     """
   end
+
+  # The status of the services on the operating system
+  defp status(service) when service === true, do: "bg-green"
+  defp status(_), do: "bg-red"
 end

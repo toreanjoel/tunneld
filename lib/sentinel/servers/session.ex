@@ -6,7 +6,7 @@ defmodule Sentinel.Servers.Session do
   require Logger
 
   # Default TTL for sessions in seconds
-  @interval 10_000
+  @interval 20_000
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)

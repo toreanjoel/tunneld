@@ -6,8 +6,8 @@ defmodule Sentinel.Servers.Services do
   require Logger
 
   @services [:dnsmasq, :dhcpcd, :'dnscrypt-proxy']
-  @service_log_limit "80"
-  @interval 10_000
+  @service_log_limit "25"
+  @interval 20_000
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)

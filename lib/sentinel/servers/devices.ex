@@ -5,7 +5,7 @@ defmodule Sentinel.Servers.Devices do
   use GenServer
   require Logger
 
-  @interval 10_000
+  @interval 20_000
   @path "/var/lib/misc/dnsmasq.leases"
 
   def start_link(_) do

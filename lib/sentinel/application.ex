@@ -5,12 +5,28 @@ defmodule Sentinel.Application do
 
   use Application
   alias Sentinel.Servers.FakeData.Whitelist
-  alias Sentinel.Servers.{Auth, Session, Services, Logs, Devices, Blacklist, Whitelist, Resources, Wlan, Cloudflare}
+
+  alias Sentinel.Servers.{
+    Auth,
+    Session,
+    Services,
+    Logs,
+    Devices,
+    Blacklist,
+    Whitelist,
+    Resources,
+    Wlan,
+    Cloudflare,
+    Nodes
+  }
 
   @impl true
   def start(_type, _args) do
     IO.inspect("MAKE SURE TO SET THE MOCK_DATA ENV VAR for development")
-    IO.inspect("MAKE SURE THE OS IS USING LEGACY IPTABLES: sudo update-alternatives --set iptables /usr/sbin/iptables-legacy")
+
+    IO.inspect(
+      "MAKE SURE THE OS IS USING LEGACY IPTABLES: sudo update-alternatives --set iptables /usr/sbin/iptables-legacy"
+    )
 
     children = [
       SentinelWeb.Telemetry,
@@ -22,6 +38,7 @@ defmodule Sentinel.Application do
       SentinelWeb.Endpoint,
       {Resources, []},
       {Services, []},
+      {Nodes, []},
       {Logs, []},
       {Devices, []},
       {Auth, []},
@@ -29,7 +46,7 @@ defmodule Sentinel.Application do
       {Whitelist, []},
       {Session, []},
       {Wlan, []},
-      {Cloudflare, []},
+      {Cloudflare, []}
     ]
 
     # This should not be async, we want this to complete before any other servers init data

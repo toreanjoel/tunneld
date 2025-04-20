@@ -46,7 +46,7 @@ defmodule SentinelWeb.Live.Components.Modal do
   def handle_event("modal_action", %{"type" => action, "data" => data}, socket) do
     Phoenix.PubSub.broadcast(Sentinel.PubSub, "modal:form:action", %{
       action: action,
-      data: data
+      data: data,
     })
 
     {:noreply, socket}

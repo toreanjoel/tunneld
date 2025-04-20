@@ -208,6 +208,7 @@ defmodule SentinelWeb.Live.Dashboard do
     view =
       case type do
         "node" ->
+          Sentinel.Servers.Nodes.get_node(id)
           :node
 
         "service" ->
@@ -391,10 +392,11 @@ defmodule SentinelWeb.Live.Dashboard do
       # Nodes
       #
       "add_node" ->
-        # TODO: add the server that will manage the polling and creating of the relevant files for node details
-        IO.inspect(data, label: "__DATA__")
-        IO.inspect("ADDING NEW NODE")
+        Sentinel.Servers.Nodes.add_node(data)
 
+      "remove_node" ->
+        %{ "id" => id } = Jason.decode!(data)
+        Sentinel.Servers.Nodes.remove_node(id)
       _ ->
         Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
           type: :error,
