@@ -51,13 +51,35 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
       <div :if={@has_data}>
         <%!-- Sidebar header that will house metadat?  --%>
         <%= sidebar_header(assigns, %{
-          header: "Node: #{data.name}",
-          body: "The details below contains relevant node details that is being tracked"
+          header: "Node",
+          body: "Areference to a running service accessible from this device over the network."
         }) %>
       </div>
 
       <div :if={@has_data} class="flex flex-row gap-1 justify-end my-2">
         <%!-- Actions to take --%>
+
+        <%!-- Actions Remove Node --%>
+        <div
+          phx-click="modal_open"
+          phx-value-modal_title="Connect to wireless network"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "schema",
+              "data" => Sentinel.Schema.Cloudflare.data(:add),
+              "default_values" => %{
+                service: "#{data.ip}:#{data.port}"
+              },
+              "action" => "connect_cloudflare"
+            })
+          }
+          class="flex items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
+        >
+          <.icon name="hero-globe-alt" class="h-5 w-5" />
+          <div class="truncate text-xs">Cloudflare Tunnel</div>
+        </div>
+
+        <%!-- Actions Remove Node --%>
         <div
           phx-click="modal_open"
           phx-value-modal_title="Remove Node?"
@@ -83,18 +105,23 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
         </div>
       </div>
 
-      <div :if={@has_data} class="bg-primary flex flex-row gap-3 py-2 px-3 my-2 items-center rounded-md">
-        <div class={"w-[13px] h-[13px] rounded-full #{status(data.status)}"}></div>
-        <div class="text-sm truncate">Status</div>
-      </div>
-
       <div class={"flex flex-col #{if !@has_data, do: "items-center justify-center p-3 h-full", else: ""}"}>
         <h1 :if={!@has_data} class="text-2xl font-light text-gray-2 my-4 text-center">
           No Node details
         </h1>
 
         <div :if={@has_data}>
-          has details
+          <div class="flex flex-col p-3 mb-2 bg-primary rounded-lg font-light">
+            <div class="text-sm truncate">
+              <span class="font-bold">Name:</span> <%= data.name %>
+            </div>
+            <div class="text-sm truncate">
+              <span class="font-bold">IP:</span> <%= data.ip %>
+            </div>
+            <div class="text-sm truncate">
+              <span class="font-bold">Port:</span> <%= data.port %>
+            </div>
+          </div>
         </div>
       </div>
     </div>

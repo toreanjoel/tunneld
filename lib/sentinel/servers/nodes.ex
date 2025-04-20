@@ -5,7 +5,7 @@ defmodule Sentinel.Servers.Nodes do
   use GenServer
   require Logger
 
-  @interval 20_000
+  @interval 10_000
 
   @broadcast_topic_main "component:nodes"
   @broadcast_topic "component:details"
@@ -155,25 +155,6 @@ defmodule Sentinel.Servers.Nodes do
     # send out the list of nodes
     nodes = broadcast_nodes()
 
-    # We need a better way of doing this so we dont need to iterate this often
-    # Broad cast the individual changes for each sidebar
-    Enum.each(nodes, fn node ->
-      # here we need to send off the detail to the sidebar
-      # Broadcast the new data structure for the sidebar component - desktop
-      Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic, %{
-        id: @component_desktop_id,
-        module: @component_module,
-        data: node
-      })
-
-      # Broadcast the new data structure for the sidebar component - mobile
-      Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic, %{
-        id: @component_mobile_id,
-        module: @component_module,
-        data: node
-      })
-    end)
-
     # restart the checking of nodes and their health
     sync_nodes()
     {:noreply, Map.put(state, :nodes, nodes)}
@@ -202,7 +183,8 @@ defmodule Sentinel.Servers.Nodes do
         ip: node["ip"],
         icon: node["icon"],
         port: node["port"],
-        status: port_busy?(node["ip"], node["port"])
+        status: port_busy?(node["ip"], node["port"]),
+        # add tunnel data here
       }
     end)
   end

@@ -30,18 +30,21 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
           description: props["description"],
           # Prioritize enums passed in `values` (dynamic injection)
           enum: Map.get(values, key, props["enum"]),
-          format: props["format"]
+          format: props["format"],
+          default: props["default"],
+          hidden: props["ui:widget"] == "hidden",
+          readonly: props["readOnly"] == true
         }
       end)
 
-    {:ok, socket
-      |> assign(loading: loading)
-      |> assign(action: assigns.action)
-      |> assign(schema: schema)
-      |> assign(fields: fields)
-      |> assign(changeset: values)
-      |> assign(errors: nil)
-    }
+    {:ok,
+     socket
+     |> assign(loading: loading)
+     |> assign(action: assigns.action)
+     |> assign(schema: schema)
+     |> assign(fields: fields)
+     |> assign(changeset: values)
+     |> assign(errors: nil)}
   end
 
   @doc """
@@ -60,12 +63,9 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
             <%= field.description %>
           </label>
 
-          <%= if field.enum do %>
+          <%= if is_list(field.enum) do %>
             <!-- Select Dropdown for Enum Fields -->
-            <select
-              name={"form[#{field.name}]"}
-              class="bg-primary rounded-md px-3 py-2 w-full"
-            >
+            <select name={"form[#{field.name}]"} class="bg-primary rounded-md px-3 py-2 w-full">
               <%= for option <- field.enum do %>
                 <option value={option} selected={Map.get(@changeset, field.name, "") == option}>
                   <%= option %>
@@ -73,24 +73,15 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
               <% end %>
             </select>
           <% else %>
-            <!-- Input Fields -->
-            <%= case field.type do %>
-              <% "string" -> %>
-                <% input_type = if field.format === "password", do: "password", else: "text" %>
-                <input
-                  type={input_type}
-                  name={"form[#{field.name}]"}
-                  value={Map.get(@changeset, field.name, "")}
-                  class="bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200"
-                />
-              <% "integer" -> %>
-                <input
-                  type="number"
-                  name={"form[#{field.name}]"}
-                  value={Map.get(@changeset, field.name, "")}
-                  class="bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200"
-                />
-            <% end %>
+            <!-- Input Field (default string if present, otherwise empty) -->
+            <% input_type = if field.format == "password", do: "password", else: "text" %>
+            <input
+              type={input_type}
+              name={"form[#{field.name}]"}
+              value={Map.get(@changeset, field.name, field.default || "")}
+              class="bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200"
+              readonly={field.readonly}
+            />
           <% end %>
         </div>
       <% end %>
@@ -121,14 +112,15 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
   @doc """
   Submits the form after validation.
   """
-  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) :: {:noreply, Phoenix.LiveView.Socket.t()}
+  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_event("submit", %{"form" => params}, socket) do
     case Validator.validate(socket.assigns.schema, params) do
       :ok ->
         # Send this back to the parent live view that handles the event already
         Phoenix.PubSub.broadcast(Sentinel.PubSub, "modal:form:action", %{
           action: socket.assigns.action,
-          data: params,
+          data: params
         })
 
         {:noreply, assign(socket, changeset: params, errors: nil)}

@@ -389,6 +389,12 @@ defmodule SentinelWeb.Live.Dashboard do
         Sentinel.Servers.Wlan.scan_networks()
 
       #
+      # cloudflare
+      #
+      "connect_cloudflare" ->
+        IO.inspect(data, label: "TODO: __CONNECT_CLOUDFLARE__")
+
+      #
       # Nodes
       #
       "add_node" ->
