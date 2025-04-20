@@ -21,6 +21,7 @@ defmodule SentinelWeb.Live.Components.Nodes do
           %{id: "id1", type: "cpu", status: "active"},
           %{id: "id2", type: "storage", status: "warning"},
           %{id: "id3", type: "vpn", status: "active"},
+          %{id: "id4", type: "pc", status: "offline"},
           %{id: "id4", type: "pc", status: "offline"}
         ]
       )
@@ -41,18 +42,25 @@ defmodule SentinelWeb.Live.Components.Nodes do
           <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
         </div>
         <div
-            phx-click="show_details"
-            phx-value-type="logs"
-            phx-value-id="_"
-            class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
-          >
-            <.icon class="w-6 h-6" name={get_icon("cpu")} />
-            <div class="truncate text-xs">Add Node</div>
-          </div>
+          phx-click="modal_open"
+          phx-value-modal_title="Add a Node"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "schema",
+              "data" => Sentinel.Schema.Node.data(:add),
+              "default_values" => %{},
+              "action" => "add_node"
+            })
+          }
+          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1"
+        >
+          <.icon class="w-6 h-6" name={get_icon("cpu")} />
+          <div class="truncate text-xs">Add Node</div>
+        </div>
       </div>
       <div class="flex flex-wrap gap-3 items-center justify-start">
-        <div :if={Enum.empty?(@nodes)} class="w-[120px] md:w-[75px] h-[120px] md:h-[75px] bg-secondary flex items-center justify-center rounded-md opacity-10">
-          <.icon class="w-10 h-10 text-white" name="hero-cpu-chip" />
+        <div :if={Enum.empty?(@nodes)} class="w-[100px] md:w-[60px] h-[100px] md:h-[60px] bg-secondary flex items-center justify-center rounded-md opacity-10">
+          <.icon class="w-8 h-8 text-white" name="hero-cpu-chip" />
         </div>
 
           <%= if !Enum.empty?(@nodes) do %>
@@ -61,9 +69,9 @@ defmodule SentinelWeb.Live.Components.Nodes do
                 phx-click="show_details"
                 phx-value-type="node"
                 phx-value-id={node.id}
-                class="relative w-[120px] md:w-[75px] h-[120px] md:h-[75px] p-2 bg-secondary flex items-center justify-center rounded-md hover:bg-secondary cursor-pointer"
+                class="relative w-[100px] md:w-[60px] h-[100px] md:h-[60px] p-2 bg-secondary flex items-center justify-center rounded-md hover:bg-secondary cursor-pointer"
               >
-                <.icon class="w-10 h-10" name={get_icon(node.type)} />
+                <.icon class="w-8 h-8" name={get_icon(node.type)} />
                 <div class={"absolute bottom-[5px] right-2 w-[10px] h-[10px] rounded-full " <> get_status_color(node.status)}>
                 </div>
               </div>

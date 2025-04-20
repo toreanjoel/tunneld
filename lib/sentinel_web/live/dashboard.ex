@@ -38,7 +38,7 @@ defmodule SentinelWeb.Live.Dashboard do
           show: false,
           title: nil,
           body: %{},
-          actions: nil,
+          actions: nil
         }
       )
       |> assign(
@@ -125,16 +125,23 @@ defmodule SentinelWeb.Live.Dashboard do
 
         <div class="flex flex-row gap-2">
           <%!-- Internet Access Placeholder --%>
-          <div phx-click="show_details" phx-value-type="wlan" phx-value-id={"_"}
-            class={"#{if @status.internet, do: "bg-green", else: "bg-red"} flex flex-row gap-3 py-2 px-3 items-center rounded-md cursor-pointer"}>
-            <%!-- We need to use icon here --%>
-            Internet Access
+          <div
+            phx-click="show_details"
+            phx-value-type="wlan"
+            phx-value-id="_"
+            class={"#{if @status.internet, do: "bg-green", else: "bg-red"} flex flex-row gap-3 py-2 px-3 items-center rounded-md cursor-pointer"}
+          >
+            <%!-- We need to use icon here --%> Internet Access
           </div>
 
           <%!-- VPN Placeholder --%>
-          <div phx-click="show_details" phx-value-type="_" phx-value-id={"_"} class="bg-secondary flex flex-row gap-3 py-2 px-3 items-center rounded-md cursor-pointer">
-            <%!-- We need to use icon here --%>
-            VPN
+          <div
+            phx-click="show_details"
+            phx-value-type="_"
+            phx-value-id="_"
+            class="bg-secondary flex flex-row gap-3 py-2 px-3 items-center rounded-md cursor-pointer"
+          >
+            <%!-- We need to use icon here --%> VPN
           </div>
 
           <div
@@ -180,9 +187,9 @@ defmodule SentinelWeb.Live.Dashboard do
   """
   def nav(assigns) do
     ~H"""
-      <div phx-click="logout" class="flex items-center justify-center cursor-pointer">
-        <.icon class="w-6 text-gray-2" name="hero-arrow-left-start-on-rectangle" />
-      </div>
+    <div phx-click="logout" class="flex items-center justify-center cursor-pointer">
+      <.icon class="w-6 text-gray-2" name="hero-arrow-left-start-on-rectangle" />
+    </div>
     """
   end
 
@@ -260,12 +267,14 @@ defmodule SentinelWeb.Live.Dashboard do
   #
   def handle_event("modal_open", params, socket) do
     actions = if params["modal_actions"], do: Jason.decode!(params["modal_actions"]), else: nil
+
     modal_data = %{
       show: true,
       title: params["modal_title"] || nil,
       body: Jason.decode!(params["modal_body"]) || %{},
       actions: actions
     }
+
     {:noreply, assign(socket, :modal, modal_data)}
   end
 
@@ -276,7 +285,7 @@ defmodule SentinelWeb.Live.Dashboard do
     action = params["action"]
     data = Jason.decode!(params["data"])
 
-    send(self(), %{ action: action, data: data })
+    send(self(), %{action: action, data: data})
     {:noreply, socket}
   end
 
@@ -290,7 +299,8 @@ defmodule SentinelWeb.Live.Dashboard do
   #
   # ---- handle component updated message :: Client Side Interaction ----
   #
-  @spec handle_info(%{id: String.t(), module: atom(), data: map()}, Phoenix.LiveView.Socket.t()) :: {:noreply, Phoenix.LiveView.Socket.t()}
+  @spec handle_info(%{id: String.t(), module: atom(), data: map()}, Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
   @doc """
   This will have the parent dashboard view be responsible for sending update messages to components
   """
@@ -305,9 +315,11 @@ defmodule SentinelWeb.Live.Dashboard do
   def handle_info(%{type: :internet, status: status}, socket) do
     socket =
       socket
-      |> assign(status: %{
-        internet: status,
-      })
+      |> assign(
+        status: %{
+          internet: status
+        }
+      )
 
     {:noreply, socket}
   end
@@ -329,30 +341,64 @@ defmodule SentinelWeb.Live.Dashboard do
   #
   def handle_info(%{action: action, data: data}, socket) do
     case action do
+      #
+      # Blacklisting and file log management
+      #
       "remove_blocked_domain" ->
         decoded_data = Jason.decode!(data)
+
         case decoded_data["type"] do
           "user" ->
-            Sentinel.Servers.Blacklist.remove_domain(decoded_data["domain"], %{type: decoded_data["type"], mac: decoded_data["mac"]})
+            Sentinel.Servers.Blacklist.remove_domain(decoded_data["domain"], %{
+              type: decoded_data["type"],
+              mac: decoded_data["mac"]
+            })
+
           _ ->
-            Sentinel.Servers.Blacklist.remove_domain(decoded_data["domain"], %{type: decoded_data["type"]})
+            Sentinel.Servers.Blacklist.remove_domain(decoded_data["domain"], %{
+              type: decoded_data["type"]
+            })
         end
+
       "add_user_domain_block" ->
-        Sentinel.Servers.Blacklist.add_domain(data["domain"], %{ type: "user", mac: data["mac"], ttl: data["ttl"] })
+        Sentinel.Servers.Blacklist.add_domain(data["domain"], %{
+          type: "user",
+          mac: data["mac"],
+          ttl: data["ttl"]
+        })
+
       "add_system_domain_block" ->
-        Sentinel.Servers.Blacklist.add_domain(data["domain"], %{ type: "system", ttl: data["ttl"] })
+        Sentinel.Servers.Blacklist.add_domain(data["domain"], %{type: "system", ttl: data["ttl"]})
+
       "backup_file_delete" ->
         decoded_data = Jason.decode!(data)
         Sentinel.Servers.Logs.delete_log_file(decoded_data["file"])
+
+      #
+      # Wireless networking
+      #
       "connect_to_wireless_network" ->
         Sentinel.Servers.Wlan.connect_with_pass(data["ssid"], data["password"])
+
       "disconnect_from_wireless_network" ->
         Sentinel.Servers.Wlan.disconnect()
         Process.send_after(self(), :delayed_scan, 3000)
+
       "scan_for_wireless_networks" ->
         Sentinel.Servers.Wlan.scan_networks()
-        _ ->
-        Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :error, message: "Action doesnt exist and cant be handled"})
+
+      #
+      # Nodes
+      #
+      "add_node" ->
+        # TODO: add the server that will manage the polling and creating of the relevant files for node details
+        IO.inspect("ADDING NEW NODE")
+
+      _ ->
+        Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+          type: :error,
+          message: "Action doesnt exist and cant be handled"
+        })
     end
 
     {:noreply, assign(socket, modal: %{show: false, title: nil, body: %{}, actions: nil})}
