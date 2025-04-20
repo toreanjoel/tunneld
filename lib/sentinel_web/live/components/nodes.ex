@@ -33,12 +33,11 @@ defmodule SentinelWeb.Live.Components.Nodes do
   Render the nodes.
   """
   def render(assigns) do
-    IO.inspect(Enum.empty?(assigns.nodes), label: "nodes")
     ~H"""
     <div class="p-5">
       <div class="mb-5 flex flex-row">
         <div class="flex-1">
-          <div class="text-xl text-gray-1 font-medium">Services</div>
+          <div class="text-xl text-gray-1 font-medium">Nodes</div>
           <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
         </div>
         <div
@@ -48,7 +47,7 @@ defmodule SentinelWeb.Live.Components.Nodes do
             class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
           >
             <.icon class="w-6 h-6" name={get_icon("cpu")} />
-            <div class="truncate text-xs">Add Service</div>
+            <div class="truncate text-xs">Add Node</div>
           </div>
       </div>
       <div class="flex flex-wrap gap-3 items-center justify-start">
