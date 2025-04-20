@@ -75,7 +75,7 @@ defmodule SentinelWeb.Live.Components.Nodes do
                 class="relative w-[100px] md:w-[60px] h-[100px] md:h-[60px] p-2 bg-secondary flex items-center justify-center rounded-md hover:bg-secondary cursor-pointer"
               >
                 <.icon class="w-8 h-8" name={get_icon(node.type)} />
-                <div class={"absolute bottom-[5px] right-2 w-[10px] h-[10px] rounded-full " <> get_status_color(node.status)}>
+                <div class={"absolute bottom-[5px] right-2 w-[6px] h-[6px] rounded-full " <> get_status_color(node.status)}>
                 </div>
               </div>
             <% end %>
