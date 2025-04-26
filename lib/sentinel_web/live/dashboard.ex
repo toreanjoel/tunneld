@@ -309,7 +309,6 @@ defmodule SentinelWeb.Live.Dashboard do
     {:noreply, assign(socket, :modal, modal_data)}
   end
 
-
   #
   # ---- handle component updated message :: Client Side Interaction ----
   #
@@ -431,6 +430,21 @@ defmodule SentinelWeb.Live.Dashboard do
   # This assumes ttyd is installed on the device
   #
   def handle_info(:terminal_session, socket) do
+    # Start ttyd running the process async to handle the terminal session
+    {:ok, _ttyd_pid} =
+      Task.start(fn ->
+        System.cmd(
+          "ttyd",
+          [
+            "-W",
+            "-p",
+            Application.get_env(:sentinel, :ttyd)[:port],
+            "bash"
+          ],
+          stderr_to_stdout: true
+        )
+      end)
+
     # Save the ttyd_pid inside the socket assigns temporarily
     modal_data = %{
       show: true,
