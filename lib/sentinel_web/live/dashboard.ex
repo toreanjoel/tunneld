@@ -304,6 +304,11 @@ defmodule SentinelWeb.Live.Dashboard do
   # Close the modal
   #
   def handle_event("modal_close", _params, socket) do
+    # If we started a ttyd session, kill it cleanly
+    if ttyd_pid = socket.assigns.modal[:ttyd_pid] do
+      Process.exit(ttyd_pid, :kill)
+    end
+
     modal_data = %{show: false, title: nil, body: %{}, actions: nil, type: :default}
 
     {:noreply, assign(socket, :modal, modal_data)}
@@ -431,7 +436,7 @@ defmodule SentinelWeb.Live.Dashboard do
   #
   def handle_info(:terminal_session, socket) do
     # Start ttyd running the process async to handle the terminal session
-    {:ok, _ttyd_pid} =
+    {:ok, ttyd_pid} =
       Task.start(fn ->
         System.cmd(
           "ttyd",
@@ -451,9 +456,10 @@ defmodule SentinelWeb.Live.Dashboard do
       title: "Terminal Session",
       body: %{
         "ip" => Application.get_env(:sentinel, :network)[:gateway],
-        "user" => Application.get_env(:sentinel, :ttyd)[:port]
+        "port" => Application.get_env(:sentinel, :ttyd)[:port]
       },
-      type: :terminal_session
+      type: :terminal_session,
+      ttyd_pid: ttyd_pid,
     }
 
     {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal_data))}

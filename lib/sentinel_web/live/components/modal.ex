@@ -51,7 +51,7 @@ defmodule SentinelWeb.Live.Components.Modal do
   def content_type(assigns, :terminal_session) do
     ~H"""
     <div class="fixed inset-0 bg-secondary bg-opacity-80 flex items-center justify-center">
-      <div class="bg-primary rounded-md p-6 w-full max-w-5xl h-[80vh] relative">
+      <div class="rounded-md p-6 w-full max-w-5xl h-[80vh] relative">
         <%!-- closing the modal --%>
         <div phx-click="modal_close" class="absolute top-[0px] right-[0px] p-3 cursor-pointer z-50">
           <.icon name="hero-x-mark-solid" class="h-5 w-5" />
@@ -61,8 +61,8 @@ defmodule SentinelWeb.Live.Components.Modal do
         <div class="w-full h-full pt-6">
           <%!-- The context is the machine that has the SSH service libraries installed --%>
           <iframe
-            src={"http://#{@body["ip"]}:#{@body["port"]}"}
-            class="w-full h-full rounded-md border border-gray-700"
+            src={"http://#{@body["ip"]}:#{@body["port"]}?fontSize=18"}
+            class="w-full h-full rounded-md"
             frameborder="0"
             tabindex="0"
             allowfullscreen
