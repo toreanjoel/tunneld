@@ -147,16 +147,6 @@ defmodule SentinelWeb.Live.Dashboard do
             <%!-- We need to use icon here --%> Internet Access
           </div>
 
-          <%!-- VPN Placeholder --%>
-          <div
-            phx-click="show_details"
-            phx-value-type="_"
-            phx-value-id="_"
-            class="bg-secondary flex flex-row gap-3 py-2 px-3 items-center rounded-md cursor-pointer"
-          >
-            <%!-- We need to use icon here --%> VPN
-          </div>
-
           <div
             phx-click="show_details"
             phx-value-type="overview"

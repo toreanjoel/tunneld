@@ -51,11 +51,15 @@ defmodule SentinelWeb.Live.Components.Modal do
   def content_type(assigns, :terminal_session) do
     ~H"""
     <div class="fixed inset-0 bg-secondary bg-opacity-80 flex items-center justify-center">
-      <div class="rounded-md p-6 w-full max-w-5xl h-[80vh] relative">
+      <div class="bg-primary rounded-md p-6 w-full max-w-5xl h-[80vh] relative">
         <%!-- closing the modal --%>
         <div phx-click="modal_close" class="absolute top-[0px] right-[0px] p-3 cursor-pointer z-50">
           <.icon name="hero-x-mark-solid" class="h-5 w-5" />
         </div>
+        <%!-- Request fullscreen for the iframe --%>
+        <button id="fullscreen-btn" class="absolute top-[0px] right-[50px] p-3 cursor-pointer z-50">
+          <.icon name="hero-arrow-top-right-on-square" class="h-5 w-5" />
+        </button>
 
         <%!-- BROWSER SESSION - Iframe --%>
         <div class="w-full h-full pt-6">
@@ -66,6 +70,8 @@ defmodule SentinelWeb.Live.Components.Modal do
             frameborder="0"
             tabindex="0"
             allowfullscreen
+            id="terminal"
+            phx-hook="FullscreenIframe"
           >
           </iframe>
         </div>
