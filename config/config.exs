@@ -79,6 +79,10 @@ config :sentinel, :network,
   mullvad: "wg0-mullvad",
   gateway: "10.0.0.1"
 
+#
+config :sentinel, :ttyd,
+  port: "9000"
+
 config :sentinel, version: "0.1.3"
 
 # Import environment specific config. This must remain at the bottom

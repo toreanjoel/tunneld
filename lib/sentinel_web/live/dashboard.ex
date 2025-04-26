@@ -38,7 +38,8 @@ defmodule SentinelWeb.Live.Dashboard do
           show: false,
           title: nil,
           body: %{},
-          actions: nil
+          actions: nil,
+          type: :default
         }
       )
       |> assign(
@@ -67,13 +68,25 @@ defmodule SentinelWeb.Live.Dashboard do
       <!-- Sidebar for more details -->
       <%= sidebar(assigns) %>
       <%!-- Modal to render confirmations and show data --%>
+
       <.live_component
-        :if={@modal.show}
+        :if={@modal.show && @modal.type === :default}
         module={Modal}
         id="generic_modal"
         title={@modal.title}
         body={@modal.body}
         actions={@modal.actions}
+      />
+
+      <%!-- Modal to render confirmations and show data --%>
+      <.live_component
+        :if={@modal.show && @modal.type === :ssh_session}
+        module={Modal}
+        id="generic_modal"
+        title={@modal.title}
+        body={@modal.body}
+        actions={@modal.actions}
+        type={:ssh_session}
       />
     </div>
     """
@@ -272,7 +285,8 @@ defmodule SentinelWeb.Live.Dashboard do
       actions: actions
     }
 
-    {:noreply, assign(socket, :modal, modal_data)}
+    # We make sure when opening the modal, we are updating the fields we need based on type
+    {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal_data))}
   end
 
   #
@@ -290,8 +304,16 @@ defmodule SentinelWeb.Live.Dashboard do
   # Close the modal
   #
   def handle_event("modal_close", _params, socket) do
-    {:noreply, assign(socket, modal: %{show: false, title: nil, body: %{}, actions: nil})}
+    # Kill the ttyd process if one was started - this is for the case of a SSH Session
+    if pid = socket.assigns.modal[:ttyd_pid] do
+      Process.exit(pid, :kill)
+    end
+
+    modal_data = %{show: false, title: nil, body: %{}, actions: nil, type: :default}
+
+    {:noreply, assign(socket, :modal, modal_data)}
   end
+
 
   #
   # ---- handle component updated message :: Client Side Interaction ----
@@ -377,10 +399,11 @@ defmodule SentinelWeb.Live.Dashboard do
 
       #
       # SSH Session
+      # --
+      # We trigger a message to the current live view to open a modal for rendering an iframe
       #
       "open_ssh_session" ->
-        IO.inspect("IP: #{data["ip"]} | USER: #{data["user"]}")
-        IO.inspect("Trigger liveview modal ssh")
+        send(self(), {:ssh_session, data})
 
       _ ->
         Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
@@ -406,5 +429,36 @@ defmodule SentinelWeb.Live.Dashboard do
     IO.inspect("Staring delayed scan for wireless networks")
     Sentinel.Servers.Wlan.scan_networks()
     {:noreply, socket}
+  end
+
+  #
+  # handle ssh session trigger init
+  #
+  def handle_info({:ssh_session, %{"ip" => ip, "user" => user}}, socket) do
+    # Build the SSH command
+    ssh_command = "ssh #{user}@#{ip}"
+
+    # Start ttyd running that command
+    {:ok, ttyd_pid} =
+      Task.start(fn ->
+        System.cmd("ttyd", [
+          "-p", Application.get_env(:sentinel, :ttyd)[:port],
+          "bash", "-c", "ssh #{user}@#{ip}"
+        ], stderr_to_stdout: true)
+      end)
+
+    # Save the ttyd_pid inside the socket assigns temporarily
+    modal_data = %{
+      show: true,
+      title: "SSH Session",
+      body: %{
+        "ip" => Application.get_env(:sentinel, :network)[:gateway],
+        "user" => user
+      },
+      type: :ssh_session,
+      ttyd_pid: ttyd_pid
+    }
+
+    {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal_data))}
   end
 end
