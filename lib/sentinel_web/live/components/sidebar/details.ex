@@ -51,8 +51,8 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
       <div :if={@has_data}>
         <%!-- Sidebar header that will house metadat?  --%>
         <%= sidebar_header(assigns, %{
-          header: "Node",
-          body: "Areference to a running service accessible from this device over the network."
+          header: data.name,
+          body: "A reference to a running service accessible from this device over the network. This tracks availability and allows exposure to the internet"
         }) %>
       </div>
 

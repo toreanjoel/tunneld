@@ -51,7 +51,9 @@ defmodule SentinelWeb.Live.Components.Devices do
               Jason.encode!(%{
                 "type" => "schema",
                 "data" => Sentinel.Schema.SshSession.data,
-                "default_values" => %{},
+                "default_values" => %{
+                  ip: Sentinel.Servers.Devices.fetch_devices |> Enum.map(fn item -> item.ip end)
+                },
                 "action" => "open_ssh_session"
               })
             }

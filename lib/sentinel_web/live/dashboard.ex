@@ -379,6 +379,7 @@ defmodule SentinelWeb.Live.Dashboard do
       # Nodes
       #
       "open_ssh_session" ->
+        IO.inspect("IP: #{data["ip"]} | USER: #{data["user"]}")
         IO.inspect("Trigger liveview modal ssh")
 
       _ ->
