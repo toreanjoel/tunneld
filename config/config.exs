@@ -68,7 +68,6 @@ config :sentinel, :auth,
 config :sentinel, :fs,
   root: "/data",
   auth: "/auth.json",
-  blacklist: "/blacklist.json",
   whitelist: "/whitelist.json",
   tunnels: "/cloudflare_tunnels.json",
   nodes: "/nodes.json"

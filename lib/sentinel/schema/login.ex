@@ -9,8 +9,8 @@ defmodule Sentinel.Schema.Login do
   """
   def data() do
     %{
-      "title" => "Blacklist - User",
-      "description" => "Blocking a domain for a specific user",
+      "title" => "Login ",
+      "description" => "The login form rendered to access the system",
       "type" => "object",
       "properties" => %{
         "name" => %{

@@ -43,15 +43,24 @@ defmodule SentinelWeb.Live.Components.Devices do
           <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
         </div>
         <div class="grid grid-cols-2 gap-1">
+          <%!-- SSH interaction? --%>
           <div
-            phx-click="show_details"
-            phx-value-type="blacklist"
-            phx-value-id="_"
-            class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
+            phx-click="modal_open"
+            phx-value-modal_title="SSH Session Request"
+            phx-value-modal_body={
+              Jason.encode!(%{
+                "type" => "schema",
+                "data" => Sentinel.Schema.SshSession.data,
+                "default_values" => %{},
+                "action" => "open_ssh_session"
+              })
+            }
+            class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1"
           >
-            <.icon class="w-4 h-4" name="hero-no-symbol" />
-            <div class="truncate text-xs text-gray-1">Block List</div>
+            <.icon class="w-4 h-4" name="hero-command-line" />
+            <div class="truncate text-xs">SSH Session</div>
           </div>
+
           <div
             phx-click="show_details"
             phx-value-type="logs"
@@ -83,7 +92,7 @@ defmodule SentinelWeb.Live.Components.Devices do
             phx-value-type="device"
             phx-value-id={device.ip}
             class="p-4 flex flex-col bg-secondary rounded-lg w-full h-[130px] hover:bg-secondary cursor-pointer"
-            style={"animation: fadeIn 0.5s ease-out forwards;"}
+            style="animation: fadeIn 0.5s ease-out forwards;"
           >
             <div class="flex flex-row">
               <div class="grow">

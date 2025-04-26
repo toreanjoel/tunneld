@@ -219,10 +219,6 @@ defmodule SentinelWeb.Live.Dashboard do
           Sentinel.Servers.Logs.get_device_logs(id)
           :device
 
-        "blacklist" ->
-          Sentinel.Servers.Blacklist.init_state()
-          :blacklist
-
         "logs" ->
           Sentinel.Servers.Logs.init_state()
           :logs
@@ -343,33 +339,8 @@ defmodule SentinelWeb.Live.Dashboard do
   def handle_info(%{action: action, data: data}, socket) do
     case action do
       #
-      # Blacklisting and file log management
+      # Deleting the auto log generated backup
       #
-      "remove_blocked_domain" ->
-        decoded_data = Jason.decode!(data)
-
-        case decoded_data["type"] do
-          "user" ->
-            Sentinel.Servers.Blacklist.remove_domain(decoded_data["domain"], %{
-              type: decoded_data["type"],
-              mac: decoded_data["mac"]
-            })
-
-          _ ->
-            Sentinel.Servers.Blacklist.remove_domain(decoded_data["domain"], %{
-              type: decoded_data["type"]
-            })
-        end
-
-      "add_user_domain_block" ->
-        Sentinel.Servers.Blacklist.add_domain(data["domain"], %{
-          type: "user",
-          mac: data["mac"],
-          ttl: data["ttl"]
-        })
-
-      "add_system_domain_block" ->
-        Sentinel.Servers.Blacklist.add_domain(data["domain"], %{type: "system", ttl: data["ttl"]})
 
       "backup_file_delete" ->
         decoded_data = Jason.decode!(data)
@@ -389,7 +360,7 @@ defmodule SentinelWeb.Live.Dashboard do
         Sentinel.Servers.Wlan.scan_networks()
 
       #
-      # cloudflare
+      # Cloudflare
       #
       "connect_cloudflare" ->
         IO.inspect(data, label: "TODO: __CONNECT_CLOUDFLARE__")
@@ -401,7 +372,7 @@ defmodule SentinelWeb.Live.Dashboard do
         Sentinel.Servers.Nodes.add_node(data)
 
       "remove_node" ->
-        %{ "id" => id } = Jason.decode!(data)
+        %{"id" => id} = Jason.decode!(data)
         Sentinel.Servers.Nodes.remove_node(id)
 
       _ ->

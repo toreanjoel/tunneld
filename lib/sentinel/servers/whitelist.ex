@@ -87,7 +87,7 @@ defmodule Sentinel.Servers.Whitelist do
 
   # Remove device access to the internet
   def handle_call({:remove_device_access, %{mac: mac}}, _from, state) do
-    # Read from the blacklist file
+    # Read from the whitelist file
     {_, data} = read_file()
 
     # Get all items that need to be removed
@@ -151,7 +151,7 @@ defmodule Sentinel.Servers.Whitelist do
 
   # Add entiries to iptables - async as we have the system starting up at this point
   def handle_info(:init_iptables, state) do
-    # Read from the blacklist file
+    # Read from the whitelist file
     {_, data} = read_file()
 
     # Loop over the data
@@ -172,7 +172,7 @@ defmodule Sentinel.Servers.Whitelist do
     :timer.send_after(@pending_ttl_interval, :request_ttl_job)
   end
 
-  # we fetch the user blacklist file data
+  # we fetch the user whitelist file data
   def fetch_whitelist(offset, limit) do
     if Application.get_env(:sentinel, :mock_data, false) do
       Sentinel.Servers.FakeData.Whitelist.get_data()
@@ -184,21 +184,6 @@ defmodule Sentinel.Servers.Whitelist do
         _ ->
           []
       end
-    end
-  end
-
-  # we count the number of lines in the blacklist file
-  def count_blacklist() do
-    try do
-      if Application.get_env(:sentinel, :mock_data, false) do
-        Sentinel.Servers.FakeData.Whitelist.get_data() |> length
-      else
-        {_, data} = read_file()
-        data |> length
-      end
-    rescue
-      _ ->
-        0
     end
   end
 
@@ -247,21 +232,21 @@ defmodule Sentinel.Servers.Whitelist do
   end
 
   @doc """
-  Create the blacklist file
+  Create the whitelist file
   """
   def create_file() do
     case path()
          |> File.write(Jason.encode!([])) do
       :ok ->
-        {:ok, "Blacklist file created"}
+        {:ok, "Whitelist file created"}
 
       {:error, reason} ->
-        {:error, "Failed to create Blacklist file: #{inspect(reason)}"}
+        {:error, "Failed to create Whitelist file: #{inspect(reason)}"}
     end
   end
 
   @doc """
-  Read the Blacklist file
+  Read the Whitelist file
   """
   def read_file() do
     case path() |> File.read() do
@@ -271,7 +256,7 @@ defmodule Sentinel.Servers.Whitelist do
             {:ok, data}
 
           {:error, err} ->
-            {:error, "Failed to decode Blacklist file: #{inspect(err)}"}
+            {:error, "Failed to decode Whitelist file: #{inspect(err)}"}
         end
 
       {:error, reason} ->
@@ -295,7 +280,7 @@ defmodule Sentinel.Servers.Whitelist do
 
 
   @doc """
-  Check if the Blacklist file exists
+  Check if the Whitelist file exists
   """
   def file_exists?(), do: path() |> File.exists?()
 
