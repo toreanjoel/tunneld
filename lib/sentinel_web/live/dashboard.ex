@@ -376,7 +376,7 @@ defmodule SentinelWeb.Live.Dashboard do
         Sentinel.Servers.Nodes.remove_node(id)
 
       #
-      # Nodes
+      # SSH Session
       #
       "open_ssh_session" ->
         IO.inspect("IP: #{data["ip"]} | USER: #{data["user"]}")
