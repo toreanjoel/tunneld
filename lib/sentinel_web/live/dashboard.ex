@@ -80,13 +80,13 @@ defmodule SentinelWeb.Live.Dashboard do
 
       <%!-- Modal to render confirmations and show data --%>
       <.live_component
-        :if={@modal.show && @modal.type === :ssh_session}
+        :if={@modal.show && @modal.type === :terminal_session}
         module={Modal}
         id="generic_modal"
         title={@modal.title}
         body={@modal.body}
         actions={@modal.actions}
-        type={:ssh_session}
+        type={:terminal_session}
       />
     </div>
     """
@@ -304,11 +304,6 @@ defmodule SentinelWeb.Live.Dashboard do
   # Close the modal
   #
   def handle_event("modal_close", _params, socket) do
-    # Kill the ttyd process if one was started - this is for the case of a SSH Session
-    if pid = socket.assigns.modal[:ttyd_pid] do
-      Process.exit(pid, :kill)
-    end
-
     modal_data = %{show: false, title: nil, body: %{}, actions: nil, type: :default}
 
     {:noreply, assign(socket, :modal, modal_data)}
@@ -398,12 +393,12 @@ defmodule SentinelWeb.Live.Dashboard do
         Sentinel.Servers.Nodes.remove_node(id)
 
       #
-      # SSH Session
+      # Terminal Session
       # --
       # We trigger a message to the current live view to open a modal for rendering an iframe
       #
-      "open_ssh_session" ->
-        send(self(), {:ssh_session, data})
+      "open_terminal" ->
+        send(self(), :terminal_session)
 
       _ ->
         Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
@@ -432,32 +427,19 @@ defmodule SentinelWeb.Live.Dashboard do
   end
 
   #
-  # handle ssh session trigger init
+  # handle terminal session init
   # This assumes ttyd is installed on the device
   #
-  def handle_info({:ssh_session, %{"ip" => ip, "user" => user}}, socket) do
-    ttyd_port = Application.get_env(:sentinel, :ttyd)[:port]
-
-    # Start ttyd running that command
-    {:ok, ttyd_pid} =
-      Task.start(fn ->
-        System.cmd("ttyd", [
-          "-W",
-          "-p", ttyd_port,
-          "bash", "-c", "ssh #{user}@#{ip}"
-        ], stderr_to_stdout: true)
-      end)
-
+  def handle_info(:terminal_session, socket) do
     # Save the ttyd_pid inside the socket assigns temporarily
     modal_data = %{
       show: true,
-      title: "SSH Session",
+      title: "Terminal Session",
       body: %{
         "ip" => Application.get_env(:sentinel, :network)[:gateway],
-        "user" => ttyd_port
+        "user" => Application.get_env(:sentinel, :ttyd)[:port]
       },
-      type: :ssh_session,
-      ttyd_pid: ttyd_pid
+      type: :terminal_session
     }
 
     {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal_data))}

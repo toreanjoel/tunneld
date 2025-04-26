@@ -44,15 +44,15 @@ defmodule SentinelWeb.Live.Components.Devices do
         </div>
         <div class="grid grid-cols-2 gap-1">
           <%!-- SSH interaction? --%>
-          <div
+          <%!-- <div
             phx-click="modal_open"
             phx-value-modal_title="SSH Session Request"
             phx-value-modal_body={
               Jason.encode!(%{
                 "type" => "schema",
-                "data" => Sentinel.Schema.SshSession.data,
+                "data" => Sentinel.Schema.SshSession.data(),
                 "default_values" => %{
-                  ip: Sentinel.Servers.Devices.fetch_devices |> Enum.map(fn item -> item.ip end)
+                  ip: Sentinel.Servers.Devices.fetch_devices() |> Enum.map(fn item -> item.ip end)
                 },
                 "action" => "open_ssh_session"
               })
@@ -61,6 +61,16 @@ defmodule SentinelWeb.Live.Components.Devices do
           >
             <.icon class="w-4 h-4" name="hero-command-line" />
             <div class="truncate text-xs">SSH Session</div>
+          </div> --%>
+
+          <div
+            phx-click="trigger_action"
+            phx-value-action="open_terminal"
+            phx-value-data={Jason.encode!(%{})}
+            class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
+          >
+            <.icon class="w-4 h-4" name="hero-command-line" />
+            <div class="truncate text-xs">Terminal</div>
           </div>
 
           <div

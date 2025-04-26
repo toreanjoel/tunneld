@@ -48,7 +48,7 @@ defmodule SentinelWeb.Live.Components.Modal do
     """
   end
 
-  def content_type(assigns, :ssh_session) do
+  def content_type(assigns, :terminal_session) do
     ~H"""
     <div class="fixed inset-0 bg-secondary bg-opacity-80 flex items-center justify-center">
       <div class="bg-primary rounded-md p-6 w-full max-w-5xl h-[80vh] relative">

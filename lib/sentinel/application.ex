@@ -51,6 +51,21 @@ defmodule Sentinel.Application do
     # This will prevent race conditions
     if not Application.get_env(:sentinel, :mock_data, false) do
       Iptables.reset()
+
+      # Start ttyd running the process async to handle the terminal session
+      {:ok, _ttyd_pid} =
+        Task.start(fn ->
+          System.cmd(
+            "ttyd",
+            [
+              "-W",
+              "-p",
+              Application.get_env(:sentinel, :ttyd)[:port],
+              "bash"
+            ],
+            stderr_to_stdout: true
+          )
+        end)
     end
 
     # See https://hexdocs.pm/elixir/Supervisor.html
