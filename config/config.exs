@@ -79,9 +79,9 @@ config :sentinel, :network,
   mullvad: "wg0-mullvad",
   gateway: "10.0.0.1"
 
-#
+# ttyd terminal session default port to handle the terminal session
 config :sentinel, :ttyd,
-  port: "9000"
+  port: "7681"
 
 config :sentinel, version: "0.1.3"
 

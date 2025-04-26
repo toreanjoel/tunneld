@@ -433,16 +433,17 @@ defmodule SentinelWeb.Live.Dashboard do
 
   #
   # handle ssh session trigger init
+  # This assumes ttyd is installed on the device
   #
   def handle_info({:ssh_session, %{"ip" => ip, "user" => user}}, socket) do
-    # Build the SSH command
-    ssh_command = "ssh #{user}@#{ip}"
+    ttyd_port = Application.get_env(:sentinel, :ttyd)[:port]
 
     # Start ttyd running that command
     {:ok, ttyd_pid} =
       Task.start(fn ->
         System.cmd("ttyd", [
-          "-p", Application.get_env(:sentinel, :ttyd)[:port],
+          "-W",
+          "-p", ttyd_port,
           "bash", "-c", "ssh #{user}@#{ip}"
         ], stderr_to_stdout: true)
       end)
@@ -453,7 +454,7 @@ defmodule SentinelWeb.Live.Dashboard do
       title: "SSH Session",
       body: %{
         "ip" => Application.get_env(:sentinel, :network)[:gateway],
-        "user" => user
+        "user" => ttyd_port
       },
       type: :ssh_session,
       ttyd_pid: ttyd_pid
