@@ -375,6 +375,12 @@ defmodule SentinelWeb.Live.Dashboard do
         %{"id" => id} = Jason.decode!(data)
         Sentinel.Servers.Nodes.remove_node(id)
 
+      #
+      # Nodes
+      #
+      "open_ssh_session" ->
+        IO.inspect("Trigger liveview modal ssh")
+
       _ ->
         Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
           type: :error,
