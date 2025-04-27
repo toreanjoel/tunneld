@@ -20,7 +20,7 @@ defmodule Sentinel.Schema.Node do
         },
         "icon" => %{
           "type" => "string",
-          "description" => "Add Icon. Icons can be found at https://heroicons.com/",
+          "description" => "Choose basic icon to represent node",
         },
         "ip" => %{
           "type" => "string",
