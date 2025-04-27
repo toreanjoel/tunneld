@@ -272,7 +272,8 @@ defmodule SentinelWeb.Live.Dashboard do
       show: true,
       title: params["modal_title"] || nil,
       body: Jason.decode!(params["modal_body"]) || %{},
-      actions: actions
+      actions: actions,
+      type: :default
     }
 
     # We make sure when opening the modal, we are updating the fields we need based on type
