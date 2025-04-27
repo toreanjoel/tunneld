@@ -219,12 +219,7 @@ defmodule SentinelWeb.Live.Dashboard do
           :service
 
         "device" ->
-          Sentinel.Servers.Logs.get_device_logs(id)
           :device
-
-        "logs" ->
-          Sentinel.Servers.Logs.init_state()
-          :logs
 
         "wlan" ->
           Sentinel.Servers.Wlan.scan_networks()
@@ -353,7 +348,6 @@ defmodule SentinelWeb.Live.Dashboard do
       #
       # Deleting the auto log generated backup
       #
-
       "backup_file_delete" ->
         decoded_data = Jason.decode!(data)
         Sentinel.Servers.Logs.delete_log_file(decoded_data["file"])
