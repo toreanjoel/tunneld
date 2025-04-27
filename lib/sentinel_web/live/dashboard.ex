@@ -346,13 +346,6 @@ defmodule SentinelWeb.Live.Dashboard do
   def handle_info(%{action: action, data: data}, socket) do
     case action do
       #
-      # Deleting the auto log generated backup
-      #
-      "backup_file_delete" ->
-        decoded_data = Jason.decode!(data)
-        Sentinel.Servers.Logs.delete_log_file(decoded_data["file"])
-
-      #
       # Wireless networking
       #
       "connect_to_wireless_network" ->

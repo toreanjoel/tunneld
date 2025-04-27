@@ -42,7 +42,7 @@ defmodule SentinelWeb.Live.Components.Devices do
           <div class="text-xl text-gray-1 font-medium">Devices</div>
           <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
         </div>
-        <div class="grid grid-cols-2 gap-1">
+        <div class="grid grid-cols-1 gap-1">
           <%!-- SSH interaction? --%>
           <%!-- <div
             phx-click="modal_open"
@@ -71,16 +71,6 @@ defmodule SentinelWeb.Live.Components.Devices do
           >
             <.icon class="w-4 h-4" name="hero-command-line" />
             <div class="truncate text-xs">Terminal</div>
-          </div>
-
-          <div
-            phx-click="show_details"
-            phx-value-type="logs"
-            phx-value-id="_"
-            class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
-          >
-            <.icon class="w-4 h-4" name="hero-circle-stack" />
-            <div class="truncate text-xs">Log Backups</div>
           </div>
         </div>
       </div>
