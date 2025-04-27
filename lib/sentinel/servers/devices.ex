@@ -5,7 +5,7 @@ defmodule Sentinel.Servers.Devices do
   use GenServer
   require Logger
 
-  @interval 20_000
+  @interval 10_000
   @path "/var/lib/misc/dnsmasq.leases"
 
   def start_link(_) do
@@ -16,6 +16,19 @@ defmodule Sentinel.Servers.Devices do
   Init devices
   """
   def init(_) do
+    # We start the process locally on the host to make terminal accessible
+    System.cmd(
+      "ttyd",
+      [
+        "-W",
+        "-p",
+        Application.get_env(:sentinel, :ttyd)[:port],
+        "bash"
+      ],
+      stderr_to_stdout: true
+    )
+
+    # Start the sync to listen for device connection changes
     send(self(), :sync)
     {:ok, %{}}
   end
@@ -30,6 +43,7 @@ defmodule Sentinel.Servers.Devices do
   # Get the data and restart sync
   def handle_info(:sync, state) do
     devices = fetch_devices()
+
     result = %{
       count: length(devices),
       devices: devices
@@ -38,7 +52,8 @@ defmodule Sentinel.Servers.Devices do
     # Broadcast to the live view (or parent) so it can update the Devices component.
     # Use an id that matches the one used in your live_component render.
     Phoenix.PubSub.broadcast(Sentinel.PubSub, "component:devices", %{
-      id: "devices", # Make sure this matches your component's id.
+      # Make sure this matches your component's id.
+      id: "devices",
       module: SentinelWeb.Live.Components.Devices,
       data: result
     })
@@ -61,6 +76,7 @@ defmodule Sentinel.Servers.Devices do
       end
 
     clean_data = String.trim(data)
+
     leases =
       if clean_data == "",
         do: [],
@@ -76,18 +92,20 @@ defmodule Sentinel.Servers.Devices do
     Enum.map(leases, fn lease ->
       [lease_expiry, mac, ip, hostname, client_id] = String.split(lease, " ")
       access = Enum.any?(whitelist, fn policy -> policy["mac"] == mac end)
+
       %{
         expiry: lease_expiry,
         mac: mac,
         ip: ip,
         hostname: hostname,
         client_id: client_id,
-        type: "",       # You can later determine type dynamically if needed.
-        access: access  # This will be true if the device is in the whitelist.
+        # You can later determine type dynamically if needed.
+        type: "",
+        # This will be true if the device is in the whitelist.
+        access: access
       }
     end)
   end
-
 
   def init_state(), do: GenServer.call(__MODULE__, :init_state)
 end

@@ -7,7 +7,7 @@ defmodule Sentinel.Servers.Services do
 
   @services [:dnsmasq, :dhcpcd, :'dnscrypt-proxy']
   @service_log_limit "25"
-  @interval 20_000
+  @interval 10_000
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
