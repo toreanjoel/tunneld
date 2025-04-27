@@ -110,8 +110,8 @@ defmodule SentinelWeb.Live.Components.Resources do
   # Check the percent and return relevant color
   defp get_percent_color(val) do
     cond do
-      val > 50 and val <= 70 -> "text-yellow"
-      val > 70 -> "text-red"
+      val > 60 and val <= 80 -> "text-yellow"
+      val > 80 -> "text-red"
       true -> "text-green"
     end
   end
