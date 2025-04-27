@@ -65,7 +65,7 @@ defmodule SentinelWeb.Live.Components.Modal do
         <div class="w-full h-full pt-6">
           <%!-- The context is the machine that has the SSH service libraries installed --%>
           <iframe
-            src={"http://#{@body["ip"]}:#{@body["port"]}?fontSize=18"}
+            src={"http://#{@body["ip"]}:#{@body["port"]}?fontSize=16"}
             class="w-full h-full rounded-md"
             frameborder="0"
             tabindex="0"

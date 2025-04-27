@@ -34,13 +34,13 @@ defmodule Sentinel.Application do
       # {Sentinel.Worker, arg},
       # Start to serve requests, typically the last entry
       SentinelWeb.Endpoint,
+      {Session, []},
       {Resources, []},
       {Services, []},
       {Nodes, []},
       {Devices, []},
       {Auth, []},
       {Whitelist, []},
-      {Session, []},
       {Wlan, []},
       {Cloudflare, []}
     ]

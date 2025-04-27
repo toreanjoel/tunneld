@@ -37,7 +37,8 @@ defmodule Sentinel.Servers.Nodes do
     nodes = Map.get(state, :nodes, [])
 
     if !Enum.empty?(nodes) do
-      node = Enum.filter(nodes, fn node -> node.id === id end) |> Enum.at(0)
+      # Why do we need to check the atom vs string map key here??
+      node = Enum.filter(nodes, fn node -> node.id === id or node["id"] === id end) |> Enum.at(0)
 
       # here we need to send off the detail to the sidebar
       # Broadcast the new data structure for the sidebar component - desktop

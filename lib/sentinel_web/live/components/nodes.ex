@@ -42,13 +42,16 @@ defmodule SentinelWeb.Live.Components.Nodes do
             Jason.encode!(%{
               "type" => "schema",
               "data" => Sentinel.Schema.Node.data(:add),
-              "default_values" => %{},
+              "default_values" => %{
+                # These below needs to be more dynamic but this is supported given what we render at the moment
+                "icon" => ["vpn", "storage", "cpu", "pc", "other"]
+              },
               "action" => "add_node"
             })
           }
           class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1"
         >
-          <.icon class="w-6 h-6" name="hero-cpu-chip" />
+          <.icon class="w-6 h-6" name={get_icon("cpu")} />
           <div class="truncate text-xs">Add Node</div>
         </div>
       </div>
@@ -65,7 +68,7 @@ defmodule SentinelWeb.Live.Components.Nodes do
                 phx-value-id={node.id || node["id"]}
                 class="relative w-[100px] md:w-[60px] h-[100px] md:h-[60px] p-2 bg-secondary flex items-center justify-center rounded-md hover:bg-secondary cursor-pointer"
               >
-                <.icon class="w-8 h-8" name={node.icon || "hero-question-mark-circle"} />
+                <.icon class="w-8 h-8" name={get_icon(node.icon || "other")} />
                 <div class={"absolute bottom-[5px] right-2 w-[6px] h-[6px] rounded-full " <> get_status_color(node.status || false)}>
                 </div>
               </div>
@@ -75,6 +78,13 @@ defmodule SentinelWeb.Live.Components.Nodes do
     </div>
     """
   end
+
+  # Helper function to select the icon based on node type.
+  defp get_icon("vpn"), do: "hero-shield-check"
+  defp get_icon("storage"), do: "hero-circle-stack"
+  defp get_icon("cpu"), do: "hero-cpu-chip"
+  defp get_icon("pc"), do: "hero-computer-desktop"
+  defp get_icon(_), do: "hero-question-mark-circle"
 
   # Helper function to set a status indicator color based on node status.
   defp get_status_color(true), do: "bg-green"

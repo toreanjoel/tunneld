@@ -47,7 +47,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
       |> assign(has_data: !Enum.empty?(data))
 
     ~H"""
-    <div class="bg-secondary flex flex-col items-center justify-center p-5 h-full">
+    <div class="bg-secondary p-2 h-full">
       <div :if={@has_data}>
         <%!-- Sidebar header that will house metadat?  --%>
         <%= sidebar_header(assigns, %{
@@ -139,7 +139,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
       |> assign(count: data |> List.wrap() |> length())
 
     ~H"""
-    <div class="bg-secondary flex flex-col items-center justify-center p-5 h-full">
+    <div class="bg-secondary p-2 h-full">
       <%!-- Sidebar header that will house metadat?  --%>
       <%= sidebar_header(assigns, %{
         header: "Wireless Network Access",
@@ -245,7 +245,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
       |> assign(count: count)
 
     ~H"""
-    <div class="bg-secondary flex flex-col items-center justify-center p-5 h-full">
+    <div class="bg-secondary p-2 h-full">
       <div class={"flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
         <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">
           No Service Logs
@@ -266,7 +266,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
   @spec render(%{:view => :device, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :device} = assigns) do
     ~H"""
-    <div class="bg-secondary flex flex-col items-center justify-center p-5 h-full">
+    <div class="bg-secondary p-2 h-full">
       <div class={"flex flex-col items-center justify-center"}>
         <h1 class="text-2xl font-light text-gray-2 my-4 text-center">
           No device Information
