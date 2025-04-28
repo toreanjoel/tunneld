@@ -64,6 +64,7 @@ defmodule Sentinel.Servers.Cloudflare do
             "subdomain" => _,
             "local_server" => local_server
           } = data
+
           retry_until_tunnel_exists(tunnel_name, fn ->
             do_run_tunnel_in_background(tunnel_name, local_server)
           end)
@@ -82,6 +83,13 @@ defmodule Sentinel.Servers.Cloudflare do
     # If subdomain already exists, skip
     if Enum.any?(state.records, &(&1["subdomain"] == subdomain)) do
       Logger.warn("Subdomain #{subdomain} is already known; skipping new tunnel.")
+
+       # Broadcast that we connected the tunnel - error
+       Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+        type: :error,
+        message: "Unable to connect tunnel to server: #{subdomain}"
+      })
+
       {:noreply, state}
     else
       tunnel_name = tunnel_name_for(subdomain)
@@ -89,6 +97,12 @@ defmodule Sentinel.Servers.Cloudflare do
       # 1) create the tunnel if missing
       unless tunnel_exists?(tunnel_name) do
         do_create_tunnel(tunnel_name)
+
+        # Step Notification
+        Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+          type: :info,
+          message: "#{subdomain}: Tunnel Created"
+        })
       end
 
       # 2) add DNS route
@@ -108,6 +122,13 @@ defmodule Sentinel.Servers.Cloudflare do
       new_state = %{state | records: new_records}
 
       write_file(new_records)
+
+      # Broadcast that we disconnected the tunnel
+      Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+        type: :info,
+        message: "#{subdomain}: Tunnel successfully created"
+      })
+
       {:noreply, new_state}
     end
   end
@@ -117,6 +138,13 @@ defmodule Sentinel.Servers.Cloudflare do
     case Enum.find(state.records, &(&1["subdomain"] == subdomain)) do
       nil ->
         Logger.warn("No record found for subdomain=#{subdomain}")
+
+        # Broadcast that we disconnected the tunnel - eeror
+        Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+          type: :error,
+          message: "No record found for subdomain: #{subdomain}"
+        })
+
         {:noreply, state}
 
       record ->
@@ -129,6 +157,12 @@ defmodule Sentinel.Servers.Cloudflare do
         final_state = %{state | records: pruned_records}
         write_file(pruned_records)
 
+        # Broadcast that we disconnected the tunnel
+        Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+          type: :info,
+          message: "Tunnel successfully disconnected for: #{subdomain}"
+        })
+
         {:noreply, final_state}
     end
   end
@@ -136,6 +170,16 @@ defmodule Sentinel.Servers.Cloudflare do
   def handle_call(:list_hosts, _from, state) do
     subs = Enum.map(state.records, & &1["subdomain"])
     {:reply, subs, state}
+  end
+
+  # Get data around the persisted tunnel file - what we expect to have running
+  def handle_call({:get_tunnel_data, ip, port}, _from, state) do
+    {_, resp} = read_file()
+
+    structured_data =
+      Enum.reduce(resp, %{}, fn item, acc -> Map.put(acc, item["local_server"], item) end)
+
+    {:reply, Map.get(structured_data, "#{ip}:#{port}", %{}), state}
   end
 
   # We no longer have any Port messages to handle (since we used nohup).
@@ -168,8 +212,20 @@ defmodule Sentinel.Servers.Cloudflare do
 
     if exit_code != 0 do
       Logger.error("Failed to add DNS route:\n#{output}")
+
+      # Step Notification
+      Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+        type: :error,
+        message: "#{subdomain}: There was an error adding DNS route"
+      })
     else
       Logger.info("DNS route for #{subdomain} added successfully.")
+
+      # Step Notification
+      Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+        type: :info,
+        message: "#{subdomain}: DNS route added successfully"
+      })
     end
   end
 
@@ -254,6 +310,13 @@ defmodule Sentinel.Servers.Cloudflare do
   """
   def remove_host(subdomain) do
     GenServer.cast(__MODULE__, {:remove_host, subdomain})
+  end
+
+  @doc """
+  Get the data about a specific tunnel if it exists in the filesystem
+  """
+  def get_tunnel_data(ip, port) do
+    GenServer.call(__MODULE__, {:get_tunnel_data, ip, port})
   end
 
   @doc """

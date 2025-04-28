@@ -2,6 +2,8 @@ defmodule SentinelWeb.Live.Dashboard do
   @moduledoc """
   Dashboard V2 Page
   """
+  alias Sentinel.Schema.Cloudflare
+  alias Bandit.Clock
   use SentinelWeb, :live_view
   alias SentinelWeb.Live.Components.Sidebar.Details, as: SidebarDetails
   alias Sentinel.Servers.{Session}
@@ -331,7 +333,7 @@ defmodule SentinelWeb.Live.Dashboard do
     # Set the flash message
     socket = put_flash(socket, type, message)
     # Schedule flash removal after 3 seconds (3000 ms)
-    Process.send_after(self(), :clear_flash, 3000)
+    # Process.send_after(self(), :clear_flash, 3000)
     {:noreply, socket}
   end
 
@@ -357,7 +359,11 @@ defmodule SentinelWeb.Live.Dashboard do
       # Cloudflare
       #
       "connect_cloudflare" ->
-        IO.inspect(data, label: "TODO: __CONNECT_CLOUDFLARE__")
+        Sentinel.Servers.Cloudflare.add_host(data["service"], data["domain"])
+
+      "disconnect_cloudflare" ->
+        %{"subdomain" => subdomain} = Jason.decode!(data)
+        Sentinel.Servers.Cloudflare.remove_host(subdomain)
 
       #
       # Nodes
@@ -366,8 +372,11 @@ defmodule SentinelWeb.Live.Dashboard do
         Sentinel.Servers.Nodes.add_node(data)
 
       "remove_node" ->
-        %{"id" => id} = Jason.decode!(data)
+        %{"id" => id, "subdomain" => subdomain} = Jason.decode!(data)
         Sentinel.Servers.Nodes.remove_node(id)
+        if (subdomain) do
+          Sentinel.Servers.Cloudflare.remove_host(subdomain)
+        end
 
       #
       # Terminal Session
@@ -389,6 +398,8 @@ defmodule SentinelWeb.Live.Dashboard do
 
   #
   # Handle clearing the flash after the delay
+  # NOTE: This will be deprecated as we dont need to clear automatically
+  # Useful if we keep a timestamp in future to decide accumulated is all shown too
   #
   def handle_info(:clear_flash, socket) do
     {:noreply, clear_flash(socket)}

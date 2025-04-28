@@ -52,17 +52,19 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
         <%!-- Sidebar header that will house metadat?  --%>
         <%= sidebar_header(assigns, %{
           header: data.name,
-          body: "A reference to a running service accessible from this device over the network. This tracks availability and allows exposure to the internet"
+          body:
+            "A reference to a running service accessible from this device over the network. This tracks availability and allows exposure to the internet"
         }) %>
       </div>
 
       <div :if={@has_data} class="flex flex-row gap-1 justify-end my-2">
         <%!-- Actions to take --%>
 
-        <%!-- Actions Remove Node --%>
+        <%!-- Actions Connect/Disconnect Tunnel --%>
         <div
+          :if={Enum.empty?(data.tunnel)}
           phx-click="modal_open"
-          phx-value-modal_title="Connect to wireless network"
+          phx-value-modal_title="Connect to Cloudflare Tunnel"
           phx-value-modal_body={
             Jason.encode!(%{
               "type" => "schema",
@@ -76,7 +78,32 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
           class="flex items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
         >
           <.icon name="hero-globe-alt" class="h-5 w-5" />
-          <div class="truncate text-xs">Cloudflare Tunnel</div>
+          <div class="truncate text-xs">Connect Tunnel</div>
+        </div>
+
+        <div
+          :if={!Enum.empty?(data.tunnel)}
+          phx-click="modal_open"
+          phx-value-modal_title="Disconnect Cloudflare Tunnel?"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "string",
+              "data" => "Are you sure you want make node inaccessible over the internet?"
+            })
+          }
+          phx-value-modal_actions={
+            Jason.encode!(%{
+              "title" => "Remove Tunnel",
+              "payload" => %{
+                "type" => "disconnect_cloudflare",
+                "data" => %{"subdomain" => data.tunnel["subdomain"]}
+              }
+            })
+          }
+          class="flex items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
+        >
+          <.icon name="hero-globe-alt" class="h-5 w-5" />
+          <div class="truncate text-xs">Disconnect Tunnel</div>
         </div>
 
         <%!-- Actions Remove Node --%>
@@ -86,7 +113,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
           phx-value-modal_body={
             Jason.encode!(%{
               "type" => "string",
-              "data" => "Are you sure you want to remove the node?"
+              "data" => "Are you sure you want to remove the node? (note if there is a tunnel, this will be disconnected as well)"
             })
           }
           phx-value-modal_actions={
@@ -94,14 +121,14 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
               "title" => "Remove",
               "payload" => %{
                 "type" => "remove_node",
-                "data" => %{"id" => data.id}
+                "data" => %{"id" => data.id, "subdomain" => data.tunnel["subdomain"]}
               }
             })
           }
-          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+          class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
         >
           <.icon name="hero-no-symbol" class="h-5 w-5" />
-          <div class="truncate text-xs text-gray-1">Remove Node</div>
+          <div class="truncate text-xs">Remove Node</div>
         </div>
       </div>
 
@@ -267,7 +294,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
   def render(%{view: :device} = assigns) do
     ~H"""
     <div class="bg-secondary p-2 h-full">
-      <div class={"flex flex-col items-center justify-center"}>
+      <div class="flex flex-col items-center justify-center">
         <h1 class="text-2xl font-light text-gray-2 my-4 text-center">
           No device Information
         </h1>

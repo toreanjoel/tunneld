@@ -34,7 +34,7 @@ defmodule Sentinel.Servers.Nodes do
   # Get node details
   #
   def handle_cast({:get_node, id}, state) do
-    nodes = Map.get(state, :nodes, [])
+    nodes = fetch_nodes()
 
     if !Enum.empty?(nodes) do
       # Why do we need to check the atom vs string map key here??
@@ -108,6 +108,7 @@ defmodule Sentinel.Servers.Nodes do
     updated_nodes = Enum.reject(data, fn node -> node["id"] === id end)
 
     # Remove to the file
+    # TODO: delete from cloudflare as well
     update_state =
       case File.write(path(), Jason.encode!(updated_nodes)) do
         :ok ->
@@ -182,6 +183,7 @@ defmodule Sentinel.Servers.Nodes do
         else: data
 
     Enum.map(nodes, fn node ->
+      # we get data
       %{
         id: node["id"],
         name: node["name"],
@@ -189,6 +191,7 @@ defmodule Sentinel.Servers.Nodes do
         icon: node["icon"],
         port: node["port"],
         status: port_busy?(node["ip"], node["port"]),
+        tunnel: Sentinel.Servers.Cloudflare.get_tunnel_data(node["ip"], node["port"])
         # add tunnel data here
       }
     end)
