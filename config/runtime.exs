@@ -31,7 +31,7 @@ if !is_nil(System.get_env("CF_API_KEY")) and !is_nil(System.get_env("CF_ZONE_ID"
     api_key: System.get_env("CF_API_KEY"),
     zone_id: System.get_env("CF_ZONE_ID")
 else
-  raise "Make sure to both the ZONE_ID and API_KEY for cloudflare has been set"
+  raise "Make sure to both the CF_ZONE_ID and CF_API_KEY for cloudflare has been set"
 end
 
 if config_env() == :prod do

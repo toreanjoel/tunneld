@@ -36,13 +36,13 @@ defmodule Sentinel.Application do
       SentinelWeb.Endpoint,
       {Wlan, []},
       {Session, []},
-      {Cloudflare, []},
       {Resources, []},
       {Services, []},
       {Nodes, []},
       {Devices, []},
       {Auth, []},
-      {Whitelist, []}
+      {Whitelist, []},
+      {Cloudflare, []}
     ]
 
     # This should not be async, we want this to complete before any other servers init data
