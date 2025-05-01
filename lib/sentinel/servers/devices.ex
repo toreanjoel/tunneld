@@ -17,18 +17,20 @@ defmodule Sentinel.Servers.Devices do
   """
   def init(_) do
     # We start the process locally on the host to make terminal accessible
-    Task.start(fn ->
-      System.cmd(
-        "ttyd",
-        [
-          "-W",
-          "-p",
-          Application.get_env(:sentinel, :ttyd)[:port],
-          "bash"
-        ],
-        stderr_to_stdout: true
-      )
-    end)
+    if not Application.get_env(:sentinel, :mock_data, false) do
+      Task.start(fn ->
+        System.cmd(
+          "ttyd",
+          [
+            "-W",
+            "-p",
+            Application.get_env(:sentinel, :ttyd)[:port],
+            "bash"
+          ],
+          stderr_to_stdout: true
+        )
+      end)
+    end
 
     # Start the sync to listen for device connection changes
     send(self(), :sync)

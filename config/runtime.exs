@@ -25,6 +25,15 @@ if System.get_env("MOCK_DATA") do
   config :sentinel, mock_data: true
 end
 
+# Set env configs for CF
+if !is_nil(System.get_env("CF_API_KEY")) and !is_nil(System.get_env("CF_ZONE_ID")) do
+  config :sentinel, :cloudflare,
+    api_key: System.get_env("CF_API_KEY"),
+    zone_id: System.get_env("CF_ZONE_ID")
+else
+  raise "Make sure to both the ZONE_ID and API_KEY for cloudflare has been set"
+end
+
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.
   # A default value is used in config/dev.exs and config/test.exs but you

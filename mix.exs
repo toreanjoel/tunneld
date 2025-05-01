@@ -57,7 +57,8 @@ defmodule Sentinel.MixProject do
       {:dns, "~> 2.4.0"},
       {:bcrypt_elixir, "~> 3.0"},
       {:ex_json_schema, "~> 0.10.2"},
-      {:yaml_elixir, "~> 2.11"}
+      {:yaml_elixir, "~> 2.11"},
+      {:httpoison, "~> 2.0"}
     ]
   end
 

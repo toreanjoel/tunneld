@@ -84,8 +84,8 @@ defmodule Sentinel.Servers.Cloudflare do
     if Enum.any?(state.records, &(&1["subdomain"] == subdomain)) do
       Logger.warn("Subdomain #{subdomain} is already known; skipping new tunnel.")
 
-       # Broadcast that we connected the tunnel - error
-       Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+      # Broadcast that we connected the tunnel - error
+      Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
         type: :error,
         message: "Unable to connect tunnel to server: #{subdomain}"
       })
@@ -151,6 +151,14 @@ defmodule Sentinel.Servers.Cloudflare do
         tunnel_name = record["tunnel_name"]
         do_cleanup_tunnel(tunnel_name)
         do_delete_tunnel(tunnel_name)
+
+        # Make sure to remove DNS record from remote
+        %{ success: success, data: data} = get_dns_record_details(subdomain)
+
+        # We remove the Record by ID
+        if success do
+          remove_dns_record(data)
+        end
 
         # Remove from file
         pruned_records = Enum.reject(state.records, &(&1["subdomain"] == subdomain))
@@ -317,6 +325,67 @@ defmodule Sentinel.Servers.Cloudflare do
   """
   def get_tunnel_data(ip, port) do
     GenServer.call(__MODULE__, {:get_tunnel_data, ip, port})
+  end
+
+  @doc """
+    Get DNS Records - We use the set env variables for the zone in order to get this information
+  """
+  def get_dns_record_details(domain) do
+    [api_key: api_key, zone_id: zone_id] = Application.get_env(:sentinel, :cloudflare)
+
+    {:ok, %HTTPoison.Response{body: body, status_code: status}} =
+      HTTPoison.get(
+        "https://api.cloudflare.com/client/v4/zones/#{zone_id}/dns_records",
+        [Authorization: "Bearer #{api_key}", Accept: "Application/json; Charset=utf-8"],
+        recv_timeout: 30_000
+      )
+
+    # Return a structure we can use to try and get the relevant record from remote
+    case status do
+      200 ->
+        json = Jason.decode!(body) || %{result: %{}}
+        relevant_record = Enum.find(json["result"], fn item -> domain === item["name"] end)
+
+        %{
+          success: not is_nil(relevant_record),
+          data: relevant_record || %{}
+        }
+
+      _ ->
+        %{
+          success: false,
+          data: %{}
+        }
+    end
+  end
+
+  @doc """
+    Delete DNS record - we need to leverage the response of the dns records to get the id to remove a record by domain name
+  """
+  def remove_dns_record(record_details) do
+    [api_key: api_key, zone_id: zone_id] = Application.get_env(:sentinel, :cloudflare)
+
+    {:ok, %HTTPoison.Response{status_code: status}} =
+      HTTPoison.delete(
+        "https://api.cloudflare.com/client/v4/zones/#{zone_id}/dns_records/#{record_details["id"]}",
+        [Authorization: "Bearer #{api_key}", Accept: "Application/json; Charset=utf-8"],
+        recv_timeout: 30_000
+      )
+
+    # Return a structure we can use to try and get the relevant record from remote
+    case status do
+      200 ->
+        Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+          type: :info,
+          message: "Successfully removed the DNS record from CloudFlare"
+        })
+
+      _ ->
+        Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+          type: :error,
+          message: "There was a issue removing the DNS record from CloudFlare: #{record_details.name}"
+        })
+    end
   end
 
   @doc """
