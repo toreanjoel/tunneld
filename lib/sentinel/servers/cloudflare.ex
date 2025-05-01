@@ -324,7 +324,7 @@ defmodule Sentinel.Servers.Cloudflare do
   Get the data about a specific tunnel if it exists in the filesystem
   """
   def get_tunnel_data(ip, port) do
-    GenServer.call(__MODULE__, {:get_tunnel_data, ip, port})
+    GenServer.call(__MODULE__, {:get_tunnel_data, ip, port}, 30_000)
   end
 
   @doc """
