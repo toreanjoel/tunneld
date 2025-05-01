@@ -35,14 +35,14 @@ defmodule Sentinel.Application do
       # Start to serve requests, typically the last entry
       SentinelWeb.Endpoint,
       {Wlan, []},
+      {Cloudflare, []},
       {Session, []},
       {Resources, []},
       {Services, []},
       {Nodes, []},
       {Devices, []},
       {Auth, []},
-      {Whitelist, []},
-      {Cloudflare, []}
+      {Whitelist, []}
     ]
 
     # This should not be async, we want this to complete before any other servers init data
