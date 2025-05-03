@@ -89,12 +89,15 @@ defmodule Sentinel.Servers.Notification do
     if enabled and endpoint !== "" do
       # this is for development data as the env wont contain the same functions of the prod env
       if Application.get_env(:sentinel, :mock_data, false) do
+        %{cpu: cpu, mem: mem_percent, storage: storage_percent} =
+          Sentinel.Servers.Resources.get_resources()
+
         post(:overview, endpoint, %{
           type: "overview",
           data: %{
-            devices: %{count: 100, max: 6},
-            tunnels: %{active: 2, total: 3},
-            services: %{ok: 4, total: 4},
+            cpu: cpu |> to_string,
+            ram: mem_percent |> to_string,
+            storage: storage_percent |> to_string,
             ip: %{lan: "DEVELOP", wan: "DEVELOP"},
             uptime: "DEVELOP"
           }
@@ -113,12 +116,18 @@ defmodule Sentinel.Servers.Notification do
               "ip -4 addr show #{@interface} | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){3}'"
             ])
 
+          %{cpu: cpu, mem: mem_percent, storage: storage_percent} =
+            Sentinel.Servers.Resources.get_resources()
+
           post(:overview, endpoint, %{
             type: "overview",
             data: %{
-              devices: %{count: 100, max: 6},
-              tunnels: %{active: 2, total: 3},
-              services: %{ok: 4, total: 4},
+              # devices: %{count: 100, max: 6},
+              # tunnels: %{active: 2, total: 3},
+              # services: %{ok: 4, total: 4},
+              cpu: cpu |> to_string,
+              ram: mem_percent |> to_string,
+              storage: storage_percent |> to_string,
               ip: %{lan: String.trim(lan_ip), wan: String.trim(ip_raw)},
               uptime: String.trim(uptime)
             }
@@ -230,9 +239,11 @@ defmodule Sentinel.Servers.Notification do
   defp post(:transient, endpoint, data) do
     # We make sure we encode the data before sending it
     encoded_data = Jason.encode!(data)
+
     case HTTPoison.post(endpoint, encoded_data, [{"Content-Type", "application/json"}]) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
         :ok
+
       _ ->
         Logger.error("There was an error sending the notifcation")
     end
@@ -242,9 +253,11 @@ defmodule Sentinel.Servers.Notification do
   defp post(:overview, endpoint, data) do
     # We make sure we encode the data before sending it
     encoded_data = Jason.encode!(data)
+
     case HTTPoison.post(endpoint, encoded_data, [{"Content-Type", "application/json"}]) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
         :ok
+
       _ ->
         Logger.error("There was an error sending the notifcation")
     end
