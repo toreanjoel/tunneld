@@ -69,7 +69,7 @@ defmodule Sentinel.Servers.Notification do
 
     # We need to make sure things are e
     if enabled and endpoint !== "" do
-      post(:transient, %{
+      post(:transient, endpoint, %{
         type: "alert",
         style: style |> to_string,
         message: msg,
@@ -89,7 +89,7 @@ defmodule Sentinel.Servers.Notification do
     if enabled and endpoint !== "" do
       # this is for development data as the env wont contain the same functions of the prod env
       if Application.get_env(:sentinel, :mock_data, false) do
-        post(:overview, %{
+        post(:overview, endpoint, %{
           type: "overview",
           data: %{
             devices: %{count: 100, max: 6},
@@ -113,7 +113,7 @@ defmodule Sentinel.Servers.Notification do
               "ip -4 addr show #{@interface} | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){3}'"
             ])
 
-          post(:overview, %{
+          post(:overview, endpoint, %{
             type: "overview",
             data: %{
               devices: %{count: 100, max: 6},
@@ -227,38 +227,24 @@ defmodule Sentinel.Servers.Notification do
 
   # HTTP post to the stored endpoing
   # We let the system crash if the trigger is not a suppeorted type
-  defp post(:transient, data) do
+  defp post(:transient, endpoint, data) do
     # We make sure we encode the data before sending it
     encoded_data = Jason.encode!(data)
-
-    # Post to the relevant endpoint
-    # Get the data from the file i.e endpoint
-    endpoint = "http://10.0.0.67/update"
-
     case HTTPoison.post(endpoint, encoded_data, [{"Content-Type", "application/json"}]) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
-        IO.inspect(body, label: "SUCCESS ALERT")
-
-      # TODO: This would be where we would have sent the data to relevant device
+        :ok
       _ ->
         Logger.error("There was an error sending the notifcation")
     end
   end
 
   # The overview that will be sent at a certain interval
-  defp post(:overview, data) do
+  defp post(:overview, endpoint, data) do
     # We make sure we encode the data before sending it
     encoded_data = Jason.encode!(data)
-
-    # Post to the relevant endpoint
-    # Get the data from the file i.e endpoint
-    endpoint = "http://10.0.0.67/update"
-
     case HTTPoison.post(endpoint, encoded_data, [{"Content-Type", "application/json"}]) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
-        IO.inspect(body, label: "SUCESS")
-
-      # TODO: This would be where we would have sent the data to relevant device
+        :ok
       _ ->
         Logger.error("There was an error sending the notifcation")
     end
