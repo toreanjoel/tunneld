@@ -1,18 +1,6 @@
 defmodule Sentinel.Servers.Notification do
   @moduledoc """
   The notification server that will manage the notifications that need to be setup.
-
-  TODO:
-
-  The system should allow for:
-  - Notification gets added to a list
-  - If it is crucial, it will be added to the top of the list
-  - If it is not, it will be added to the end
-  - The system will trigger the moment the list is added to
-  - it will go through all of the items in the list
-  - The duration sent with the notification will also be the pause that will take before the system sends
-   - - This time will be sent to the hardware as well and it will also manage
-  - If the notification is crucial, it will not wait for a time (if there is another before, it will just send it)
   """
 
   use GenServer
@@ -77,10 +65,6 @@ defmodule Sentinel.Servers.Notification do
   The trigger that will be a cast that the notification server will send to the endpoint
   """
   def handle_cast({:trigger, style, msg}, state) do
-    # TODO: Here we need check if the settings are setup
-    # TOOD: we need to check if the notification settings is set as enabled
-    # TODO: we need to post to the stored endpoing
-
     %{"enabled" => enabled, "endpoint" => endpoint} = fetch_settings()
 
     # We need to make sure things are e
@@ -100,9 +84,6 @@ defmodule Sentinel.Servers.Notification do
   The interval that will be sending the overview
   """
   def handle_info(:sync, state) do
-    # Get all the details we want to send as part of the overview
-    # TODO: replace the information below with actual information
-
     %{"enabled" => enabled, "endpoint" => endpoint} = fetch_settings()
 
     if enabled and endpoint !== "" do
@@ -233,8 +214,8 @@ defmodule Sentinel.Servers.Notification do
   defp broadcast_settings() do
     settings = fetch_settings()
 
-    # # Broadcast to the live view (or parent) so it can update the notification settings component.
-    # # Use an id that matches the one used in your live_component render.
+    # Broadcast to the live view (or parent) so it can update the notification settings component.
+    # Use an id that matches the one used in your live_component render.
     Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic_main, %{
       id: "notifications",
       module: SentinelWeb.Live.Components.Nodes,
