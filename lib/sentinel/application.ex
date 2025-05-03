@@ -15,7 +15,8 @@ defmodule Sentinel.Application do
     Resources,
     Wlan,
     Cloudflare,
-    Nodes
+    Nodes,
+    Notification
   }
 
   @impl true
@@ -42,7 +43,8 @@ defmodule Sentinel.Application do
       {Nodes, []},
       {Devices, []},
       {Auth, []},
-      {Whitelist, []}
+      {Whitelist, []},
+      {Notification, []}
     ]
 
     # This should not be async, we want this to complete before any other servers init data
