@@ -39,7 +39,7 @@ defmodule Sentinel.Servers.Notification do
     # Here we need to update the file and also send off the relevant notifcations to the client
     case File.write(path(), Jason.encode!(data)) do
       :ok ->
-        Phoenix.PubSub.broadcast(Sentinel.PubSub, "notification_settings", %{
+        Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
           type: :info,
           message: "Successfully updated notification settings"
         })
@@ -47,17 +47,17 @@ defmodule Sentinel.Servers.Notification do
         # Update the dashboard view nodes
         broadcast_settings()
 
-        {:reply, :ok, state}
+        {:reply, {:ok, data}, state}
 
       {:error, err} ->
-        Phoenix.PubSub.broadcast(Sentinel.PubSub, "notification_settings", %{
+        Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
           type: :error,
           message: "Failed to update notification settings: #{inspect(err)}"
         })
 
         {:error, "Failed to update notification settings: #{inspect(err)}"}
 
-        {:reply, :error, state}
+        {:reply, {:error, %{}}, state}
     end
   end
 

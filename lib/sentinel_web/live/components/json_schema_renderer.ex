@@ -73,15 +73,24 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
               <% end %>
             </select>
           <% else %>
-            <!-- Input Field (default string if present, otherwise empty) -->
-            <% input_type = if field.format == "password", do: "password", else: "text" %>
-            <input
-              type={input_type}
-              name={"form[#{field.name}]"}
-              value={Map.get(@changeset, field.name, field.default || "")}
-              class="bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200"
-              readonly={field.readonly}
-            />
+            <%= if field.type == "boolean" do %>
+              <input
+                type="checkbox"
+                name={"form[#{field.name}]"}
+                value="true"
+                checked={Map.get(@changeset, field.name) in [true, "true", "on", 1]}
+                class="rounded border-gray-300 text-purple shadow-sm focus:ring-2 focus:ring-purple"
+              />
+            <% else %>
+              <% input_type = if field.format == "password", do: "password", else: "text" %>
+              <input
+                type={input_type}
+                name={"form[#{field.name}]"}
+                value={Map.get(@changeset, field.name, field.default || "")}
+                class="bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200"
+                readonly={field.readonly}
+              />
+            <% end %>
           <% end %>
         </div>
       <% end %>
@@ -114,13 +123,26 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
   """
   @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
-  def handle_event("submit", %{"form" => params}, socket) do
+  def handle_event("submit", %{"form" => raw_params}, socket) do
+    params =
+      socket.assigns.fields
+      |> Enum.reduce(%{}, fn field, acc ->
+        value =
+          case field.type do
+            "boolean" ->
+              # HTML checkboxes only send data when checked
+              # So if the key is present, it's checked
+              Map.has_key?(raw_params, field.name)
+
+            _ ->
+              Map.get(raw_params, field.name)
+          end
+
+        Map.put(acc, field.name, value)
+      end)
+
     case Validator.validate(socket.assigns.schema, params) do
       :ok ->
-        # Send this back to the parent live view that handles the event already
-        # send(self(), %{action: socket.assigns.action, data: params})
-
-        # NOTE: This will send to all subscribed and not just the parent, causing rerenders
         Phoenix.PubSub.broadcast(Sentinel.PubSub, "modal:form:action", %{
           action: socket.assigns.action,
           data: params

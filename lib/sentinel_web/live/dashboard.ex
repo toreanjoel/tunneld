@@ -2,8 +2,6 @@ defmodule SentinelWeb.Live.Dashboard do
   @moduledoc """
   Dashboard V2 Page
   """
-  alias Sentinel.Schema.Cloudflare
-  alias Bandit.Clock
   use SentinelWeb, :live_view
   alias SentinelWeb.Live.Components.Sidebar.Details, as: SidebarDetails
   alias Sentinel.Servers.{Session}
@@ -53,6 +51,11 @@ defmodule SentinelWeb.Live.Dashboard do
       |> assign(
         status: %{
           internet: false
+        }
+      )
+      |> assign(
+        settings: %{
+          notifications: Sentinel.Servers.Notification.fetch_settings()
         }
       )
 
@@ -149,14 +152,21 @@ defmodule SentinelWeb.Live.Dashboard do
             <%!-- We need to use icon here --%> Internet Access
           </div>
 
+          <%!-- General Settings --%>
           <div
-            phx-click="show_details"
-            phx-value-type="overview"
-            phx-value-id="_"
-            class="relative rounded-md hover:bg-secondary cursor-pointer"
+            phx-click="modal_open"
+            phx-value-modal_title="Notification Settings"
+            phx-value-modal_body={
+              Jason.encode!(%{
+                "type" => "schema",
+                "data" => Sentinel.Schema.Settings.data(:notifications),
+                "default_values" => @settings.notifications,
+                "action" => "update_notifications"
+              })
+            }
+            class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1"
           >
-            <div class="absolute right-0 top-0 w-[10px] h-[10px] rounded-full bg-yellow" />
-            <.icon name="hero-bell" class="h-15 w-15" />
+            <.icon name="hero-cog-6-tooth" class="h-15 w-15" />
           </div>
         </div>
       </div>
@@ -371,10 +381,18 @@ defmodule SentinelWeb.Live.Dashboard do
       "add_node" ->
         Sentinel.Servers.Nodes.add_node(data)
 
+      #
+      # Notification Settings
+      #
+      "update_notifications" ->
+        resp = Sentinel.Servers.Notification.update_settings(data)
+        send(self(), {:update_notification_settings, resp})
+
       "remove_node" ->
         %{"id" => id, "subdomain" => subdomain} = Jason.decode!(data)
         Sentinel.Servers.Nodes.remove_node(id)
-        if (subdomain) do
+
+        if subdomain do
           Sentinel.Servers.Cloudflare.remove_host(subdomain)
         end
 
@@ -430,5 +448,18 @@ defmodule SentinelWeb.Live.Dashboard do
     }
 
     {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal_data))}
+  end
+
+  #
+  # Handle the success case of updating notification settings
+  # We update the state for the form
+  #
+  def handle_info({:update_notification_settings, {:ok, data}}, socket) do
+    settings = %{
+      socket.assigns.settings |
+      notifications: data
+    }
+
+    {:noreply, assign(socket, :settings, settings)}
   end
 end
