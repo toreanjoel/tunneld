@@ -9,7 +9,7 @@ defmodule Sentinel.Servers.Notification do
   @interface Application.compile_env!(:sentinel, [:network, :wlan])
 
   @broadcast_topic_main "component:notifications"
-  @interval 10_000
+  @interval 30_000
 
   @spec start_link(any()) :: GenServer.on_start()
   def start_link(_) do
@@ -105,8 +105,16 @@ defmodule Sentinel.Servers.Notification do
       else
         # We make sure we are enabled with regards to sending out notifications
         if enabled and endpoint !== "" do
-          # uptime
-          {uptime, 0} = System.cmd("uptime", ["-p"])
+          # uptime - we remove the up and only get the rest of the data
+          {"up " <> uptime, 0} = System.cmd("uptime", ["-p"])
+
+          # The custom uptime formatted data
+          uptime = uptime
+          |> String.trim()
+          |> String.split(", ")
+          |> Enum.map(&shorten/1)
+          |> Enum.join(" ")
+
           # lan
           {lan_ip, 0} = System.cmd("sh", ["-c", "hostname -I | awk '{print $1}'"])
           # raw ip
@@ -260,6 +268,23 @@ defmodule Sentinel.Servers.Notification do
 
       _ ->
         Logger.error("There was an error sending the notifcation")
+    end
+  end
+
+  # Take string data from the response of System.cmd("uptime", ["-p"]) and make it nicer to read
+  defp shorten(segment) do
+    cond do
+      String.contains?(segment, "day") ->
+        segment |> String.replace(" days", "d") |> String.replace(" day", "d")
+
+      String.contains?(segment, "hour") ->
+        segment |> String.replace(" hours", "h") |> String.replace(" hour", "h")
+
+      String.contains?(segment, "minute") ->
+        segment |> String.replace(" minutes", "m") |> String.replace(" minute", "m")
+
+      true ->
+        segment
     end
   end
 
