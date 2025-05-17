@@ -52,6 +52,13 @@ if config_env() == :prod do
 
   config :sentinel, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
+  # We make sure if a domain is added or there is a tunnel made for a CF domain, the system supports
+  check_origins =
+  case System.get_env("CF_DOMAIN") do
+    nil -> ["http://localhost"]
+    domain -> ["http://localhost", "https://#{domain}"]
+  end
+
   config :sentinel, SentinelWeb.Endpoint,
     url: [host: host, port: 80, scheme: "http"],
     http: [
@@ -64,6 +71,7 @@ if config_env() == :prod do
       ip: {0, 0, 0, 0},
       port: port
     ],
+    check_origins: check_origins,
     secret_key_base: secret_key_base
 
   # ## SSL Support
