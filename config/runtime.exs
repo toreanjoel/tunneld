@@ -54,10 +54,10 @@ if config_env() == :prod do
 
   # We make sure if a domain is added or there is a tunnel made for a CF domain, the system supports
   check_origins =
-  case System.get_env("CF_DOMAIN") do
-    nil -> ["http://localhost"]
-    domain -> ["http://localhost", "https://#{domain}"]
-  end
+    case System.get_env("CF_DOMAIN") do
+      nil -> ["http://10.0.0.1", "http://localhost"]
+      domain -> ["http://10.0.0.1", "http://localhost", "https://#{domain}"]
+    end
 
   config :sentinel, SentinelWeb.Endpoint,
     url: [host: host, port: 80, scheme: "http"],
