@@ -58,7 +58,8 @@ defmodule Sentinel.MixProject do
       {:bcrypt_elixir, "~> 3.0"},
       {:ex_json_schema, "~> 0.10.2"},
       {:yaml_elixir, "~> 2.11"},
-      {:httpoison, "~> 2.0"}
+      {:httpoison, "~> 2.0"},
+      {:slipstream, "~> 1.2.0"}
     ]
   end
 
