@@ -71,7 +71,8 @@ config :sentinel, :fs,
   whitelist: "/whitelist.json",
   tunnels: "/cloudflare_tunnels.json",
   nodes: "/nodes.json",
-  notifications: "/notifications.json"
+  notifications: "/notifications.json",
+  encryption: "/encryption.json"
 
 # TODO: This needs to come from env variables from runtime config
 config :sentinel, :network,
@@ -84,7 +85,7 @@ config :sentinel, :network,
 config :sentinel, :ttyd,
   port: "7681"
 
-config :sentinel, version: "0.1.7"
+config :sentinel, version: "0.1.8"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

@@ -18,6 +18,7 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
   def update(assigns, socket) do
     schema = Schema.resolve(assigns.schema)
     # Defaults to empty if not provided
+    title = Map.get(assigns, :title, 'Submit')
     values = Map.get(assigns, :values, %{})
     loading = Map.get(assigns, :loading, false)
 
@@ -39,6 +40,7 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
 
     {:ok,
      socket
+     |> assign(title: title)
      |> assign(loading: loading)
      |> assign(action: assigns.action)
      |> assign(schema: schema)
@@ -111,7 +113,7 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
             transition duration-200"
           }
         >
-          <%= if @loading, do: "Loading...", else: "Submit" %>
+          <%= if @loading, do: "Loading...", else: @title %>
         </button>
       </div>
     </form>

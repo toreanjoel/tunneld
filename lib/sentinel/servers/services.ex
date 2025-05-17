@@ -5,7 +5,7 @@ defmodule Sentinel.Servers.Services do
   use GenServer
   require Logger
 
-  @services [:dnsmasq, :dhcpcd, :'dnscrypt-proxy']
+  @services [:dnsmasq, :dhcpcd, :"dnscrypt-proxy"]
   @service_log_limit "25"
   @interval 10_000
 
@@ -25,16 +25,26 @@ defmodule Sentinel.Servers.Services do
   Get the system logs for the services that we can render
   """
   def handle_call({:get_service_logs, service}, _from, state) do
-    service_atom = service |> String.to_atom
+    service_atom = service |> String.to_atom()
 
     if service_atom in @services do
-      data = case System.cmd("journalctl", ["-u", service |> to_string, "-n", @service_log_limit, "--no-pager"]) do
-        {resp, 0} -> resp
-        _ ->
-          "There was an error fetching the service logs"
-      end
+      data =
+        case System.cmd("journalctl", [
+               "-u",
+               service |> to_string,
+               "-n",
+               @service_log_limit,
+               "--no-pager"
+             ]) do
+          {resp, 0} ->
+            resp
 
-      data = data |> String.split("\n") |> Enum.filter(fn item -> item !== "" end) |> Enum.reverse()
+          _ ->
+            "There was an error fetching the service logs"
+        end
+
+      data =
+        data |> String.split("\n") |> Enum.filter(fn item -> item !== "" end) |> Enum.reverse()
 
       # Broadcast to sidebar details for desktop:
       Phoenix.PubSub.broadcast(Sentinel.PubSub, "component:details", %{
@@ -56,7 +66,11 @@ defmodule Sentinel.Servers.Services do
 
       {:reply, {:ok, data}, state}
     else
-      Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :error, message: "Make sure the service selected is allowed"})
+      Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+        type: :error,
+        message: "Make sure the service selected is allowed"
+      })
+
       {:reply, {:error, "Make sure the service selected is allowed"}, state}
     end
   end
@@ -68,15 +82,23 @@ defmodule Sentinel.Servers.Services do
     Task.start(fn ->
       System.cmd("systemctl", ["restart", service_name])
     end)
-    Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :error, message: "Restarting serice: #{service_name}"})
+
+    Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+      type: :error,
+      message: "Restarting serice: #{service_name}"
+    })
+
+    # Broadcast to notification server
+    Sentinel.Servers.Notification.trigger({:info, "Restarting service #{service_name}"})
     {:noreply, state}
   end
 
   # get the data and restart sync
   def handle_info(:sync, state) do
-    result = Enum.reduce(@services, %{}, fn service, acc ->
-      Map.put(acc, service, check_service(service))
-    end)
+    result =
+      Enum.reduce(@services, %{}, fn service, acc ->
+        Map.put(acc, service, check_service(service))
+      end)
 
     # Broadcast to sidebar details for desktop:
     Phoenix.PubSub.broadcast(Sentinel.PubSub, "component:services", %{

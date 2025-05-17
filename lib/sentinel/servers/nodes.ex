@@ -69,21 +69,34 @@ defmodule Sentinel.Servers.Nodes do
         _ -> []
       end
 
-    updated_nodes = nodes ++ [Map.put(node, "id", DateTime.utc_now() |> DateTime.to_unix() |> to_string)]
+    # We make sure we dont add if there already is
+    exists = Enum.find(nodes, fn item -> item["ip"] === "localhost" end)
+
+    u_nodes =
+      if is_nil(exists) do
+        nodes ++ [Map.put(node, "id", DateTime.utc_now() |> DateTime.to_unix() |> to_string)]
+      else
+        nodes
+      end
 
     update_state =
-      case File.write(path(), Jason.encode!(updated_nodes)) do
+      case File.write(path(), Jason.encode!(u_nodes)) do
         :ok ->
           Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
             type: :info,
             message: "Node added successfully"
           })
 
+          # Broadcast to notification server
+          Sentinel.Servers.Notification.trigger(
+            {:info, "Node added successfully"}
+          )
+
           # Update the dashboard view nodes
           broadcast_nodes()
 
           # updated state
-          Map.put(state, :nodes, updated_nodes)
+          Map.put(state, :nodes, u_nodes)
 
         {:error, err} ->
           Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
@@ -91,7 +104,10 @@ defmodule Sentinel.Servers.Nodes do
             message: "Failed to add node: #{inspect(err)}"
           })
 
-          {:error, "Failed to add node: #{inspect(err)}"}
+          # Broadcast to notification server
+          Sentinel.Servers.Notification.trigger(
+            {:critical, "Failed to add node"}
+          )
 
           state
       end
@@ -108,7 +124,6 @@ defmodule Sentinel.Servers.Nodes do
     updated_nodes = Enum.reject(data, fn node -> node["id"] === id end)
 
     # Remove to the file
-    # TODO: delete from cloudflare as well
     update_state =
       case File.write(path(), Jason.encode!(updated_nodes)) do
         :ok ->
@@ -125,15 +140,20 @@ defmodule Sentinel.Servers.Nodes do
           Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic, %{
             id: @component_desktop_id,
             module: @component_module,
-            data: %{},
+            data: %{}
           })
 
           # Broadcast the new data structure for the sidebar component - mobile
           Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic, %{
             id: @component_mobile_id,
             module: @component_module,
-            data: %{},
+            data: %{}
           })
+
+          # Broadcast to notification server
+          Sentinel.Servers.Notification.trigger(
+            {:info, "Node removed successfully"}
+          )
 
           # updated state
           Map.put(state, :nodes, updated_nodes)
@@ -141,10 +161,13 @@ defmodule Sentinel.Servers.Nodes do
         {:error, err} ->
           Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
             type: :error,
-            message: "Failed to add node: #{inspect(err)}"
+            message: "Failed to remove node: #{inspect(err)}"
           })
 
-          {:error, "Failed to add node: #{inspect(err)}"}
+          # Broadcast to notification server
+          Sentinel.Servers.Notification.trigger(
+            {:info, "Failed to removed node"}
+          )
 
           state
       end

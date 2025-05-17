@@ -26,4 +26,20 @@ defmodule Sentinel.Schema.Settings do
       "required" => ["endpoint"]
     }
   end
+
+  def data(:encryption) do
+    %{
+      "title" => "Encryption Settings",
+      "description" => "View the generated encryption key used for other Sentinel nodes to get access to your resources",
+      "type" => "object",
+      "properties" => %{
+         "encryption_key" => %{
+          "type" => "string",
+          "description" => "The current node encryption key",
+          "readOnly" => true
+        }
+      },
+      "required" => ["encryption_key"]
+    }
+  end
 end

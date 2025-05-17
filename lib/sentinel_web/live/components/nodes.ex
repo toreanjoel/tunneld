@@ -84,6 +84,7 @@ defmodule SentinelWeb.Live.Components.Nodes do
   defp get_icon("storage"), do: "hero-circle-stack"
   defp get_icon("cpu"), do: "hero-cpu-chip"
   defp get_icon("pc"), do: "hero-computer-desktop"
+  defp get_icon("key"), do: "hero-key"
   defp get_icon(_), do: "hero-question-mark-circle"
 
   # Helper function to set a status indicator color based on node status.

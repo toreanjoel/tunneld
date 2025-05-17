@@ -101,18 +101,23 @@ defmodule SentinelWeb.Live.Components.Modal do
     data
   end
 
-  defp render_body(assigns, %{
-         "type" => "schema",
-         "data" => data,
-         "default_values" => default_values,
-         "action" => action
-       }) do
+  defp render_body(
+         assigns,
+         %{
+           "type" => "schema",
+           "data" => data,
+           "default_values" => default_values,
+           "action" => action
+         } = payload
+       ) do
     # Reassign the default values so we can access it in the html
     assigns =
       assigns
       |> assign(data: data)
       |> assign(default_values: default_values)
       |> assign(action: action)
+      # We do this so we can match with or without the title for backward compatibility
+      |> assign(title: Map.get(payload, "title", "Submit"))
 
     ~H"""
     <div>
@@ -122,6 +127,7 @@ defmodule SentinelWeb.Live.Components.Modal do
         schema={@data}
         values={@default_values}
         action={@action}
+        title={@title}
       />
     </div>
     """

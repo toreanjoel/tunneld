@@ -18,6 +18,7 @@ defmodule Sentinel.Servers.Cloudflare do
   even if our Elixir app stops. We only store metadata about subdomains in a file
   so we can remove them later if desired.
   """
+alias ThousandIsland.ServerConfig
 
   use GenServer
   require Logger
@@ -90,6 +91,9 @@ defmodule Sentinel.Servers.Cloudflare do
         message: "Unable to connect tunnel to server: #{subdomain}"
       })
 
+      # Broadcast to notification server
+      Sentinel.Servers.Notification.trigger({:critical, "Unable to connect tunnel #{subdomain} to server"})
+
       {:noreply, state}
     else
       tunnel_name = tunnel_name_for(subdomain)
@@ -129,6 +133,10 @@ defmodule Sentinel.Servers.Cloudflare do
         message: "#{subdomain}: Tunnel successfully created"
       })
 
+      # Broadcast to notification server
+      Sentinel.Servers.Notification.trigger({:info, "Tunnel Created: #{subdomain}"})
+
+
       {:noreply, new_state}
     end
   end
@@ -144,6 +152,9 @@ defmodule Sentinel.Servers.Cloudflare do
           type: :error,
           message: "No record found for subdomain: #{subdomain}"
         })
+
+        # Broadcast to notification server
+        Sentinel.Servers.Notification.trigger({:critical, "No record #{subdomain} to disconnect"})
 
         {:noreply, state}
 
@@ -170,6 +181,9 @@ defmodule Sentinel.Servers.Cloudflare do
           type: :info,
           message: "Tunnel successfully disconnected for: #{subdomain}"
         })
+
+        # Broadcast to notification server
+        Sentinel.Servers.Notification.trigger({:info, "Tunnel Disconnected: #{subdomain}"})
 
         {:noreply, final_state}
     end
@@ -226,6 +240,9 @@ defmodule Sentinel.Servers.Cloudflare do
         type: :error,
         message: "#{subdomain}: There was an error adding DNS route"
       })
+
+      # Broadcast to notification server
+      Sentinel.Servers.Notification.trigger({:critical, "Erorr adding DNS route for #{subdomain}"})
     else
       Logger.info("DNS route for #{subdomain} added successfully.")
 
@@ -234,6 +251,9 @@ defmodule Sentinel.Servers.Cloudflare do
         type: :info,
         message: "#{subdomain}: DNS route added successfully"
       })
+
+      # Broadcast to notification server
+      Sentinel.Servers.Notification.trigger({:info, "DNS route added for #{subdomain}"})
     end
   end
 
@@ -380,11 +400,16 @@ defmodule Sentinel.Servers.Cloudflare do
           message: "Successfully removed the DNS record from CloudFlare"
         })
 
+        # Broadcast to notification server
+        Sentinel.Servers.Notification.trigger({:info, "Successfully removed DNS Record"})
       _ ->
         Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
           type: :error,
           message: "There was a issue removing the DNS record from CloudFlare: #{record_details.name}"
         })
+
+        # Broadcast to notification server
+        Sentinel.Servers.Notification.trigger({:critical, "Issue removing DNS record for #{record_details.name}"})
     end
   end
 

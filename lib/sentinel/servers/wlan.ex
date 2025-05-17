@@ -65,6 +65,9 @@ defmodule Sentinel.Servers.Wlan do
       Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :info, message: "Disconnected from network"})
       Logger.info("Disconencted from network")
 
+      # Broadcast to notification server
+      Sentinel.Servers.Notification.trigger({:info, "Disconnected from wireless network"})
+
       # send relevant events to the main dashboard
       check_connection()
       {:reply, :ok, state}
@@ -149,6 +152,8 @@ defmodule Sentinel.Servers.Wlan do
 
     Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :info, message: "Connected to network #{ssid} successfully"})
 
+    # Broadcast to notification server
+    Sentinel.Servers.Notification.trigger({:info, "Connected from wireless network"})
     # send relevant events to the main dashboard
     check_connection()
 

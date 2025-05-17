@@ -55,7 +55,8 @@ defmodule SentinelWeb.Live.Dashboard do
       )
       |> assign(
         settings: %{
-          notifications: Sentinel.Servers.Notification.fetch_settings()
+          notifications: Sentinel.Servers.Notification.fetch_settings(),
+          encryption_key: Sentinel.Servers.Encryption.fetch_settings()
         }
       )
 
@@ -135,13 +136,16 @@ defmodule SentinelWeb.Live.Dashboard do
   def main(assigns) do
     ~H"""
     <div class="flex-1 flex flex-col p-5 system-scroll">
+      <%!-- Hooks to mount on startup --%>
+      <div id="clipboard-hook" phx-hook="CopyToClipboard"></div>
+
       <div class="flex flex-row h-[30px]">
         <!-- Fixed width left column -->
         <%= nav(assigns) %>
 
         <div class="flex-1" />
 
-        <div class="flex flex-row gap-2">
+        <div class="flex flex-row gap-1">
           <%!-- Internet Access Placeholder --%>
           <div
             phx-click="show_details"
@@ -167,6 +171,25 @@ defmodule SentinelWeb.Live.Dashboard do
             class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1"
           >
             <.icon name="hero-cog-6-tooth" class="h-15 w-15" />
+          </div>
+
+          <div
+            phx-click="modal_open"
+            phx-value-modal_title="Encryption Settings"
+            phx-value-modal_body={
+              Jason.encode!(%{
+                "type" => "schema",
+                "data" => Sentinel.Schema.Settings.data(:encryption),
+                "default_values" => %{
+                  "encryption_key" => @settings.encryption_key
+                },
+                "action" => "copy_encryption_key",
+                "title" => "Copy"
+              })
+            }
+            class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1"
+          >
+            <.icon name="hero-key" class="h-15 w-15" />
           </div>
         </div>
       </div>
@@ -388,6 +411,13 @@ defmodule SentinelWeb.Live.Dashboard do
         resp = Sentinel.Servers.Notification.update_settings(data)
         send(self(), {:update_notification_settings, resp})
 
+      #
+      # Encryption Settings
+      #
+      "copy_encryption_key" ->
+        %{"encryption_key" => key} = data
+        send(self(), {:copy_encyption_key, key})
+
       "remove_node" ->
         %{"id" => id, "subdomain" => subdomain} = Jason.decode!(data)
         Sentinel.Servers.Nodes.remove_node(id)
@@ -433,6 +463,18 @@ defmodule SentinelWeb.Live.Dashboard do
   end
 
   #
+  # Copy the encryption key to the client clipboard
+  #
+  def handle_info({:copy_encyption_key, key}, socket) do
+    socket =
+      socket
+      |> push_event("copy_to_clipboard", %{text: key})
+      |> put_flash(:info, "Copied to clipboard!")
+
+    {:noreply, socket}
+  end
+
+  #
   # handle terminal session init
   # This assumes ttyd is installed on the device
   #
@@ -456,8 +498,8 @@ defmodule SentinelWeb.Live.Dashboard do
   #
   def handle_info({:update_notification_settings, {:ok, data}}, socket) do
     settings = %{
-      socket.assigns.settings |
-      notifications: data
+      socket.assigns.settings
+      | notifications: data
     }
 
     {:noreply, assign(socket, :settings, settings)}

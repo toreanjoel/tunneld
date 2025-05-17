@@ -76,10 +76,15 @@ defmodule Sentinel.Servers.Whitelist do
           # We add the item to iptables
           # TODO: maybe try do this first and then write to file? - could have errors
           Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :info, message: "Internet granted for device: #{mac}"})
+
+          # Broadcast to notification server
+          Sentinel.Servers.Notification.trigger({:info, "Internet access granted for #{hostname}"})
           add_policy(policy)
 
         {:error, err} ->
           Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :error, message: "Failed to add user internet: #{inspect(err)}"})
+          # Broadcast to notification server
+          Sentinel.Servers.Notification.trigger({:critical, "Failed to grant internet access to #{hostname}"})
           {:error, "Failed to add user internet: #{inspect(err)}"}
       end
     {:reply, {:ok, %{}}, state}
@@ -108,8 +113,13 @@ defmodule Sentinel.Servers.Whitelist do
           Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :info, message: "Internet revoked for device: #{mac}"})
           remove_policy(policy)
 
+          # Broadcast to notification server
+          Sentinel.Servers.Notification.trigger({:info, "Internet access revoked for #{policy["hostname"]}"})
+
         {:error, err} ->
           Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{ type: :error, message: "Failed to revoke device access: #{inspect(err)}"})
+          # Broadcast to notification server
+          Sentinel.Servers.Notification.trigger({:critical, "Failed to revoke access for #{policy["hostname"]}"})
           {:error, "Failed to revoke device access: #{inspect(err)}"}
       end
     end
