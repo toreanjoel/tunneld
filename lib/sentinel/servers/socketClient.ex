@@ -12,12 +12,12 @@ defmodule Sentinel.Servers.SocketClient do
   Sentinel.Servers.SocketClient.disconnect()
 
   """
-  alias Sentinel.Encryption
   use Slipstream
   require Logger
 
-  @topic "sentinet"
+  @topic "sentinet:host"
 
+  @spec start_link(any()) :: :ignore | {:error, any()} | {:ok, pid()}
   @doc """
   Starts the Slipstream client process.
   """
@@ -90,6 +90,15 @@ defmodule Sentinel.Servers.SocketClient do
   def handle_reply(_ref, reply, socket) do
     # TODO: We need to decode and decrypt the response data
     Logger.debug("Reply received: #{inspect(reply)}")
+    {:ok, socket}
+  end
+
+  @doc """
+  When a general message comes from the server
+  """
+  @impl Slipstream
+  def handle_message(topic, event, message, socket) do
+    IO.inspect("Randome message from the server: #{topic}:#{event}:#{inspect(message)}")
     {:ok, socket}
   end
 

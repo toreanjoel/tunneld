@@ -5,7 +5,7 @@ defmodule SentinelWeb.SentinetChannel do
   use SentinelWeb, :channel
 
   @impl true
-  def join("sentinet", payload, socket) do
+  def join("sentinet:host", payload, socket) do
     if authorized?(payload) do
       {:ok, socket}
     else
@@ -37,8 +37,15 @@ defmodule SentinelWeb.SentinetChannel do
     {:reply, {:ok, init_data()}, socket}
   end
   def handle_in("event", payload, socket) do
-    IO.inspect(payload)
-    {:reply, {:ok, "MSG"}, socket}
+    IO.inspect(payload, label: "__RECIEVED__")
+
+    if (payload["type"] === "broadcast") do
+      Process.sleep(3_000)
+      broadcast(socket, "alert", %{"message" => "__BROADCAST_PAYLOAD__"})
+      {:noreply, socket}
+    else
+      {:reply, {:ok, "MSG"}, socket}
+    end
   end
 
   # Add authorization logic here as required.

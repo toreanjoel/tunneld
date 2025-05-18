@@ -8,7 +8,7 @@ defmodule SentinelWeb.UserSocket do
 
   ## Channels
 
-  channel "sentinet", SentinelWeb.SentinetChannel
+  channel "sentinet:*", SentinelWeb.SentinetChannel
 
   # Socket params are passed from the client and can
   # be used to verify and authenticate a user. After
