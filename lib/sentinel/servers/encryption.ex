@@ -66,6 +66,22 @@ defmodule Sentinel.Servers.Encryption do
   end
 
   @doc """
+  Encrypt a payload - we can then use this for what ever purpose
+  """
+  def encrypt_payload(plaintext) when is_binary(plaintext) do
+    key = Base.decode64!(fetch_settings())
+    Sentinel.Encryption.encrypt(key, plaintext)
+  end
+
+  @doc """
+  Decrypt a payload to read the data
+  """
+  def decrypt_payload(ciphertext) when is_binary(ciphertext) do
+    key = Base.decode64!(fetch_settings())
+    Sentinel.Encryption.decrypt(key, ciphertext)
+  end
+
+  @doc """
   Check if the encryption file exists
   """
   def file_exists?(), do: path() |> File.exists?()

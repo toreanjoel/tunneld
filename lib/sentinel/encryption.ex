@@ -29,4 +29,13 @@ defmodule Sentinel.Encryption do
   def decrypt(key, <<iv::binary-size(@iv_size), tag::binary-size(16), ciphertext::binary>>) do
     :crypto.crypto_one_time_aead(@aes_algo, key, iv, ciphertext, "", tag, false)
   end
+
+  @doc """
+  Pass shared key and use generated uuid to create a 1 way hash key that we need to send to the server on auth.
+  The server will compare the UUID do the same compute with its key to confirm keys are the same
+  """
+  def generate_auth_token(key, device_id) do
+    hmac = :crypto.mac(:hmac, :sha256, key, device_id)
+    Base.encode64(hmac)
+  end
 end

@@ -13,58 +13,52 @@ defmodule SentinelWeb.SentinetChannel do
     end
   end
 
-  # Channels can be used in a request/response fashion
-  # by sending replies to requests from the client
-  @impl true
-  def handle_in("ping", payload, socket) do
-    {:reply, {:ok, payload}, socket}
-  end
-
-  # It is also common to receive messages from the client and
-  # broadcast to everyone in the current topic (sentinet:lobby).
-  @impl true
-  def handle_in("shout", payload, socket) do
-    broadcast(socket, "shout", payload)
-    {:noreply, socket}
-  end
-
   @doc """
-  Handle different types of event payloads
+  Handle different types of event payloads - payload will be encrypted by default
   """
   @impl true
-  def handle_in("event", %{"type" => "init"}, socket) do
-    # init the data for the user
-    {:reply, {:ok, init_data()}, socket}
-  end
   def handle_in("event", payload, socket) do
-    IO.inspect(payload, label: "__RECIEVED__")
+    # Decode the payload, then store that as the binary to decrypt
+    data = payload |> Base.decode64!()
+    # The key to decrypt with is the local stored key - cypher
+    cypher = Sentinel.Servers.Encryption.fetch_settings() |> Base.decode64!()
+    # Original Data
+    decrypted_data = Jason.decode!(Sentinel.Encryption.decrypt(cypher, data))
+    # We look at the event type that we want to process in some way to the client
+    process(decrypted_data["type"], socket)
+  end
 
-    if (payload["type"] === "broadcast") do
-      Process.sleep(3_000)
-      broadcast(socket, "alert", %{"message" => "__BROADCAST_PAYLOAD__"})
-      {:noreply, socket}
-    else
-      {:reply, {:ok, "MSG"}, socket}
-    end
+  # Private functions to process different event types
+  defp process("init", socket) do
+    # TODO: add the custom data here that we need to send to the user
+    #
+    resp = %{
+      "data" => "This is the init data!"
+    } |> Jason.encode!()
+
+    # We send a response back to the user for the init data
+    {:reply, {:ok, Sentinel.Servers.Encryption.encrypt_payload(resp) |> Base.encode64}, socket}
   end
 
   # Add authorization logic here as required.
-  defp authorized?(%{"token" => token}) do
-    if Sentinel.Servers.Encryption.fetch_settings() === token do
+  defp authorized?(%{"token" => token, "device" => device}) do
+    #  We will get a device key and some string, we need to use that device key and our string to decript
+    expected =
+      Sentinel.Encryption.generate_auth_token(
+        Sentinel.Servers.Encryption.fetch_settings(),
+        device
+      )
+
+    if Plug.Crypto.secure_compare(expected, token) do
       true
     else
       false
     end
   end
+
   defp authorized?(_) do
     false
   end
 
-  # Here we send the init date to the new user
-  defp init_data do
-    # Get relevant data here to the client
-    %{
-      "data" => "This is the init data!"
-    }
-  end
+  # TODO: add other events to handle for the user making the request
 end

@@ -40,11 +40,21 @@ defmodule Sentinel.Servers.SocketClient do
   """
   @impl Slipstream
   def handle_continue(:init_state, socket) do
-    # TODO: We need to encrypt the encrypted token and socket client needs to decrpt to check it matches
+    # Make a request to auth the device on the channel
+    device_id = UUID.uuid4()
+
     socket =
       socket
       |> assign(:retry_attempts, 0)
-      |> assign(:metadata, %{token: Sentinel.Servers.Encryption.fetch_settings()})
+      # TODO: We need to send the data
+      |> assign(:metadata, %{
+        device: device_id,
+        token:
+          Sentinel.Encryption.generate_auth_token(
+            Sentinel.Servers.Encryption.fetch_settings(),
+            device_id
+          )
+      })
 
     {:noreply, socket}
   end
@@ -63,8 +73,11 @@ defmodule Sentinel.Servers.SocketClient do
   """
   @impl Slipstream
   def handle_cast({:event, payload}, socket) do
-    Logger.debug("Pushing event to #{@topic}: #{inspect(payload)}")
-    push(socket, @topic, "event", payload)
+    # Encode the json payload so that we can send that encrypted through
+    encrypted = Sentinel.Servers.Encryption.encrypt_payload(Jason.encode!(payload))
+    encoded = Base.encode64(encrypted)
+
+    push(socket, @topic, "event", encoded)
     {:noreply, socket}
   end
 
@@ -80,16 +93,20 @@ defmodule Sentinel.Servers.SocketClient do
       |> disconnect()
       |> await_disconnect()
 
-    {:noreply, socket}
+    # this is to stop the current process
+    {:stop, :disconnected, socket}
   end
 
   @doc """
   When we get a reply back to us on the topic
   """
   @impl Slipstream
-  def handle_reply(_ref, reply, socket) do
+  def handle_reply(_ref, {_, reply}, socket) do
     # TODO: We need to decode and decrypt the response data
-    Logger.debug("Reply received: #{inspect(reply)}")
+    resp =
+      Base.decode64!(reply) |> Sentinel.Servers.Encryption.decrypt_payload() |> Jason.decode!()
+
+    Logger.debug("Reply received: #{inspect(resp)}")
     {:ok, socket}
   end
 
