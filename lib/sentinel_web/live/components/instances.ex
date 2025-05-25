@@ -38,7 +38,7 @@ defmodule SentinelWeb.Live.Components.Instances do
         </div>
         <div
           phx-click="modal_open"
-          phx-value-modal_title="Add a Node"
+          phx-value-modal_title="Add an Instance"
           phx-value-modal_body={
             Jason.encode!(%{
               "type" => "schema",
@@ -53,7 +53,7 @@ defmodule SentinelWeb.Live.Components.Instances do
           class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1"
         >
           <.icon class="w-6 h-6" name={get_icon("cpu")} />
-          <div class="truncate text-xs">Add Node</div>
+          <div class="truncate text-xs">Add Instance</div>
         </div>
       </div>
 

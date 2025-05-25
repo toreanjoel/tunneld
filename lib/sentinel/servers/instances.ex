@@ -84,12 +84,12 @@ defmodule Sentinel.Servers.Instances do
         :ok ->
           Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
             type: :info,
-            message: "Node added successfully"
+            message: "Instance added successfully"
           })
 
           # Broadcast to notification server
           Sentinel.Servers.Notification.trigger(
-            {:info, "Node added successfully"}
+            {:info, "Instance added successfully"}
           )
 
           # Update the dashboard view instances
@@ -129,7 +129,7 @@ defmodule Sentinel.Servers.Instances do
         :ok ->
           Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
             type: :info,
-            message: "Node removed successfully"
+            message: "Instance removed successfully"
           })
 
           # Update the dashboard view instances
@@ -152,7 +152,7 @@ defmodule Sentinel.Servers.Instances do
 
           # Broadcast to notification server
           Sentinel.Servers.Notification.trigger(
-            {:info, "Node removed successfully"}
+            {:info, "Instance removed successfully"}
           )
 
           # updated state
@@ -257,7 +257,7 @@ defmodule Sentinel.Servers.Instances do
   end
 
   @doc """
-  Create the Node file.
+  Create the Instance file.
   """
   def create_file() do
     case File.write(path(), Jason.encode!([])) do
@@ -267,7 +267,7 @@ defmodule Sentinel.Servers.Instances do
   end
 
   @doc """
-  Read the Node file
+  Read the Instance file
   """
   def read_file() do
     case path() |> File.read() do
@@ -277,7 +277,7 @@ defmodule Sentinel.Servers.Instances do
             {:ok, data}
 
           {:error, err} ->
-            {:error, "Failed to decode Node file: #{inspect(err)}"}
+            {:error, "Failed to decode Instance file: #{inspect(err)}"}
         end
 
       {:error, reason} ->
@@ -290,7 +290,7 @@ defmodule Sentinel.Servers.Instances do
   def remove_instance(instance), do: GenServer.cast(__MODULE__, {:remove_instance, instance})
 
   @doc """
-  Check if the Node file exists.
+  Check if the Instance file exists.
   """
   def file_exists?(), do: File.exists?(path())
 

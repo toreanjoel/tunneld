@@ -35,7 +35,7 @@ defmodule Sentinel.Schema.Settings do
       "properties" => %{
          "encryption_key" => %{
           "type" => "string",
-          "description" => "The current node encryption key",
+          "description" => "The current instance encryption key",
           "readOnly" => true
         }
       },

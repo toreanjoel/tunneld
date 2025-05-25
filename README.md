@@ -6,7 +6,7 @@ A wireless-first, zero-trust network manager built for portability, performance,
 
 ---
 
-Sentinel acts as your network's intelligent gateway — managing devices, assigning IPs via DHCP, resolving DNS securely, sharing local compute and exposing optional network services through Cloudflare Tunnels. Designed to be lightweight, modular, and node-driven, Sentinel works both at home and on the move.
+Sentinel acts as your network's intelligent gateway — managing devices, assigning IPs via DHCP, resolving DNS securely, sharing local compute and exposing optional network services through Cloudflare Tunnels. Designed to be lightweight, modular, and instance-driven, Sentinel works both at home and on the move.
 
 ---
 
@@ -27,7 +27,7 @@ Built to operate as a wireless access point, Sentinel runs independently from yo
 ### 🛠 Built-in Web Terminal
 Includes a web-accessible terminal within the Sentinel UI, allowing local shell access directly from the browser — ideal for managing services, debugging, or extending functionality on the fly.
 
-### 📡 Local & Remote Node Monitoring
+### 📡 Local & Remote Instance Monitoring
 Sentinel monitors active services (e.g., dnsmasq, hostapd, doh proxy) and connected devices. It can detect other nodes on the network and remotely display their status, offering an overview of your distributed system.
 
 ### 🌍 Optional Cloudflare Tunnel Support
@@ -50,7 +50,7 @@ Run Sentinel in:
 | `dnsmasq`        | DHCP and DNS resolution with caching and ad blocking                       |
 | `hostapd`        | Broadcasts the wireless access point                                        |
 | `dnscrypt-proxy` | Enforces DNS-over-HTTPS (DoH) with preloaded secure resolvers              |
-| `Elixir + Phoenix` | Manages the UI, session-based device approval, node discovery, and services |
+| `Elixir + Phoenix` | Manages the UI, session-based device approval, instance discovery, and services |
 | `iptables`       | Controls packet forwarding and filtering                                    |
 
 ---
@@ -82,7 +82,7 @@ Sentinel exposes endpoints for:
 - Device status
 - TTL-based access requests
 - Internal health and monitoring
-- Node registration and schema-based contract sharing
+- Instance registration and schema-based contract sharing
 
 > This allows custom nodes (AI inference, file servers, etc.) to announce themselves and expose UIs or APIs back to Sentinel.
 
@@ -93,7 +93,7 @@ Sentinel exposes endpoints for:
 Sentinel is built for users who:
 - Want **control without overhead**
 - Don’t trust routers with limited UIs or poor security
-- Prefer a node-driven setup over traditional home lab models
+- Prefer a instance-driven setup over traditional home lab models
 - Value speed, clarity, and privacy — with zero reliance on third parties
 
 ---

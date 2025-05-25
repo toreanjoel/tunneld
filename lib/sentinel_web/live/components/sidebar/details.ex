@@ -4,9 +4,6 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
   """
   use SentinelWeb, :live_component
 
-  # To move to separate component - logs
-  alias SentinelWeb.Router.Helpers, as: Routes
-
   def mount(socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Sentinel.PubSub, "component:details")
@@ -38,8 +35,8 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
     """
   end
 
-  @spec render(%{:view => :node, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
-  def render(%{view: :node} = assigns) do
+  @spec render(%{:view => :instance, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{view: :instance} = assigns) do
     data = Map.get(assigns, :data)
 
     assigns =
@@ -88,7 +85,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
           phx-value-modal_body={
             Jason.encode!(%{
               "type" => "string",
-              "data" => "Are you sure you want make node inaccessible over the internet?"
+              "data" => "Are you sure you want make instance inaccessible over the internet?"
             })
           }
           phx-value-modal_actions={
@@ -106,14 +103,14 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
           <div class="truncate text-xs">Disconnect Tunnel</div>
         </div>
 
-        <%!-- Actions Remove Node --%>
+        <%!-- Actions Remove Instance --%>
         <div
           phx-click="modal_open"
-          phx-value-modal_title="Remove Node?"
+          phx-value-modal_title="Remove Instance?"
           phx-value-modal_body={
             Jason.encode!(%{
               "type" => "string",
-              "data" => "Are you sure you want to remove the node? (note if there is a tunnel, this will be disconnected as well)"
+              "data" => "Are you sure you want to remove the instance? (note if there is a tunnel, this will be disconnected as well)"
             })
           }
           phx-value-modal_actions={
@@ -128,13 +125,13 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
           class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
         >
           <.icon name="hero-no-symbol" class="h-5 w-5" />
-          <div class="truncate text-xs">Remove Node</div>
+          <div class="truncate text-xs">Remove Instance</div>
         </div>
       </div>
 
       <div class={"flex flex-col #{if !@has_data, do: "items-center justify-center p-3 h-full", else: ""}"}>
         <h1 :if={!@has_data} class="text-2xl font-light text-gray-2 my-4 text-center">
-          No Node details
+          No Instance details
         </h1>
 
         <div :if={@has_data}>

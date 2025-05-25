@@ -249,9 +249,9 @@ defmodule SentinelWeb.Live.Dashboard do
     # The broadcast here will be to the component:sidebar - we will render accordingly and replace data
     view =
       case type do
-        "node" ->
+        "instance" ->
           Sentinel.Servers.Instances.get_instance(id)
-          :node
+          :instance
 
         "service" ->
           Sentinel.Servers.Services.get_service_logs(id)
