@@ -1,13 +1,13 @@
-defmodule Sentinel.Servers.Nodes do
+defmodule Sentinel.Servers.Instances do
   @moduledoc """
-  Manage the nodes (references of devices on the network that are hosting applications)
+  Manage the instances (references of devices on the network that are hosting applications)
   """
   use GenServer
   require Logger
 
   @interval 10_000
 
-  @broadcast_topic_main "component:nodes"
+  @broadcast_topic_main "component:instances"
   @broadcast_topic "component:details"
   @component_desktop_id "sidebar_details_desktop"
   @component_mobile_id "sidebar_details_mobile"
@@ -18,41 +18,41 @@ defmodule Sentinel.Servers.Nodes do
   end
 
   @doc """
-  Init node persistence
+  Init instance persistence
   """
   def init(_) do
     # We need to make sure we create the file that we willwrite the data to
     if not file_exists?(), do: create_file()
 
-    # The job that will be responsible for updating current node state
+    # The job that will be responsible for updating current instance state
     send(self(), :sync)
 
     {:ok, %{}}
   end
 
   #
-  # Get node details
+  # Get instance details
   #
-  def handle_cast({:get_node, id}, state) do
-    nodes = fetch_nodes()
+  def handle_cast({:get_instance, id}, state) do
+    instances = fetch_nodes()
 
-    if !Enum.empty?(nodes) do
+    if !Enum.empty?(instances) do
       # Why do we need to check the atom vs string map key here??
-      node = Enum.filter(nodes, fn node -> node.id === id or node["id"] === id end) |> Enum.at(0)
+      instance = Enum.filter(instances, fn instance -> instance.id === id or instance["id"] === id end) |> Enum.at(0)
 
       # here we need to send off the detail to the sidebar
       # Broadcast the new data structure for the sidebar component - desktop
       Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic, %{
         id: @component_desktop_id,
         module: @component_module,
-        data: node
+        data: instance
       })
 
       # Broadcast the new data structure for the sidebar component - mobile
       Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic, %{
         id: @component_mobile_id,
         module: @component_module,
-        data: node
+        data: instance
       })
     end
 
@@ -60,23 +60,23 @@ defmodule Sentinel.Servers.Nodes do
   end
 
   #
-  # Add node to be persisted
+  # Add instance to be persisted
   #
-  def handle_cast({:add_node, node}, state) do
-    nodes =
+  def handle_cast({:add_instance, instance}, state) do
+    instances =
       case read_file() do
         {:ok, list} when is_list(list) -> list
         _ -> []
       end
 
     # We make sure we dont add if there already is
-    exists = Enum.find(nodes, fn item -> item["ip"] === "localhost" end)
+    exists = Enum.find(instances, fn item -> item["ip"] === "localhost" end)
 
     u_nodes =
       if is_nil(exists) do
-        nodes ++ [Map.put(node, "id", DateTime.utc_now() |> DateTime.to_unix() |> to_string)]
+        instances ++ [Map.put(instance, "id", DateTime.utc_now() |> DateTime.to_unix() |> to_string)]
       else
-        nodes
+        instances
       end
 
     update_state =
@@ -92,21 +92,21 @@ defmodule Sentinel.Servers.Nodes do
             {:info, "Node added successfully"}
           )
 
-          # Update the dashboard view nodes
+          # Update the dashboard view instances
           broadcast_nodes()
 
           # updated state
-          Map.put(state, :nodes, u_nodes)
+          Map.put(state, :instances, u_nodes)
 
         {:error, err} ->
           Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
             type: :error,
-            message: "Failed to add node: #{inspect(err)}"
+            message: "Failed to add instance: #{inspect(err)}"
           })
 
           # Broadcast to notification server
           Sentinel.Servers.Notification.trigger(
-            {:critical, "Failed to add node"}
+            {:critical, "Failed to add instance"}
           )
 
           state
@@ -116,12 +116,12 @@ defmodule Sentinel.Servers.Nodes do
     {:noreply, update_state}
   end
 
-  # Remove a node to be tracked
-  def handle_cast({:remove_node, id}, state) do
+  # Remove a instance to be tracked
+  def handle_cast({:remove_instance, id}, state) do
     {_, data} = read_file()
 
     # we need to reject the specific id
-    updated_nodes = Enum.reject(data, fn node -> node["id"] === id end)
+    updated_nodes = Enum.reject(data, fn instance -> instance["id"] === id end)
 
     # Remove to the file
     update_state =
@@ -132,7 +132,7 @@ defmodule Sentinel.Servers.Nodes do
             message: "Node removed successfully"
           })
 
-          # Update the dashboard view nodes
+          # Update the dashboard view instances
           broadcast_nodes()
 
           # here we need to send off the detail to the sidebar
@@ -156,17 +156,17 @@ defmodule Sentinel.Servers.Nodes do
           )
 
           # updated state
-          Map.put(state, :nodes, updated_nodes)
+          Map.put(state, :instances, updated_nodes)
 
         {:error, err} ->
           Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
             type: :error,
-            message: "Failed to remove node: #{inspect(err)}"
+            message: "Failed to remove instance: #{inspect(err)}"
           })
 
           # Broadcast to notification server
           Sentinel.Servers.Notification.trigger(
-            {:info, "Failed to removed node"}
+            {:info, "Failed to removed instance"}
           )
 
           state
@@ -181,12 +181,12 @@ defmodule Sentinel.Servers.Nodes do
   # Get the data and restart sync
   # NOTE: THIS WOULD BE BETTER OFF WITH DYNAMIC SUPERVISOR FOR EACH SERVICE
   def handle_info(:sync, state) do
-    # send out the list of nodes
-    nodes = broadcast_nodes()
+    # send out the list of instances
+    instances = broadcast_nodes()
 
-    # restart the checking of nodes and their health
+    # restart the checking of instances and their health
     sync_nodes()
-    {:noreply, Map.put(state, :nodes, nodes)}
+    {:noreply, Map.put(state, :instances, instances)}
   end
 
   # The job that will start interval sync
@@ -195,26 +195,26 @@ defmodule Sentinel.Servers.Nodes do
   end
 
   #
-  # The nodes inside the persisted file that was created
+  # The instances inside the persisted file that was created
   #
   def fetch_nodes() do
     {_status, data} = read_file()
 
-    nodes =
+    instances =
       if data == "",
         do: [],
         else: data
 
-    Enum.map(nodes, fn node ->
+    Enum.map(instances, fn instance ->
       # we get data
       %{
-        id: node["id"],
-        name: node["name"],
-        ip: node["ip"],
-        icon: node["icon"],
-        port: node["port"],
-        status: port_busy?(node["ip"], node["port"]),
-        tunnel: Sentinel.Servers.Cloudflare.get_tunnel_data(node["ip"], node["port"])
+        id: instance["id"],
+        name: instance["name"],
+        ip: instance["ip"],
+        icon: instance["icon"],
+        port: instance["port"],
+        status: port_busy?(instance["ip"], instance["port"]),
+        tunnel: Sentinel.Servers.Cloudflare.get_tunnel_data(instance["ip"], instance["port"])
         # add tunnel data here
       }
     end)
@@ -240,20 +240,20 @@ defmodule Sentinel.Servers.Nodes do
   end
 
   #
-  # Broadcast the nodes to the relevant component
+  # Broadcast the instances to the relevant component
   #
   defp broadcast_nodes() do
-    nodes = fetch_nodes()
+    instances = fetch_nodes()
 
     # # Broadcast to the live view (or parent) so it can update the Devices component.
     # # Use an id that matches the one used in your live_component render.
     Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic_main, %{
-      id: "nodes",
-      module: SentinelWeb.Live.Components.Nodes,
-      data: nodes
+      id: "instances",
+      module: SentinelWeb.Live.Components.Instances,
+      data: instances
     })
 
-    nodes
+    instances
   end
 
   @doc """
@@ -261,8 +261,8 @@ defmodule Sentinel.Servers.Nodes do
   """
   def create_file() do
     case File.write(path(), Jason.encode!([])) do
-      :ok -> {:ok, "Nodes file created"}
-      {:error, reason} -> {:error, "Failed to create Nodes file: #{inspect(reason)}"}
+      :ok -> {:ok, "Instances file created"}
+      {:error, reason} -> {:error, "Failed to create Instances file: #{inspect(reason)}"}
     end
   end
 
@@ -285,16 +285,16 @@ defmodule Sentinel.Servers.Nodes do
     end
   end
 
-  def get_node(id), do: GenServer.cast(__MODULE__, {:get_node, id})
-  def add_node(node), do: GenServer.cast(__MODULE__, {:add_node, node})
-  def remove_node(node), do: GenServer.cast(__MODULE__, {:remove_node, node})
+  def get_instance(id), do: GenServer.cast(__MODULE__, {:get_instance, id})
+  def add_instance(instance), do: GenServer.cast(__MODULE__, {:add_instance, instance})
+  def remove_instance(instance), do: GenServer.cast(__MODULE__, {:remove_instance, instance})
 
   @doc """
   Check if the Node file exists.
   """
   def file_exists?(), do: File.exists?(path())
 
-  def path(), do: "./" <> config_fs(:root) <> config_fs(:nodes)
+  def path(), do: "./" <> config_fs(:root) <> config_fs(:instances)
   defp config_fs(), do: Application.get_env(:sentinel, :fs)
   defp config_fs(key), do: config_fs()[key]
 end

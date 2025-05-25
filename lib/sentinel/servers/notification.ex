@@ -44,7 +44,7 @@ defmodule Sentinel.Servers.Notification do
           message: "Successfully updated notification settings"
         })
 
-        # Update the dashboard view nodes
+        # Update the dashboard view instances
         broadcast_settings()
 
         {:reply, {:ok, data}, state}
@@ -227,7 +227,7 @@ defmodule Sentinel.Servers.Notification do
   @spec file_exists?() :: boolean()
   def file_exists?(), do: path() |> File.exists?()
 
-  # Broadcast the nodes to the relevant component
+  # Broadcast the instances to the relevant component
   defp broadcast_settings() do
     settings = fetch_settings()
 
@@ -235,7 +235,7 @@ defmodule Sentinel.Servers.Notification do
     # Use an id that matches the one used in your live_component render.
     Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic_main, %{
       id: "notifications",
-      module: SentinelWeb.Live.Components.Nodes,
+      module: SentinelWeb.Live.Components.Instances,
       data: settings
     })
 

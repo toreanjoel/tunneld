@@ -90,10 +90,7 @@ defmodule SentinelWeb.Live.Components.Devices do
       <div :if={!@loading} class="grid grid-cols-2 md:grid-cols-4 gap-3">
         <%= for device <- Map.get(@data, :devices, []) do %>
           <div
-            phx-click="show_details"
-            phx-value-type="device"
-            phx-value-id={device.ip}
-            class="p-4 flex flex-col bg-secondary rounded-lg w-full h-[130px] hover:bg-secondary cursor-pointer"
+            class="p-4 flex flex-col bg-secondary rounded-lg w-full h-[130px] hover:bg-secondary"
             style="animation: fadeIn 0.5s ease-out forwards;"
           >
             <div class="flex flex-row">

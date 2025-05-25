@@ -3,18 +3,17 @@ defmodule SentinelWeb.Live.Dashboard do
   Dashboard V2 Page
   """
   use SentinelWeb, :live_view
-  alias SentinelWeb.Live.Components.Sidebar.Details, as: SidebarDetails
   alias Sentinel.Servers.{Session}
   alias SentinelWeb.Router.Helpers, as: Routes
 
-  alias SentinelWeb.Live.Components.{
-    Welcome,
-    Resources,
-    Services,
-    Nodes,
-    Devices,
-    Modal
-  }
+  # Components
+  alias SentinelWeb.Live.Components.Sidebar.Details, as: SidebarDetails
+  alias SentinelWeb.Live.Components.Welcome
+  alias SentinelWeb.Live.Components.Resources
+  alias SentinelWeb.Live.Components.Services
+  alias SentinelWeb.Live.Components.Instances
+  alias SentinelWeb.Live.Components.Devices
+  alias SentinelWeb.Live.Components.Modal
 
   # auth check if this page needs to be behind auth
   on_mount SentinelWeb.Hooks.CheckAuth
@@ -200,16 +199,21 @@ defmodule SentinelWeb.Live.Dashboard do
         </div>
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
-        <%!-- Resources, Nodes and Services  --%>
+        <%!-- Resources, Instances and Services  --%>
         <div class="flex flex-col md:flex-row w-full gap-6">
           <div class="flex-1"><.live_component id="resources" module={Resources} /></div>
           <div class="flex-1">
-            <.live_component id="nodes" module={Nodes} />
             <.live_component id="services" module={Services} />
           </div>
         </div>
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
+
+        <%!-- Instances --%>
+        <div class="min-h-[200px]">
+          <.live_component id="instances" module={Instances} />
+        </div>
+
         <%!-- Devices --%>
         <div class="min-h-[200px]">
           <.live_component id="devices" module={Devices} />
@@ -246,15 +250,12 @@ defmodule SentinelWeb.Live.Dashboard do
     view =
       case type do
         "node" ->
-          Sentinel.Servers.Nodes.get_node(id)
+          Sentinel.Servers.Instances.get_instance(id)
           :node
 
         "service" ->
           Sentinel.Servers.Services.get_service_logs(id)
           :service
-
-        "device" ->
-          :device
 
         "wlan" ->
           Sentinel.Servers.Wlan.scan_networks()
@@ -399,10 +400,10 @@ defmodule SentinelWeb.Live.Dashboard do
         Sentinel.Servers.Cloudflare.remove_host(subdomain)
 
       #
-      # Nodes
+      # Instances
       #
-      "add_node" ->
-        Sentinel.Servers.Nodes.add_node(data)
+      "add_instance" ->
+        Sentinel.Servers.Instances.add_instance(data)
 
       #
       # Notification Settings
@@ -418,9 +419,9 @@ defmodule SentinelWeb.Live.Dashboard do
         %{"encryption_key" => key} = data
         send(self(), {:copy_encyption_key, key})
 
-      "remove_node" ->
+      "remove_instance" ->
         %{"id" => id, "subdomain" => subdomain} = Jason.decode!(data)
-        Sentinel.Servers.Nodes.remove_node(id)
+        Sentinel.Servers.Instances.remove_instance(id)
 
         if subdomain do
           Sentinel.Servers.Cloudflare.remove_host(subdomain)

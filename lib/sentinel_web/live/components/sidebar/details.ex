@@ -120,7 +120,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
             Jason.encode!(%{
               "title" => "Remove",
               "payload" => %{
-                "type" => "remove_node",
+                "type" => "remove_instance",
                 "data" => %{"id" => data.id, "subdomain" => data.tunnel["subdomain"]}
               }
             })
