@@ -62,7 +62,7 @@ defmodule Sentinel.Servers.Instances do
   #
   # Add instance to be persisted
   #
-  def handle_cast({:add_instance, instance}, state) do
+  def handle_call({:add_instance, instance}, _from, state) do
     instances =
       case read_file() do
         {:ok, list} when is_list(list) -> list
@@ -113,7 +113,7 @@ defmodule Sentinel.Servers.Instances do
       end
 
     # Broadcast to component will happen when a sync happens, we dont need to do this
-    {:noreply, update_state}
+    {:reply, update_state, update_state}
   end
 
   # Remove a instance to be tracked
@@ -286,7 +286,7 @@ defmodule Sentinel.Servers.Instances do
   end
 
   def get_instance(id), do: GenServer.cast(__MODULE__, {:get_instance, id})
-  def add_instance(instance), do: GenServer.cast(__MODULE__, {:add_instance, instance})
+  def add_instance(instance), do: GenServer.call(__MODULE__, {:add_instance, instance}, 25_000)
   def remove_instance(instance), do: GenServer.cast(__MODULE__, {:remove_instance, instance})
 
   @doc """

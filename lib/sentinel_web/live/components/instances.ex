@@ -65,7 +65,7 @@ defmodule SentinelWeb.Live.Components.Instances do
           <.icon class="w-8 h-8 text-white" name="hero-cpu-chip" />
         </div>
 
-        <div class="flex flex-row gap-3 items-center justify-start">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           <%= if !Enum.empty?(@instances) do %>
             <%= for instance <- @instances do %>
               <div

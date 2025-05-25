@@ -18,7 +18,6 @@ defmodule Sentinel.Servers.Cloudflare do
   even if our Elixir app stops. We only store metadata about subdomains in a file
   so we can remove them later if desired.
   """
-alias ThousandIsland.ServerConfig
 
   use GenServer
   require Logger
