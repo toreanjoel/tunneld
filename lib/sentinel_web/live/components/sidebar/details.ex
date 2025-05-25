@@ -102,51 +102,53 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
             </div>
           </div>
 
-          <div class="flex flex-col gap-2">
+          <div class="flex flex-row gap-2">
             <%!-- Actions Connect/Disconnect Tunnel --%>
-            <div
-              :if={Enum.empty?(data.tunnel)}
-              phx-click="modal_open"
-              phx-value-modal_title="Connect to Cloudflare Tunnel"
-              phx-value-modal_body={
-                Jason.encode!(%{
-                  "type" => "schema",
-                  "data" => Sentinel.Schema.Cloudflare.data(:add),
-                  "default_values" => %{
-                    service: "#{data.ip}:#{data.port}"
-                  },
-                  "action" => "connect_cloudflare"
-                })
-              }
-              class="flex items-center justify-center gap-1 bg-orange p-2 cursor-pointer rounded-md"
-            >
-              <.icon name="hero-globe-alt" class="h-5 w-5" />
-              <div class="truncate text-xs">Connect Tunnel</div>
-            </div>
+            <div class="grow">
+              <div
+                :if={Enum.empty?(data.tunnel)}
+                phx-click="modal_open"
+                phx-value-modal_title="Connect to Cloudflare Tunnel"
+                phx-value-modal_body={
+                  Jason.encode!(%{
+                    "type" => "schema",
+                    "data" => Sentinel.Schema.Cloudflare.data(:add),
+                    "default_values" => %{
+                      service: "#{data.ip}:#{data.port}"
+                    },
+                    "action" => "connect_cloudflare"
+                  })
+                }
+                class="flex items-center justify-center gap-1 bg-orange p-2 cursor-pointer rounded-md"
+              >
+                <.icon name="hero-globe-alt" class="h-5 w-5" />
+                <div class="truncate text-xs">Connect Tunnel</div>
+              </div>
 
-            <div
-              :if={!Enum.empty?(data.tunnel)}
-              phx-click="modal_open"
-              phx-value-modal_title="Disconnect Cloudflare Tunnel?"
-              phx-value-modal_body={
-                Jason.encode!(%{
-                  "type" => "string",
-                  "data" => "Are you sure you want make instance inaccessible over the internet?"
-                })
-              }
-              phx-value-modal_actions={
-                Jason.encode!(%{
-                  "title" => "Remove Tunnel",
-                  "payload" => %{
-                    "type" => "disconnect_cloudflare",
-                    "data" => %{"subdomain" => data.tunnel["subdomain"]}
-                  }
-                })
-              }
-              class="flex items-center justify-center gap-1 bg-orange p-2 cursor-pointer rounded-md"
-            >
-              <.icon name="hero-globe-alt" class="h-5 w-5" />
-              <div class="truncate text-xs">Disconnect Tunnel</div>
+              <div
+                :if={!Enum.empty?(data.tunnel)}
+                phx-click="modal_open"
+                phx-value-modal_title="Disconnect Cloudflare Tunnel?"
+                phx-value-modal_body={
+                  Jason.encode!(%{
+                    "type" => "string",
+                    "data" => "Are you sure you want make instance inaccessible over the internet?"
+                  })
+                }
+                phx-value-modal_actions={
+                  Jason.encode!(%{
+                    "title" => "Remove Tunnel",
+                    "payload" => %{
+                      "type" => "disconnect_cloudflare",
+                      "data" => %{"subdomain" => data.tunnel["subdomain"]}
+                    }
+                  })
+                }
+                class="flex items-center justify-center gap-1 bg-orange p-2 cursor-pointer rounded-md"
+              >
+                <.icon name="hero-globe-alt" class="h-5 w-5" />
+                <div class="truncate text-xs">Disconnect Tunnel</div>
+              </div>
             </div>
 
             <div
@@ -160,7 +162,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
                   "action" => "sentinet_settings"
                 })
               }
-              class="flex items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
+              class="flex grow items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
             >
               <.icon name="hero-globe-alt" class="h-5 w-5" />
               <div class="truncate text-xs">Sentinet Settings</div>

@@ -15,7 +15,7 @@ defmodule Sentinel.Schema.Sentinet do
       "properties" => %{
         "enabled" => %{
           "type" => "boolean",
-          "description" => "Enable or disable instance and make it available to other trusted users",
+          "description" => "Enable or disable instance availibility to other trusted users",
         },
         "route" => %{
           "type" => "string",
