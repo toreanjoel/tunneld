@@ -57,52 +57,6 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
       <div :if={@has_data} class="flex flex-row gap-1 justify-end my-2">
         <%!-- Actions to take --%>
 
-        <%!-- Actions Connect/Disconnect Tunnel --%>
-        <div
-          :if={Enum.empty?(data.tunnel)}
-          phx-click="modal_open"
-          phx-value-modal_title="Connect to Cloudflare Tunnel"
-          phx-value-modal_body={
-            Jason.encode!(%{
-              "type" => "schema",
-              "data" => Sentinel.Schema.Cloudflare.data(:add),
-              "default_values" => %{
-                service: "#{data.ip}:#{data.port}"
-              },
-              "action" => "connect_cloudflare"
-            })
-          }
-          class="flex items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
-        >
-          <.icon name="hero-globe-alt" class="h-5 w-5" />
-          <div class="truncate text-xs">Connect Tunnel</div>
-        </div>
-
-        <div
-          :if={!Enum.empty?(data.tunnel)}
-          phx-click="modal_open"
-          phx-value-modal_title="Disconnect Cloudflare Tunnel?"
-          phx-value-modal_body={
-            Jason.encode!(%{
-              "type" => "string",
-              "data" => "Are you sure you want make instance inaccessible over the internet?"
-            })
-          }
-          phx-value-modal_actions={
-            Jason.encode!(%{
-              "title" => "Remove Tunnel",
-              "payload" => %{
-                "type" => "disconnect_cloudflare",
-                "data" => %{"subdomain" => data.tunnel["subdomain"]}
-              }
-            })
-          }
-          class="flex items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
-        >
-          <.icon name="hero-globe-alt" class="h-5 w-5" />
-          <div class="truncate text-xs">Disconnect Tunnel</div>
-        </div>
-
         <%!-- Actions Remove Instance --%>
         <div
           phx-click="modal_open"
@@ -110,7 +64,8 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
           phx-value-modal_body={
             Jason.encode!(%{
               "type" => "string",
-              "data" => "Are you sure you want to remove the instance? (note if there is a tunnel, this will be disconnected as well)"
+              "data" =>
+                "Are you sure you want to remove the instance? (note if there is a tunnel, this will be disconnected as well)"
             })
           }
           phx-value-modal_actions={
@@ -144,6 +99,71 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
             </div>
             <div class="text-sm truncate">
               <span class="font-bold">Port:</span> <%= data.port %>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-2">
+            <%!-- Actions Connect/Disconnect Tunnel --%>
+            <div
+              :if={Enum.empty?(data.tunnel)}
+              phx-click="modal_open"
+              phx-value-modal_title="Connect to Cloudflare Tunnel"
+              phx-value-modal_body={
+                Jason.encode!(%{
+                  "type" => "schema",
+                  "data" => Sentinel.Schema.Cloudflare.data(:add),
+                  "default_values" => %{
+                    service: "#{data.ip}:#{data.port}"
+                  },
+                  "action" => "connect_cloudflare"
+                })
+              }
+              class="flex items-center justify-center gap-1 bg-orange p-2 cursor-pointer rounded-md"
+            >
+              <.icon name="hero-globe-alt" class="h-5 w-5" />
+              <div class="truncate text-xs">Connect Tunnel</div>
+            </div>
+
+            <div
+              :if={!Enum.empty?(data.tunnel)}
+              phx-click="modal_open"
+              phx-value-modal_title="Disconnect Cloudflare Tunnel?"
+              phx-value-modal_body={
+                Jason.encode!(%{
+                  "type" => "string",
+                  "data" => "Are you sure you want make instance inaccessible over the internet?"
+                })
+              }
+              phx-value-modal_actions={
+                Jason.encode!(%{
+                  "title" => "Remove Tunnel",
+                  "payload" => %{
+                    "type" => "disconnect_cloudflare",
+                    "data" => %{"subdomain" => data.tunnel["subdomain"]}
+                  }
+                })
+              }
+              class="flex items-center justify-center gap-1 bg-orange p-2 cursor-pointer rounded-md"
+            >
+              <.icon name="hero-globe-alt" class="h-5 w-5" />
+              <div class="truncate text-xs">Disconnect Tunnel</div>
+            </div>
+
+            <div
+              phx-click="modal_open"
+              phx-value-modal_title="Sentinet Settings"
+              phx-value-modal_body={
+                Jason.encode!(%{
+                  "type" => "schema",
+                  "data" => Sentinel.Schema.Sentinet.data(:settings),
+                  "default_values" => %{},
+                  "action" => "sentinet_settings"
+                })
+              }
+              class="flex items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
+            >
+              <.icon name="hero-globe-alt" class="h-5 w-5" />
+              <div class="truncate text-xs">Sentinet Settings</div>
             </div>
           </div>
         </div>

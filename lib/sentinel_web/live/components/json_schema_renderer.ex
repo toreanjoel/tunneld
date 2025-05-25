@@ -34,7 +34,8 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
           format: props["format"],
           default: props["default"],
           hidden: props["ui:widget"] == "hidden",
-          readonly: props["readOnly"] == true
+          readonly: props["readOnly"] == true,
+          widget: props["ui:widget"]
         }
       end)
 
@@ -66,7 +67,7 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
           </label>
 
           <%= if is_list(field.enum) do %>
-            <!-- Select Dropdown for Enum Fields -->
+            <!-- Enum dropdown -->
             <select name={"form[#{field.name}]"} class="bg-primary rounded-md px-3 py-2 w-full">
               <%= for option <- field.enum do %>
                 <option value={option} selected={Map.get(@changeset, field.name, "") == option}>
@@ -84,14 +85,23 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
                 class="rounded border-gray-300 text-purple shadow-sm focus:ring-2 focus:ring-purple"
               />
             <% else %>
-              <% input_type = if field.format == "password", do: "password", else: "text" %>
-              <input
-                type={input_type}
-                name={"form[#{field.name}]"}
-                value={Map.get(@changeset, field.name, field.default || "")}
-                class="bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200"
-                readonly={field.readonly}
-              />
+              <%= if field.widget == "textarea" do %>
+                <textarea
+                  name={"form[#{field.name}]"}
+                  rows="6"
+                  class="bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200 font-mono text-sm"
+                  readonly={field.readonly}
+                ><%= Map.get(@changeset, field.name, field.default || "") %></textarea>
+              <% else %>
+                <% input_type = if field.format == "password", do: "password", else: "text" %>
+                <input
+                  type={input_type}
+                  name={"form[#{field.name}]"}
+                  value={Map.get(@changeset, field.name, field.default || "")}
+                  class="bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200"
+                  readonly={field.readonly}
+                />
+              <% end %>
             <% end %>
           <% end %>
         </div>

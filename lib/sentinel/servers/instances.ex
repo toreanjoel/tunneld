@@ -34,7 +34,7 @@ defmodule Sentinel.Servers.Instances do
   # Get instance details
   #
   def handle_cast({:get_instance, id}, state) do
-    instances = fetch_nodes()
+    instances = fetch_instances()
 
     if !Enum.empty?(instances) do
       # Why do we need to check the atom vs string map key here??
@@ -93,7 +93,7 @@ defmodule Sentinel.Servers.Instances do
           )
 
           # Update the dashboard view instances
-          broadcast_nodes()
+          broadcast_instances()
 
           # updated state
           Map.put(state, :instances, u_nodes)
@@ -133,7 +133,7 @@ defmodule Sentinel.Servers.Instances do
           })
 
           # Update the dashboard view instances
-          broadcast_nodes()
+          broadcast_instances()
 
           # here we need to send off the detail to the sidebar
           # Broadcast the new data structure for the sidebar component - desktop
@@ -182,7 +182,7 @@ defmodule Sentinel.Servers.Instances do
   # NOTE: THIS WOULD BE BETTER OFF WITH DYNAMIC SUPERVISOR FOR EACH SERVICE
   def handle_info(:sync, state) do
     # send out the list of instances
-    instances = broadcast_nodes()
+    instances = broadcast_instances()
 
     # restart the checking of instances and their health
     sync_nodes()
@@ -197,7 +197,7 @@ defmodule Sentinel.Servers.Instances do
   #
   # The instances inside the persisted file that was created
   #
-  def fetch_nodes() do
+  def fetch_instances() do
     {_status, data} = read_file()
 
     instances =
@@ -242,8 +242,8 @@ defmodule Sentinel.Servers.Instances do
   #
   # Broadcast the instances to the relevant component
   #
-  defp broadcast_nodes() do
-    instances = fetch_nodes()
+  defp broadcast_instances() do
+    instances = fetch_instances()
 
     # # Broadcast to the live view (or parent) so it can update the Devices component.
     # # Use an id that matches the one used in your live_component render.

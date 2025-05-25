@@ -16,7 +16,7 @@ defmodule Sentinel.Schema.Cloudflare do
         "domain" => %{
           "type" => "string",
           "description" => "The domain on cloudflare you want to connect the service to",
-          "minLength" => 1
+          "minLength" => 1,
         },
         "service" => %{
           "type" => "string",
