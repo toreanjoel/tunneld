@@ -38,7 +38,9 @@ defmodule Sentinel.Servers.Artifacts do
 
     if !Enum.empty?(artifacts) do
       # Why do we need to check the atom vs string map key here??
-      artifact = Enum.filter(artifacts, fn artifact -> artifact.id === id or artifact["id"] === id end) |> Enum.at(0)
+      artifact =
+        Enum.filter(artifacts, fn artifact -> artifact.id === id or artifact["id"] === id end)
+        |> Enum.at(0)
 
       # here we need to send off the detail to the sidebar
       # Broadcast the new data structure for the sidebar component - desktop
@@ -69,51 +71,54 @@ defmodule Sentinel.Servers.Artifacts do
         _ -> []
       end
 
-    # We make sure we dont add if there already is
-    exists = Enum.find(artifacts, fn item -> item["ip"] === "localhost" end)
+    # We make sure we dont add if there already is - we check ports as this is a running instance
+    exists = Enum.find(artifacts, fn item -> item["port"] === artifact["port"] end)
 
-    u_nodes =
+    IO.inspect(exists, label: "CHECK DATA")
+
+    updated_state =
       if is_nil(exists) do
-        artifacts ++ [Map.put(artifact, "id", DateTime.utc_now() |> DateTime.to_unix() |> to_string)]
+        u_nodes =
+          artifacts ++
+            [Map.put(artifact, "id", DateTime.utc_now() |> DateTime.to_unix() |> to_string)]
+
+          case File.write(path(), Jason.encode!(u_nodes)) do
+            :ok ->
+              Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+                type: :info,
+                message: "artifact added successfully"
+              })
+
+              # Broadcast to notification server
+              Sentinel.Servers.Notification.trigger({:info, "artifact added successfully"})
+
+              # Update the dashboard view artifacts
+              broadcast_artifacts()
+
+              # updated state
+              Map.put(state, :artifacts, u_nodes)
+
+            {:error, err} ->
+              Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+                type: :error,
+                message: "Failed to add artifact: #{inspect(err)}"
+              })
+
+              # Broadcast to notification server
+              Sentinel.Servers.Notification.trigger({:critical, "Failed to add artifact"})
+
+              state
+          end
       else
-        artifacts
-      end
-
-    update_state =
-      case File.write(path(), Jason.encode!(u_nodes)) do
-        :ok ->
-          Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
-            type: :info,
-            message: "artifact added successfully"
-          })
-
-          # Broadcast to notification server
-          Sentinel.Servers.Notification.trigger(
-            {:info, "artifact added successfully"}
-          )
-
-          # Update the dashboard view artifacts
-          broadcast_artifacts()
-
-          # updated state
-          Map.put(state, :artifacts, u_nodes)
-
-        {:error, err} ->
-          Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
-            type: :error,
-            message: "Failed to add artifact: #{inspect(err)}"
-          })
-
-          # Broadcast to notification server
-          Sentinel.Servers.Notification.trigger(
-            {:critical, "Failed to add artifact"}
-          )
-
-          state
+        Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+          type: :error,
+          message: "Only one artifact instance allowed at a time"
+        })
+        state
       end
 
     # Broadcast to component will happen when a sync happens, we dont need to do this
-    {:reply, update_state, update_state}
+    {:reply, updated_state, updated_state}
   end
 
   # Remove a artifact to be tracked
@@ -151,9 +156,7 @@ defmodule Sentinel.Servers.Artifacts do
           })
 
           # Broadcast to notification server
-          Sentinel.Servers.Notification.trigger(
-            {:info, "artifact removed successfully"}
-          )
+          Sentinel.Servers.Notification.trigger({:info, "artifact removed successfully"})
 
           # updated state
           Map.put(state, :artifacts, updated_nodes)
@@ -165,9 +168,7 @@ defmodule Sentinel.Servers.Artifacts do
           })
 
           # Broadcast to notification server
-          Sentinel.Servers.Notification.trigger(
-            {:info, "Failed to removed artifact"}
-          )
+          Sentinel.Servers.Notification.trigger({:info, "Failed to removed artifact"})
 
           state
       end

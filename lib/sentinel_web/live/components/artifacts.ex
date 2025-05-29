@@ -43,16 +43,13 @@ defmodule SentinelWeb.Live.Components.Artifacts do
             Jason.encode!(%{
               "type" => "schema",
               "data" => Sentinel.Schema.Artifact.data(:add),
-              "default_values" => %{
-                # These below needs to be more dynamic but this is supported given what we render at the moment
-                "icon" => ["vpn", "storage", "cpu", "pc", "other"]
-              },
+              "default_values" => %{},
               "action" => "add_artifact"
             })
           }
           class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1"
         >
-          <.icon class="w-6 h-6" name={get_icon("cpu")} />
+          <.icon class="w-6 h-6" name="hero-cpu-chip" />
           <div class="truncate text-xs">Add Artifact</div>
         </div>
       </div>
@@ -105,14 +102,6 @@ defmodule SentinelWeb.Live.Components.Artifacts do
     </div>
     """
   end
-
-  # Helper function to select the icon based on artifact type.
-  defp get_icon("vpn"), do: "hero-shield-check"
-  defp get_icon("storage"), do: "hero-circle-stack"
-  defp get_icon("cpu"), do: "hero-cpu-chip"
-  defp get_icon("pc"), do: "hero-computer-desktop"
-  defp get_icon("key"), do: "hero-key"
-  defp get_icon(_), do: "hero-question-mark-circle"
 
   # Helper function to set a status indicator color based on artifact status.
   defp get_status_color(true), do: "bg-green"

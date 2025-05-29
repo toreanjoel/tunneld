@@ -18,10 +18,6 @@ defmodule Sentinel.Schema.Artifact do
           "description" => "Name the artifact to make it easy to reference",
           "minLength" => 1
         },
-        "icon" => %{
-          "type" => "string",
-          "description" => "Choose basic icon to represent artifact",
-        },
         "ip" => %{
           "type" => "string",
           "description" => "IP address of the machine hosting the application",
@@ -32,7 +28,7 @@ defmodule Sentinel.Schema.Artifact do
           "description" => "The port where the application is accessible from"
         }
       },
-      "required" => ["ip", "port", "name", "icon"]
+      "required" => ["ip", "port", "name"]
     }
   end
 end

@@ -387,7 +387,7 @@ defmodule SentinelWeb.Live.Dashboard do
         Process.send_after(self(), :delayed_scan, 3000)
 
       "scan_for_wireless_networks" ->
-        Sentinel.Servers.Wlan.scan_networks()
+        send(self(), :scan_for_wireless_networks)
 
       #
       # Cloudflare
@@ -504,5 +504,13 @@ defmodule SentinelWeb.Live.Dashboard do
     }
 
     {:noreply, assign(socket, :settings, settings)}
+  end
+
+  #
+  # Background job in order to process the network fetch
+  #
+  def handle_info(:scan_for_wireless_networks, socket) do
+    Task.start(fn -> Sentinel.Servers.Wlan.scan_networks() end)
+    {:noreply, put_flash(socket, :info, "Scanning for wireless networks")}
   end
 end
