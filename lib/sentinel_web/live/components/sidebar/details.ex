@@ -35,8 +35,8 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
     """
   end
 
-  @spec render(%{:view => :instance, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
-  def render(%{view: :instance} = assigns) do
+  @spec render(%{:view => :artifact, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{view: :artifact} = assigns) do
     data = Map.get(assigns, :data)
 
     assigns =
@@ -57,22 +57,22 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
       <div :if={@has_data} class="flex flex-row gap-1 justify-end my-2">
         <%!-- Actions to take --%>
 
-        <%!-- Actions Remove Instance --%>
+        <%!-- Actions Remove Artifact --%>
         <div
           phx-click="modal_open"
-          phx-value-modal_title="Remove Instance?"
+          phx-value-modal_title="Remove Artifact?"
           phx-value-modal_body={
             Jason.encode!(%{
               "type" => "string",
               "data" =>
-                "Are you sure you want to remove the instance? (note if there is a tunnel, this will be disconnected as well)"
+                "Are you sure you want to remove the artifact? (note if there is a tunnel, this will be disconnected as well)"
             })
           }
           phx-value-modal_actions={
             Jason.encode!(%{
               "title" => "Remove",
               "payload" => %{
-                "type" => "remove_instance",
+                "type" => "remove_artifact",
                 "data" => %{"id" => data.id, "subdomain" => data.tunnel["subdomain"]}
               }
             })
@@ -80,13 +80,13 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
           class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
         >
           <.icon name="hero-no-symbol" class="h-5 w-5" />
-          <div class="truncate text-xs">Remove Instance</div>
+          <div class="truncate text-xs">Remove Artifact</div>
         </div>
       </div>
 
       <div class={"flex flex-col #{if !@has_data, do: "items-center justify-center p-3 h-full", else: ""}"}>
         <h1 :if={!@has_data} class="text-2xl font-light text-gray-2 my-4 text-center">
-          No Instance details
+          No Artifact details
         </h1>
 
         <div :if={@has_data}>
@@ -132,7 +132,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
                 phx-value-modal_body={
                   Jason.encode!(%{
                     "type" => "string",
-                    "data" => "Are you sure you want make instance inaccessible over the internet?"
+                    "data" => "Are you sure you want make artifact inaccessible over the internet?"
                   })
                 }
                 phx-value-modal_actions={

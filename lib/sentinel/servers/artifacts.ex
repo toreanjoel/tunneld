@@ -1,13 +1,13 @@
-defmodule Sentinel.Servers.Instances do
+defmodule Sentinel.Servers.Artifacts do
   @moduledoc """
-  Manage the instances (references of devices on the network that are hosting applications)
+  Manage the artifacts (to a running application hosted on some device on the network)
   """
   use GenServer
   require Logger
 
   @interval 10_000
 
-  @broadcast_topic_main "component:instances"
+  @broadcast_topic_main "component:artifacts"
   @broadcast_topic "component:details"
   @component_desktop_id "sidebar_details_desktop"
   @component_mobile_id "sidebar_details_mobile"
@@ -18,41 +18,41 @@ defmodule Sentinel.Servers.Instances do
   end
 
   @doc """
-  Init instance persistence
+  Init artifact persistence
   """
   def init(_) do
     # We need to make sure we create the file that we willwrite the data to
     if not file_exists?(), do: create_file()
 
-    # The job that will be responsible for updating current instance state
+    # The job that will be responsible for updating current artifact state
     send(self(), :sync)
 
     {:ok, %{}}
   end
 
   #
-  # Get instance details
+  # Get artifact details
   #
-  def handle_cast({:get_instance, id}, state) do
-    instances = fetch_instances()
+  def handle_cast({:get_artifact, id}, state) do
+    artifacts = fetch_artifacts()
 
-    if !Enum.empty?(instances) do
+    if !Enum.empty?(artifacts) do
       # Why do we need to check the atom vs string map key here??
-      instance = Enum.filter(instances, fn instance -> instance.id === id or instance["id"] === id end) |> Enum.at(0)
+      artifact = Enum.filter(artifacts, fn artifact -> artifact.id === id or artifact["id"] === id end) |> Enum.at(0)
 
       # here we need to send off the detail to the sidebar
       # Broadcast the new data structure for the sidebar component - desktop
       Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic, %{
         id: @component_desktop_id,
         module: @component_module,
-        data: instance
+        data: artifact
       })
 
       # Broadcast the new data structure for the sidebar component - mobile
       Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic, %{
         id: @component_mobile_id,
         module: @component_module,
-        data: instance
+        data: artifact
       })
     end
 
@@ -60,23 +60,23 @@ defmodule Sentinel.Servers.Instances do
   end
 
   #
-  # Add instance to be persisted
+  # Add artifact to be persisted
   #
-  def handle_call({:add_instance, instance}, _from, state) do
-    instances =
+  def handle_call({:add_artifact, artifact}, _from, state) do
+    artifacts =
       case read_file() do
         {:ok, list} when is_list(list) -> list
         _ -> []
       end
 
     # We make sure we dont add if there already is
-    exists = Enum.find(instances, fn item -> item["ip"] === "localhost" end)
+    exists = Enum.find(artifacts, fn item -> item["ip"] === "localhost" end)
 
     u_nodes =
       if is_nil(exists) do
-        instances ++ [Map.put(instance, "id", DateTime.utc_now() |> DateTime.to_unix() |> to_string)]
+        artifacts ++ [Map.put(artifact, "id", DateTime.utc_now() |> DateTime.to_unix() |> to_string)]
       else
-        instances
+        artifacts
       end
 
     update_state =
@@ -84,29 +84,29 @@ defmodule Sentinel.Servers.Instances do
         :ok ->
           Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
             type: :info,
-            message: "Instance added successfully"
+            message: "artifact added successfully"
           })
 
           # Broadcast to notification server
           Sentinel.Servers.Notification.trigger(
-            {:info, "Instance added successfully"}
+            {:info, "artifact added successfully"}
           )
 
-          # Update the dashboard view instances
-          broadcast_instances()
+          # Update the dashboard view artifacts
+          broadcast_artifacts()
 
           # updated state
-          Map.put(state, :instances, u_nodes)
+          Map.put(state, :artifacts, u_nodes)
 
         {:error, err} ->
           Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
             type: :error,
-            message: "Failed to add instance: #{inspect(err)}"
+            message: "Failed to add artifact: #{inspect(err)}"
           })
 
           # Broadcast to notification server
           Sentinel.Servers.Notification.trigger(
-            {:critical, "Failed to add instance"}
+            {:critical, "Failed to add artifact"}
           )
 
           state
@@ -116,12 +116,12 @@ defmodule Sentinel.Servers.Instances do
     {:reply, update_state, update_state}
   end
 
-  # Remove a instance to be tracked
-  def handle_cast({:remove_instance, id}, state) do
+  # Remove a artifact to be tracked
+  def handle_cast({:remove_artifact, id}, state) do
     {_, data} = read_file()
 
     # we need to reject the specific id
-    updated_nodes = Enum.reject(data, fn instance -> instance["id"] === id end)
+    updated_nodes = Enum.reject(data, fn artifact -> artifact["id"] === id end)
 
     # Remove to the file
     update_state =
@@ -129,11 +129,11 @@ defmodule Sentinel.Servers.Instances do
         :ok ->
           Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
             type: :info,
-            message: "Instance removed successfully"
+            message: "artifact removed successfully"
           })
 
-          # Update the dashboard view instances
-          broadcast_instances()
+          # Update the dashboard view artifacts
+          broadcast_artifacts()
 
           # here we need to send off the detail to the sidebar
           # Broadcast the new data structure for the sidebar component - desktop
@@ -152,21 +152,21 @@ defmodule Sentinel.Servers.Instances do
 
           # Broadcast to notification server
           Sentinel.Servers.Notification.trigger(
-            {:info, "Instance removed successfully"}
+            {:info, "artifact removed successfully"}
           )
 
           # updated state
-          Map.put(state, :instances, updated_nodes)
+          Map.put(state, :artifacts, updated_nodes)
 
         {:error, err} ->
           Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
             type: :error,
-            message: "Failed to remove instance: #{inspect(err)}"
+            message: "Failed to remove artifact: #{inspect(err)}"
           })
 
           # Broadcast to notification server
           Sentinel.Servers.Notification.trigger(
-            {:info, "Failed to removed instance"}
+            {:info, "Failed to removed artifact"}
           )
 
           state
@@ -181,12 +181,12 @@ defmodule Sentinel.Servers.Instances do
   # Get the data and restart sync
   # NOTE: THIS WOULD BE BETTER OFF WITH DYNAMIC SUPERVISOR FOR EACH SERVICE
   def handle_info(:sync, state) do
-    # send out the list of instances
-    instances = broadcast_instances()
+    # send out the list of artifacts
+    artifacts = broadcast_artifacts()
 
-    # restart the checking of instances and their health
+    # restart the checking of artifacts and their health
     sync_nodes()
-    {:noreply, Map.put(state, :instances, instances)}
+    {:noreply, Map.put(state, :artifacts, artifacts)}
   end
 
   # The job that will start interval sync
@@ -195,26 +195,26 @@ defmodule Sentinel.Servers.Instances do
   end
 
   #
-  # The instances inside the persisted file that was created
+  # The artifacts inside the persisted file that was created
   #
-  def fetch_instances() do
+  def fetch_artifacts() do
     {_status, data} = read_file()
 
-    instances =
+    artifacts =
       if data == "",
         do: [],
         else: data
 
-    Enum.map(instances, fn instance ->
+    Enum.map(artifacts, fn artifact ->
       # we get data
       %{
-        id: instance["id"],
-        name: instance["name"],
-        ip: instance["ip"],
-        icon: instance["icon"],
-        port: instance["port"],
-        status: port_busy?(instance["ip"], instance["port"]),
-        tunnel: Sentinel.Servers.Cloudflare.get_tunnel_data(instance["ip"], instance["port"])
+        id: artifact["id"],
+        name: artifact["name"],
+        ip: artifact["ip"],
+        icon: artifact["icon"],
+        port: artifact["port"],
+        status: port_busy?(artifact["ip"], artifact["port"]),
+        tunnel: Sentinel.Servers.Cloudflare.get_tunnel_data(artifact["ip"], artifact["port"])
         # add tunnel data here
       }
     end)
@@ -240,34 +240,34 @@ defmodule Sentinel.Servers.Instances do
   end
 
   #
-  # Broadcast the instances to the relevant component
+  # Broadcast the artifacts to the relevant component
   #
-  defp broadcast_instances() do
-    instances = fetch_instances()
+  defp broadcast_artifacts() do
+    artifacts = fetch_artifacts()
 
     # # Broadcast to the live view (or parent) so it can update the Devices component.
     # # Use an id that matches the one used in your live_component render.
     Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic_main, %{
-      id: "instances",
-      module: SentinelWeb.Live.Components.Instances,
-      data: instances
+      id: "artifacts",
+      module: SentinelWeb.Live.Components.Artifacts,
+      data: artifacts
     })
 
-    instances
+    artifacts
   end
 
   @doc """
-  Create the Instance file.
+  Create the artifact file.
   """
   def create_file() do
     case File.write(path(), Jason.encode!([])) do
-      :ok -> {:ok, "Instances file created"}
-      {:error, reason} -> {:error, "Failed to create Instances file: #{inspect(reason)}"}
+      :ok -> {:ok, "Artifacts file created"}
+      {:error, reason} -> {:error, "Failed to create Artifacts file: #{inspect(reason)}"}
     end
   end
 
   @doc """
-  Read the Instance file
+  Read the artifact file
   """
   def read_file() do
     case path() |> File.read() do
@@ -277,7 +277,7 @@ defmodule Sentinel.Servers.Instances do
             {:ok, data}
 
           {:error, err} ->
-            {:error, "Failed to decode Instance file: #{inspect(err)}"}
+            {:error, "Failed to decode artifact file: #{inspect(err)}"}
         end
 
       {:error, reason} ->
@@ -285,16 +285,16 @@ defmodule Sentinel.Servers.Instances do
     end
   end
 
-  def get_instance(id), do: GenServer.cast(__MODULE__, {:get_instance, id})
-  def add_instance(instance), do: GenServer.call(__MODULE__, {:add_instance, instance}, 25_000)
-  def remove_instance(instance), do: GenServer.cast(__MODULE__, {:remove_instance, instance})
+  def get_artifact(id), do: GenServer.cast(__MODULE__, {:get_artifact, id})
+  def add_artifact(artifact), do: GenServer.call(__MODULE__, {:add_artifact, artifact}, 25_000)
+  def remove_artifact(artifact), do: GenServer.cast(__MODULE__, {:remove_artifact, artifact})
 
   @doc """
-  Check if the Instance file exists.
+  Check if the artifact file exists.
   """
   def file_exists?(), do: File.exists?(path())
 
-  def path(), do: "./" <> config_fs(:root) <> config_fs(:instances)
+  def path(), do: "./" <> config_fs(:root) <> config_fs(:artifacts)
   defp config_fs(), do: Application.get_env(:sentinel, :fs)
   defp config_fs(key), do: config_fs()[key]
 end

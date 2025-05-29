@@ -1,6 +1,6 @@
-defmodule Sentinel.Schema.Instance do
+defmodule Sentinel.Schema.Artifact do
   @moduledoc """
-  Instance JSON Schema - This is the schema that will be used to generate a form how we interact with instance
+  Artifact JSON Schema - This is the schema that will be used to generate a form how we interact with artifact
   """
 
   @spec data(atom()) :: map()
@@ -9,18 +9,18 @@ defmodule Sentinel.Schema.Instance do
   """
   def data(:add) do
     %{
-      "title" => "Instance Add",
+      "title" => "Artifact Add",
       "description" => "Add a reference to a device running on the sentinel network",
       "type" => "object",
       "properties" => %{
         "name" => %{
           "type" => "string",
-          "description" => "Name the instance to make it easy to reference",
+          "description" => "Name the artifact to make it easy to reference",
           "minLength" => 1
         },
         "icon" => %{
           "type" => "string",
-          "description" => "Choose basic icon to represent instance",
+          "description" => "Choose basic icon to represent artifact",
         },
         "ip" => %{
           "type" => "string",

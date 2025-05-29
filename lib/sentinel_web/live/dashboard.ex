@@ -11,7 +11,7 @@ defmodule SentinelWeb.Live.Dashboard do
   alias SentinelWeb.Live.Components.Welcome
   alias SentinelWeb.Live.Components.Resources
   alias SentinelWeb.Live.Components.Services
-  alias SentinelWeb.Live.Components.Instances
+  alias SentinelWeb.Live.Components.Artifacts
   alias SentinelWeb.Live.Components.Devices
   alias SentinelWeb.Live.Components.Modal
 
@@ -199,7 +199,7 @@ defmodule SentinelWeb.Live.Dashboard do
         </div>
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
-        <%!-- Resources, Instances and Services  --%>
+        <%!-- Resources, Artifacts and Services  --%>
         <div class="flex flex-col md:flex-row w-full gap-6">
           <div class="flex-1"><.live_component id="resources" module={Resources} /></div>
           <div class="flex-1">
@@ -209,9 +209,9 @@ defmodule SentinelWeb.Live.Dashboard do
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
 
-        <%!-- Instances --%>
+        <%!-- Artifacts --%>
         <div class="min-h-[200px]">
-          <.live_component id="instances" module={Instances} />
+          <.live_component id="artifacts" module={Artifacts} />
         </div>
 
         <%!-- Devices --%>
@@ -249,9 +249,9 @@ defmodule SentinelWeb.Live.Dashboard do
     # The broadcast here will be to the component:sidebar - we will render accordingly and replace data
     view =
       case type do
-        "instance" ->
-          Sentinel.Servers.Instances.get_instance(id)
-          :instance
+        "artifact" ->
+          Sentinel.Servers.Artifacts.get_artifact(id)
+          :artifact
 
         "service" ->
           Sentinel.Servers.Services.get_service_logs(id)
@@ -400,10 +400,10 @@ defmodule SentinelWeb.Live.Dashboard do
         Sentinel.Servers.Cloudflare.remove_host(subdomain)
 
       #
-      # Instances
+      # Artifacts
       #
-      "add_instance" ->
-        Sentinel.Servers.Instances.add_instance(data)
+      "add_artifact" ->
+        Sentinel.Servers.Artifacts.add_artifact(data)
 
       #
       # Notification Settings
@@ -419,9 +419,9 @@ defmodule SentinelWeb.Live.Dashboard do
         %{"encryption_key" => key} = data
         send(self(), {:copy_encyption_key, key})
 
-      "remove_instance" ->
+      "remove_artifact" ->
         %{"id" => id, "subdomain" => subdomain} = Jason.decode!(data)
-        Sentinel.Servers.Instances.remove_instance(id)
+        Sentinel.Servers.Artifacts.remove_artifact(id)
 
         if subdomain do
           Sentinel.Servers.Cloudflare.remove_host(subdomain)

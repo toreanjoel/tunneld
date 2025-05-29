@@ -1,6 +1,6 @@
 defmodule Sentinel.Schema.Sentinet do
   @moduledoc """
-  Setup Sentinet settings to manage access over a private network to your instances
+  Setup Sentinet settings to manage access over a private network to your artifacts
   """
 
   @spec data(atom()) :: map()
@@ -10,12 +10,12 @@ defmodule Sentinel.Schema.Sentinet do
   def data(:settings) do
     %{
       "title" => "Sentinet Settings",
-      "description" => "Setup instance settings and access over the private Sentinel network",
+      "description" => "Setup artifact settings and access over the private Sentinel network",
       "type" => "object",
       "properties" => %{
         "enabled" => %{
           "type" => "boolean",
-          "description" => "Enable or disable instance availibility to other trusted users",
+          "description" => "Enable or disable artifact availibility to other trusted users",
         },
         "route" => %{
           "type" => "string",
@@ -23,7 +23,7 @@ defmodule Sentinel.Schema.Sentinet do
         },
         "schema" => %{
           "type" => "string",
-          "description" => "The JSON schema in which the trusted user will render to interact with your instance",
+          "description" => "The JSON schema in which the trusted user will render to interact with your artifact",
           "ui:widget" => "textarea"
         }
       },

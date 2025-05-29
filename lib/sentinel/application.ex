@@ -15,7 +15,7 @@ defmodule Sentinel.Application do
     Resources,
     Wlan,
     Cloudflare,
-    Instances,
+    Artifacts,
     Notification,
     Encryption
   }
@@ -41,7 +41,7 @@ defmodule Sentinel.Application do
       {Session, []},
       {Resources, []},
       {Services, []},
-      {Instances, []},
+      {Artifacts, []},
       {Devices, []},
       {Auth, []},
       {Whitelist, []},

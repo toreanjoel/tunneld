@@ -70,7 +70,7 @@ config :sentinel, :fs,
   auth: "/auth.json",
   whitelist: "/whitelist.json",
   tunnels: "/cloudflare_tunnels.json",
-  instances: "/instances.json",
+  artifacts: "/artifacts.json",
   notifications: "/notifications.json",
   encryption: "/encryption.json"
 
