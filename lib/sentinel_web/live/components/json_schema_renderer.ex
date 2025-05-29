@@ -23,8 +23,9 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
     loading = Map.get(assigns, :loading, false)
 
     fields =
-      assigns.schema["properties"]
-      |> Enum.map(fn {key, props} ->
+      assigns.schema["ui:order"] |> Enum.map(fn key ->
+        props = Map.get(assigns.schema["properties"], key, "")
+
         %{
           name: key,
           type: props["type"],

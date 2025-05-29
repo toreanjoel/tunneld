@@ -12,11 +12,17 @@ defmodule Sentinel.Schema.Artifact do
       "title" => "Artifact Add",
       "description" => "Add a reference to a device running on the sentinel network",
       "type" => "object",
+      "ui:order" => ["name", "description", "ip", "port"],
       "properties" => %{
         "name" => %{
           "type" => "string",
           "description" => "Name the artifact to make it easy to reference",
           "minLength" => 1
+        },
+        "description" => %{
+          "type" => "string",
+          "description" => "Describe what this artifact or application instance is that you is monitored",
+          "ui:widget" => "textarea"
         },
         "ip" => %{
           "type" => "string",

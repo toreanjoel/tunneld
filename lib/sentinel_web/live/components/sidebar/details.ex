@@ -39,6 +39,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
   def render(%{view: :artifact} = assigns) do
     data = Map.get(assigns, :data)
 
+    IO.inspect(data, label: "ARTIFACT DATA")
     assigns =
       assigns
       |> assign(has_data: !Enum.empty?(data))
@@ -50,7 +51,8 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
         <%= sidebar_header(assigns, %{
           header: data.name,
           body:
-            "A reference to a running service accessible from this device over the network. This tracks availability and allows exposure to the internet"
+            data.description ||
+              "A reference to a running service accessible from this device over the network. This tracks availability and allows exposure to the internet"
         }) %>
       </div>
 

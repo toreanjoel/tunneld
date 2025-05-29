@@ -74,8 +74,6 @@ defmodule Sentinel.Servers.Artifacts do
     # We make sure we dont add if there already is - we check ports as this is a running instance
     exists = Enum.find(artifacts, fn item -> item["port"] === artifact["port"] end)
 
-    IO.inspect(exists, label: "CHECK DATA")
-
     updated_state =
       if is_nil(exists) do
         u_nodes =
@@ -212,7 +210,7 @@ defmodule Sentinel.Servers.Artifacts do
         id: artifact["id"],
         name: artifact["name"],
         ip: artifact["ip"],
-        icon: artifact["icon"],
+        description: artifact["description"],
         port: artifact["port"],
         status: port_busy?(artifact["ip"], artifact["port"]),
         tunnel: Sentinel.Servers.Cloudflare.get_tunnel_data(artifact["ip"], artifact["port"])
