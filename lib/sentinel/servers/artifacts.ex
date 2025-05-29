@@ -78,7 +78,7 @@ defmodule Sentinel.Servers.Artifacts do
       if is_nil(exists) do
         u_nodes =
           artifacts ++
-            [Map.put(artifact, "id", DateTime.utc_now() |> DateTime.to_unix() |> to_string)]
+            [Map.put(artifact, "sentinet_settings", %{}) |> Map.put("id", DateTime.utc_now() |> DateTime.to_unix() |> to_string)]
 
           case File.write(path(), Jason.encode!(u_nodes)) do
             :ok ->

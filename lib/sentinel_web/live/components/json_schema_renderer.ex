@@ -63,16 +63,18 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
     <form phx-target={@myself} phx-submit="submit">
       <%= for field <- @fields do %>
         <div class="mb-4 capitalize">
-          <label class="block text-white text-sm font-semibold mb-1">
+          <% hidden = if field.hidden, do: "hidden", else: "" %>
+
+          <label class={"#{hidden} text-white text-sm font-semibold mb-1"}>
             <%= field.name %>
           </label>
-          <label :if={field.description} class="block text-white text-xs font-semibold mb-1">
+          <label :if={field.description} class={"#{hidden} block text-white text-xs font-semibold mb-1"}>
             <%= field.description %>
           </label>
 
           <%= if is_list(field.enum) do %>
             <!-- Enum dropdown -->
-            <select name={"form[#{field.name}]"} class="bg-primary rounded-md px-3 py-2 w-full">
+            <select name={"form[#{field.name}]"} class={"#{hidden} bg-primary rounded-md px-3 py-2 w-full"}>
               <%= for option <- field.enum do %>
                 <option value={option} selected={Map.get(@changeset, field.name, "") == option}>
                   <%= option %>
@@ -86,14 +88,14 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
                 name={"form[#{field.name}]"}
                 value="true"
                 checked={Map.get(@changeset, field.name) in [true, "true", "on", 1]}
-                class="rounded border-gray-300 text-purple shadow-sm focus:ring-2 focus:ring-purple"
+                class={"#{hidden} rounded border-gray-300 text-purple shadow-sm focus:ring-2 focus:ring-purple"}
               />
             <% else %>
               <%= if field.widget == "textarea" do %>
                 <textarea
                   name={"form[#{field.name}]"}
                   rows="6"
-                  class="bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200 font-mono text-sm"
+                  class={"#{hidden} bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200 font-mono text-sm"}
                   readonly={field.readonly}
                 ><%= Map.get(@changeset, field.name, field.default || "") %></textarea>
               <% else %>
@@ -102,7 +104,7 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
                   type={input_type}
                   name={"form[#{field.name}]"}
                   value={Map.get(@changeset, field.name, field.default || "")}
-                  class="bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200"
+                  class={"#{hidden} bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200"}
                   readonly={field.readonly}
                 />
               <% end %>

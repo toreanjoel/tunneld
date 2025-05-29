@@ -427,6 +427,9 @@ defmodule SentinelWeb.Live.Dashboard do
           Sentinel.Servers.Cloudflare.remove_host(subdomain)
         end
 
+      "sentinet_settings" ->
+        IO.inspect(data, label: "SENTINET_SETTINGS")
+
       #
       # Terminal Session
       # --

@@ -13,6 +13,11 @@ defmodule Sentinel.Schema.Sentinet do
       "description" => "Setup artifact settings and access over the private Sentinel network",
       "type" => "object",
       "properties" => %{
+        "id" => %{
+          "type" => "string",
+          "description" => "The Id of the Artifact instance",
+          "ui:widget" => "hidden",
+        },
         "enabled" => %{
           "type" => "boolean",
           "description" => "Enable or disable artifact availibility to other trusted users",
