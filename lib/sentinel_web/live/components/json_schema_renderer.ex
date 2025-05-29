@@ -22,8 +22,11 @@ defmodule SentinelWeb.Live.Components.JsonSchemaRenderer do
     values = Map.get(assigns, :values, %{})
     loading = Map.get(assigns, :loading, false)
 
+    # This should allow a default of the keys that is already on the form to handle fallback order
+    ui_order = Map.get(assigns.schema, "ui:order", assigns.schema["properties"] |> Map.keys())
+
     fields =
-      assigns.schema["ui:order"] |> Enum.map(fn key ->
+       ui_order |> Enum.map(fn key ->
         props = Map.get(assigns.schema["properties"], key, "")
 
         %{

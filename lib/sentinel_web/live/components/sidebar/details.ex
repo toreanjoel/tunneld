@@ -39,7 +39,6 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
   def render(%{view: :artifact} = assigns) do
     data = Map.get(assigns, :data)
 
-    IO.inspect(data, label: "ARTIFACT DATA")
     assigns =
       assigns
       |> assign(has_data: !Enum.empty?(data))
