@@ -235,7 +235,7 @@ defmodule Sentinel.Servers.Notification do
     # Use an id that matches the one used in your live_component render.
     Phoenix.PubSub.broadcast(Sentinel.PubSub, @broadcast_topic_main, %{
       id: "notifications",
-      module: SentinelWeb.Live.Components.artifacts,
+      module: SentinelWeb.Live.Components.Artifacts,
       data: settings
     })
 
