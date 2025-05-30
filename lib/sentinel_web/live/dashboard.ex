@@ -25,6 +25,7 @@ defmodule SentinelWeb.Live.Dashboard do
   def mount(_params, %{"ip" => ip} = _session, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Sentinel.PubSub, "notifications")
+      Phoenix.PubSub.subscribe(Sentinel.PubSub, "show_details")
       Phoenix.PubSub.subscribe(Sentinel.PubSub, "modal:form:action")
       Phoenix.PubSub.subscribe(Sentinel.PubSub, "status:internet")
     end
@@ -244,30 +245,9 @@ defmodule SentinelWeb.Live.Dashboard do
   Render Sidebar content
   """
   def handle_event("show_details", %{"id" => id, "type" => type}, socket) do
-    # we need to check the types where we want to request data from
-    # Here we tell the GenServers to do the work
-    # The broadcast here will be to the component:sidebar - we will render accordingly and replace data
-    view =
-      case type do
-        "artifact" ->
-          Sentinel.Servers.Artifacts.get_artifact(id)
-          :artifact
-
-        "service" ->
-          Sentinel.Servers.Services.get_service_logs(id)
-          :service
-
-        "wlan" ->
-          Sentinel.Servers.Wlan.scan_networks()
-          :wlan
-
-        _ ->
-          :system_overview
-      end
-
     sidebar = %{
       is_open: true,
-      view: view
+      view: get_sidebar_details(type, id)
     }
 
     {:noreply, assign(socket, :sidebar, sidebar)}
@@ -428,7 +408,7 @@ defmodule SentinelWeb.Live.Dashboard do
         end
 
       "sentinet_settings" ->
-        IO.inspect(data, label: "SENTINET_SETTINGS")
+        Sentinel.Servers.Artifacts.update_artifact(data, :sentinet)
 
       #
       # Terminal Session
@@ -515,5 +495,40 @@ defmodule SentinelWeb.Live.Dashboard do
   def handle_info(:scan_for_wireless_networks, socket) do
     Task.start(fn -> Sentinel.Servers.Wlan.scan_networks() end)
     {:noreply, put_flash(socket, :info, "Scanning for wireless networks")}
+  end
+
+  #
+  # Show details - server request
+  # NOTE: we have a function to do this client side but this is a listener for the server
+  #
+  def handle_info({:show_details, %{"id" => id, "type" => type}}, socket) do
+    sidebar = %{
+      is_open: true,
+      view: get_sidebar_details(type, id)
+    }
+
+    {:noreply, assign(socket, :sidebar, sidebar)}
+  end
+
+  #
+  # Get the sidebar details that is used for client and server sider trigger render
+  #
+  defp get_sidebar_details(type, id) do
+      case type do
+        "artifact" ->
+          Sentinel.Servers.Artifacts.get_artifact(id)
+          :artifact
+
+        "service" ->
+          Sentinel.Servers.Services.get_service_logs(id)
+          :service
+
+        "wlan" ->
+          Sentinel.Servers.Wlan.scan_networks()
+          :wlan
+
+        _ ->
+          :system_overview
+      end
   end
 end

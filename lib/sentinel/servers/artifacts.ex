@@ -62,6 +62,72 @@ defmodule Sentinel.Servers.Artifacts do
   end
 
   #
+  # Update artifact settings by key type
+  #
+  def handle_cast({:update_artifact, type, data}, state) do
+    artifacts = fetch_artifacts()
+
+    if !Enum.empty?(artifacts) do
+      artifact =
+        Enum.filter(artifacts, fn artifact ->
+          artifact.id === data["id"] or artifact["id"] === data["id"]
+        end)
+        |> Enum.at(0)
+
+      # Assume the settings is not set, always override and replace
+      updated_artifacts =
+        case type do
+          :sentinet ->
+            Enum.map(artifacts, fn a ->
+              if a.id === artifact.id do
+                Map.put(a, :sentinet, data)
+              else
+                # We need to return the others
+                a
+              end
+            end)
+
+          _ ->
+            Logger.info("Tried to set settings with an unhandled type")
+            Sentinel.Servers.Notification.trigger({:critical, "Update not supported"})
+        end
+
+      case File.write(path(), Jason.encode!(updated_artifacts)) do
+        :ok ->
+          Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+            type: :info,
+            message: "Artifact updated successfully"
+          })
+
+          # Broadcast to notification server
+          Sentinel.Servers.Notification.trigger({:info, "Artifact updated successfully"})
+
+          # Update the dashboard view artifacts
+          broadcast_artifacts()
+
+          # Send the current artifact back
+          # NOTE: Find a better way to structure this data
+          Phoenix.PubSub.broadcast(Sentinel.PubSub, "show_details", {
+            :show_details,
+            # We get this from the input
+            %{"id" => data["id"], "type" => "artifact"}
+          })
+
+        {:error, err} ->
+          Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+            type: :error,
+            message: "Failed to update artifact: #{inspect(err)}"
+          })
+
+          # Broadcast to notification server
+          Sentinel.Servers.Notification.trigger({:critical, "Failed to add artifact"})
+      end
+    end
+
+    {:noreply, state}
+  end
+
+  #
   # Add artifact to be persisted
   #
   def handle_call({:add_artifact, artifact}, _from, state) do
@@ -72,46 +138,57 @@ defmodule Sentinel.Servers.Artifacts do
       end
 
     # We make sure we dont add if there already is - we check ports as this is a running instance
-    exists = Enum.find(artifacts, fn item -> item["port"] === artifact["port"] end)
+    exists =
+      Enum.find(artifacts, fn item ->
+        item["port"] === artifact["port"] and item["ip"] === artifact["ip"]
+      end)
 
     updated_state =
       if is_nil(exists) do
-        u_nodes =
-          artifacts ++
-            [Map.put(artifact, "sentinet_settings", %{}) |> Map.put("id", DateTime.utc_now() |> DateTime.to_unix() |> to_string)]
+        new_artifact =
+          artifact
+          |> Map.merge(%{
+            "id" => DateTime.utc_now() |> DateTime.to_unix() |> to_string,
+            "sentinet" => %{}
+          })
 
-          case File.write(path(), Jason.encode!(u_nodes)) do
-            :ok ->
-              Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
-                type: :info,
-                message: "artifact added successfully"
-              })
+        # Add a new list item to be updated
+        # TODO: not ideal with many
+        u_nodes = artifacts ++ [new_artifact]
 
-              # Broadcast to notification server
-              Sentinel.Servers.Notification.trigger({:info, "artifact added successfully"})
+        case File.write(path(), Jason.encode!(u_nodes)) do
+          :ok ->
+            Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+              type: :info,
+              message: "artifact added successfully"
+            })
 
-              # Update the dashboard view artifacts
-              broadcast_artifacts()
+            # Broadcast to notification server
+            Sentinel.Servers.Notification.trigger({:info, "artifact added successfully"})
 
-              # updated state
-              Map.put(state, :artifacts, u_nodes)
+            # Update the dashboard view artifacts
+            broadcast_artifacts()
 
-            {:error, err} ->
-              Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
-                type: :error,
-                message: "Failed to add artifact: #{inspect(err)}"
-              })
+            # updated state
+            Map.put(state, :artifacts, u_nodes)
 
-              # Broadcast to notification server
-              Sentinel.Servers.Notification.trigger({:critical, "Failed to add artifact"})
+          {:error, err} ->
+            Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+              type: :error,
+              message: "Failed to add artifact: #{inspect(err)}"
+            })
 
-              state
-          end
+            # Broadcast to notification server
+            Sentinel.Servers.Notification.trigger({:critical, "Failed to add artifact"})
+
+            state
+        end
       else
         Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
           type: :error,
           message: "Only one artifact instance allowed at a time"
         })
+
         state
       end
 
@@ -213,8 +290,8 @@ defmodule Sentinel.Servers.Artifacts do
         description: artifact["description"],
         port: artifact["port"],
         status: port_busy?(artifact["ip"], artifact["port"]),
-        tunnel: Sentinel.Servers.Cloudflare.get_tunnel_data(artifact["ip"], artifact["port"])
-        # add tunnel data here
+        tunnel: Sentinel.Servers.Cloudflare.get_tunnel_data(artifact["ip"], artifact["port"]),
+        sentinet: artifact["sentinet"]
       }
     end)
   end
@@ -287,6 +364,10 @@ defmodule Sentinel.Servers.Artifacts do
   def get_artifact(id), do: GenServer.cast(__MODULE__, {:get_artifact, id})
   def add_artifact(artifact), do: GenServer.call(__MODULE__, {:add_artifact, artifact}, 25_000)
   def remove_artifact(artifact), do: GenServer.cast(__MODULE__, {:remove_artifact, artifact})
+  # Update specific settings
+  # TODO: This needs to change to be more generic
+  def update_artifact(data, :sentinet),
+    do: GenServer.cast(__MODULE__, {:update_artifact, :sentinet, data})
 
   @doc """
   Check if the artifact file exists.

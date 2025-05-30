@@ -159,9 +159,9 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
                 Jason.encode!(%{
                   "type" => "schema",
                   "data" => Sentinel.Schema.Sentinet.data(:settings),
-                  "default_values" => %{
+                  "default_values" => Map.merge(data.sentinet, %{
                     "id" => data.id
-                  },
+                  }),
                   "action" => "sentinet_settings"
                 })
               }
