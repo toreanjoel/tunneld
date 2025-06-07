@@ -85,7 +85,7 @@ config :sentinel, :network,
 config :sentinel, :ttyd,
   port: "7681"
 
-config :sentinel, version: "0.1.9"
+config :sentinel, version: "0.1.10"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
