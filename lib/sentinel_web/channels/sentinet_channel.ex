@@ -25,19 +25,57 @@ defmodule SentinelWeb.SentinetChannel do
     # Original Data
     decrypted_data = Jason.decode!(Sentinel.Encryption.decrypt(cypher, data))
     # We look at the event type that we want to process in some way to the client
-    process(decrypted_data["type"], socket)
+    process(%{type: decrypted_data["type"], data: decrypted_data["data"]}, socket)
   end
 
   # Private functions to process different event types
-  defp process("init", socket) do
-    # TODO: add the custom data here that we need to send to the user
-    #
-    resp = %{
-      "data" => "This is the init data!"
-    } |> Jason.encode!()
+  # We need to process an init and accept other messages for general data
+  defp process(%{type: "init", data: _data}, socket) do
+    resp =
+      case Sentinel.Servers.Artifacts.get_enabled_artifacts() do
+        {:ok, data} -> data
+        _ -> []
+      end
+      |> Jason.encode!()
 
     # We send a response back to the user for the init data
-    {:reply, {:ok, Sentinel.Servers.Encryption.encrypt_payload(resp) |> Base.encode64}, socket}
+    {:reply, {:ok, Sentinel.Servers.Encryption.encrypt_payload(resp) |> Base.encode64()}, socket}
+  end
+
+  # The trigger against the artifact from the remote sentinel
+  # NOTE: This should ideally be setup under a gen server for multi user requests
+  defp process(%{type: "trigger", data: %{"id" => id, "payload" => payload}} = data, socket) do
+    {_, artifact} = Sentinel.Servers.Artifacts.get_artifact_details(id)
+
+    {status, resp} =
+      if not is_nil(artifact) and Map.get(artifact.sentinet, "enabled", false) do
+        # The base HTTP payload
+        http_payload = %{
+          ip: artifact.ip,
+          port: artifact.port,
+          path: Map.get(artifact.sentinet, "route"),
+          data: payload
+        }
+
+        {_, %HTTPoison.Response{status_code: code, body: body}} =
+          resp = http_request(Map.get(artifact.sentinet, "request_type"), http_payload)
+
+        {:ok, %{"code" => code, "resp" => body}}
+      else
+        {:ok, %{"code" => 500, "resp" => "No artifact to handle"}}
+      end
+
+    # Payload built from the calls to the relevant services
+    resp = %{
+      "status" => status,
+      "payload" => resp
+    }
+
+    # We send a response back to the user for the init data
+    {:reply,
+     {:ok,
+      Sentinel.Servers.Encryption.encrypt_payload(resp |> Jason.encode!()) |> Base.encode64()},
+     socket}
   end
 
   # Add authorization logic here as required.
@@ -60,5 +98,21 @@ defmodule SentinelWeb.SentinetChannel do
     false
   end
 
-  # TODO: add other events to handle for the user making the request
+  # Handle the HTTP reqeust to the local servers through gateway to machines on the network
+  defp http_request("post", payload) do
+    HTTPoison.post(
+      "http://#{payload.ip}:#{payload.port}#{payload.path}",
+      Jason.encode!(payload.data || %{}),
+      [Accept: "Application/json"],
+      recv_timeout: 30_000
+    )
+  end
+
+  defp http_request("get", payload) do
+    HTTPoison.get(
+      "http://#{payload.ip}:#{payload.port}#{payload.path}",
+      [Accept: "Application/json"],
+      recv_timeout: 30_000
+    )
+  end
 end

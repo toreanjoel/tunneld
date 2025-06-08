@@ -93,6 +93,7 @@ defmodule Sentinel.Servers.SocketClient do
       |> disconnect()
       |> await_disconnect()
 
+
     # this is to stop the current process
     {:stop, :disconnected, socket}
   end
@@ -102,11 +103,14 @@ defmodule Sentinel.Servers.SocketClient do
   """
   @impl Slipstream
   def handle_reply(_ref, {_, reply}, socket) do
-    # TODO: We need to decode and decrypt the response data
     resp =
       Base.decode64!(reply) |> Sentinel.Servers.Encryption.decrypt_payload() |> Jason.decode!()
 
+    # Do something by sending it to the client if we need to send messages back
     Logger.debug("Reply received: #{inspect(resp)}")
+
+    # Reset retry attempts
+    socket = socket |> assign(:retry_attempts, 0)
     {:ok, socket}
   end
 
@@ -180,5 +184,7 @@ defmodule Sentinel.Servers.SocketClient do
   @doc """
   Sends an event payload to the Phoenix channel.
   """
-  def send_event(payload), do: GenServer.cast(__MODULE__, {:event, payload})
+  def send_event(%{ "type" => "init", "data" => _} = payload), do: GenServer.cast(__MODULE__, {:event, payload})
+  # This is to enfore that we pass the artifact when sending a request to trigger
+  def send_event(%{ "type" => "trigger", "data" => %{ "id" => _, "payload" => _}} = payload), do: GenServer.cast(__MODULE__, {:event, payload})
 end

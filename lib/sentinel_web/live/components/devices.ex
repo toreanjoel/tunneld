@@ -94,22 +94,23 @@ defmodule SentinelWeb.Live.Components.Devices do
             style="animation: fadeIn 0.5s ease-out forwards;"
           >
             <div class="flex flex-row">
-              <div class="grow">
-                <.icon class="w-6 h-6" name={get_device_icon(device.type)} />
+              <div class="grow truncate ellipsis">
+                <div class="text-sm truncate"><%= device.hostname %></div>
               </div>
-              <label
-                phx-click="toggle_access"
-                phx-target={@myself}
-                phx-value-mac={device.mac}
-                class="relative inline-flex items-center cursor-pointer"
-              >
-                <input type="checkbox" class="sr-only peer" checked={device.access} />
-                <div class="w-9 h-5 bg-light_purple rounded-full peer-checked:bg-purple relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-light_purple after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4">
-                </div>
-              </label>
+              <div>
+                <label
+                  phx-click="toggle_access"
+                  phx-target={@myself}
+                  phx-value-mac={device.mac}
+                  class="relative inline-flex items-center cursor-pointer"
+                >
+                  <input type="checkbox" class="sr-only peer" checked={device.access} />
+                  <div class="w-9 h-5 bg-light_purple rounded-full peer-checked:bg-purple relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-light_purple after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4">
+                  </div>
+                </label>
+              </div>
             </div>
             <div class="grow" />
-            <div class="text-sm truncate"><%= device.hostname %></div>
             <div class="text-xs"><%= device.ip %></div>
             <div class="text-xs"><%= device.mac %></div>
           </div>
@@ -145,9 +146,4 @@ defmodule SentinelWeb.Live.Components.Devices do
 
     {:noreply, socket}
   end
-
-  defp get_device_icon("tv"), do: "hero-tv"
-  defp get_device_icon("phone"), do: "hero-phone"
-  defp get_device_icon("pc"), do: "hero-computer-desktop"
-  defp get_device_icon(_), do: "hero-question-mark-circle"
 end

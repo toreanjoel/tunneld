@@ -160,7 +160,7 @@ defmodule SentinelWeb.Live.Components.Sidebar.Details do
                   "type" => "schema",
                   "data" => Sentinel.Schema.Sentinet.data(:settings),
                   "default_values" => Map.merge(data.sentinet, %{
-                    "id" => data.id
+                    "id" => data.id,
                   }),
                   "action" => "sentinet_settings"
                 })

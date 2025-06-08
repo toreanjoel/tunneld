@@ -31,7 +31,104 @@ defmodule Sentinel.Servers.Artifacts do
   end
 
   #
+  # Get artifacts by type
+  #
+  def handle_call(:get_enabled_artifacts, _from, state) do
+    artifacts = fetch_artifacts()
+    data = artifacts |> Enum.filter(fn a -> a.sentinet["enabled"] end)
+    {:reply, {:ok, data}, state}
+  end
+
+  #
+  # Add artifact to be persisted
+  #
+  def handle_call({:add_artifact, artifact}, _from, state) do
+    artifacts =
+      case read_file() do
+        {:ok, list} when is_list(list) -> list
+        _ -> []
+      end
+
+    # We make sure we dont add if there already is - we check ports as this is a running instance
+    exists =
+      Enum.find(artifacts, fn item ->
+        item["port"] === artifact["port"] and item["ip"] === artifact["ip"]
+      end)
+
+    updated_state =
+      if is_nil(exists) do
+        new_artifact =
+          artifact
+          |> Map.merge(%{
+            "id" => DateTime.utc_now() |> DateTime.to_unix() |> to_string,
+            "sentinet" => %{}
+          })
+
+        # Add a new list item to be updated
+        # TODO: not ideal with many
+        u_nodes = artifacts ++ [new_artifact]
+
+        case File.write(path(), Jason.encode!(u_nodes)) do
+          :ok ->
+            Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+              type: :info,
+              message: "artifact added successfully"
+            })
+
+            # Broadcast to notification server
+            Sentinel.Servers.Notification.trigger({:info, "artifact added successfully"})
+
+            # Update the dashboard view artifacts
+            broadcast_artifacts()
+
+            # updated state
+            Map.put(state, :artifacts, u_nodes)
+
+          {:error, err} ->
+            Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+              type: :error,
+              message: "Failed to add artifact: #{inspect(err)}"
+            })
+
+            # Broadcast to notification server
+            Sentinel.Servers.Notification.trigger({:critical, "Failed to add artifact"})
+
+            state
+        end
+      else
+        Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
+          type: :error,
+          message: "Only one artifact instance allowed at a time"
+        })
+
+        state
+      end
+
+    # Broadcast to component will happen when a sync happens, we dont need to do this
+    {:reply, updated_state, updated_state}
+  end
+
+  #
   # Get artifact details
+  # We need to merge this with the client side fetch to a helper function
+  #
+  def handle_call({:get_artifact_details, id}, _from, state) do
+    artifacts = fetch_artifacts()
+
+    # We get the general details of the artifact
+    artifact =
+      if !Enum.empty?(artifacts) do
+        Enum.filter(artifacts, fn artifact -> artifact.id === id or artifact["id"] === id end)
+        |> Enum.at(0)
+      else
+        %{}
+      end
+
+    {:reply, {:ok, artifact}, state}
+  end
+
+  #
+  # Get artifact details - send to the client to render
   #
   def handle_cast({:get_artifact, id}, state) do
     artifacts = fetch_artifacts()
@@ -125,75 +222,6 @@ defmodule Sentinel.Servers.Artifacts do
     end
 
     {:noreply, state}
-  end
-
-  #
-  # Add artifact to be persisted
-  #
-  def handle_call({:add_artifact, artifact}, _from, state) do
-    artifacts =
-      case read_file() do
-        {:ok, list} when is_list(list) -> list
-        _ -> []
-      end
-
-    # We make sure we dont add if there already is - we check ports as this is a running instance
-    exists =
-      Enum.find(artifacts, fn item ->
-        item["port"] === artifact["port"] and item["ip"] === artifact["ip"]
-      end)
-
-    updated_state =
-      if is_nil(exists) do
-        new_artifact =
-          artifact
-          |> Map.merge(%{
-            "id" => DateTime.utc_now() |> DateTime.to_unix() |> to_string,
-            "sentinet" => %{}
-          })
-
-        # Add a new list item to be updated
-        # TODO: not ideal with many
-        u_nodes = artifacts ++ [new_artifact]
-
-        case File.write(path(), Jason.encode!(u_nodes)) do
-          :ok ->
-            Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
-              type: :info,
-              message: "artifact added successfully"
-            })
-
-            # Broadcast to notification server
-            Sentinel.Servers.Notification.trigger({:info, "artifact added successfully"})
-
-            # Update the dashboard view artifacts
-            broadcast_artifacts()
-
-            # updated state
-            Map.put(state, :artifacts, u_nodes)
-
-          {:error, err} ->
-            Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
-              type: :error,
-              message: "Failed to add artifact: #{inspect(err)}"
-            })
-
-            # Broadcast to notification server
-            Sentinel.Servers.Notification.trigger({:critical, "Failed to add artifact"})
-
-            state
-        end
-      else
-        Phoenix.PubSub.broadcast(Sentinel.PubSub, "notifications", %{
-          type: :error,
-          message: "Only one artifact instance allowed at a time"
-        })
-
-        state
-      end
-
-    # Broadcast to component will happen when a sync happens, we dont need to do this
-    {:reply, updated_state, updated_state}
   end
 
   # Remove a artifact to be tracked
@@ -361,7 +389,9 @@ defmodule Sentinel.Servers.Artifacts do
     end
   end
 
+  def get_enabled_artifacts(), do: GenServer.call(__MODULE__, :get_enabled_artifacts, 25_000)
   def get_artifact(id), do: GenServer.cast(__MODULE__, {:get_artifact, id})
+  def get_artifact_details(id), do: GenServer.call(__MODULE__, {:get_artifact_details, id})
   def add_artifact(artifact), do: GenServer.call(__MODULE__, {:add_artifact, artifact}, 25_000)
   def remove_artifact(artifact), do: GenServer.cast(__MODULE__, {:remove_artifact, artifact})
   # Update specific settings
