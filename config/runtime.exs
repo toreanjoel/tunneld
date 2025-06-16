@@ -12,22 +12,40 @@ import Config
 # If you use `mix release`, you need to explicitly enable the server
 # by passing the PHX_SERVER=true when you start it:
 #
-#     PHX_SERVER=true bin/sentinel start
+#     PHX_SERVER=true bin/tunneld start
 #
 # Alternatively, you can use `mix phx.gen.release` to generate a `bin/server`
 # script that automatically sets the env var above.
 if System.get_env("PHX_SERVER") do
-  config :sentinel, SentinelWeb.Endpoint, server: true
+  config :tunneld, TunneldWeb.Endpoint, server: true
 end
 
 # THe flag to use mock data or not
 if System.get_env("MOCK_DATA") do
-  config :sentinel, mock_data: true
+  config :tunneld, mock_data: true
+end
+
+# Get the set gateway address
+if System.get_env("SUBNET_IP") do
+  config :tunneld, :network,
+    gateway: System.get_env("SUBNET_IP")
+end
+
+# Set the upstream internet wireless interface
+if System.get_env("WIFI_INTERFACE") do
+  config :tunneld, :network,
+    wlan: System.get_env("WIFI_INTERFACE")
+end
+
+# Set the downstream interface for internet passthrough
+if System.get_env("LAN_INTERFACE") do
+  config :tunneld, :network,
+    eth: System.get_env("LAN_INTERFACE")
 end
 
 # Set env configs for CF
 if !is_nil(System.get_env("CF_API_KEY")) and !is_nil(System.get_env("CF_ZONE_ID")) do
-  config :sentinel, :cloudflare,
+  config :tunneld, :cloudflare,
     api_key: System.get_env("CF_API_KEY"),
     zone_id: System.get_env("CF_ZONE_ID")
 else
@@ -50,16 +68,16 @@ if config_env() == :prod do
   host = System.get_env("PHX_HOST") || "localhost"
   port = String.to_integer(System.get_env("PORT") || "80")
 
-  config :sentinel, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
+  config :tunneld, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
   # We make sure if a domain is added or there is a tunnel made for a CF domain, the system supports
   check_origins =
     case System.get_env("CF_DOMAIN") do
-      nil -> ["http://10.0.0.1", "http://localhost"]
-      domain -> ["http://10.0.0.1", "http://localhost", "https://#{domain}"]
+      nil -> [System.get_env("GATEWAY"), "http://localhost"]
+      domain -> [System.get_env("GATEWAY"), "http://localhost", "https://#{domain}"]
     end
 
-  config :sentinel, SentinelWeb.Endpoint,
+  config :tunneld, TunneldWeb.Endpoint,
     url: [host: host, port: 80, scheme: "http"],
     http: [
       # Enable IPv6 and bind on all interfaces.
@@ -79,7 +97,7 @@ if config_env() == :prod do
   # To get SSL working, you will need to add the `https` key
   # to your endpoint configuration:
   #
-  #     config :sentinel, SentinelWeb.Endpoint,
+  #     config :tunneld, TunneldWeb.Endpoint,
   #       https: [
   #         ...,
   #         port: 443,
@@ -101,7 +119,7 @@ if config_env() == :prod do
   # We also recommend setting `force_ssl` in your config/prod.exs,
   # ensuring no data is ever sent via http, always redirecting to https:
   #
-  #     config :sentinel, SentinelWeb.Endpoint,
+  #     config :tunneld, TunneldWeb.Endpoint,
   #       force_ssl: [hsts: true]
   #
   # Check `Plug.SSL` for all available options in `force_ssl`.

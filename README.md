@@ -1,22 +1,22 @@
-# Project Sentinel
+# Project Tunneld
 
 A wireless-first, zero-trust network manager built for portability, performance, and total control.
 
-<img width="1506" alt="Project Sentinel Dashboard Overview" src="https://github.com/user-attachments/assets/9594dc07-d456-47b3-8e2e-ab62ca9c4011" />
+<img width="1506" alt="Project Tunneld Dashboard Overview" src="https://github.com/user-attachments/assets/9594dc07-d456-47b3-8e2e-ab62ca9c4011" />
 
 ---
 
-Sentinel acts as your network's intelligent gateway — managing devices, assigning IPs via DHCP, resolving DNS securely, sharing local compute and exposing optional network services through Cloudflare Tunnels. Designed to be lightweight, modular, and artifact-driven, Sentinel works both at home and on the move.
+Tunneld acts as your network's intelligent gateway — managing devices, assigning IPs via DHCP, resolving DNS securely, sharing local compute and exposing optional network services through Cloudflare Tunnels. Designed to be lightweight, modular, and artifact-driven, Tunneld works both at home and on the move.
 
 ---
 
 ## ✨ Features
 
 ### 🔐 Zero Trust Network Access
-Sentinel treats every device as untrusted by default. Access to the internet is explicitly granted — no open gateway, no assumptions. Devices are approved manually or programmatically and assigned TTL-based access.
+Tunneld treats every device as untrusted by default. Access to the internet is explicitly granted — no open gateway, no assumptions. Devices are approved manually or programmatically and assigned TTL-based access.
 
 ### 📡 Wireless-First Design
-Built to operate as a wireless access point, Sentinel runs independently from your router or ISP equipment. Devices connect directly to Sentinel's network and receive configuration, access control, and internet routing.
+Built to operate as a wireless access point, Tunneld runs independently from your router or ISP equipment. Devices connect directly to Tunneld's network and receive configuration, access control, and internet routing.
 
 ### 🧠 Intelligent DHCP + DNS
 - Acts as the **DHCP server** for your network
@@ -25,21 +25,21 @@ Built to operate as a wireless access point, Sentinel runs independently from yo
 - Ensures all DNS queries are filtered and resolved securely
 
 ### 🛠 Built-in Web Terminal
-Includes a web-accessible terminal within the Sentinel UI, allowing local shell access directly from the browser — ideal for managing services, debugging, or extending functionality on the fly.
+Includes a web-accessible terminal within the Tunneld UI, allowing local shell access directly from the browser — ideal for managing services, debugging, or extending functionality on the fly.
 
 ### 📡 Local & Remote Artifact Monitoring
-Sentinel monitors active services (e.g., dnsmasq, hostapd, doh proxy) and connected devices. It can detect other nodes on the network and remotely display their status, offering an overview of your distributed system.
+Tunneld monitors active services (e.g., dnsmasq, hostapd, doh proxy) and connected devices. It can detect other nodes on the network and remotely display their status, offering an overview of your distributed system.
 
 ### 🌍 Optional Cloudflare Tunnel Support
-Expose your local Sentinel UI or custom services to the internet via secure Cloudflare Tunnels. Great for accessing your dashboard while away from home, or connecting peer Sentinels together.
+Expose your local Tunneld UI or custom services to the internet via secure Cloudflare Tunnels. Great for accessing your dashboard while away from home, or connecting peer tunneld instances together.
 
 ### 🖥️ Optional Compute sharing
-Sentinel is the gateway, once setting up nodes to be montored, you can share compute between Sentinel devices, sharing local services to trusted parites i.e File storage, AI Compute etc. that others can access through their Sentinel Host
+Tunneld is the gateway, once setting up nodes to be montored, you can share compute between Tunneld devices, sharing local services to trusted parites i.e File storage, AI Compute etc. that others can access through their Tunneld Host
 
 ### 🧩 Static or Portable
-Run Sentinel in:
+Run Tunneld in:
 - **Static mode**: At home, replacing your router's weak UI — manage every device, filter content, and control network flow.
-- **Portable mode**: Take it with you. Share access, deploy temporary networks, or integrate Sentinel with mobile data.
+- **Portable mode**: Take it with you. Share access, deploy temporary networks, or integrate Tunneld with mobile data.
 
 ---
 
@@ -67,7 +67,7 @@ Run Sentinel in:
 
 ## ⚙️ Deployment
 
-You can deploy Sentinel to:
+You can deploy Tunneld to:
 - Raspberry Pi
 - NanoPi / ZimaBoard / x86 mini PC
 - Custom Debian-based SBCs
@@ -78,19 +78,19 @@ Install via custom scripts or build a bootable image. A YAML-based configuration
 
 ## 🌐 Local API
 
-Sentinel exposes endpoints for:
+Tunneld exposes endpoints for:
 - Device status
 - TTL-based access requests
 - Internal health and monitoring
 - Artifact registration and schema-based contract sharing
 
-> This allows custom nodes (AI inference, file servers, etc.) to announce themselves and expose UIs or APIs back to Sentinel.
+> This allows custom nodes (AI inference, file servers, etc.) to announce themselves and expose UIs or APIs back to Tunneld.
 
 ---
 
 ## 🛠 Admin Philosophy
 
-Sentinel is built for users who:
+Tunneld is built for users who:
 - Want **control without overhead**
 - Don’t trust routers with limited UIs or poor security
 - Prefer a artifact-driven setup over traditional home lab models
@@ -113,5 +113,5 @@ Sentinel is built for users who:
 
 ---
 
-**Project Sentinel**  
+**Project Tunneld**  
 > Built for wireless-first, zero-trust, always-private networking.

@@ -8,8 +8,8 @@ const path = require("path")
 module.exports = {
   content: [
     "./js/**/*.js",
-    "../lib/sentinel_web.ex",
-    "../lib/sentinel_web/**/*.*ex"
+    "../lib/tunneld_web.ex",
+    "../lib/tunneld_web/**/*.*ex"
   ],
   theme: {
     extend: {

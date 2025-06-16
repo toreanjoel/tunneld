@@ -1,10 +1,10 @@
-defmodule Sentinel.MixProject do
+defmodule Tunneld.MixProject do
   use Mix.Project
 
   def project do
     [
-      app: :sentinel,
-      version: "0.1.11",
+      app: :tunneld,
+      version: "0.2",
       elixir: "~> 1.14",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -18,7 +18,7 @@ defmodule Sentinel.MixProject do
   # Type `mix help compile.app` for more information.
   def application do
     [
-      mod: {Sentinel.Application, []},
+      mod: {Tunneld.Application, []},
       extra_applications: [:logger, :runtime_tools, :os_mon]
     ]
   end
@@ -74,10 +74,10 @@ defmodule Sentinel.MixProject do
     [
       setup: ["deps.get", "assets.setup", "assets.build"],
       "assets.setup": ["tailwind.install --if-missing", "esbuild.install --if-missing"],
-      "assets.build": ["tailwind sentinel", "esbuild sentinel"],
+      "assets.build": ["tailwind tunneld", "esbuild tunneld"],
       "assets.deploy": [
-        "tailwind sentinel --minify",
-        "esbuild sentinel --minify",
+        "tailwind tunneld --minify",
+        "esbuild tunneld --minify",
         "phx.digest"
       ]
     ]

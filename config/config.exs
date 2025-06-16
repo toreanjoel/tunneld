@@ -7,18 +7,18 @@
 # General application configuration
 import Config
 
-config :sentinel,
+config :tunneld,
   generators: [timestamp_type: :utc_datetime]
 
 # Configures the endpoint
-config :sentinel, SentinelWeb.Endpoint,
+config :tunneld, TunneldWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [html: SentinelWeb.ErrorHTML, json: SentinelWeb.ErrorJSON],
+    formats: [html: TunneldWeb.ErrorHTML, json: TunneldWeb.ErrorJSON],
     layout: false
   ],
-  pubsub_server: Sentinel.PubSub,
+  pubsub_server: Tunneld.PubSub,
   live_view: [signing_salt: "IT1chlHR"]
 
 # Configures the mailer
@@ -32,7 +32,7 @@ config :sentinel, SentinelWeb.Endpoint,
 # Configure esbuild (the version is required)
 config :esbuild,
   version: "0.17.11",
-  sentinel: [
+  tunneld: [
     args:
       ~w(js/app.js --bundle --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/*),
     cd: Path.expand("../assets", __DIR__),
@@ -42,7 +42,7 @@ config :esbuild,
 # Configure tailwind (the version is required)
 config :tailwind,
   version: "3.4.0",
-  sentinel: [
+  tunneld: [
     args: ~w(
       --config=tailwind.config.js
       --input=css/app.css
@@ -60,12 +60,12 @@ config :logger, :console,
 config :phoenix, :json_library, Jason
 
 # DEFAILT ADMIN DASHBOARD DETAILS
-config :sentinel, :auth,
+config :tunneld, :auth,
   user: "admin",
   pass: "!admin_123!",
   ttl: 900 # 15 minutes
 
-config :sentinel, :fs,
+config :tunneld, :fs,
   root: "/data",
   auth: "/auth.json",
   whitelist: "/whitelist.json",
@@ -75,17 +75,17 @@ config :sentinel, :fs,
   encryption: "/encryption.json"
 
 # TODO: This needs to come from env variables from runtime config
-config :sentinel, :network,
+config :tunneld, :network,
   wlan: "wlx202351114745",
   eth: "end0",
   mullvad: "wg0-mullvad",
   gateway: "10.0.0.1"
 
 # ttyd terminal session default port to handle the terminal session
-config :sentinel, :ttyd,
+config :tunneld, :ttyd,
   port: "7681"
 
-config :sentinel, version: "0.1.11"
+config :tunneld, version: "0.2"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

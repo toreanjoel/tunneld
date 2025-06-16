@@ -6,7 +6,7 @@ import Config
 # The watchers configuration can be used to run external
 # watchers to your application. For example, we can use it
 # to bundle .js and .css sources.
-config :sentinel, SentinelWeb.Endpoint,
+config :tunneld, TunneldWeb.Endpoint,
   # Binding to loopback ipv4 address prevents access from other machines.
   # Change to `ip: {0, 0, 0, 0}` to allow access from other machines.
   http: [ip: {0, 0, 0, 0}, port: System.get_env("PORT", "80") |> String.to_integer(10)],
@@ -15,8 +15,8 @@ config :sentinel, SentinelWeb.Endpoint,
   debug_errors: true,
   secret_key_base: "QP7XoPG697mFVOaNqkcXK1EQr4tALSD6ud3pBlAO7yfRzLbqeEHl1UnA9Kk5tLN+",
   watchers: [
-    esbuild: {Esbuild, :install_and_run, [:sentinel, ~w(--sourcemap=inline --watch)]},
-    tailwind: {Tailwind, :install_and_run, [:sentinel, ~w(--watch)]}
+    esbuild: {Esbuild, :install_and_run, [:tunneld, ~w(--sourcemap=inline --watch)]},
+    tailwind: {Tailwind, :install_and_run, [:tunneld, ~w(--watch)]}
   ]
 
 # ## SSL Support
@@ -43,7 +43,7 @@ config :sentinel, SentinelWeb.Endpoint,
 # different ports.
 
 # Watch static and templates for browser reloading.
-config :sentinel, SentinelWeb.Endpoint,
+config :tunneld, TunneldWeb.Endpoint,
   live_reload: [
     patterns: [
       ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
@@ -53,7 +53,7 @@ config :sentinel, SentinelWeb.Endpoint,
   ]
 
 # Enable dev routes for dashboard and mailbox
-config :sentinel, dev_routes: true
+config :tunneld, dev_routes: true
 
 # Do not include metadata nor timestamps in development logs
 config :logger, :console, format: "[$level] $message\n"
