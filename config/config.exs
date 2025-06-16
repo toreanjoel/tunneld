@@ -61,8 +61,6 @@ config :phoenix, :json_library, Jason
 
 # DEFAILT ADMIN DASHBOARD DETAILS
 config :tunneld, :auth,
-  user: "admin",
-  pass: "!admin_123!",
   ttl: 900 # 15 minutes
 
 config :tunneld, :fs,
@@ -85,7 +83,7 @@ config :tunneld, :network,
 config :tunneld, :ttyd,
   port: "7681"
 
-config :tunneld, version: "0.2"
+config :tunneld, version: "0.2.0"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

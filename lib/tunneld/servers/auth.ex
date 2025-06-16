@@ -13,8 +13,6 @@ defmodule Tunneld.Servers.Auth do
   Init and check auth files
   """
   def init(_) do
-    if not file_exists?(), do: create_file()
-
     {:ok, %{}}
   end
 
@@ -38,9 +36,9 @@ defmodule Tunneld.Servers.Auth do
   @doc """
   Create the auth file
   """
-  def create_file() do
+  def create_file(u, p) do
     case path()
-      |> File.write(Jason.encode!(%{"user" => config_auth(:user), "pass" => Bcrypt.hash_pwd_salt(config_auth(:pass))})) do
+      |> File.write(Jason.encode!(%{"user" => u, "pass" => Bcrypt.hash_pwd_salt(p)})) do
       :ok ->
         {:ok, "Auth file created"}
       {:error, reason} ->
