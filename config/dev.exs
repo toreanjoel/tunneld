@@ -48,7 +48,7 @@ config :tunneld, TunneldWeb.Endpoint,
     patterns: [
       ~r"priv/static/(?!uploads/).*(js|css|png|jpeg|jpg|gif|svg)$",
       ~r"priv/gettext/.*(po)$",
-      ~r"lib/sentinel_web/(controllers|live|components)/.*(ex|heex)$"
+      ~r"lib/tunneld_web/(controllers|live|components)/.*(ex|heex)$"
     ]
   ]
 

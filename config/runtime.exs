@@ -26,9 +26,9 @@ if System.get_env("MOCK_DATA") do
 end
 
 # Get the set gateway address
-if System.get_env("SUBNET_IP") do
+if System.get_env("GATEWAY") do
   config :tunneld, :network,
-    gateway: System.get_env("SUBNET_IP")
+    gateway: System.get_env("GATEWAY")
 end
 
 # Set the upstream internet wireless interface

@@ -6,7 +6,7 @@ defmodule TunneldWeb.Endpoint do
   # Set :encryption_salt if you would also like to encrypt it.
   @session_options [
     store: :cookie,
-    key: "_sentinel_key",
+    key: "_tunneld_key",
     signing_salt: "e9ruVTpn",
     same_site: "Lax"
   ]
