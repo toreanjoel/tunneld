@@ -1,40 +1,39 @@
-# Project Tunneld
+# Tunneld
 
-A wireless-first, zero-trust network manager built for portability, performance, and total control.
-
-<img width="1506" alt="Project Tunneld Dashboard Overview" src="https://github.com/user-attachments/assets/9594dc07-d456-47b3-8e2e-ab62ca9c4011" />
+A wireless-first, zero-trust network manager built for portability, performance, and total control. Spend less time on infrastructure and more time building without giving up security.
 
 ---
 
-Tunneld acts as your network's intelligent gateway — managing devices, assigning IPs via DHCP, resolving DNS securely, sharing local compute and exposing optional network services through Cloudflare Tunnels. Designed to be lightweight, modular, and artifact-driven, Tunneld works both at home and on the move.
+Tunneld acts as your network's intelligent gateway — managing devices, assigning IPs via DHCP, resolving DNS securely, sharing local compute and exposing optional network services through Cloudflare Tunnels. Designed to be lightweight, modular, and artifact-driven, Tunneld works both at home and on the move. The goal, you focus on building and can plug the device in your network, keeping it isolated and allowing you expose and share resources publicly or private over a private tunneld network.
 
 ---
 
 ## ✨ Features
 
 ### 🔐 Zero Trust Network Access
-Tunneld treats every device as untrusted by default. Access to the internet is explicitly granted — no open gateway, no assumptions. Devices are approved manually or programmatically and assigned TTL-based access.
+Tunneld treats every device as untrusted by default. Access to the internet is explicitly granted — no open gateway, no assumptions. Devices are approved manually.
 
 ### 📡 Wireless-First Design
-Built to operate as a wireless access point, Tunneld runs independently from your router or ISP equipment. Devices connect directly to Tunneld's network and receive configuration, access control, and internet routing.
+Built to operate by wirelessly connecting to upstream internet source, Tunneld runs independently from your router or ISP equipment. Devices connect directly to Tunneld's and receive configuration, access control, and internet routing through its ethernet interface.
+Everything you need can be controlled through the tunneld dashboard
 
-### 🧠 Intelligent DHCP + DNS
+### 🧠 Intelligent DHCP + DNS + DNScrypt
 - Acts as the **DHCP server** for your network
 - Uses `dnsmasq` for fast, cache-aware DNS resolution
-- Integrates DNS-over-HTTPS (DoH) to block ads, tracking domains, and fingerprinting
+- Integrates DNS-over-HTTPS (DoH) to block ads, tracking domains, and fingerprinting 
 - Ensures all DNS queries are filtered and resolved securely
 
 ### 🛠 Built-in Web Terminal
 Includes a web-accessible terminal within the Tunneld UI, allowing local shell access directly from the browser — ideal for managing services, debugging, or extending functionality on the fly.
 
 ### 📡 Local & Remote Artifact Monitoring
-Tunneld monitors active services (e.g., dnsmasq, hostapd, doh proxy) and connected devices. It can detect other nodes on the network and remotely display their status, offering an overview of your distributed system.
+Tunneld monitors active services (e.g., dnsmasq, hostapd, doh proxy) and connected devices. It also allows you to setup artifacts that setup intent to potentially sharing a resource that exists on some machine on your tunneld network.
 
-### 🌍 Optional Cloudflare Tunnel Support
-Expose your local Tunneld UI or custom services to the internet via secure Cloudflare Tunnels. Great for accessing your dashboard while away from home, or connecting peer tunneld instances together.
+### 🌍 Cloudflare Tunnel First class citizen
+Expose your local Tunneld UI or custom services to the internet via secure Cloudflare Tunnels. Great for accessing your dashboard while away from home, self host applications running on any device on its network, or connecting peer tunneld instances together.
 
 ### 🖥️ Optional Compute sharing
-Tunneld is the gateway, once setting up nodes to be montored, you can share compute between Tunneld devices, sharing local services to trusted parites i.e File storage, AI Compute etc. that others can access through their Tunneld Host
+Tunneld is the gateway, once setting up nodes to be montored, you can share compute between Tunneld devices through APIs, sharing local services to trusted parites i.e AI APIs access etc. that others can access through their Tunneld Host
 
 ### 🧩 Static or Portable
 Run Tunneld in:
@@ -52,16 +51,20 @@ Run Tunneld in:
 | `dnscrypt-proxy` | Enforces DNS-over-HTTPS (DoH) with preloaded secure resolvers              |
 | `Elixir + Phoenix` | Manages the UI, session-based device approval, artifact discovery, and services |
 | `iptables`       | Controls packet forwarding and filtering                                    |
+| `cloudflared`    | The tunnel provider that will be orchestrated through the tool              |
 
 ---
 
 ## 🔧 UI Overview
 
 - Approve or deny internet access per device
-- View connected devices and their lease information
 - See service status and restart components if needed
 - View internal terminal output or issue commands directly
 - Dynamic refresh — minimal design, efficient interaction
+- Creating Artifacts (references with intent to share and monitor for any selfhosted application on its network)
+- Expose Services to the internet using Cloudflare tunnels
+- Enable sharing and connect to other tunneld devices to access shared/enabled resources
+- Tunneld sends device health and overview information to a device on its network (get events when activity takes place)
 
 ---
 
@@ -70,19 +73,16 @@ Run Tunneld in:
 You can deploy Tunneld to:
 - Raspberry Pi
 - NanoPi / ZimaBoard / x86 mini PC
-- Custom Debian-based SBCs
+- Custom Debian-based OS SBCs (Current using Armbian)
 
-Install via custom scripts or build a bootable image. A YAML-based configuration system defines your network interfaces, startup behavior, and any tunnel setup.
-
+Install via install script that will walk through the entire setup with all needed dependencies. You can also build from source.
 ---
 
 ## 🌐 Local API
 
 Tunneld exposes endpoints for:
-- Device status
-- TTL-based access requests
-- Internal health and monitoring
-- Artifact registration and schema-based contract sharing
+- Getting current tunneld instance overview details (Internal health and monitoring)
+- Artifact registration and schema-based contract sharing over tunneld private network
 
 > This allows custom nodes (AI inference, file servers, etc.) to announce themselves and expose UIs or APIs back to Tunneld.
 
@@ -91,27 +91,25 @@ Tunneld exposes endpoints for:
 ## 🛠 Admin Philosophy
 
 Tunneld is built for users who:
-- Want **control without overhead**
-- Don’t trust routers with limited UIs or poor security
-- Prefer a artifact-driven setup over traditional home lab models
-- Value speed, clarity, and privacy — with zero reliance on third parties
+- Want **control without overhead** exposing services, resources and compute without firewall punching
+- Need a plug and play installation to self host on a debian based OS and SBC
+- Want to focus on building instead of infrastructure (being your own cloud private cloud)
 
 ---
 
 ## 🧪 Example Use Cases
 
-- Home router replacement with full visibility
-- Secure access point while traveling
-- Distributed nodes across households or friends
-- Local dashboard for self-hosted file servers, AI inference, or shared tunnels
+- Connect a router in bridge mode to expand tunneld device network to be accessed wirelessly
+- Distributed compute and application exposing and sharing across households or friends (hosting blogs, website etc)
+- Network level ad blocking
+- Secure DNS encryption
+- Access to your APIs and tools over a trusted application level encrypted network (your own compute or friends sharing APIs)
 
 ---
 
 ## 📦 Getting Started
 
-> Setup instructions, scripts, and YAML config templates coming soon.
+> Build From Source
+[TDOD]
 
----
-
-**Project Tunneld**  
-> Built for wireless-first, zero-trust, always-private networking.
+> [Install Script](https://github.com/toreanjoel/tunneld-installer)
