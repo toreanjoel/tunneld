@@ -54,27 +54,31 @@ defmodule Tunneld.Servers.Cloudflare do
 
     create_file_if_missing()
 
-    case read_file() do
-      {:ok, tunnels} ->
-        Logger.info("Loaded tunnel data from file: #{inspect(tunnels)}")
+    if Application.get_env(:tunneld, :mock_data, false) do
+      {:ok, %{records: []}}
+    else
+      case read_file() do
+        {:ok, tunnels} ->
+          Logger.info("Loaded tunnel data from file: #{inspect(tunnels)}")
 
-        Enum.each(tunnels, fn data ->
-          %{
-            "tunnel_name" => tunnel_name,
-            "subdomain" => _,
-            "local_server" => local_server
-          } = data
+          Enum.each(tunnels, fn data ->
+            %{
+              "tunnel_name" => tunnel_name,
+              "subdomain" => _,
+              "local_server" => local_server
+            } = data
 
-          retry_until_tunnel_exists(tunnel_name, fn ->
-            do_run_tunnel_in_background(tunnel_name, local_server)
+            retry_until_tunnel_exists(tunnel_name, fn ->
+              do_run_tunnel_in_background(tunnel_name, local_server)
+            end)
           end)
-        end)
 
-        {:ok, %{records: tunnels}}
+          {:ok, %{records: tunnels}}
 
-      {:error, reason} ->
-        Logger.error("Failed to load existing tunnel data: #{reason}")
-        {:ok, %{records: []}}
+        {:error, reason} ->
+          Logger.error("Failed to load existing tunnel data: #{reason}")
+          {:ok, %{records: []}}
+      end
     end
   end
 
@@ -91,7 +95,9 @@ defmodule Tunneld.Servers.Cloudflare do
       })
 
       # Broadcast to notification server
-      Tunneld.Servers.Notification.trigger({:critical, "Unable to connect tunnel #{subdomain} to server"})
+      Tunneld.Servers.Notification.trigger(
+        {:critical, "Unable to connect tunnel #{subdomain} to server"}
+      )
 
       {:noreply, state}
     else
@@ -135,7 +141,6 @@ defmodule Tunneld.Servers.Cloudflare do
       # Broadcast to notification server
       Tunneld.Servers.Notification.trigger({:info, "Tunnel Created: #{subdomain}"})
 
-
       {:noreply, new_state}
     end
   end
@@ -163,7 +168,7 @@ defmodule Tunneld.Servers.Cloudflare do
         do_delete_tunnel(tunnel_name)
 
         # Make sure to remove DNS record from remote
-        %{ success: success, data: data} = get_dns_record_details(subdomain)
+        %{success: success, data: data} = get_dns_record_details(subdomain)
 
         # We remove the Record by ID
         if success do
@@ -401,14 +406,18 @@ defmodule Tunneld.Servers.Cloudflare do
 
         # Broadcast to notification server
         Tunneld.Servers.Notification.trigger({:info, "Successfully removed DNS Record"})
+
       _ ->
         Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
           type: :error,
-          message: "There was a issue removing the DNS record from CloudFlare: #{record_details.name}"
+          message:
+            "There was a issue removing the DNS record from CloudFlare: #{record_details.name}"
         })
 
         # Broadcast to notification server
-        Tunneld.Servers.Notification.trigger({:critical, "Issue removing DNS record for #{record_details.name}"})
+        Tunneld.Servers.Notification.trigger(
+          {:critical, "Issue removing DNS record for #{record_details.name}"}
+        )
     end
   end
 

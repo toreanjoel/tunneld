@@ -164,11 +164,13 @@ defmodule Tunneld.Servers.Whitelist do
     # Read from the whitelist file
     {_, data} = read_file()
 
-    # Loop over the data
-    Enum.each(data, fn policy ->
-      # TODO: add the devices that has access persisted to have access
-      add_policy(policy)
-    end)
+    if not Application.get_env(:tunneld, :mock_data, false) do
+      # Loop over the data
+      Enum.each(data, fn policy ->
+        # TODO: add the devices that has access persisted to have access
+        add_policy(policy)
+      end)
+    end
 
     {:noreply, state}
   end

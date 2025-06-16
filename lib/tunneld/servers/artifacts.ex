@@ -286,11 +286,15 @@ defmodule Tunneld.Servers.Artifacts do
   # NOTE: THIS WOULD BE BETTER OFF WITH DYNAMIC SUPERVISOR FOR EACH SERVICE
   def handle_info(:sync, state) do
     # send out the list of artifacts
-    artifacts = broadcast_artifacts()
+    if Application.get_env(:tunneld, :mock_data, false) do
+      {:noreply, state}
+    else
+      artifacts = broadcast_artifacts()
 
-    # restart the checking of artifacts and their health
-    sync_nodes()
-    {:noreply, Map.put(state, :artifacts, artifacts)}
+      # restart the checking of artifacts and their health
+      sync_nodes()
+      {:noreply, Map.put(state, :artifacts, artifacts)}
+    end
   end
 
   # The job that will start interval sync

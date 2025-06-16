@@ -38,7 +38,4 @@ npm-debug.log
 .elixir_ls
 
 # The data folder that needs to be generated
-/data/*
-
-# ignore priv files
-
+/data/*.json

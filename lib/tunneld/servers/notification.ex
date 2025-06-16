@@ -84,70 +84,75 @@ defmodule Tunneld.Servers.Notification do
   The interval that will be sending the overview
   """
   def handle_info(:sync, state) do
-    %{"enabled" => enabled, "endpoint" => endpoint} = fetch_settings()
+    if Application.get_env(:tunneld, :mock_data, false) do
+      {:noreply, state}
+    else
+      %{"enabled" => enabled, "endpoint" => endpoint} = fetch_settings()
 
-    if enabled and endpoint !== "" do
-      # this is for development data as the env wont contain the same functions of the prod env
-      if Application.get_env(:tunneld, :mock_data, false) do
-        %{cpu: cpu, mem: mem_percent, storage: storage_percent} =
-          Tunneld.Servers.Resources.get_resources()
-
-        post(:overview, endpoint, %{
-          type: "overview",
-          data: %{
-            cpu: cpu |> to_string,
-            ram: mem_percent |> to_string,
-            storage: storage_percent |> to_string,
-            ip: %{lan: "DEVELOP", wan: "DEVELOP"},
-            uptime: "DEVELOP"
-          }
-        })
-      else
-        # We make sure we are enabled with regards to sending out notifications
-        if enabled and endpoint !== "" do
-          # uptime - we remove the up and only get the rest of the data
-          {"up " <> uptime, 0} = System.cmd("uptime", ["-p"])
-
-          # The custom uptime formatted data
-          uptime = uptime
-          |> String.trim()
-          |> String.split(", ")
-          |> Enum.map(&shorten/1)
-          |> Enum.join(" ")
-
-          # lan
-          {lan_ip, 0} = System.cmd("sh", ["-c", "hostname -I | awk '{print $1}'"])
-          # raw ip
-          {ip_raw, 0} =
-            System.cmd("sh", [
-              "-c",
-              "ip -4 addr show #{@interface} | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){3}'"
-            ])
-
+      if enabled and endpoint !== "" do
+        # this is for development data as the env wont contain the same functions of the prod env
+        if Application.get_env(:tunneld, :mock_data, false) do
           %{cpu: cpu, mem: mem_percent, storage: storage_percent} =
             Tunneld.Servers.Resources.get_resources()
 
           post(:overview, endpoint, %{
             type: "overview",
             data: %{
-              # devices: %{count: 100, max: 6},
-              # tunnels: %{active: 2, total: 3},
-              # services: %{ok: 4, total: 4},
               cpu: cpu |> to_string,
               ram: mem_percent |> to_string,
               storage: storage_percent |> to_string,
-              ip: %{lan: String.trim(lan_ip), wan: String.trim(ip_raw)},
-              uptime: String.trim(uptime)
+              ip: %{lan: "DEVELOP", wan: "DEVELOP"},
+              uptime: "DEVELOP"
             }
           })
+        else
+          # We make sure we are enabled with regards to sending out notifications
+          if enabled and endpoint !== "" do
+            # uptime - we remove the up and only get the rest of the data
+            {"up " <> uptime, 0} = System.cmd("uptime", ["-p"])
+
+            # The custom uptime formatted data
+            uptime =
+              uptime
+              |> String.trim()
+              |> String.split(", ")
+              |> Enum.map(&shorten/1)
+              |> Enum.join(" ")
+
+            # lan
+            {lan_ip, 0} = System.cmd("sh", ["-c", "hostname -I | awk '{print $1}'"])
+            # raw ip
+            {ip_raw, 0} =
+              System.cmd("sh", [
+                "-c",
+                "ip -4 addr show #{@interface} | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){3}'"
+              ])
+
+            %{cpu: cpu, mem: mem_percent, storage: storage_percent} =
+              Tunneld.Servers.Resources.get_resources()
+
+            post(:overview, endpoint, %{
+              type: "overview",
+              data: %{
+                # devices: %{count: 100, max: 6},
+                # tunnels: %{active: 2, total: 3},
+                # services: %{ok: 4, total: 4},
+                cpu: cpu |> to_string,
+                ram: mem_percent |> to_string,
+                storage: storage_percent |> to_string,
+                ip: %{lan: String.trim(lan_ip), wan: String.trim(ip_raw)},
+                uptime: String.trim(uptime)
+              }
+            })
+          end
         end
       end
+
+      # Start the sync process again
+      sync_overview()
+
+      {:noreply, state}
     end
-
-    # Start the sync process again
-    sync_overview()
-
-    {:noreply, state}
   end
 
   @doc """
