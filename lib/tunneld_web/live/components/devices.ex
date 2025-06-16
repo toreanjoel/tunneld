@@ -93,9 +93,9 @@ defmodule TunneldWeb.Live.Components.Devices do
             class="p-4 flex flex-col bg-secondary rounded-lg w-full h-[130px] hover:bg-secondary"
             style="animation: fadeIn 0.5s ease-out forwards;"
           >
-            <div class="flex flex-row">
+            <div class="flex flex-row gap-2">
               <div class="grow truncate ellipsis">
-                <div class="text-sm truncate"><%= device.hostname %></div>
+                <div class="text-sm truncate ellipsis"><%= device.hostname %></div>
               </div>
               <div>
                 <label
