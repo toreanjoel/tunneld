@@ -23,6 +23,7 @@ defmodule TunneldWeb.Router do
     pipe_through [:browser, :set_ip]
 
     live "/", Live.Login
+    live "/iso_grid", Live.IsoGrid
     live "/dashboard", Live.Dashboard
   end
 
