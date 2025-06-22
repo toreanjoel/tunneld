@@ -63,14 +63,14 @@ export default {
     this.canvas.addEventListener("mousemove", (e) => {
       if (!this.isDragging) return;
       // Where the mouse currently is vs where it came from
-      const dx = e.clientX - this.lastDrag.x;
-      const dy = e.clientY - this.lastDrag.y;
+      const newMousePosX = e.clientX - this.lastDrag.x;
+      const newMousePosY = e.clientY - this.lastDrag.y;
       // On the base offset of 0, we add what ever that is with the difference from where we were started dragging from
       // vs where we stopped dragging
       // NOTE: Offset is the point on init render, if we change the offset by a value, we are updating its new position
       // This is for everything being rendered
-      this.offsetX += dx;
-      this.offsetY += dy;
+      this.offsetX += newMousePosX;
+      this.offsetY += newMousePosY;
       // Set the new
       this.lastDrag = { x: e.clientX, y: e.clientY };
       // Make sure as we are dragging, always re init and draw everything
@@ -104,8 +104,6 @@ export default {
       canvas,
       tileW,
       tileH,
-      cols,
-      rows,
       offsetX,
       offsetY,
       groundImg,
@@ -148,6 +146,21 @@ export default {
         // adjust drawY if you need it to sit higher/lower
         // We need to make sure we loop over the list and set the items on the relevant parent block
         ctx.drawImage(overlayImg, drawX, drawY - tileH, tileW, tileW);
+
+        // Add the tooltip just above the tile
+        const tooltipWidth = 100;
+        const tooltipHeight = 30;
+        const tooltipX = drawX + tileW / 2 - tooltipWidth / 2;
+        const tooltipY = drawY - tileH - tooltipHeight; // 10px padding above
+
+        this.drawSpeechBubble(
+          ctx,
+          "Gateway",
+          tooltipX,
+          tooltipY,
+          tooltipWidth,
+          tooltipHeight
+        );
       }
 
       // draw overlay on the chosen tile - hard code where
@@ -155,6 +168,21 @@ export default {
         // adjust drawY if you need it to sit higher/lower
         // We need to make sure we loop over the list and set the items on the relevant parent block
         ctx.drawImage(overlayImg, drawX, drawY - tileH, tileW, tileW);
+
+        // Add the tooltip just above the tile
+        const tooltipWidth = 100;
+        const tooltipHeight = 30;
+        const tooltipX = drawX + tileW / 2 - tooltipWidth / 2;
+        const tooltipY = drawY - tileH - tooltipHeight; // 10px padding above
+
+        this.drawSpeechBubble(
+          ctx,
+          "Laptop",
+          tooltipX,
+          tooltipY,
+          tooltipWidth,
+          tooltipHeight
+        );
       }
 
       // draw overlay on the chosen tile - hard code where
@@ -178,5 +206,46 @@ export default {
       }
     }
     return arr;
+  },
+
+  /**
+   * Draws a simple speech bubble (rounded rectangle with centered text) on a canvas.
+   *
+   * @param {CanvasRenderingContext2D} ctx - The canvas 2D rendering context to draw on.
+   * @param {string} text - The text to display inside the speech bubble.
+   * @param {number} x - The X-coordinate of the top-left corner of the bubble.
+   * @param {number} y - The Y-coordinate of the top-left corner of the bubble.
+   * @param {number} width - The width of the bubble.
+   * @param {number} height - The height of the bubble.
+   * @param {number} [radius=6] - The corner radius for the rounded rectangle.
+   */
+
+  drawSpeechBubble(ctx, text, x, y, width, height, radius = 6) {
+    // Draw the rounded rectangle
+    ctx.beginPath();
+    ctx.moveTo(x + radius, y);
+    ctx.lineTo(x + width - radius, y);
+    ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
+    ctx.lineTo(x + width, y + height - radius);
+    ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
+    ctx.lineTo(x + radius, y + height);
+    ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
+    ctx.lineTo(x, y + radius);
+    ctx.quadraticCurveTo(x, y, x + radius, y);
+    ctx.closePath();
+
+    // Fill & border
+    ctx.fillStyle = "white";
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 1.5;
+    ctx.fill();
+    ctx.stroke();
+
+    // Draw text
+    ctx.fillStyle = "black";
+    ctx.font = "12px sans-serif";
+    ctx.textBaseline = "middle";
+    ctx.textAlign = "center";
+    ctx.fillText(text, x + width / 2, y + height / 2);
   },
 };
