@@ -5,8 +5,8 @@ defmodule TunneldWeb.Live.IsoGrid do
   use TunneldWeb, :live_view
 
   # Constants
-  @tile_w 80
-  @tile_h 40
+  @tile_w 64
+  @tile_h 32
 
   # NOTE: the cols will be dynamic down the line
   @cols 5

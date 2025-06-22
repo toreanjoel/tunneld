@@ -7,15 +7,21 @@
  */
 export default {
   mounted() {
-    // context & canvas
+    // Context and canvas
     this.ctx = this.el.querySelector("canvas").getContext("2d");
     this.canvas = this.ctx.canvas;
 
-    this.debug = false;
+    // Set the base canvas cursor
+    this.canvas.style.cursor = "grab";
+
+    // The data and values of the amount of rows and each tiles width and height
+    // NOTE: the + is a way to convert from a string to a number
     this.tileW = +this.el.dataset.tileW;
     this.tileH = +this.el.dataset.tileH;
     this.cols = +this.el.dataset.cols;
     this.rows = +this.el.dataset.rows;
+    // Offset position relative from where we start clicking vs where the mouse moved to
+    // We use this to move items around the screne using the click drag
     this.offsetX = 0;
     this.offsetY = 0;
 
@@ -31,98 +37,139 @@ export default {
     this.overlayImg.src = "../images/block.png";
     this.overlayImg.onload = () => this.draw();
 
-    // NOTE: assets need to be able to render animations
-
+    // Keep checking if screen resolution changed - we make sure to reinit and render
     this.resizeCanvas();
+
+    // Add event listener to check if the window resize has happned
     window.addEventListener("resize", () => {
+      // Update the canvas after resize to use new dimension size
       this.resizeCanvas();
+      // Clear and recompute everything
       this.draw();
     });
 
-    // pan handlers
-    this.canvas.addEventListener("mousedown", e => {
+    // Add event listener to keep track of if we are dragging (while clicking) - on the canvas
+    // Also keep track of the point the moment we clicked to get last value
+    this.canvas.addEventListener("mousedown", (e) => {
+      // We could update the cursor here to be mouse down
+      this.canvas.style.cursor = "grabbing";
+
+      //set dragging state and the last vector from when we started dragging
       this.isDragging = true;
-      this.lastDrag   = { x: e.clientX, y: e.clientY };
+      this.lastDrag = { x: e.clientX, y: e.clientY };
     });
 
-    this.canvas.addEventListener("mousemove", e => {
+    // Add listender if the mouse is moving but only do something while clicked (mouse down)
+    this.canvas.addEventListener("mousemove", (e) => {
       if (!this.isDragging) return;
+      // Where the mouse currently is vs where it came from
       const dx = e.clientX - this.lastDrag.x;
       const dy = e.clientY - this.lastDrag.y;
-      this.offsetX += dx; this.offsetY += dy;
+      // On the base offset of 0, we add what ever that is with the difference from where we were started dragging from
+      // vs where we stopped dragging
+      // NOTE: Offset is the point on init render, if we change the offset by a value, we are updating its new position
+      // This is for everything being rendered
+      this.offsetX += dx;
+      this.offsetY += dy;
+      // Set the new
       this.lastDrag = { x: e.clientX, y: e.clientY };
+      // Make sure as we are dragging, always re init and draw everything
       this.draw();
     });
-    window.addEventListener("mouseup", () => this.isDragging = false);
+
+    // reset state of dragging and the cursor
+    window.addEventListener("mouseup", () => {
+      this.canvas.style.cursor = "grab";
+      this.isDragging = false;
+    });
   },
 
+  /**
+   * Update the canvas dimensions to be updated (full screen) relative to the vieqport
+   * We init to get the size and keep calling if we notice the window size is changing (resizing)
+   */
   resizeCanvas() {
-    this.canvas.width  = this.el.clientWidth;
+    this.canvas.width = this.el.clientWidth;
     this.canvas.height = this.el.clientHeight;
   },
 
+  /**
+   * Render the items to the screen
+   */
   draw() {
-    const { ctx, canvas, tileW, tileH, cols, rows, offsetX, offsetY,
-            groundImg, overlayImg } = this;
-    const cw = canvas.width, ch = canvas.height;
-    ctx.resetTransform();
+    // Get the relevant information that determines what to render
+    // context, canvas, the dementions of tiles, the roles and current position of everything along with images
+    const {
+      ctx,
+      canvas,
+      tileW,
+      tileH,
+      cols,
+      rows,
+      offsetX,
+      offsetY,
+      groundImg,
+      overlayImg,
+    } = this;
+    // The actual current size of the canvas
+    const cw = canvas.width,
+      ch = canvas.height;
+    //  We need to reset the canvas and clear everything before painting anything new
+    // ctx.resetTransform();
     ctx.clearRect(0, 0, cw, ch);
 
     // total grid size
     const gridW = tileW * 0.5;
-    const gridH = (cols + rows) * (tileH * 0.25);
-    const baseX = (cw - gridW) * 0.5 + offsetX;
-    const baseY = (ch - gridH) * 0.5 + offsetY;
-    const spriteOffsetY = (tileW - tileH) / 2;
+    const gridH = tileH * 0.5;
 
+    // Move everything the current half w/h of the canvas - bottom right - it will make sure everything is rendered in the center
+    // The grid and width are the dimensions of what we are rendering and want to center this entire thing
+    // We need to make sure we account position based off offset so we move it when we click and drag
+    const gridX = cw * 0.5 - gridW + offsetX;
+    const gridY = ch * 0.5 - gridH + offsetY;
+
+    // Take the data that we use to represent tiles information and loop through everything to render
     for (const { i, j } of this.computeTileDepths()) {
-      const tipX = baseX + (i - j) * 0.5 * tileW;
-      const tipY = baseY + (i + j) * 0.5 * tileH;
-      const drawX = tipX - tileW * 0.5;
-      const drawY = tipY - tileW;
+      // Calculate the isometric position of each tile.
+      // - `gridX` and `gridY` are the top-left pixel offsets of the entire grid.
+      // - `(i - j) * tileW * 0.5` moves tiles horizontally in isometric space.
+      // - `(i + j) * tileH * 0.5` moves tiles vertically in isometric space.
+      // This centers each tile's tip based on the grid layout and avoids gaps from tile corners.
+      const drawX = gridX + (i - j) * tileW * 0.5;
+      const drawY = gridY + (i + j) * tileH * 0.5;
 
-      // draw ground
+      // draw ground item assuming it is loaded into memory
       if (groundImg.complete) {
         ctx.drawImage(groundImg, drawX, drawY, tileW, tileW);
       }
 
-      // draw overlay on the chosen tile - hard code where
+      // draw overlay on the chosen tile - hard code where but assuming its into memoery
       if (i === 4 && j === 3 && overlayImg.complete) {
         // adjust drawY if you need it to sit higher/lower
         // We need to make sure we loop over the list and set the items on the relevant parent block
-        ctx.drawImage(overlayImg, drawX, drawY - (tileH), tileW, tileW);
+        ctx.drawImage(overlayImg, drawX, drawY - tileH, tileW, tileW);
       }
-      
+
       // draw overlay on the chosen tile - hard code where
       if (i === 2 && j === 0 && overlayImg.complete) {
         // adjust drawY if you need it to sit higher/lower
         // We need to make sure we loop over the list and set the items on the relevant parent block
-        ctx.drawImage(overlayImg, drawX, drawY - (tileH), tileW, tileW);
+        ctx.drawImage(overlayImg, drawX, drawY - tileH, tileW, tileW);
       }
-      
+
       // draw overlay on the chosen tile - hard code where
       if (i === 1 && j === 3 && overlayImg.complete) {
         // adjust drawY if you need it to sit higher/lower
         // We need to make sure we loop over the list and set the items on the relevant parent block
-        ctx.drawImage(overlayImg, drawX, drawY - (tileH), tileW, tileW);
-      }
-
-      // debug collision diamond
-      if (this.debug) {
-        const cy = tipY - spriteOffsetY;
-        ctx.beginPath();
-        ctx.moveTo(tipX,           cy);
-        ctx.lineTo(tipX + tileW/2, cy - tileH/2);
-        ctx.lineTo(tipX,           cy - tileH);
-        ctx.lineTo(tipX - tileW/2, cy - tileH/2);
-        ctx.closePath();
-        ctx.lineWidth   = 1;
-        ctx.strokeStyle = "rgba(0,255,0,0.3)";
-        ctx.stroke();
+        ctx.drawImage(overlayImg, drawX, drawY - tileH, tileW, tileW);
       }
     }
   },
 
+  /**
+   * Render the tiles, this is based on the rows and columns
+   * We should pass an array and use this as a helper to render the items
+   */
   computeTileDepths() {
     const arr = [];
     for (let i = 0; i < this.cols; i++) {
@@ -130,6 +177,6 @@ export default {
         arr.push({ i, j, d: i + j });
       }
     }
-    return arr.sort((a, b) => a.d - b.d);
+    return arr;
   },
-}
+};
