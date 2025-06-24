@@ -20,6 +20,8 @@ export default {
     this.tileH = +this.el.dataset.tileH;
     this.cols = +this.el.dataset.cols;
     this.rows = +this.el.dataset.rows;
+    // The data that will be rendered
+    this.overlays = JSON.parse(this.el.dataset.overlays || "[]");
     // Offset position relative from where we start clicking vs where the mouse moved to
     // We use this to move items around the screne using the click drag
     this.offsetX = 0;
@@ -141,55 +143,26 @@ export default {
         ctx.drawImage(groundImg, drawX, drawY, tileW, tileW);
       }
 
-      // draw overlay on the chosen tile - hard code where but assuming its into memoery
-      if (i === 4 && j === 3 && overlayImg.complete) {
-        // adjust drawY if you need it to sit higher/lower
-        // We need to make sure we loop over the list and set the items on the relevant parent block
+      // Check if there's an overlay on this tile -  we this to render the items
+      const overlay = this.overlays.find((o) => o.i === i && o.j === j);
+      if (overlay && overlayImg.complete) {
         ctx.drawImage(overlayImg, drawX, drawY - tileH, tileW, tileW);
 
-        // Add the tooltip just above the tile
-        const tooltipWidth = 100;
-        const tooltipHeight = 30;
+
+        // Optional: draw tooltip or label above
+        const tooltipWidth = 70;
+        const tooltipHeight = 20;
         const tooltipX = drawX + tileW / 2 - tooltipWidth / 2;
-        const tooltipY = drawY - tileH - tooltipHeight; // 10px padding above
+        const tooltipY = drawY - tileH;
 
         this.drawSpeechBubble(
           ctx,
-          "Gateway",
+          overlay.label || overlay.kind,
           tooltipX,
           tooltipY,
           tooltipWidth,
           tooltipHeight
         );
-      }
-
-      // draw overlay on the chosen tile - hard code where
-      if (i === 2 && j === 0 && overlayImg.complete) {
-        // adjust drawY if you need it to sit higher/lower
-        // We need to make sure we loop over the list and set the items on the relevant parent block
-        ctx.drawImage(overlayImg, drawX, drawY - tileH, tileW, tileW);
-
-        // Add the tooltip just above the tile
-        const tooltipWidth = 100;
-        const tooltipHeight = 30;
-        const tooltipX = drawX + tileW / 2 - tooltipWidth / 2;
-        const tooltipY = drawY - tileH - tooltipHeight; // 10px padding above
-
-        this.drawSpeechBubble(
-          ctx,
-          "Laptop",
-          tooltipX,
-          tooltipY,
-          tooltipWidth,
-          tooltipHeight
-        );
-      }
-
-      // draw overlay on the chosen tile - hard code where
-      if (i === 1 && j === 3 && overlayImg.complete) {
-        // adjust drawY if you need it to sit higher/lower
-        // We need to make sure we loop over the list and set the items on the relevant parent block
-        ctx.drawImage(overlayImg, drawX, drawY - tileH, tileW, tileW);
       }
     }
   },
@@ -220,7 +193,7 @@ export default {
    * @param {number} [radius=6] - The corner radius for the rounded rectangle.
    */
 
-  drawSpeechBubble(ctx, text, x, y, width, height, radius = 6) {
+  drawSpeechBubble(ctx, text, x, y, width, height, radius = 3) {
     // Draw the rounded rectangle
     ctx.beginPath();
     ctx.moveTo(x + radius, y);
@@ -243,7 +216,7 @@ export default {
 
     // Draw text
     ctx.fillStyle = "black";
-    ctx.font = "12px sans-serif";
+    ctx.font = "10px sans-serif";
     ctx.textBaseline = "middle";
     ctx.textAlign = "center";
     ctx.fillText(text, x + width / 2, y + height / 2);
