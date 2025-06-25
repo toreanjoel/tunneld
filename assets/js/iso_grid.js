@@ -125,8 +125,9 @@ export default {
     // Move everything the current half w/h of the canvas - bottom right - it will make sure everything is rendered in the center
     // The grid and width are the dimensions of what we are rendering and want to center this entire thing
     // We need to make sure we account position based off offset so we move it when we click and drag
-    const gridX = cw * 0.5 - gridW + offsetX;
-    const gridY = ch * 0.5 - gridH + offsetY;
+    const gridX = cw * 0.5 + offsetX
+    // We make sure the canvas height half minus the half of the full cluster of cubes to center vertically
+    const gridY = ch * 0.5 - gridH * gridW / 2 + offsetY
 
     // Take the data that we use to represent tiles information and loop through everything to render
     for (const { i, j } of this.computeTileDepths()) {
@@ -153,7 +154,7 @@ export default {
         const tooltipWidth = 70;
         const tooltipHeight = 20;
         const tooltipX = drawX + tileW / 2 - tooltipWidth / 2;
-        const tooltipY = drawY - tileH;
+        const tooltipY = drawY - tileH - 10;
 
         this.drawSpeechBubble(
           ctx,
