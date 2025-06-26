@@ -13,63 +13,63 @@ defmodule TunneldWeb.Live.IsoGrid do
       %{id: "svc3", type: :dhcpcd}
     ],
     devices: [
-      # %{
-      #   id: "dev-1",
-      #   type: :device,
-      #   artifacts: [
-      #     %{id: "dev0_app1"},
-      #     %{id: "dev0_app2"},
-      #     %{id: "dev0_app1"},
-      #     %{id: "dev0_app2"}
-      #   ]
-      # },
+      %{
+        id: "dev-1",
+        type: :device,
+        artifacts: [
+          %{id: "dev0_app1"},
+          %{id: "dev0_app2"},
+          %{id: "dev0_app1"},
+          %{id: "dev0_app2"}
+        ]
+      },
       %{
         id: "dev0",
         type: :device,
         artifacts: [%{id: "dev0_app1"}]
       },
-      # %{
-      #   id: "dev0",
-      #   type: :device,
-      #   artifacts: [%{id: "dev0_app1"}]
-      # },
-      # %{
-      #   id: "dev0",
-      #   type: :device,
-      #   artifacts: [%{id: "dev0_app1"}]
-      # },
-      # %{
-      #   id: "dev0",
-      #   type: :device,
-      #   artifacts: [%{id: "dev0_app1"}]
-      # },
-      # %{
-      #   id: "dev0",
-      #   type: :device,
-      #   artifacts: [%{id: "dev0_app1"}, %{id: "dev0_app2"}]
-      # },
-      # %{
-      #   id: "dev0",
-      #   type: :device,
-      #   artifacts: [
-      #     %{id: "dev0_app1"},
-      #     %{id: "dev0_app2"},
-      #     %{id: "dev0_app1"},
-      #     %{id: "dev0_app1"},
-      #     %{id: "dev0_app2"}
-      #   ]
-      # },
-      # %{
-      #   id: "dev0",
-      #   type: :device,
-      #   artifacts: [%{id: "dev0_app1"}, %{id: "dev0_app2"}]
-      # }
+      %{
+        id: "dev0",
+        type: :device,
+        artifacts: [%{id: "dev0_app1"}]
+      },
+      %{
+        id: "dev0",
+        type: :device,
+        artifacts: [%{id: "dev0_app1"}]
+      },
+      %{
+        id: "dev0",
+        type: :device,
+        artifacts: [%{id: "dev0_app1"}]
+      },
+      %{
+        id: "dev0",
+        type: :device,
+        artifacts: [%{id: "dev0_app1"}, %{id: "dev0_app2"}]
+      },
+      %{
+        id: "dev0",
+        type: :device,
+        artifacts: [
+          %{id: "dev0_app1"},
+          %{id: "dev0_app2"},
+          %{id: "dev0_app1"},
+          %{id: "dev0_app1"},
+          %{id: "dev0_app2"}
+        ]
+      },
+      %{
+        id: "dev0",
+        type: :device,
+        artifacts: [%{id: "dev0_app1"}, %{id: "dev0_app2"}]
+      }
     ]
   }
 
   # Constants
-  @tile_w 128
-  @tile_h 64
+  @tile_w 64
+  @tile_h 32
   @horizontal_spacing 1
   @vertical_spacing 1
   @padding 3
@@ -86,7 +86,8 @@ defmodule TunneldWeb.Live.IsoGrid do
         tile_h: @tile_h,
         cols: layout.cols,
         rows: layout.rows,
-        overlays: Jason.encode!(layout.overlays)
+        overlays: Jason.encode!(layout.overlays),
+        selected_overlay: nil
       )
 
     {:ok, socket}
@@ -97,28 +98,43 @@ defmodule TunneldWeb.Live.IsoGrid do
   """
   def render(assigns) do
     ~H"""
-    <div
-      id="iso-grid"
-      phx-hook="IsoGrid"
-      data-tile-w={@tile_w}
-      data-tile-h={@tile_h}
-      data-cols={@cols}
-      data-rows={@rows}
-      data-overlays={@overlays}
-      style="
-        position: absolute;
-        top: 0; left: 0;
-        width: 100vw;
-        height: 100vh;
-        overflow: hidden;
-        background: #15151d;
-      "
-    >
-      <canvas style="
-        display: block;
-        width: 100%;
-        height: 100%;
-      "></canvas>
+    <div>
+      <div
+        id="iso-grid"
+        phx-hook="IsoGrid"
+        phx-update="ignore"
+        data-tile-w={@tile_w}
+        data-tile-h={@tile_h}
+        data-cols={@cols}
+        data-rows={@rows}
+        data-overlays={@overlays}
+        class="absolute inset-0 w-screen h-screen overflow-hidden bg-[#15151d]"
+      >
+        <canvas class="block w-full h-full"></canvas>
+      </div>
+      <%= if @selected_overlay do %>
+        <div
+          id="overlay-popup"
+          class="absolute top-5 right-5 w-72 bg-zinc-800 text-white p-5 rounded-xl shadow-xl z-50"
+        >
+          <div class="flex items-center justify-between">
+            <strong class="text-lg capitalize"><%= @selected_overlay.kind %></strong>
+            <button
+              phx-click="close_overlay"
+              class="text-white text-lg hover:text-zinc-300 focus:outline-none"
+            >
+              ✕
+            </button>
+          </div>
+          <div class="mt-4 space-y-1 text-sm text-zinc-200">
+            <p><span class="font-semibold">ID:</span> <%= @selected_overlay.label %></p>
+            <p>
+              <span class="font-semibold">Coords:</span>
+              (<%= @selected_overlay.i %>, <%= @selected_overlay.j %>)
+            </p>
+          </div>
+        </div>
+      <% end %>
     </div>
     """
   end
@@ -147,11 +163,15 @@ defmodule TunneldWeb.Live.IsoGrid do
     services_check = if services_count > 0, do: 3 + 1, else: 1
     devices_check = if device_count > 0, do: 1 + 1, else: 3
     artifact_check = if max_artifact_depth > 0, do: @padding * 2 + 1, else: 2
+    # gateway
+    # service spacer + services
+    # device spacer + devices
+    # deepest artifacts + make sure to account for spaces between as we do a n + n
     rows =
-        1 +  # gateway
-        services_check + # service spacer + services
-        devices_check + # device spacer + devices
-        (max_artifact_depth + max_artifact_depth) + # deepest artifacts + make sure to account for spaces between as we do a n + n
+      1 +
+        services_check +
+        devices_check +
+        (max_artifact_depth + max_artifact_depth) +
         artifact_check
 
     # Get the center of the grid
@@ -227,5 +247,22 @@ defmodule TunneldWeb.Live.IsoGrid do
 
       {acc ++ [device_overlay | artifacts], max(max_artifacts, length(artifacts))}
     end)
+  end
+
+  @impl true
+  def handle_event("close_overlay", _params, socket) do
+    {:noreply, assign(socket, selected_overlay: nil)}
+  end
+
+  @impl true
+  def handle_event(
+        "overlay_selected",
+        %{"i" => i, "j" => j, "kind" => kind, "label" => label} = payload,
+        socket
+      ) do
+    IO.inspect(payload, label: "Selected overlay")
+
+    # Optionally assign it to socket for use in the UI
+    {:noreply, assign(socket, selected_overlay: %{i: i, j: j, kind: kind, label: label})}
   end
 end

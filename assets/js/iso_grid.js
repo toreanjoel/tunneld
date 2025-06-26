@@ -4,9 +4,18 @@
  * Renders a fixed-scale isometric grid using a single 64×64 sprite
  * (visible diamond = 128x64), centered on-screen, with click-drag
  * panning, diamond-based hover detection, and an entry animation.
+ *
+ * TODO:
+ * - Spritesheet atlast rather
+ * - Culling to only show what is on screen
+ * - Aim to use maps over lists with SIMD parallel rendering of data over loops
  */
+
+// The names of the assets we want to add in memory
+const ASSETS = ["block", "ground"];
+
 export default {
-  mounted() {
+  async mounted() {
     // Context and canvas
     this.ctx = this.el.querySelector("canvas").getContext("2d");
     this.canvas = this.ctx.canvas;
@@ -22,25 +31,30 @@ export default {
     this.rows = +this.el.dataset.rows;
     // The data that will be rendered
     this.overlays = JSON.parse(this.el.dataset.overlays || "[]");
+    this.overlayMap = new Map();
+    // Convert overlays to Map with "i,j" as key
+    for (const overlay of this.overlays) {
+      this.overlayMap.set(`${overlay.i},${overlay.j}`, overlay);
+    }
+
+    // Keep track of currently selected overlay
+    this.selectedOverlayKey = null;
+
+    // Track rendered overlay bounding boxes for click detection
+    this.renderedOverlays = new Map();
+
     // Offset position relative from where we start clicking vs where the mouse moved to
     // We use this to move items around the screne using the click drag
     this.offsetX = 0;
     this.offsetY = 0;
 
-    // This needs to be dynamic from a matrix list maybe?
-    // load base ground sprite
-    this.groundImg = new Image();
-    this.groundImg.src = "../images/ground_three.png";
-    this.groundImg.onload = () => this.draw();
-
-    // We need to layer the icons on another matrix list that gets looped over on top of this?
-    // load overlay sprite
-    this.overlayImg = new Image();
-    this.overlayImg.src = "../images/block.png";
-    this.overlayImg.onload = () => this.draw();
+    // initialize assets
+    const loadedAssets = await this.initAssets();
+    this.assetsToRender = loadedAssets;
 
     // Keep checking if screen resolution changed - we make sure to reinit and render
     this.resizeCanvas();
+    this.draw();
 
     // Add event listener to check if the window resize has happned
     window.addEventListener("resize", () => {
@@ -84,6 +98,33 @@ export default {
       this.canvas.style.cursor = "grab";
       this.isDragging = false;
     });
+
+    // Add click event for selecting overlays
+    this.canvas.addEventListener("click", (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      for (const [key, { overlay, x, y, width, height }] of this
+        .renderedOverlays) {
+        if (
+          mouseX >= x &&
+          mouseX <= x + width &&
+          mouseY >= y &&
+          mouseY <= y + height
+        ) {
+          this.selectedOverlayKey = key;
+          console.log("Selected overlay:", overlay);
+          this.draw();
+          this.processInteraction();
+          return;
+        }
+      }
+
+      // Clear selection if no match
+      this.selectedOverlayKey = null;
+      this.draw();
+    });
   },
 
   /**
@@ -101,33 +142,25 @@ export default {
   draw() {
     // Get the relevant information that determines what to render
     // context, canvas, the dementions of tiles, the roles and current position of everything along with images
-    const {
-      ctx,
-      canvas,
-      tileW,
-      tileH,
-      offsetX,
-      offsetY,
-      groundImg,
-      overlayImg,
-    } = this;
+    const { ctx, canvas, tileW, tileH, offsetX, offsetY, assetsToRender } =
+      this;
+
+    // Clear stored overlay bounds for interaction - when render and when we click on canvas in general
+    this.renderedOverlays.clear();
+
     // The actual current size of the canvas
     const cw = canvas.width,
       ch = canvas.height;
-    //  We need to reset the canvas and clear everything before painting anything new
-    // ctx.resetTransform();
-    ctx.clearRect(0, 0, cw, ch);
 
-    // total grid size
-    const gridW = tileW * 0.5;
-    const gridH = tileH * 0.5;
+    //  We need to reset the canvas and clear everything before painting anything new
+    ctx.clearRect(0, 0, cw, ch);
 
     // Move everything the current half w/h of the canvas - bottom right - it will make sure everything is rendered in the center
     // The grid and width are the dimensions of what we are rendering and want to center this entire thing
     // We need to make sure we account position based off offset so we move it when we click and drag
-    const gridX = cw * 0.5 + offsetX
+    const gridX = cw / 2 + offsetX;
     // We make sure the canvas height half minus the half of the full cluster of cubes to center vertically
-    const gridY = ch * 0.5 - gridH * gridW / 4 + offsetY
+    const gridY = (ch / 2) * 0.5 + offsetY;
 
     // Take the data that we use to represent tiles information and loop through everything to render
     for (const { i, j } of this.computeTileDepths()) {
@@ -139,34 +172,60 @@ export default {
       const drawX = gridX + (i - j) * tileW * 0.5;
       const drawY = gridY + (i + j) * tileH * 0.5;
 
-      // draw ground item assuming it is loaded into memory
-      if (groundImg.complete) {
-        ctx.drawImage(groundImg, drawX, drawY, tileW, tileW);
+      // Culling - This makes sure we dont draw the current block if it is not on the screen
+      if (
+        drawX + tileW < 0 ||
+        drawX > canvas.width ||
+        drawY + tileW < 0 ||
+        drawY > canvas.height
+      ) {
+        continue; // Skip this tile if offscreen
       }
 
-      // Get the image of the relevant icon
-      
+      // draw ground item assuming it is loaded into memory
+      ctx.drawImage(assetsToRender["ground"], drawX, drawY, tileW, tileW);
 
-      // Check if there's an overlay on this tile -  we this to render the items
-      const overlay = this.overlays.find((o) => o.i === i && o.j === j);
-      if (overlay && overlayImg.complete) {
-        ctx.drawImage(overlayImg, drawX, drawY - tileH, tileW, tileW);
-
-
-        // Optional: draw tooltip or label above
-        const tooltipWidth = 70;
-        const tooltipHeight = 20;
-        const tooltipX = drawX + tileW / 2 - tooltipWidth / 2;
-        const tooltipY = drawY - tileH - 10;
-
-        this.drawSpeechBubble(
-          ctx,
-          overlay.label || overlay.kind,
-          tooltipX,
-          tooltipY,
-          tooltipWidth,
-          tooltipHeight
+      // Check if there's an overlay on this tile - we use this to render the items
+      const overlay = this.overlayMap.get(`${i},${j}`);
+      if (overlay) {
+        ctx.drawImage(
+          assetsToRender["block"],
+          drawX,
+          drawY - tileH,
+          tileW,
+          tileW
         );
+
+        // Store this overlay’s render position for interaction
+        this.renderedOverlays.set(`${i},${j}`, {
+          overlay,
+          x: drawX,
+          y: drawY - tileH,
+          width: tileW,
+          height: tileW,
+        });
+
+        // draw selection outline if this is the selected overlay
+        if (this.selectedOverlayKey === `${i},${j}`) {
+          ctx.strokeStyle = "yellow";
+          ctx.lineWidth = 2;
+          ctx.strokeRect(drawX, drawY - tileH, tileW, tileW);
+
+          // draw tooltip or label above on click
+          const tooltipWidth = 70;
+          const tooltipHeight = 20;
+          const tooltipX = drawX + tileW / 2 - tooltipWidth / 2;
+          const tooltipY = drawY - tileH - 10;
+
+          this.drawSpeechBubble(
+            ctx,
+            overlay.label || overlay.kind,
+            tooltipX,
+            tooltipY,
+            tooltipWidth,
+            tooltipHeight
+          );
+        }
       }
     }
   },
@@ -196,7 +255,6 @@ export default {
    * @param {number} height - The height of the bubble.
    * @param {number} [radius=6] - The corner radius for the rounded rectangle.
    */
-
   drawSpeechBubble(ctx, text, x, y, width, height, radius = 3) {
     // Draw the rounded rectangle
     ctx.beginPath();
@@ -224,5 +282,36 @@ export default {
     ctx.textBaseline = "middle";
     ctx.textAlign = "center";
     ctx.fillText(text, x + width / 2, y + height / 2);
+  },
+
+  /**
+   * Initialize the assets that we want to have prepared in memory for renderer usage
+   */
+  async initAssets() {
+    const result = {};
+    return Promise.all(
+      ASSETS.map((asset) => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.src = `../images/${asset}.png`;
+          img.onload = () => {
+            result[asset] = img;
+            resolve();
+          };
+        });
+      })
+    ).then(() => result);
+  },
+
+  /**
+   * Process click events back to the server
+   */
+  processInteraction() {
+    if (!this.selectedOverlayKey) return;
+
+    const overlay = this.overlayMap.get(this.selectedOverlayKey);
+    if (!overlay) return;
+
+    this.pushEvent("overlay_selected", overlay);
   },
 };
