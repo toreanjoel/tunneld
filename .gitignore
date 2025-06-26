@@ -39,3 +39,6 @@ npm-debug.log
 
 # The data folder that needs to be generated
 /data/*.json
+
+# other
+.DS_Store

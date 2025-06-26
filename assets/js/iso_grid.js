@@ -2,7 +2,7 @@
  * IsoGrid LiveView Hook
  *
  * Renders a fixed-scale isometric grid using a single 64×64 sprite
- * (visible diamond = 64×32), centered on-screen, with click-drag
+ * (visible diamond = 128x64), centered on-screen, with click-drag
  * panning, diamond-based hover detection, and an entry animation.
  */
 export default {
@@ -30,7 +30,7 @@ export default {
     // This needs to be dynamic from a matrix list maybe?
     // load base ground sprite
     this.groundImg = new Image();
-    this.groundImg.src = "../images/blockdetail.png";
+    this.groundImg.src = "../images/ground_three.png";
     this.groundImg.onload = () => this.draw();
 
     // We need to layer the icons on another matrix list that gets looped over on top of this?
@@ -127,7 +127,7 @@ export default {
     // We need to make sure we account position based off offset so we move it when we click and drag
     const gridX = cw * 0.5 + offsetX
     // We make sure the canvas height half minus the half of the full cluster of cubes to center vertically
-    const gridY = ch * 0.5 - gridH * gridW / 2 + offsetY
+    const gridY = ch * 0.5 - gridH * gridW / 4 + offsetY
 
     // Take the data that we use to represent tiles information and loop through everything to render
     for (const { i, j } of this.computeTileDepths()) {
@@ -143,6 +143,9 @@ export default {
       if (groundImg.complete) {
         ctx.drawImage(groundImg, drawX, drawY, tileW, tileW);
       }
+
+      // Get the image of the relevant icon
+      
 
       // Check if there's an overlay on this tile -  we this to render the items
       const overlay = this.overlays.find((o) => o.i === i && o.j === j);

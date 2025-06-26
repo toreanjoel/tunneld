@@ -13,58 +13,52 @@ defmodule TunneldWeb.Live.IsoGrid do
       %{id: "svc3", type: :dhcpcd}
     ],
     devices: [
-      %{
-        id: "dev-1",
-        type: :device,
-        artifacts: [
-          %{id: "dev0_app1"},
-          %{id: "dev0_app2"},
-          %{id: "dev0_app1"},
-          %{id: "dev0_app2"}
-        ]
-      },
-      %{
-        id: "dev0",
-        type: :device,
-        artifacts: [%{id: "dev0_app1"}]
-      },
+      # %{
+      #   id: "dev-1",
+      #   type: :device,
+      #   artifacts: [
+      #     %{id: "dev0_app1"},
+      #     %{id: "dev0_app2"},
+      #     %{id: "dev0_app1"},
+      #     %{id: "dev0_app2"}
+      #   ]
+      # },
       %{
         id: "dev0",
         type: :device,
         artifacts: [%{id: "dev0_app1"}]
       },
-      %{
-        id: "dev0",
-        type: :device,
-        artifacts: [%{id: "dev0_app1"}]
-      },
-      %{
-        id: "dev0",
-        type: :device,
-        artifacts: [%{id: "dev0_app1"}]
-      },
-      %{
-        id: "dev0",
-        type: :device,
-        artifacts: [%{id: "dev0_app1"}, %{id: "dev0_app2"}]
-      },
-      %{
-        id: "dev0",
-        type: :device,
-        artifacts: [
-          %{id: "dev0_app1"},
-          %{id: "dev0_app2"},
-          %{id: "dev0_app1"},
-          %{id: "dev0_app2"},
-          %{id: "dev0_app2"},
-          %{id: "dev0_app2"},
-          %{id: "dev0_app2"},
-          %{id: "dev0_app2"},
-          %{id: "dev0_app1"},
-          %{id: "dev0_app1"},
-          %{id: "dev0_app2"}
-        ]
-      },
+      # %{
+      #   id: "dev0",
+      #   type: :device,
+      #   artifacts: [%{id: "dev0_app1"}]
+      # },
+      # %{
+      #   id: "dev0",
+      #   type: :device,
+      #   artifacts: [%{id: "dev0_app1"}]
+      # },
+      # %{
+      #   id: "dev0",
+      #   type: :device,
+      #   artifacts: [%{id: "dev0_app1"}]
+      # },
+      # %{
+      #   id: "dev0",
+      #   type: :device,
+      #   artifacts: [%{id: "dev0_app1"}, %{id: "dev0_app2"}]
+      # },
+      # %{
+      #   id: "dev0",
+      #   type: :device,
+      #   artifacts: [
+      #     %{id: "dev0_app1"},
+      #     %{id: "dev0_app2"},
+      #     %{id: "dev0_app1"},
+      #     %{id: "dev0_app1"},
+      #     %{id: "dev0_app2"}
+      #   ]
+      # },
       # %{
       #   id: "dev0",
       #   type: :device,
@@ -74,8 +68,8 @@ defmodule TunneldWeb.Live.IsoGrid do
   }
 
   # Constants
-  @tile_w 64
-  @tile_h 32
+  @tile_w 128
+  @tile_h 64
   @horizontal_spacing 1
   @vertical_spacing 1
   @padding 3
