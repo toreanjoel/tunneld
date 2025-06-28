@@ -27,20 +27,17 @@ end
 
 # Get the set gateway address
 if System.get_env("GATEWAY") do
-  config :tunneld, :network,
-    gateway: System.get_env("GATEWAY")
+  config :tunneld, :network, gateway: System.get_env("GATEWAY")
 end
 
 # Set the upstream internet wireless interface
 if System.get_env("WIFI_INTERFACE") do
-  config :tunneld, :network,
-    wlan: System.get_env("WIFI_INTERFACE")
+  config :tunneld, :network, wlan: System.get_env("WIFI_INTERFACE")
 end
 
 # Set the downstream interface for internet passthrough
 if System.get_env("LAN_INTERFACE") do
-  config :tunneld, :network,
-    eth: System.get_env("LAN_INTERFACE")
+  config :tunneld, :network, eth: System.get_env("LAN_INTERFACE")
 end
 
 # Set env configs for CF
@@ -70,12 +67,11 @@ if config_env() == :prod do
 
   config :tunneld, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
+  gateway_origin = System.get_env("GATEWAY", "")
+  cf_domain = System.get_env("CF_DOMAIN")
+
   # We make sure if a domain is added or there is a tunnel made for a CF domain, the system supports
-  check_origins =
-    case System.get_env("CF_DOMAIN") do
-      nil -> [System.get_env("GATEWAY"), "http://localhost"]
-      domain -> [System.get_env("GATEWAY"), "http://localhost", "https://#{domain}"]
-    end
+  check_origins = ["http://#{gateway_origin}", "http://localhost", "https://#{cf_domain}"]
 
   config :tunneld, TunneldWeb.Endpoint,
     url: [host: host, port: 80, scheme: "http"],
