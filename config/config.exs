@@ -15,7 +15,7 @@ config :tunneld, TunneldWeb.Endpoint,
   url: [host: "localhost"],
   adapter: Bandit.PhoenixAdapter,
   render_errors: [
-    formats: [json: TunneldWeb.ErrorJSON],
+    formats: [html: TunneldWeb.ErrorHTML, json: TunneldWeb.ErrorJSON],
     layout: false
   ],
   pubsub_server: Tunneld.PubSub,
