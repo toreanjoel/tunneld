@@ -1,7 +1,7 @@
-import { initAssets } from "./nework_core/";
-import { draw, depthOrder, resizeCanvas } from "./nework_core/renderer.js";
-import { loop } from "./nework_core/animations.js";
-import { bindPointerEvents } from "./nework_core/pointerEvents.js";
+import { initAssets } from "./network_core/assetsLoader.js";
+import { draw, depthOrder, resizeCanvas } from "./network_core/renderer.js";
+import { loop } from "./network_core/animations.js";
+import { bindPointerEvents } from "./network_core/pointerEvents.js";
 
 export default {
   async mounted() {

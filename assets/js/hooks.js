@@ -1,4 +1,4 @@
-import IsoGrid from "./iso_grid"
+import NetworkDiagram from "./network_diagram"
 
 // Base hooks
 let Hooks = {};
@@ -37,5 +37,5 @@ Hooks.CopyToClipboard = {
 
 export default {
   ...Hooks,
-  IsoGrid
+  NetworkDiagram
 };
