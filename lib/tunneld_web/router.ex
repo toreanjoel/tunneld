@@ -23,15 +23,8 @@ defmodule TunneldWeb.Router do
     pipe_through [:browser, :set_ip]
 
     live "/", Live.Login
-    live "/network_diagram", Live.NetworkDiagram
+    # live "/network_diagram", Live.NetworkDiagram
     live "/dashboard", Live.Dashboard
-  end
-
-  # controller to manage the file downloads
-  scope "/files", TunneldWeb do
-    pipe_through [:browser]
-
-    get "/download/:name", Controllers.FileDownloadController, :download
   end
 
   if Application.compile_env(:tunneld, :dev_routes) do

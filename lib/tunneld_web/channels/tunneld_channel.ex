@@ -103,7 +103,7 @@ defmodule TunneldWeb.TunneldChannel do
     HTTPoison.post(
       "http://#{payload.ip}:#{payload.port}#{payload.path}",
       Jason.encode!(payload.data || %{}),
-      [Accept: "Application/json"],
+      [{"Accept", "Application/json"}, {"Content-Type", "application/json"}],
       recv_timeout: 30_000
     )
   end
@@ -111,7 +111,7 @@ defmodule TunneldWeb.TunneldChannel do
   defp http_request("get", payload) do
     HTTPoison.get(
       "http://#{payload.ip}:#{payload.port}#{payload.path}",
-      [Accept: "Application/json"],
+      [{"Accept", "Application/json"}, {"Content-Type", "application/json"}],
       recv_timeout: 30_000
     )
   end

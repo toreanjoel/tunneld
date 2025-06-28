@@ -1,10 +1,15 @@
 defmodule TunneldWeb.ErrorJSON do
-  @doc "Rendered on 404 errors"
+  @moduledoc """
+  The error pages that we will be used when there is issues on the request
+  This does require updates for responses
+  """
+
+  # "Rendered on 404 errors"
   def render("404.json", _assigns) do
     %{errors: %{detail: "Not Found"}}
   end
 
-  @doc "Rendered on 500 errors"
+  # "Rendered on 500 errors"
   def render("500.json", _assigns) do
     %{errors: %{detail: "Internal Server Error"}}
   end
