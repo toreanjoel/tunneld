@@ -22,7 +22,7 @@ defmodule TunneldWeb.Live.Components.Modal do
   def content_type(assigns, :default) do
     ~H"""
     <div class="fixed inset-0 bg-secondary bg-opacity-80 flex items-center justify-center">
-      <div class="bg-primary rounded-md p-6 max-w-[500px] lg:w-1/3 relative">
+      <div class="bg-primary rounded-md p-6 max-w-[500px] lg:w-1/3 relative z-20">
         <%!-- closing the modal --%>
         <div phx-click="modal_close" class="absolute top-[0px] right-[0px] p-3 cursor-pointer">
           <.icon name="hero-x-mark-solid" class="h-5 w-5" />

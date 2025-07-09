@@ -45,7 +45,7 @@ defmodule TunneldWeb.Live.Dashboard do
       |> assign(
         sidebar: %{
           is_open: false,
-          view: :system_overview
+          view: nil
         }
       )
       |> assign(
@@ -71,8 +71,11 @@ defmodule TunneldWeb.Live.Dashboard do
     <div class="relative flex flex-row flex-1 h-screen text-white bg-primary">
       <!-- Flexible middle column -->
       <%= main(assigns) %>
+      <%= if @sidebar.is_open do %>
+        <div class="fixed inset-0 bg-black bg-opacity-50 z-2" phx-click="close_details" />
+      <% end %>
       <!-- Sidebar for more details -->
-      <%= sidebar(assigns) %>
+      <%= if not is_nil(@sidebar.view), do: sidebar(assigns) %>
       <%!-- Modal to render confirmations and show data --%>
 
       <.live_component
@@ -101,29 +104,26 @@ defmodule TunneldWeb.Live.Dashboard do
   #
   # ---- Views :: Components For Dashboard----
   #
-  @spec sidebar(%{:sidebar => %{is_open: boolean(), details: atom()}, optional(any()) => any()}) ::
+  @spec sidebar(%{:sidebar => %{is_open: boolean(), view: atom()}, optional(any()) => any()}) ::
           Phoenix.LiveView.Rendered.t()
   @doc """
-  The sidebar used for details around the selected conted
+  Overlay sidebar with close button and responsive width.
   """
   def sidebar(%{sidebar: sidebar} = assigns) do
     assigns = assign(assigns, :sidebar, sidebar)
 
     ~H"""
-    <!-- Right panel: always visible on medium+ screens -->
-    <div class="sticky inset-0 w-[30%] max-w-[600px] hidden lg:block rounded-lg system-scroll bg-secondary m-2">
+    <div
+      :if={@sidebar.is_open}
+      class="fixed top-0 right-0 z-40 h-screen w-screen lg:w-[30%] lg:max-w-[600px] bg-secondary system-scroll shadow-lg transition-transform duration-300 ease-in-out"
+    >
+      <button phx-click="close_details" class="absolute top-4 right-4">
+        <.icon class="w-5 h-5" name="hero-x-mark" />
+      </button>
+
       <div class="h-full">
-        <.live_component id="sidebar_details_desktop" module={SidebarDetails} view={@sidebar.view} />
-      </div>
-    </div>
-    <!-- Right panel for small screens when toggled -->
-    <div :if={@sidebar.is_open} class="fixed inset-0 bg-secondary lg:hidden z-1 system-scroll">
-      <div class="p-4 h-full">
-        <!-- Toggle button for small screens only -->
-        <button phx-click="close_details" class="lg:hiddeny p-2 m-2">
-          Close
-        </button>
-        <.live_component id="sidebar_details_mobile" module={SidebarDetails} view={@sidebar.view} />
+        <!-- pt-14 makes room for close button -->
+        <.live_component id="sidebar_details" module={SidebarDetails} view={@sidebar.view} />
       </div>
     </div>
     """
@@ -153,7 +153,7 @@ defmodule TunneldWeb.Live.Dashboard do
             phx-value-id="_"
             class={"#{if @status.internet, do: "bg-green", else: "bg-red"} flex flex-row gap-3 py-2 px-3 items-center rounded-md cursor-pointer"}
           >
-            <%!-- We need to use icon here --%> Internet Access
+            Internet Access
           </div>
 
           <%!-- General Settings --%>
@@ -191,8 +191,19 @@ defmodule TunneldWeb.Live.Dashboard do
           >
             <.icon name="hero-key" class="h-15 w-15" />
           </div>
+
+          <%!-- Auth Settings  --%>
+          <div
+            phx-click="show_details"
+            phx-value-type="authentication"
+            phx-value-id="_"
+            class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1"
+          >
+            <.icon name="hero-user" class="h-15 w-15" />
+          </div>
         </div>
       </div>
+
       <div class="flex flex-col mx-auto max-w-[1280px]">
         <%!-- Welcome section --%>
         <div>
@@ -263,6 +274,29 @@ defmodule TunneldWeb.Live.Dashboard do
     }
 
     {:noreply, assign(socket, :sidebar, sidebar)}
+  end
+
+  #
+  # Completed the WebAuthn registration
+  #
+  def handle_event("webauthn_register_complete", %{} = data, socket) do
+    case Tunneld.Servers.Auth.save_webauthn(data) do
+      :ok ->
+        socket = put_flash(socket, :info, "WebAuthn credential saved successfully")
+        {:noreply, socket}
+
+      {:error, reason} ->
+        Logger.error("Failed to save WebAuthn credential: #{inspect(reason)}")
+        socket = put_flash(socket, :error, "Failed to save WebAuthn credential")
+        {:noreply, socket}
+    end
+  end
+
+  #
+  # Error completing the WebAuthn registration
+  #
+  def handle_event("webauthn_register_error", %{"error" => err}, socket) do
+    {:noreply, socket |> put_flash(:error, err)}
   end
 
   #
@@ -368,6 +402,19 @@ defmodule TunneldWeb.Live.Dashboard do
 
       "scan_for_wireless_networks" ->
         send(self(), :scan_for_wireless_networks)
+
+      #
+      # WebAuthn configure
+      #
+      "configure_web_authn" ->
+        send(self(), :configure_web_authn)
+
+      #
+      # Revoke Login Credentials
+      #
+      "revoke_login_creds" ->
+        File.rm(Tunneld.Servers.Auth.path())
+        send(self(), :revoke_login_creds)
 
       #
       # Cloudflare
@@ -498,6 +545,39 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   #
+  # Trigger and send options for the webAuthn
+  #
+  def handle_info(:configure_web_authn, socket) do
+    challenge = :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
+    user_id = :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
+
+    public_key_options = %{
+      challenge: challenge,
+      rp: %{name: "Tunneld"},
+      user: %{
+        id: user_id,
+        name: "NAME",
+        displayName: "NAME"
+      },
+      pubKeyCredParams: [%{type: "public-key", alg: -7}],
+      timeout: 60000,
+      attestation: "none"
+    }
+
+    {:noreply,
+     push_event(socket, "start_webauthn", %{
+       publicKeyOptions: public_key_options
+     })}
+  end
+
+  #
+  # Revoke the login credentials
+  #
+  def handle_info(:revoke_login_creds, socket) do
+    {:noreply, put_flash(socket, :info, "Auth reset. Next login will require a new password to be setup")}
+  end
+
+  #
   # Show details - server request
   # NOTE: we have a function to do this client side but this is a listener for the server
   #
@@ -514,21 +594,21 @@ defmodule TunneldWeb.Live.Dashboard do
   # Get the sidebar details that is used for client and server sider trigger render
   #
   defp get_sidebar_details(type, id) do
-      case type do
-        "artifact" ->
-          Tunneld.Servers.Artifacts.get_artifact(id)
-          :artifact
+    case type do
+      "artifact" ->
+        Tunneld.Servers.Artifacts.get_artifact(id)
+        :artifact
 
-        "service" ->
-          Tunneld.Servers.Services.get_service_logs(id)
-          :service
+      "service" ->
+        Tunneld.Servers.Services.get_service_logs(id)
+        :service
 
-        "wlan" ->
-          Tunneld.Servers.Wlan.scan_networks()
-          :wlan
+      "wlan" ->
+        Tunneld.Servers.Wlan.scan_networks()
+        :wlan
 
-        _ ->
-          :system_overview
-      end
+      "authentication" ->
+        :authentication
+    end
   end
 end

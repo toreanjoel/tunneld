@@ -1,4 +1,5 @@
 import NetworkDiagram from "./network_diagram"
+import Auth from "./auth.js"
 
 // Base hooks
 let Hooks = {};
@@ -37,5 +38,6 @@ Hooks.CopyToClipboard = {
 
 export default {
   ...Hooks,
+  Auth,
   NetworkDiagram
 };

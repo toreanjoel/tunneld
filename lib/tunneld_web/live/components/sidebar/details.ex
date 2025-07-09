@@ -35,13 +35,62 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     """
   end
 
+  @spec render(%{:view => :authentication, optional(any()) => any()}) ::
+          Phoenix.LiveView.Rendered.t()
+  def render(%{view: :authentication} = assigns) do
+    ~H"""
+    <div class="bg-secondary p-2 h-full" id="auth" phx-hook="Auth">
+      <%!-- Sidebar header that will house metadat?  --%>
+      <%= sidebar_header(assigns, %{
+        header: "Authentication",
+        body: "Authentication options to access the application dashboard"
+      }) %>
+
+      <div class="flex flex-row gap-1 justify-end my-2">
+        <%!-- Actions to take --%>
+        <div
+          phx-click="modal_open"
+          phx-value-modal_title="Reset Login?"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "string",
+              "data" =>
+                "This will reset your login details. New details will be prompted for and required on your next login"
+            })
+          }
+          phx-value-modal_actions={
+            Jason.encode!(%{
+              "title" => "Reset",
+              "payload" => %{
+                "type" => "revoke_login_creds",
+                "data" => %{}
+              }
+            })
+          }
+          class="flex grow items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
+        >
+          <.icon name="hero-no-symbol" class="h-5 w-5" />
+          <div class="truncate text-xs">Reset Login</div>
+        </div>
+
+        <div
+          phx-click="trigger_action"
+          phx-value-action="configure_web_authn"
+          phx-value-data={Jason.encode!(%{})}
+          class="flex grow items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
+        >
+          <.icon name="hero-finger-print" class="h-5 w-5" />
+          <div class="truncate text-xs">WebAuthn</div>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
   @spec render(%{:view => :artifact, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :artifact} = assigns) do
     data = Map.get(assigns, :data)
-
-    assigns =
-      assigns
-      |> assign(has_data: !Enum.empty?(data))
+    assigns = assigns |> assign(has_data: !Enum.empty?(data))
 
     ~H"""
     <div class="bg-secondary p-2 h-full">
@@ -159,9 +208,10 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                 Jason.encode!(%{
                   "type" => "schema",
                   "data" => Tunneld.Schema.PrivateNet.data(:settings),
-                  "default_values" => Map.merge(data.tunneld, %{
-                    "id" => data.id,
-                  }),
+                  "default_values" =>
+                    Map.merge(data.tunneld, %{
+                      "id" => data.id
+                    }),
                   "action" => "tunneld_settings"
                 })
               }
