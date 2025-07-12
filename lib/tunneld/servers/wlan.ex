@@ -99,17 +99,7 @@ defmodule Tunneld.Servers.Wlan do
       # Broadcast to the live view (or parent) so it can update the Devices component.
       # Use an id that matches the one used in your live_component render.
       Phoenix.PubSub.broadcast(Tunneld.PubSub, "component:details", %{
-        id: "sidebar_details_desktop",
-        module: TunneldWeb.Live.Components.Sidebar.Details,
-        data: %{
-          networks: networks,
-          info: parse_wpa_status(status_output)
-        }
-      })
-
-      # Broadcast to sidebar details for mobile:
-      Phoenix.PubSub.broadcast(Tunneld.PubSub, "component:details", %{
-        id: "sidebar_details_mobile",
+        id: "sidebar_details",
         module: TunneldWeb.Live.Components.Sidebar.Details,
         data: %{
           networks: networks,

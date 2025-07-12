@@ -48,16 +48,7 @@ defmodule Tunneld.Servers.Services do
 
       # Broadcast to sidebar details for desktop:
       Phoenix.PubSub.broadcast(Tunneld.PubSub, "component:details", %{
-        id: "sidebar_details_desktop",
-        module: TunneldWeb.Live.Components.Sidebar.Details,
-        data: %{
-          logs: data
-        }
-      })
-
-      # Broadcast to sidebar details for mobile:
-      Phoenix.PubSub.broadcast(Tunneld.PubSub, "component:details", %{
-        id: "sidebar_details_mobile",
+        id: "sidebar_details",
         module: TunneldWeb.Live.Components.Sidebar.Details,
         data: %{
           logs: data

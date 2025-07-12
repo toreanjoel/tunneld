@@ -9,8 +9,7 @@ defmodule Tunneld.Servers.Artifacts do
 
   @broadcast_topic_main "component:artifacts"
   @broadcast_topic "component:details"
-  @component_desktop_id "sidebar_details_desktop"
-  @component_mobile_id "sidebar_details_mobile"
+  @component_desktop_id "sidebar_details"
   @component_module TunneldWeb.Live.Components.Sidebar.Details
 
   def start_link(_) do
@@ -143,13 +142,6 @@ defmodule Tunneld.Servers.Artifacts do
       # Broadcast the new data structure for the sidebar component - desktop
       Phoenix.PubSub.broadcast(Tunneld.PubSub, @broadcast_topic, %{
         id: @component_desktop_id,
-        module: @component_module,
-        data: artifact
-      })
-
-      # Broadcast the new data structure for the sidebar component - mobile
-      Phoenix.PubSub.broadcast(Tunneld.PubSub, @broadcast_topic, %{
-        id: @component_mobile_id,
         module: @component_module,
         data: artifact
       })

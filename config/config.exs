@@ -83,7 +83,7 @@ config :tunneld, :network,
 config :tunneld, :ttyd,
   port: "7681"
 
-config :tunneld, version: "0.2.0"
+config :tunneld, version: "0.2.1"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
