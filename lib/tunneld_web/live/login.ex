@@ -21,7 +21,6 @@ defmodule TunneldWeb.Live.Login do
     uri_info = get_connect_info(socket, :uri)
     host = uri_info && URI.parse(uri_info) |> Map.get(:host)
     gateway_domain = System.get_env("CF_DOMAIN") || "tunneld.local"
-    gateway_ip = Application.get_env(:tunneld, :network)[:gateway]
 
     has_webauthn? = Tunneld.Servers.Auth.has_webauthn?()
     connected_via_gateway_domain = host == gateway_domain
@@ -42,7 +41,7 @@ defmodule TunneldWeb.Live.Login do
       |> assign(:loading, false)
       |> assign(:ip, ip)
       |> assign(:type, type)
-      |> assign(:info_content, gateway_ip)
+      |> assign(:info_content, "👋 Hello")
       |> assign(:show_form, show_form)
       |> assign(:show_webauthn, show_webauthn)
 
