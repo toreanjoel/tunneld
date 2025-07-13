@@ -90,6 +90,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         <%!-- We have the option to generate --%>
         <div
           :if={@web_authn}
+          phx-click="trigger_action"
           phx-value-action="configure_web_authn"
           phx-value-data={Jason.encode!(%{})}
           class="flex grow items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md w-1/2"

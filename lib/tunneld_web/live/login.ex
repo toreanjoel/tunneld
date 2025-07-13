@@ -19,21 +19,12 @@ defmodule TunneldWeb.Live.Login do
     end
 
     type = if Tunneld.Servers.Auth.file_exists?(), do: :login, else: :signup
-
-    # Check the scheme and domain to make sure it is possible to show
-    # Turn to a helper?
-    uri_info = get_connect_info(socket, :uri)
-    correct_domain? = uri_info && URI.parse(uri_info) |> Map.get(:host) == System.get_env("CF_DOMAIN")
-    https? = uri_info && URI.parse(uri_info) |> Map.get(:scheme) == "https"
-    allow_webauthn? = correct_domain? and https?
-
     socket =
       socket
       |> assign(:loading, false)
       |> assign(:ip, ip)
       |> assign(:type, type)
       |> assign(:info_content, Application.get_env(:tunneld, :network)[:gateway])
-      |> assign(:allow_webauthn?, allow_webauthn?)
 
     {:ok, socket}
   end
@@ -95,7 +86,8 @@ defmodule TunneldWeb.Live.Login do
           />
         </div>
         <div class="py-2" />
-        <div :if={@allow_webauthn?} class="mt-4 text-center flex flex-col text-gray-500">
+        <%!-- We need to only show the option for this auth if the artifact for the gateway is exposed? --%>
+        <div class="mt-4 text-center flex flex-col text-gray-500">
           <button phx-click="trigger_webauthn_login">
             <.icon name="hero-finger-print" class="h-14 w-14" />
           </button>

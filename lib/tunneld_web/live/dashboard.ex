@@ -37,14 +37,11 @@ defmodule TunneldWeb.Live.Dashboard do
     correct_domain? =
       uri_info && URI.parse(uri_info) |> Map.get(:host) == System.get_env("CF_DOMAIN")
 
-    https? = uri_info && URI.parse(uri_info) |> Map.get(:scheme) == "https"
-    allow_webauthn? = correct_domain? and https?
-
     socket =
       socket
       |> assign(:ip, ip)
       |> assign(:uri_info, uri_info)
-      |> assign(:allow_webauthn?, allow_webauthn?)
+      |> assign(:allow_webauthn?, correct_domain?)
       |> assign(
         modal: %{
           show: false,
@@ -545,8 +542,8 @@ defmodule TunneldWeb.Live.Dashboard do
       rp: %{name: "Tunneld"},
       user: %{
         id: user_id,
-        name: "NAME",
-        displayName: "NAME"
+        name: "Tunneld Gateway",
+        displayName: "Tunneld Gateway"
       },
       pubKeyCredParams: [%{type: "public-key", alg: -7}],
       timeout: 60000,
