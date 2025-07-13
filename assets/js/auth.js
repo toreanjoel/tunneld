@@ -58,7 +58,7 @@ export default {
           },
         });
       } catch (err) {
-        this.pushEvent("webauthn_login_error", { error: err.message });
+        this.pushEvent("webauthn_login_error", { error: "There was a error. Please contact the administrator." });
       }
     });
 
@@ -99,7 +99,7 @@ export default {
           },
         });
       } catch (err) {
-        this.pushEvent("webauthn_register_error", { error: err.message });
+        this.pushEvent("webauthn_register_error", { error: "There was a error. Please contact the administrator." });
       }
     });
   },

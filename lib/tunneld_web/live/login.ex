@@ -18,13 +18,33 @@ defmodule TunneldWeb.Live.Login do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "modal:form:action")
     end
 
-    type = if Tunneld.Servers.Auth.file_exists?(), do: :login, else: :signup
+    uri_info = get_connect_info(socket, :uri)
+    host = uri_info && URI.parse(uri_info) |> Map.get(:host)
+    gateway_domain = System.get_env("CF_DOMAIN") || "tunneld.local"
+    gateway_ip = Application.get_env(:tunneld, :network)[:gateway]
+
+    has_webauthn? = Tunneld.Servers.Auth.has_webauthn?()
+    connected_via_gateway_domain = host == gateway_domain
+
+    # Fix: Don't crash if any value is nil
+    show_form = not has_webauthn? or not connected_via_gateway_domain
+    show_webauthn = has_webauthn? and connected_via_gateway_domain
+
+    type =
+      if Tunneld.Servers.Auth.file_exists?() do
+        :login
+      else
+        :signup
+      end
+
     socket =
       socket
       |> assign(:loading, false)
       |> assign(:ip, ip)
       |> assign(:type, type)
-      |> assign(:info_content, Application.get_env(:tunneld, :network)[:gateway])
+      |> assign(:info_content, gateway_ip)
+      |> assign(:show_form, show_form)
+      |> assign(:show_webauthn, show_webauthn)
 
     {:ok, socket}
   end
@@ -63,7 +83,7 @@ defmodule TunneldWeb.Live.Login do
       </div>
 
       <div class="lg:w-2/5 w-full flex flex-col items-center justify-center p-8">
-        <div :if={@type === :login} class="w-full max-w-sm">
+        <div :if={@show_form and @type === :login} class="w-full max-w-sm">
           <h1 class="text-3xl text-white font-bold mb-4 text-center">Login</h1>
           <!-- Login Form -->
           <.live_component
@@ -74,7 +94,7 @@ defmodule TunneldWeb.Live.Login do
             action="login"
           />
         </div>
-        <div :if={@type === :signup} class="w-full max-w-sm">
+        <div :if={@show_form and @type === :signup} class="w-full max-w-sm">
           <h1 class="text-3xl text-white font-bold mb-4 text-center">Register</h1>
           <!-- signup Form -->
           <.live_component
@@ -87,10 +107,14 @@ defmodule TunneldWeb.Live.Login do
         </div>
         <div class="py-2" />
         <%!-- We need to only show the option for this auth if the artifact for the gateway is exposed? --%>
-        <div class="mt-4 text-center flex flex-col text-gray-500">
+        <div :if={@show_webauthn} class="mt-4 text-center flex flex-col text-gray-500 gap-2">
+          <h1 class="text-lg text-white font-bold mb-4 text-center">Login (WebAuthn)</h1>
           <button phx-click="trigger_webauthn_login">
             <.icon name="hero-finger-print" class="h-14 w-14" />
           </button>
+          <div class="text-sm text-gray-1">
+            Authorized device access
+          </div>
         </div>
       </div>
     </div>

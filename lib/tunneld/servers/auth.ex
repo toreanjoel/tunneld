@@ -40,7 +40,7 @@ defmodule Tunneld.Servers.Auth do
   """
   def create_file(u, p) do
     case path()
-         |> File.write(Jason.encode!(%{"user" => u, "pass" => Bcrypt.hash_pwd_salt(p)})) do
+         |> File.write(Jason.encode!(%{"user" => u, "pass" => Bcrypt.hash_pwd_salt(p), "hide_login" => false})) do
       :ok ->
         {:ok, "Auth file created"}
 
@@ -77,6 +77,18 @@ defmodule Tunneld.Servers.Auth do
 
       error ->
         error
+    end
+  end
+
+  @doc """
+  Check if the user has setup webauthn
+  """
+  def has_webauthn?() do
+    case read_file() do
+      {:ok, data} ->
+        Map.has_key?(data, "webauthn")
+      _error ->
+        false
     end
   end
 
