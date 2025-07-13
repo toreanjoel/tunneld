@@ -30,9 +30,21 @@ defmodule TunneldWeb.Live.Dashboard do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "status:internet")
     end
 
+    # Check the scheme and domain to make sure it is possible to show
+    # Turn to a helper?
+    uri_info = get_connect_info(socket, :uri)
+
+    correct_domain? =
+      uri_info && URI.parse(uri_info) |> Map.get(:host) == System.get_env("CF_DOMAIN")
+
+    https? = uri_info && URI.parse(uri_info) |> Map.get(:scheme) == "https"
+    allow_webauthn? = correct_domain? and https?
+
     socket =
       socket
       |> assign(:ip, ip)
+      |> assign(:uri_info, uri_info)
+      |> assign(:allow_webauthn?, allow_webauthn?)
       |> assign(
         modal: %{
           show: false,
@@ -93,13 +105,21 @@ defmodule TunneldWeb.Live.Dashboard do
   #
   # ---- Views :: Components For Dashboard----
   #
-  @spec sidebar(%{:sidebar => %{is_open: boolean(), view: atom()}, optional(any()) => any()}) ::
+  @spec sidebar(%{
+          :allow_webauthn? => boolean(),
+          :sidebar => %{is_open: boolean(), view: atom()},
+          optional(any()) => any()
+        }) ::
           Phoenix.LiveView.Rendered.t()
   @doc """
   Overlay sidebar with close button and responsive width.
   """
-  def sidebar(%{sidebar: sidebar} = assigns) do
-    assigns = assign(assigns, :sidebar, sidebar)
+  def sidebar(%{sidebar: sidebar, allow_webauthn?: allow_webauthn?, uri_info: uri_info} = assigns) do
+    assigns =
+      assigns
+      |> assign(:sidebar, sidebar)
+      |> assign(:uri_info, uri_info)
+      |> assign(:allow_webauthn?, allow_webauthn?)
 
     ~H"""
     <div
@@ -112,7 +132,13 @@ defmodule TunneldWeb.Live.Dashboard do
 
       <div class="h-full">
         <!-- pt-14 makes room for close button -->
-        <.live_component id="sidebar_details" module={SidebarDetails} view={@sidebar.view} />
+        <.live_component
+          id="sidebar_details"
+          module={SidebarDetails}
+          view={@sidebar.view}
+          uri_info={@uri_info}
+          web_authn={@allow_webauthn?}
+        />
       </div>
     </div>
     """
@@ -537,7 +563,8 @@ defmodule TunneldWeb.Live.Dashboard do
   # Revoke the login credentials
   #
   def handle_info(:revoke_login_creds, socket) do
-    {:noreply, put_flash(socket, :info, "Auth reset. Next login will require a new password to be setup")}
+    {:noreply,
+     put_flash(socket, :info, "Auth reset. Next login will require a new password to be setup")}
   end
 
   #

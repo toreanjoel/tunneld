@@ -18,18 +18,23 @@ defmodule TunneldWeb.Live.Login do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "modal:form:action")
     end
 
-    # TODO: check the password file exists or show a form to create
-    # Update the info content here
     type = if Tunneld.Servers.Auth.file_exists?(), do: :login, else: :signup
+
+    # Check the scheme and domain to make sure it is possible to show
+    # Turn to a helper?
+    uri_info = get_connect_info(socket, :uri)
+    correct_domain? = uri_info && URI.parse(uri_info) |> Map.get(:host) == System.get_env("CF_DOMAIN")
+    https? = uri_info && URI.parse(uri_info) |> Map.get(:scheme) == "https"
+    allow_webauthn? = correct_domain? and https?
 
     socket =
       socket
       |> assign(:loading, false)
       |> assign(:ip, ip)
       |> assign(:type, type)
-      |> assign(:info_content, Application.get_env(:tunneld, :network)[:gateway] || nil)
+      |> assign(:info_content, Application.get_env(:tunneld, :network)[:gateway])
+      |> assign(:allow_webauthn?, allow_webauthn?)
 
-    # Assign the form to the socket
     {:ok, socket}
   end
 
@@ -59,6 +64,11 @@ defmodule TunneldWeb.Live.Login do
           </span>
           <h1 class="text-3xl font-bold my-4">tunneld.local</h1>
         </div>
+        <div class="text-sm text-gray-1">
+          <a href="https://github.com/toreanjoel/tunneld" target="_blank">
+            Made with ☕ | <span class="underline"> self-host your own tunneld instance </span>
+          </a>
+        </div>
       </div>
 
       <div class="lg:w-2/5 w-full flex flex-col items-center justify-center p-8">
@@ -85,7 +95,7 @@ defmodule TunneldWeb.Live.Login do
           />
         </div>
         <div class="py-2" />
-        <div class="mt-4 text-center flex flex-col text-gray-500">
+        <div :if={@allow_webauthn?} class="mt-4 text-center flex flex-col text-gray-500">
           <button phx-click="trigger_webauthn_login">
             <.icon name="hero-finger-print" class="h-14 w-14" />
           </button>

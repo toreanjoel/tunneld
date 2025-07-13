@@ -14,12 +14,14 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
   def update(assigns, socket) do
     view = Map.get(assigns, :view, socket.assigns[:view] || :system_overview)
-    new_data = Map.get(assigns, :data, %{})
+    web_authn = Map.get(assigns, :web_authn, socket.assigns[:web_authn] || false)
+    data = Map.get(assigns, :data, %{})
 
     socket =
       socket
-      |> assign(view: view)
-      |> assign(data: new_data)
+      |> assign(:view, view)
+      |> assign(:data, data)
+      |> assign(:web_authn, web_authn)
 
     {:ok, socket}
   end
@@ -37,13 +39,17 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
   @spec render(%{:view => :authentication, optional(any()) => any()}) ::
           Phoenix.LiveView.Rendered.t()
-  def render(%{view: :authentication} = assigns) do
+  def render(%{view: :authentication, web_authn: web_authn} = assigns) do
+    assigns = assign(assigns, :web_authn, web_authn)
+
     ~H"""
     <div class="bg-secondary p-2 h-full" id="auth" phx-hook="Auth">
       <%!-- Sidebar header that will house metadat?  --%>
       <%= sidebar_header(assigns, %{
         header: "Authentication",
-        body: "Authentication options to access the application dashboard"
+        body:
+          "Authentication options to access the application dashboard. WebAuthn (required) after you expose dashboard as an artifact.
+        This is needed in order to remotely access artifacts"
       }) %>
 
       <div class="flex flex-row gap-1 justify-end my-2">
@@ -67,17 +73,26 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               }
             })
           }
-          class="flex grow items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
+          class="flex grow items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md w-1/2"
         >
           <.icon name="hero-no-symbol" class="h-5 w-5" />
           <div class="truncate text-xs">Reset Login</div>
         </div>
 
+        <%!-- Not allowed if the scheme is not HTTPS and we dont have a domain --%>
         <div
-          phx-click="trigger_action"
+          :if={not @web_authn}
+          class="flex grow items-center justify-center gap-1 bg-gray-2 p-2 rounded-md w-1/2"
+        >
+          <.icon name="hero-finger-print" class="h-5 w-5" />
+          <div class="truncate text-xs">WebAuthn (disabled)</div>
+        </div>
+        <%!-- We have the option to generate --%>
+        <div
+          :if={@web_authn}
           phx-value-action="configure_web_authn"
           phx-value-data={Jason.encode!(%{})}
-          class="flex grow items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
+          class="flex grow items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md w-1/2"
         >
           <.icon name="hero-finger-print" class="h-5 w-5" />
           <div class="truncate text-xs">WebAuthn</div>
@@ -90,7 +105,11 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   @spec render(%{:view => :artifact, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :artifact} = assigns) do
     data = Map.get(assigns, :data)
-    assigns = assigns |> assign(has_data: !Enum.empty?(data))
+
+    assigns =
+      assigns
+      |> assign(has_data: !Enum.empty?(data))
+      |> assign(gateway: Application.get_env(:tunneld, :network)[:gateway])
 
     ~H"""
     <div class="bg-secondary p-2 h-full">
@@ -220,6 +239,13 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               <.icon name="hero-globe-alt" class="h-5 w-5" />
               <div class="truncate text-xs">Tunneld Settings</div>
             </div>
+          </div>
+
+          <div
+            :if={data.ip === Application.get_env(:tunneld, :network)[:gateway]}
+            class="text-xs border-2 border-solid rounded border-red p-2 text-red mt-3"
+          >
+            Note: It is highly recommended that you enable WebAuthn after exposing the gateway as a tunnel
           </div>
         </div>
       </div>

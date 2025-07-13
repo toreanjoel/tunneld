@@ -47,7 +47,7 @@ defmodule TunneldWeb.Live.Components.Artifacts do
               "action" => "add_artifact"
             })
           }
-          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1"
+          class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
         >
           <.icon class="w-6 h-6" name="hero-cpu-chip" />
           <div class="truncate text-xs">Add Artifact</div>
