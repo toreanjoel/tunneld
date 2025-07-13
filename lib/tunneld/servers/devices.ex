@@ -16,22 +16,6 @@ defmodule Tunneld.Servers.Devices do
   Init devices
   """
   def init(_) do
-    # We start the process locally on the host to make terminal accessible
-    if not Application.get_env(:tunneld, :mock_data, false) do
-      Task.start(fn ->
-        System.cmd(
-          "ttyd",
-          [
-            "-W",
-            "-p",
-            Application.get_env(:tunneld, :ttyd)[:port],
-            "bash"
-          ],
-          stderr_to_stdout: true
-        )
-      end)
-    end
-
     # Start the sync to listen for device connection changes
     send(self(), :sync)
     {:ok, %{}}

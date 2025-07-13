@@ -89,12 +89,6 @@ defmodule TunneldWeb.Live.NetworkDiagram do
   def handle_event("open_internet_settings", _params, socket),
     do: {:noreply, assign(socket, active_panel: :internet, selected_overlay: nil)}
 
-  @doc """
-  Open the Terminal panel.
-  """
-  def handle_event("open_terminal", _params, socket),
-    do: {:noreply, assign(socket, active_panel: :terminal, selected_overlay: nil)}
-
   @impl true
   @doc """
   Renders the LiveView. It includes:
@@ -125,12 +119,6 @@ defmodule TunneldWeb.Live.NetworkDiagram do
           class="px-3 py-1 bg-[#28283d] hover:bg-[#3a3a5c] text-[#e0e0ff] font-['Press_Start_2P'] text-[10px] uppercase tracking-widest"
         >
           Internet Settings
-        </button>
-        <button
-          phx-click="open_terminal"
-          class="px-3 py-1 bg-[#28283d] hover:bg-[#3a3a5c] text-[#e0e0ff] font-['Press_Start_2P'] text-[10px] uppercase tracking-widest"
-        >
-          Terminal
         </button>
       </div>
       <!-- Isometric canvas & loader -->
@@ -167,8 +155,6 @@ defmodule TunneldWeb.Live.NetworkDiagram do
                   NOTIFICATION SETTINGS
                 <% :internet -> %>
                   INTERNET SETTINGS
-                <% :terminal -> %>
-                  TERMINAL
               <% end %>
             </span>
             <button
@@ -196,8 +182,6 @@ defmodule TunneldWeb.Live.NetworkDiagram do
               <p>🔔 Choose which alerts you’d like to receive and how.</p>
             <% :internet -> %>
               <p>🌐 Set upstream/router preferences, DNS, and bandwidth limits.</p>
-            <% :terminal -> %>
-              <p>💻 Launch an embedded terminal session or SSH settings.</p>
           <% end %>
 
           <div class="flex-grow"></div>

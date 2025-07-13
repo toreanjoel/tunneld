@@ -79,11 +79,7 @@ config :tunneld, :network,
   mullvad: "wg0-mullvad",
   gateway: "10.0.0.1"
 
-# ttyd terminal session default port to handle the terminal session
-config :tunneld, :ttyd,
-  port: "7681"
-
-config :tunneld, version: "0.2.1"
+config :tunneld, version: "0.2.2"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

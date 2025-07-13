@@ -63,14 +63,15 @@ defmodule TunneldWeb.Live.Components.Devices do
             <div class="truncate text-xs">SSH Session</div>
           </div> --%>
 
+          <%!-- This is the button above the devices --%>
           <div
             phx-click="trigger_action"
-            phx-value-action="open_terminal"
+            phx-value-action="open_node_connect"
             phx-value-data={Jason.encode!(%{})}
             class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
           >
             <.icon class="w-4 h-4" name="hero-command-line" />
-            <div class="truncate text-xs">Terminal</div>
+            <div class="truncate text-xs">Connect to Node</div>
           </div>
         </div>
       </div>

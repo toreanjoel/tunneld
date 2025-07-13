@@ -86,17 +86,6 @@ defmodule TunneldWeb.Live.Dashboard do
         body={@modal.body}
         actions={@modal.actions}
       />
-
-      <%!-- Modal to render confirmations and show data --%>
-      <.live_component
-        :if={@modal.show && @modal.type === :terminal_session}
-        module={Modal}
-        id="generic_modal"
-        title={@modal.title}
-        body={@modal.body}
-        actions={@modal.actions}
-        type={:terminal_session}
-      />
     </div>
     """
   end
@@ -457,14 +446,6 @@ defmodule TunneldWeb.Live.Dashboard do
       "tunneld_settings" ->
         Tunneld.Servers.Artifacts.update_artifact(data, :tunneld)
 
-      #
-      # Terminal Session
-      # --
-      # We trigger a message to the current live view to open a modal for rendering an iframe
-      #
-      "open_terminal" ->
-        send(self(), :terminal_session)
-
       _ ->
         Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
           type: :error,
@@ -503,24 +484,6 @@ defmodule TunneldWeb.Live.Dashboard do
       |> put_flash(:info, "Copied to clipboard!")
 
     {:noreply, socket}
-  end
-
-  #
-  # handle terminal session init
-  # This assumes ttyd is installed on the device
-  #
-  def handle_info(:terminal_session, socket) do
-    modal_data = %{
-      show: true,
-      title: "Terminal Session",
-      body: %{
-        "ip" => Application.get_env(:tunneld, :network)[:gateway],
-        "port" => Application.get_env(:tunneld, :ttyd)[:port]
-      },
-      type: :terminal_session
-    }
-
-    {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal_data))}
   end
 
   #

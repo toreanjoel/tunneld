@@ -23,9 +23,6 @@ Everything you need can be controlled through the tunneld dashboard
 - Integrates DNS-over-HTTPS (DoH) to block ads, tracking domains, and fingerprinting 
 - Ensures all DNS queries are filtered and resolved securely
 
-### 🛠 Built-in Web Terminal
-Includes a web-accessible terminal within the Tunneld UI, allowing local shell access directly from the browser — ideal for managing services, debugging, or extending functionality on the fly.
-
 ### 📡 Local & Remote Artifact Monitoring
 Tunneld monitors active services (e.g., dnsmasq, hostapd, doh proxy) and connected devices. It also allows you to setup artifacts that setup intent to potentially sharing a resource that exists on some machine on your tunneld network.
 
@@ -59,7 +56,6 @@ Run Tunneld in:
 
 - Approve or deny internet access per device
 - See service status and restart components if needed
-- View internal terminal output or issue commands directly
 - Dynamic refresh — minimal design, efficient interaction
 - Creating Artifacts (references with intent to share and monitor for any selfhosted application on its network)
 - Expose Services to the internet using Cloudflare tunnels
