@@ -13,7 +13,7 @@ defmodule Tunneld.Servers.FakeData.Whitelist do
       },
       %{
         "hostname" => "DEVICE TWO",
-        "ip" => "102.132.99.34",
+        "ip" => "127.0.0.1",
         "mac" => "1234",
         "ttl" => "-",
         "status" => "PENDING"

@@ -18,6 +18,11 @@ defmodule TunneldWeb.Router do
     plug TunneldWeb.Plugs.SetIp
   end
 
+  # Check the device access given its details to make requests against the controller
+  pipeline :authed_device do
+    plug TunneldWeb.Plugs.AuthedDevice
+  end
+
   # These are the open routes
   scope "/", TunneldWeb do
     pipe_through [:browser, :set_ip]
@@ -25,6 +30,23 @@ defmodule TunneldWeb.Router do
     live "/", Live.Login
     # live "/network_diagram", Live.NetworkDiagram
     live "/dashboard", Live.Dashboard
+  end
+
+  scope "/api", TunneldWeb do
+    pipe_through [:fetch_session, :api, :authed_device]
+
+    # Artifacts
+    get "/artifacts", Controller.CLI, :list_artifacts
+    post "/artifacts", Controller.CLI, :add_artifact
+    post "/artifacts/:id/expose", Controller.CLI, :expose_artifact
+    post "/artifacts/:id/call", Controller.CLI, :call_artifact
+    delete "/artifacts/:id", Controller.CLI, :remove_artifact
+
+    # Nodes
+    post "/nodes/host", Controller.CLI, :host_node
+    post "/nodes/connect", Controller.CLI, :connect_node
+    post "/nodes/disconnect", Controller.CLI, :disconnect_node
+    get "/nodes", Controller.CLI, :list_nodes
   end
 
   if Application.compile_env(:tunneld, :dev_routes) do
