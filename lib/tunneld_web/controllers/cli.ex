@@ -7,6 +7,16 @@ defmodule TunneldWeb.Controller.CLI do
   use TunneldWeb, :controller
 
   @doc """
+  Get details of an artifact. This will support the fetching of details, desciptions and schema information
+  """
+  @spec get_artifact(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def get_artifact(conn, %{ "id" => id}) do
+    conn
+    |> put_status(:not_found)
+    |> json(%{message: "Option not yet supported"})
+  end
+
+  @doc """
   List all artifacts
   """
   @spec list_artifacts(Plug.Conn.t(), map()) :: Plug.Conn.t()
@@ -56,10 +66,10 @@ defmodule TunneldWeb.Controller.CLI do
   end
 
   @doc """
-  Expose an artifact publicly
+  Publish an artifact to make it accessible on a domain
   """
-  @spec expose_artifact(Plug.Conn.t(), map()) :: Plug.Conn.t()
-  def expose_artifact(conn, %{"id" => id, "domain" => domain}) do
+  @spec publish_artifact(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def publish_artifact(conn, %{"id" => id, "domain" => domain}) do
     # We will need to get the artifact and then pass it through the cloudflare function
     case Tunneld.Servers.Artifacts.get_artifact_details(id) do
       {_, artifact} ->
@@ -85,6 +95,44 @@ defmodule TunneldWeb.Controller.CLI do
         |> put_status(:bad_request)
         |> json(%{
           message: "There was a problem exposing artifact publicly on the domain #{domain}"
+        })
+    end
+  end
+
+  @doc """
+  Unpublish an artifact to remove making it accessible on a domain
+  """
+  @spec unpublish_artifact(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def unpublish_artifact(conn, %{"id" => id}) do
+    # We will need to get the artifact and then pass it through the cloudflare function
+    case Tunneld.Servers.Artifacts.get_artifact_details(id) do
+      {_, artifact} ->
+        if is_nil(artifact) do
+          conn
+          |> put_status(:bad_request)
+          |> json(%{
+            message: "There was a problem fetching artifact."
+          })
+        else
+          if not Enum.empty?(artifact.tunnel) do
+            # gracefully try and disconnect the tunnel link
+            Tunneld.Servers.Cloudflare.remove_host(artifact.tunnel["subdomain"])
+          end
+
+          # This is async, we need to make sure message gets this across
+          Tunneld.Servers.Artifacts.remove_artifact(id)
+
+          json(conn, %{
+            message:
+              "Artifact #{id} being unpiblushed from the domain: #{artifact.tunnel["subdomain"]}"
+          })
+        end
+
+      _ ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{
+          message: "There was a problem exposing unpublishing artifact."
         })
     end
   end

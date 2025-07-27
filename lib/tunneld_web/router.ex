@@ -32,8 +32,10 @@ defmodule TunneldWeb.Router do
 
     # Artifacts
     get "/artifacts", Controller.CLI, :list_artifacts
+    get "/artifacts/:id", Controller.CLI, :get_artifact
     post "/artifacts", Controller.CLI, :add_artifact
-    post "/artifacts/:id/expose", Controller.CLI, :expose_artifact
+    post "/artifacts/:id/publish", Controller.CLI, :publish_artifact
+    post "/artifacts/:id/unpublish", Controller.CLI, :unpublish_artifact
     post "/artifacts/:id/call", Controller.CLI, :call_artifact
     delete "/artifacts/:id", Controller.CLI, :remove_artifact
 
