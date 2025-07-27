@@ -18,11 +18,6 @@ defmodule TunneldWeb.Router do
     plug TunneldWeb.Plugs.SetIp
   end
 
-  # Check the device access given its details to make requests against the controller
-  pipeline :authed_device do
-    plug TunneldWeb.Plugs.AuthedDevice
-  end
-
   # These are the open routes
   scope "/", TunneldWeb do
     pipe_through [:browser, :set_ip]
@@ -33,7 +28,7 @@ defmodule TunneldWeb.Router do
   end
 
   scope "/api", TunneldWeb do
-    pipe_through [:fetch_session, :api, :authed_device]
+    pipe_through [:fetch_session, :api]
 
     # Artifacts
     get "/artifacts", Controller.CLI, :list_artifacts
