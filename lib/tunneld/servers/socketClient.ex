@@ -1,139 +1,126 @@
 defmodule Tunneld.Servers.SocketClient do
-  @moduledoc """
-  Client to connect with channels to the a phoenix socket
-
-  # Start the client with the desired WebSocket URI
-  {:ok, _pid} = Tunneld.Servers.SocketClient.start_link(uri: "ws://localhost/socket/websocket")
-
-  # Send an event to the channel
-  Tunneld.Servers.SocketClient.send_event(%{message: "Hello, Phoenix!"})
-
-  # Disconnect from the channel
-  Tunneld.Servers.SocketClient.disconnect()
-
-  """
   use Slipstream
   require Logger
 
   @topic "tunneld:host"
 
-  @spec start_link(any()) :: :ignore | {:error, any()} | {:ok, pid()}
-  @doc """
-  Starts the Slipstream client process.
-  """
-  def start_link(config) do
-    Slipstream.start_link(__MODULE__, config, name: __MODULE__)
+  @spec start_link(keyword()) :: :ignore | {:error, any()} | {:ok, pid()}
+  def start_link(opts) do
+    token = Keyword.get(opts, :token, nil)
+    uri = Keyword.fetch!(opts, :uri)
+
+    # Always register name, even if connect fails
+    Slipstream.start_link(__MODULE__, [uri: uri, token: token], name: __MODULE__)
   end
 
-  @spec init(keyword()) :: {:ok, Slipstream.Socket.t(), {:continue, :init_state}}
-  @doc """
-  init with base config for the urls or server details that we will be trying to conenct to
-  """
+  @spec wait_for_connection(timeout()) :: :ok | {:error, term()}
+  def wait_for_connection(timeout \\ 5_000) do
+    case Process.whereis(__MODULE__) do
+      nil ->
+        {:error, :not_running}
+
+      _pid ->
+        ref = make_ref()
+        GenServer.cast(__MODULE__, {:register_waiter, self(), ref})
+
+        receive do
+          {:connection_ready, ^ref} -> :ok
+          {:connection_failed, ^ref, reason} -> {:error, reason}
+        after
+          timeout -> {:error, :timeout}
+        end
+    end
+  end
+
   @impl Slipstream
-  def init(config) do
-    socket = connect!(config)
-    {:ok, socket, {:continue, :init_state}}
+  def init(opts) do
+    uri = Keyword.fetch!(opts, :uri)
+    token = Keyword.get(opts, :token, nil)
+
+    case Slipstream.connect(uri: uri) do
+      {:ok, socket} ->
+        socket =
+          socket
+          |> assign(:provided_token, token)
+          |> assign(:retry_attempts, 0)
+          |> assign(:waiters, [])
+          |> assign(:connected, false)
+
+        {:ok, socket, {:continue, :init_state}}
+
+      {:error, reason} ->
+        # Still start process but mark failure_reason
+        socket =
+          Slipstream.Socket.new()
+          |> assign(:failure_reason, reason)
+          |> assign(:connected, false)
+
+        {:ok, socket}
+    end
   end
 
-  @doc """
-  The side effect happening after connecting to setup the base init data to join with
-  """
   @impl Slipstream
   def handle_continue(:init_state, socket) do
-    # Make a request to auth the device on the channel
     device_id = UUID.uuid4()
 
-    socket =
-      socket
-      |> assign(:retry_attempts, 0)
-      # TODO: We need to send the data
-      |> assign(:metadata, %{
-        device: device_id,
-        token:
-          Tunneld.Encryption.generate_auth_token(
-            Tunneld.Servers.Encryption.fetch_settings(),
-            device_id
-          )
-      })
+    token =
+      Tunneld.Encryption.generate_auth_token(
+        socket.assigns[:provided_token] || Tunneld.Servers.Encryption.fetch_settings(),
+        device_id
+      )
+
+    socket = assign(socket, :metadata, %{device: device_id, token: token})
 
     {:noreply, socket}
   end
 
-  @doc """
-  Callback after connecting to try and join to a server
-  """
   @impl Slipstream
   def handle_connect(socket) do
-    Logger.info("Joining topic #{@topic}")
+    Logger.info("Connected to socket, joining topic #{@topic}")
     {:ok, join(socket, @topic, socket.assigns.metadata)}
   end
 
-  @doc """
-  Send a request to the server with a given payload
-  """
   @impl Slipstream
-  def handle_cast({:event, payload}, socket) do
-    # Encode the json payload so that we can send that encrypted through
-    encrypted = Tunneld.Servers.Encryption.encrypt_payload(Jason.encode!(payload))
-    encoded = Base.encode64(encrypted)
+  def handle_join(@topic, _payload, socket) do
+    Logger.info("Successfully joined topic #{@topic}")
 
-    push(socket, @topic, "event", encoded)
-    {:noreply, socket}
+    # Mark fully connected
+    socket = assign(socket, :connected, true)
+
+    # Notify all waiters
+    Enum.each(socket.assigns.waiters, fn {pid, ref} ->
+      send(pid, {:connection_ready, ref})
+    end)
+
+    {:ok, assign(socket, :waiters, [])}
   end
 
-  @doc """
-  Server request to disconnect from the given server
-  """
   @impl Slipstream
-  def handle_cast(:disconnect, socket) do
-    Logger.info("Manually disconnecting from #{@topic}")
-
-    socket =
-      socket
-      |> disconnect()
-      |> await_disconnect()
-
-
-    # this is to stop the current process
-    {:stop, :disconnected, socket}
+  def handle_cast({:register_waiter, pid, ref}, socket) do
+    waiters = [{pid, ref} | socket.assigns.waiters]
+    {:noreply, assign(socket, :waiters, waiters)}
   end
 
-  @doc """
-  When we get a reply back to us on the topic
-  """
+  # Handle failed joins
   @impl Slipstream
-  def handle_reply(_ref, {_, reply}, socket) do
-    resp =
-      Base.decode64!(reply) |> Tunneld.Servers.Encryption.decrypt_payload() |> Jason.decode!()
+  def handle_topic_close(@topic, reason, socket) do
+    Logger.error("Join failed for #{@topic}: #{inspect(reason)}")
 
-    # Do something by sending it to the client if we need to send messages back
-    Logger.debug("Reply received: #{inspect(resp)}")
+    Enum.each(socket.assigns.waiters, fn {pid, ref} ->
+      send(pid, {:connection_failed, ref, reason})
+    end)
 
-    # Reset retry attempts
-    socket = socket |> assign(:retry_attempts, 0)
-    {:ok, socket}
+    {:ok,
+     socket
+     |> assign(:connected, false)
+     |> assign(:failure_reason, reason)
+     |> assign(:waiters, [])}
   end
 
-  @doc """
-  When a general message comes from the server
-  """
   @impl Slipstream
-  def handle_message(topic, event, message, socket) do
-    IO.inspect("Randome message from the server: #{topic}:#{event}:#{inspect(message)}")
-    {:ok, socket}
-  end
-
-  @doc """
-  Handle the disconnects if they are intentional or not and try get the system reconnected
-  """
-  @impl Slipstream
-  def handle_disconnect(:client_disconnect_requested, socket) do
-    Logger.warn("Disconnecting client as per their request")
-    {:stop, :disconnected, socket}
-  end
-
   def handle_disconnect(reason, socket) do
     Logger.warn("Disconnected: #{inspect(reason)}. Attempting to reconnect.")
+    socket = assign(socket, :connected, false)
 
     case reconnect(socket) do
       {:ok, socket} -> {:ok, socket}
@@ -141,50 +128,39 @@ defmodule Tunneld.Servers.SocketClient do
     end
   end
 
-  @doc """
-  We listen on the join result if there is a issue we retry a few times if needed
-  """
-  @impl Slipstream
-  def handle_topic_close(topic, _reason, socket) do
-    attempt = socket.assigns[:retry_attempts] || 0
+  # Details
+  @spec details() :: :not_running | %{connected: boolean(), metadata: map(), reason: term() | nil}
+  def details do
+    IO.inspect(Process.whereis(__MODULE__))
 
-    if attempt < 5 do
-      Logger.warn("Join refused for #{topic}, retrying (attempt #{attempt + 1})")
+    case Process.whereis(__MODULE__) do
+      nil ->
+        :not_running
 
-      socket = assign(socket, :retry_attempts, attempt + 1)
-
-      case rejoin(socket, topic) do
-        {:ok, updated_socket} ->
-          {:ok, updated_socket}
-
-        {:error, reason} ->
-          Logger.error("Rejoin failed: #{inspect(reason)}")
-          {:stop, reason, socket}
-      end
-    else
-      Logger.error("Join refused for #{topic} too many times. Giving up.")
-      {:stop, :normal, socket}
+      _pid ->
+        GenServer.call(__MODULE__, :details)
     end
   end
 
-  @doc """
-  When the process exits, we need to handle and log only for now but this is when we kill this process
-  """
-  @impl true
-  def terminate(reason, _socket) do
-    Logger.warn("Client shutting down with reason: #{inspect(reason)}")
-    :ok
+  @impl Slipstream
+  def handle_call(:details, _from, socket) do
+    details = %{
+      connected: Map.get(socket.assigns, :connected, false),
+      metadata: Map.get(socket.assigns, :metadata, %{}),
+      reason: Map.get(socket.assigns, :failure_reason, nil)
+    }
+
+    {:reply, details, socket}
   end
 
-  @doc """
-  Disconnects the client from the Phoenix channel.
-  """
   def disconnect, do: GenServer.cast(__MODULE__, :disconnect)
 
-  @doc """
-  Sends an event payload to the Phoenix channel.
-  """
-  def send_event(%{ "type" => "init", "data" => _} = payload), do: GenServer.cast(__MODULE__, {:event, payload})
-  # This is to enfore that we pass the artifact when sending a request to trigger
-  def send_event(%{ "type" => "trigger", "data" => %{ "id" => _, "payload" => _}} = payload), do: GenServer.cast(__MODULE__, {:event, payload})
+  def handle_cast(:disconnect, socket) do
+    socket =
+      socket
+      |> disconnect()
+      |> await_disconnect()
+
+    {:stop, :disconnected, socket}
+  end
 end

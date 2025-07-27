@@ -385,7 +385,7 @@ defmodule Tunneld.Servers.Artifacts do
   def get_artifact(id), do: GenServer.cast(__MODULE__, {:get_artifact, id})
   def get_artifact_details(id), do: GenServer.call(__MODULE__, {:get_artifact_details, id})
   def add_artifact(artifact), do: GenServer.call(__MODULE__, {:add_artifact, artifact}, 25_000)
-  def remove_artifact(artifact), do: GenServer.cast(__MODULE__, {:remove_artifact, artifact})
+  def remove_artifact(id), do: GenServer.cast(__MODULE__, {:remove_artifact, id})
   # Update specific settings
   # TODO: This needs to change to be more generic
   def update_artifact(data, :tunneld),
