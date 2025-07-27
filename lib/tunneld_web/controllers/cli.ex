@@ -311,7 +311,7 @@ defmodule TunneldWeb.Controller.CLI do
         json(conn, %{nodes: [], message: "Socket client not running"})
 
       %{connected: true, metadata: metadata} ->
-        json(conn, %{nodes: [%{id: metadata.device, status: "connected"}]})
+        json(conn, %{nodes: [%{id: metadata.device, uri: System.get_env("CF_DOMAIN"), status: "connected"}]})
 
       %{connected: false, reason: reason} ->
         json(conn, %{nodes: [], message: "Socket client disconnected", reason: inspect(reason)})
