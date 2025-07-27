@@ -104,7 +104,7 @@ defmodule TunneldWeb.TunneldChannel do
       "http://#{payload.ip}:#{payload.port}#{payload.path}",
       Jason.encode!(payload.data || %{}),
       [{"Accept", "Application/json"}, {"Content-Type", "application/json"}],
-      recv_timeout: 30_000
+      recv_timeout: 120_000
     )
   end
 
@@ -112,7 +112,7 @@ defmodule TunneldWeb.TunneldChannel do
     HTTPoison.get(
       "http://#{payload.ip}:#{payload.port}#{payload.path}",
       [{"Accept", "Application/json"}, {"Content-Type", "application/json"}],
-      recv_timeout: 30_000
+      recv_timeout: 120_000
     )
   end
 end

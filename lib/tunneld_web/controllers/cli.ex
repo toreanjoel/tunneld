@@ -7,18 +7,33 @@ defmodule TunneldWeb.Controller.CLI do
   use TunneldWeb, :controller
 
   @doc """
-  GET /api/artifacts — List all artifacts
+  List all artifacts
   """
+  @spec list_artifacts(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def list_artifacts(conn, _params) do
-    artifacts = Tunneld.Servers.Artifacts.fetch_artifacts()
+    local =
+      Tunneld.Servers.Artifacts.fetch_artifacts()
+      |> Enum.map(&Map.put(&1, "remote", false))
 
-    json(conn, %{artifacts: artifacts})
+    remote =
+      case Tunneld.Servers.SocketClient.details() do
+        %{connected: true} ->
+          case Tunneld.Servers.SocketClient.request_event(%{"type" => "init", "data" => %{}}) do
+            {:ok, artifacts} -> Enum.map(artifacts, &Map.put(&1, "remote", true))
+            _ -> []
+          end
+
+        _ ->
+          []
+      end
+
+    json(conn, %{artifacts: local ++ remote})
   end
 
   @doc """
-  POST /api/artifacts — Add a new artifact
-  Expected params: %{ "name" => name, "ip" => ip, "port" => port, "description" => description }
+  Add a new artifact
   """
+  @spec add_artifact(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def add_artifact(conn, %{
         "name" => name,
         "ip" => ip,
@@ -41,9 +56,9 @@ defmodule TunneldWeb.Controller.CLI do
   end
 
   @doc """
-  POST /api/artifacts/:id/expose — Expose an artifact publicly
-  Expected params: %{ "name" => name, "name" => name }
+  Expose an artifact publicly
   """
+  @spec expose_artifact(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def expose_artifact(conn, %{"id" => id, "domain" => domain}) do
     # We will need to get the artifact and then pass it through the cloudflare function
     case Tunneld.Servers.Artifacts.get_artifact_details(id) do
@@ -74,18 +89,60 @@ defmodule TunneldWeb.Controller.CLI do
   end
 
   @doc """
-  POST /api/artifacts/:id/call — Call an artifact with payload
-  Expected params: %{ "data" => map }
+  Call an artifact with payload
   """
+  @spec call_artifact(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def call_artifact(conn, %{"id" => id, "data" => data}) do
-    # TODO: Forward data to artifact process
-    json(conn, %{message: "Called artifact #{id}", data: data})
+    artifact = find_artifact_by_id(id)
+
+    cond do
+      is_nil(artifact) ->
+        conn
+        |> put_status(:bad_request)
+        |> json(%{message: "Artifact not found"})
+
+      Map.get(artifact, "remote", false) ->
+        # Remote artifact call via socket
+        case Tunneld.Servers.SocketClient.request_event(%{
+               "type" => "trigger",
+               "data" => %{"id" => id, "payload" => data}
+             }) do
+          {:ok, response} ->
+            json(conn, %{message: "Triggered remote artifact #{id}", data: response})
+
+          {:error, reason} ->
+            conn
+            |> put_status(:bad_gateway)
+            |> json(%{message: "Failed to trigger remote artifact", error: inspect(reason)})
+        end
+
+      true ->
+        # Local artifact call via HTTP
+        {status, resp} =
+          if artifact["tunneld"] && Map.get(artifact["tunneld"], "enabled", false) do
+            http_payload = %{
+              ip: artifact["ip"],
+              port: artifact["port"],
+              path: Map.get(artifact["tunneld"], "route"),
+              data: data
+            }
+
+            {_, %HTTPoison.Response{status_code: code, body: body}} =
+              http_request(Map.get(artifact["tunneld"], "request_type"), http_payload)
+
+            {:ok, %{"code" => code, "resp" => body}}
+          else
+            {:ok, %{"code" => 500, "resp" => "Artifact disabled"}}
+          end
+
+        json(conn, %{status: status, payload: resp})
+    end
   end
 
   @doc """
-  DELETE /api/artifacts/:id — Remove an artifact
+  Remove an artifact
   """
-  # TODO: add a separate function to make it easy to quickly expose
+  @spec remove_artifact(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def remove_artifact(conn, %{"id" => id}) do
     case Tunneld.Servers.Artifacts.get_artifact_details(id) do
       {_, artifact} ->
@@ -122,8 +179,9 @@ defmodule TunneldWeb.Controller.CLI do
   end
 
   @doc """
-  POST /api/nodes/host — Start hosting this gateway as a node
+  Start hosting this gateway as a node
   """
+  @spec host_node(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def host_node(conn, _params) do
     gateway = "https://#{System.get_env("CF_DOMAIN")}"
 
@@ -154,9 +212,9 @@ defmodule TunneldWeb.Controller.CLI do
   end
 
   @doc """
-  POST /api/nodes/connect — Connect to another node
-  Expected params: %{ "domain" => domain, "token" => token }
+  Connect to another node
   """
+  @spec connect_node(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def connect_node(conn, %{"domain" => domain} = params) do
     token = Map.get(params, "token")
 
@@ -189,18 +247,19 @@ defmodule TunneldWeb.Controller.CLI do
     end
   end
 
-  @spec disconnect_node(Plug.Conn.t(), any()) :: Plug.Conn.t()
   @doc """
-  POST /api/nodes/disconnect — Disconnect from current node
+  Disconnect from current node
   """
+  @spec disconnect_node(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def disconnect_node(conn, _params) do
     Tunneld.Servers.SocketClient.disconnect()
     json(conn, %{message: "Disconnected from remote node"})
   end
 
   @doc """
-  GET /api/nodes — List connected nodes
+  List connected nodes
   """
+  @spec list_nodes(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def list_nodes(conn, _params) do
     case Tunneld.Servers.SocketClient.details() do
       :not_running ->
@@ -212,5 +271,49 @@ defmodule TunneldWeb.Controller.CLI do
       %{connected: false, reason: reason} ->
         json(conn, %{nodes: [], message: "Socket client disconnected", reason: inspect(reason)})
     end
+  end
+
+  # Get the details around the artifacts remote and local
+  @spec find_artifact_by_id(String.t()) :: map() | nil
+  defp find_artifact_by_id(id) do
+    # Local artifacts
+    local =
+      Tunneld.Servers.Artifacts.fetch_artifacts()
+      |> Enum.map(&Map.put(&1, "remote", false))
+
+    # Remote artifacts (only if connected)
+    remote =
+      case Tunneld.Servers.SocketClient.details() do
+        %{connected: true} ->
+          case Tunneld.Servers.SocketClient.request_event(%{"type" => "init", "data" => %{}}) do
+            {:ok, artifacts} -> Enum.map(artifacts, &Map.put(&1, "remote", true))
+            _ -> []
+          end
+
+        _ ->
+          []
+      end
+
+    # Combine and find matching ID
+    Enum.find(local ++ remote, fn artifact -> artifact["id"] == id end)
+  end
+
+  # These are for now but allows us to make requests the artifacts that are locally accessible
+  @spec http_request(String.t(), map()) :: {:ok, HTTPoison.Response.t()} | {:error, term()}
+  defp http_request("post", payload) do
+    HTTPoison.post(
+      "http://#{payload.ip}:#{payload.port}#{payload.path}",
+      Jason.encode!(payload.data || %{}),
+      [{"Accept", "Application/json"}, {"Content-Type", "application/json"}],
+      recv_timeout: 30_000
+    )
+  end
+
+  defp http_request("get", payload) do
+    HTTPoison.get(
+      "http://#{payload.ip}:#{payload.port}#{payload.path}",
+      [{"Accept", "Application/json"}, {"Content-Type", "application/json"}],
+      recv_timeout: 30_000
+    )
   end
 end
