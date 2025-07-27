@@ -127,6 +127,26 @@ defmodule TunneldWeb.Controller.CLI do
   def host_node(conn, _params) do
     gateway = "https://#{System.get_env("CF_DOMAIN")}"
 
+    payload = %{
+      "description" =>
+        "CLI: Adding the current device as an artifact to be accesble on its registered domain",
+      "ip" => System.get_env("GATEWAY", ""),
+      "name" => "GATEWAY",
+      "port" => "80"
+    }
+
+    # We dont do anything in terms of waiting, so this needs feedback as the response
+    %{artifacts: items} = Tunneld.Servers.Artifacts.add_artifact(payload)
+    gateway_artifact = items |> Enum.filter(fn item -> item["name"] === "GATEWAY" end)
+
+    if Enum.empty?(gateway_artifact) do
+      # Expose the gateway - this is async, so we need to make the message keep this in mind
+      Tunneld.Servers.Cloudflare.add_host(
+        "#{gateway_artifact.ip}:#{gateway_artifact.port}",
+        gateway_artifact
+      )
+    end
+
     json(conn, %{
       message:
         "Gateway accessible on #{gateway}, Log into dashboard to get access key to share with client nodes to access your artifacts"
