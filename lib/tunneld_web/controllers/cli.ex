@@ -71,7 +71,8 @@ defmodule TunneldWeb.Controller.CLI do
           })
         else
           # TODO: we may need to make a call here so we can know if this succeeded
-          Tunneld.Servers.Cloudflare.add_host("#{artifact["ip"]}:#{artifact["port"]}", domain)
+          # We need to look at a better way to keep the data structure consistent - we need to use dot and array selection notation?
+          Tunneld.Servers.Cloudflare.add_host("#{artifact.ip}:#{artifact.port}", domain)
           # Connect to cloudflare here - needs to be the user domain setup on the gateway
           json(conn, %{
             message:
@@ -156,7 +157,7 @@ defmodule TunneldWeb.Controller.CLI do
           # we check if we have tunnel data
           if Enum.empty?(
                tunnel =
-                 Tunneld.Servers.Cloudflare.get_tunnel_data(artifact["ip"], artifact["port"])
+                 Tunneld.Servers.Cloudflare.get_tunnel_data(artifact.ip, artifact.port)
              ) do
             # gracefully try and disconnect the tunnel link
             Tunneld.Servers.Cloudflare.remove_host(tunnel["subdomain"])
