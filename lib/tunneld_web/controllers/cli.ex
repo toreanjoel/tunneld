@@ -154,13 +154,9 @@ defmodule TunneldWeb.Controller.CLI do
             message: "There was a problem fetching artifact."
           })
         else
-          # we check if we have tunnel data
-          if Enum.empty?(
-               tunnel =
-                 Tunneld.Servers.Cloudflare.get_tunnel_data(artifact.ip, artifact.port)
-             ) do
+          if not Enum.empty?(artifact.tunnel) do
             # gracefully try and disconnect the tunnel link
-            Tunneld.Servers.Cloudflare.remove_host(tunnel["subdomain"])
+            Tunneld.Servers.Cloudflare.remove_host(artifact.tunnel["subdomain"])
           end
 
           # This is async, we need to make sure message gets this across
