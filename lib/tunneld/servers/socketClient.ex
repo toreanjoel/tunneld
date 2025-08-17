@@ -1,4 +1,5 @@
 defmodule Tunneld.Servers.SocketClient do
+  @moduledoc false
   use Slipstream
   require Logger
 
@@ -8,8 +9,6 @@ defmodule Tunneld.Servers.SocketClient do
   def start_link(opts) do
     token = Keyword.get(opts, :token, nil)
     uri = Keyword.fetch!(opts, :uri)
-
-    # Always register name, even if connect fails
     Slipstream.start_link(__MODULE__, [uri: uri, token: token], name: __MODULE__)
   end
 
@@ -52,11 +51,12 @@ defmodule Tunneld.Servers.SocketClient do
           |> assign(:started_at, DateTime.utc_now())
           |> assign(:connected_at, nil)
           |> assign(:last_disconnect_at, nil)
+          |> assign(:manual_disconnect, false)
+          |> assign(:pending_replies, %{})
 
         {:ok, socket, {:continue, :init_state}}
 
       {:error, reason} ->
-        # Still start process but mark failure_reason
         socket =
           Slipstream.Socket.new()
           |> assign(:uri, uri)
@@ -70,6 +70,8 @@ defmodule Tunneld.Servers.SocketClient do
           |> assign(:started_at, DateTime.utc_now())
           |> assign(:connected_at, nil)
           |> assign(:last_disconnect_at, nil)
+          |> assign(:manual_disconnect, false)
+          |> assign(:pending_replies, %{})
 
         {:ok, socket}
     end
@@ -85,22 +87,19 @@ defmodule Tunneld.Servers.SocketClient do
         device_id
       )
 
-    socket = assign(socket, :metadata, %{device: device_id, token: token})
-
-    {:noreply, socket}
+    {:noreply, assign(socket, :metadata, %{device: device_id, token: token})}
   end
 
   @impl Slipstream
   def handle_connect(socket) do
-    Logger.info("Connected to socket, joining topic #{@topic}")
+    Logger.info("Connected, joining #{@topic}")
     {:ok, join(socket, @topic, socket.assigns.metadata)}
   end
 
   @impl Slipstream
   def handle_join(@topic, _payload, socket) do
-    Logger.info("Successfully joined topic #{@topic}")
+    Logger.info("Joined #{@topic}")
 
-    # Mark fully connected
     socket =
       socket
       |> assign(:connected, true)
@@ -108,7 +107,6 @@ defmodule Tunneld.Servers.SocketClient do
       |> assign(:failure_reason, nil)
       |> assign(:connected_at, DateTime.utc_now())
 
-    # Notify all waiters
     Enum.each(socket.assigns.waiters, fn {pid, ref} ->
       send(pid, {:connection_ready, ref})
     end)
@@ -116,28 +114,6 @@ defmodule Tunneld.Servers.SocketClient do
     {:ok, assign(socket, :waiters, [])}
   end
 
-  @impl Slipstream
-  def handle_cast({:register_waiter, pid, ref}, socket) do
-    waiters = [{pid, ref} | socket.assigns.waiters]
-    {:noreply, assign(socket, :waiters, waiters)}
-  end
-
-  @impl Slipstream
-  def handle_cast({:event_with_reply, payload, caller, ref}, socket) do
-    encrypted = Tunneld.Servers.Encryption.encrypt_payload(Jason.encode!(payload))
-    encoded = Base.encode64(encrypted)
-
-    # push/4 returns {:ok, slip_ref}
-    {:ok, slip_ref} = push(socket, @topic, "event", encoded)
-
-    # store mapping of slip_ref → {caller, user_ref}
-    pending = Map.get(socket.assigns, :pending_replies, %{})
-    pending = Map.put(pending, slip_ref, {caller, ref})
-
-    {:noreply, assign(socket, :pending_replies, pending)}
-  end
-
-  # Handle failed joins
   @impl Slipstream
   def handle_topic_close(@topic, reason, socket) do
     Logger.error("Join failed for #{@topic}: #{inspect(reason)}")
@@ -156,7 +132,8 @@ defmodule Tunneld.Servers.SocketClient do
 
   @impl Slipstream
   def handle_disconnect(reason, socket) do
-    Logger.warn("Disconnected: #{inspect(reason)}. Attempting to reconnect.")
+    Logger.warn("Disconnected: #{inspect(reason)}")
+    manual? = Map.get(socket.assigns, :manual_disconnect, false)
 
     socket =
       socket
@@ -164,29 +141,72 @@ defmodule Tunneld.Servers.SocketClient do
       |> assign(:reason, reason)
       |> assign(:failure_reason, reason)
       |> assign(:last_disconnect_at, DateTime.utc_now())
-      |> assign(:retry_attempts, socket.assigns.retry_attempts + 1)
+      |> assign(:retry_attempts, Map.get(socket.assigns, :retry_attempts, 0) + 1)
+      |> assign(:manual_disconnect, false)
 
-    case reconnect(socket) do
-      {:ok, socket} -> {:ok, socket}
-      {:error, reason} -> {:stop, reason, socket}
+    if manual? do
+      # Manual: do NOT auto-reconnect; keep process alive
+      {:ok, socket}
+    else
+      case reconnect(socket) do
+        {:ok, socket} -> {:ok, socket}
+        {:error, r} -> {:stop, r, socket}
+      end
     end
   end
 
-  # Details
-  @spec details() :: :not_running | %{connected: boolean(), metadata: map(), reason: term() | nil}
-  def details do
-    case Process.whereis(__MODULE__) do
-      nil ->
-        :not_running
+  @impl Slipstream
+  def handle_cast({:register_waiter, pid, ref}, socket) do
+    {:noreply, assign(socket, :waiters, [{pid, ref} | socket.assigns.waiters])}
+  end
 
-      _pid ->
-        GenServer.call(__MODULE__, :details)
-    end
+  @impl Slipstream
+  def handle_cast({:event_with_reply, payload, caller, ref}, socket) do
+    encrypted = Tunneld.Servers.Encryption.encrypt_payload(Jason.encode!(payload))
+    encoded = Base.encode64(encrypted)
+
+    {:ok, slip_ref} = push(socket, @topic, "event", encoded)
+
+    pending =
+      socket.assigns.pending_replies
+      |> Map.put(slip_ref, {caller, ref})
+
+    {:noreply, assign(socket, :pending_replies, pending)}
+  end
+
+  @impl Slipstream
+  def handle_cast({:event, payload}, socket) do
+    encrypted = Tunneld.Servers.Encryption.encrypt_payload(Jason.encode!(payload))
+    encoded = Base.encode64(encrypted)
+    push(socket, @topic, "event", encoded)
+    {:noreply, socket}
+  end
+
+  def disconnect, do: GenServer.cast(__MODULE__, :disconnect)
+
+  @impl Slipstream
+  def handle_cast(:disconnect, socket) do
+    # Mark as manual so handle_disconnect/2 skips auto-reconnect
+    socket = assign(socket, :manual_disconnect, true)
+
+    # Do not pipe tuples into assign/3
+    {:ok, s1} = disconnect(socket)
+    {:ok, s2} = await_disconnect(s1)
+
+    s2 =
+      s2
+      |> assign(:connected, false)
+      |> assign(:reason, :manual_disconnect)
+      |> assign(:last_disconnect_at, DateTime.utc_now())
+
+    # Keep the process alive
+    {:noreply, s2}
   end
 
   @doc """
-  Sends an event and waits for reply. Used for `init` to fetch remote artifacts.
+  Synchronous request over the socket, returns {:ok, term} | {:error, term}.
   """
+  @spec request_event(map(), non_neg_integer()) :: {:ok, term()} | {:error, term()}
   def request_event(payload, timeout \\ 60_000) do
     case Process.whereis(__MODULE__) do
       nil ->
@@ -207,31 +227,27 @@ defmodule Tunneld.Servers.SocketClient do
   @impl Slipstream
   def handle_reply(slip_ref, {_, reply}, socket) do
     decrypted =
-      Base.decode64!(reply)
+      reply
+      |> Base.decode64!()
       |> Tunneld.Servers.Encryption.decrypt_payload()
       |> Jason.decode!()
 
-    pending = Map.get(socket.assigns, :pending_replies, %{})
-
-    case Map.pop(pending, slip_ref) do
-      {nil, _} ->
+    case Map.pop(socket.assigns.pending_replies, slip_ref) do
+      {nil, _pending} ->
         {:ok, socket}
 
       {{caller, user_ref}, remaining} ->
         send(caller, {:event_reply, user_ref, decrypted})
         {:ok, assign(socket, :pending_replies, remaining)}
-    end
+      end
   end
 
   @impl Slipstream
   def handle_call(:details, _from, socket) do
     details = %{
-      # required by controller matches
       connected: Map.get(socket.assigns, :connected, false),
       metadata: Map.get(socket.assigns, :metadata, %{}),
       reason: Map.get(socket.assigns, :reason, Map.get(socket.assigns, :failure_reason)),
-
-      # extra diagnostic fields (safe to ignore by caller)
       uri: Map.get(socket.assigns, :uri),
       retry_attempts: Map.get(socket.assigns, :retry_attempts, 0),
       started_at: Map.get(socket.assigns, :started_at),
@@ -242,39 +258,23 @@ defmodule Tunneld.Servers.SocketClient do
     {:reply, details, socket}
   end
 
-  def disconnect, do: GenServer.cast(__MODULE__, :disconnect)
-
-  @impl Slipstream
-  def handle_cast({:event, payload}, socket) do
-    # Encode payload → encrypt → base64
-    encrypted = Tunneld.Servers.Encryption.encrypt_payload(Jason.encode!(payload))
-    encoded = Base.encode64(encrypted)
-
-    # Push event on topic
-    push(socket, @topic, "event", encoded)
-
-    {:noreply, socket}
-  end
-
-  def handle_cast(:disconnect, socket) do
-    socket =
-      socket
-      |> disconnect()
-      |> await_disconnect()
-      |> assign(:connected, false)
-      |> assign(:reason, :manual_disconnect)
-      |> assign(:last_disconnect_at, DateTime.utc_now())
-
-    {:stop, :disconnected, socket}
-  end
-
   @doc """
-  Sends an event payload to the Phoenix channel.
-  This is used for "init" and "trigger" events to remote artifacts.
+  Fire-and-forget helpers used by callers.
   """
   def send_event(%{"type" => "init", "data" => _} = payload),
     do: GenServer.cast(__MODULE__, {:event, payload})
 
   def send_event(%{"type" => "trigger", "data" => %{"id" => _, "payload" => _}} = payload),
     do: GenServer.cast(__MODULE__, {:event, payload})
+
+  @doc """
+  Public details accessor for external callers (e.g. controllers).
+  """
+  @spec details() :: :not_running | map()
+  def details do
+    case Process.whereis(__MODULE__) do
+      nil -> :not_running
+      _pid -> GenServer.call(__MODULE__, :details)
+    end
+  end
 end

@@ -10,7 +10,7 @@ defmodule TunneldWeb.Controller.CLI do
   Get details of an artifact. This will support the fetching of details, desciptions and schema information
   """
   @spec get_artifact(Plug.Conn.t(), map()) :: Plug.Conn.t()
-  def get_artifact(conn, %{ "id" => id}) do
+  def get_artifact(conn, %{ "id" => _id}) do
     conn
     |> put_status(:not_found)
     |> json(%{message: "Option not yet supported"})
