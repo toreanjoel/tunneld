@@ -7,6 +7,16 @@ defmodule TunneldWeb.Controller.CLI do
   use TunneldWeb, :controller
 
   @doc """
+  Success health check
+  """
+  @spec health_check(Plug.Conn.t(), map()) :: Plug.Conn.t()
+  def health_check(conn, _params) do
+    conn
+    |> put_status(200)
+    |> json(%{status: "ok"})
+  end
+
+  @doc """
   Get details of an artifact. This will support the fetching of details, desciptions and schema information
   """
   @spec get_artifact(Plug.Conn.t(), map()) :: Plug.Conn.t()

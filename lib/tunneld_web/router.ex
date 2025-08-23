@@ -30,6 +30,9 @@ defmodule TunneldWeb.Router do
   scope "/api", TunneldWeb do
     pipe_through [:fetch_session, :api]
 
+    # Health
+    get "/health", Controller.CLI, :health_check
+
     # Artifacts
     get "/artifacts", Controller.CLI, :list_artifacts
     get "/artifacts/:id", Controller.CLI, :get_artifact
