@@ -81,7 +81,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
         <%!-- Not allowed if the scheme is not HTTPS and we dont have a domain --%>
         <div
-          :if={not @web_authn}
+          :if={@web_authn and not @web_authn}
           class="flex grow items-center justify-center gap-1 bg-gray-2 p-2 rounded-md w-1/2"
         >
           <.icon name="hero-finger-print" class="h-5 w-5" />
