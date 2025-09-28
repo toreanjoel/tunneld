@@ -68,10 +68,11 @@ if config_env() == :prod do
   config :tunneld, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
   gateway_origin = System.get_env("GATEWAY", "")
+  hostname = System.get_env("HOSTNAME", "")
   cf_domain = System.get_env("CF_DOMAIN")
 
-  # We make sure if a domain is added or there is a tunnel made for a CF domain, the system supports
-  check_origins = ["http://#{gateway_origin}", "http://localhost", "https://#{cf_domain}"]
+  # We make sure if a domain is added or there is a tunnel made for a CF domain, the system supports - hostname optionally
+  check_origins = ["http://#{gateway_origin}", "http://localhost", "https://#{cf_domain}", "http://#{hostname}"]
 
   config :tunneld, TunneldWeb.Endpoint,
     url: [host: host, port: 80, scheme: "http"],
