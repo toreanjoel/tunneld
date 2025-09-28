@@ -24,7 +24,7 @@ defmodule TunneldWeb.Live.Components.Welcome do
     ~H"""
     <div class="py-5">
       <div class="text-4xl font-medium bg-gradient-to-r from-slate-300 to-slate-600 bg-clip-text text-transparent">
-        tunneld.local
+        tunneld.lan
       </div>
       <div class="text-lg text-gray-2 font-light">
         <%= @version %>
