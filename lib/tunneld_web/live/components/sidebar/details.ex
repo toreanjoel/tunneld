@@ -40,7 +40,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   @spec render(%{:view => :authentication, optional(any()) => any()}) ::
           Phoenix.LiveView.Rendered.t()
   def render(%{view: :authentication, web_authn: web_authn} = assigns) do
-    assigns = assign(assigns, :web_authn, web_authn)
+    assigns = assign(assigns, :web_authn, Map.get(assigns, web_authn, false))
 
     ~H"""
     <div class="bg-secondary p-2 h-full" id="auth" phx-hook="Auth">
@@ -81,7 +81,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
         <%!-- Not allowed if the scheme is not HTTPS and we dont have a domain --%>
         <div
-          :if={@web_authn and not @web_authn}
+          :if={!@web_authn}
           class="flex grow items-center justify-center gap-1 bg-gray-2 p-2 rounded-md w-1/2"
         >
           <.icon name="hero-finger-print" class="h-5 w-5" />

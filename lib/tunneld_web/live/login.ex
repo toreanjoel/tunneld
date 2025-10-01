@@ -13,9 +13,9 @@ defmodule TunneldWeb.Live.Login do
   @doc """
   Initialize the login page and the session data for the client
   """
-  def mount(_params, %{"ip" => ip} = _session, socket) do
+  def mount(_params, %{"client_id" => client_id} = _session, socket) do
     if connected?(socket) do
-      Phoenix.PubSub.subscribe(Tunneld.PubSub, "modal:form:action")
+      Phoenix.PubSub.subscribe(Tunneld.PubSub, "modal:form:action:#{client_id}")
     end
 
     uri_info = get_connect_info(socket, :uri)
@@ -39,7 +39,7 @@ defmodule TunneldWeb.Live.Login do
     socket =
       socket
       |> assign(:loading, false)
-      |> assign(:ip, ip)
+      |> assign(:client_id, client_id)
       |> assign(:type, type)
       |> assign(:info_content, "👋 Hello")
       |> assign(:show_form, show_form)
@@ -91,6 +91,7 @@ defmodule TunneldWeb.Live.Login do
             schema={Tunneld.Schema.Login.data()}
             loading={@loading}
             action="login"
+            client_id={@client_id}
           />
         </div>
         <div :if={@show_form and @type === :signup} class="w-full max-w-sm">
@@ -102,6 +103,7 @@ defmodule TunneldWeb.Live.Login do
             schema={Tunneld.Schema.Signup.data()}
             loading={@loading}
             action="signup"
+            client_id={@client_id}
           />
         </div>
         <div class="py-2" />
@@ -134,7 +136,7 @@ defmodule TunneldWeb.Live.Login do
   #
   def handle_info(%{can_login: can_login}, socket) do
     if can_login do
-      Session.create(socket.assigns.ip)
+      Session.create(socket.assigns.client_id)
       send(self(), %{loading: false})
 
       {:noreply,
@@ -246,7 +248,7 @@ defmodule TunneldWeb.Live.Login do
     with {:ok, auth} <- Tunneld.Servers.Auth.read_file(),
          %{"webauthn" => webauthn} <- auth,
          true <- id == webauthn["id"] do
-      Session.create(socket.assigns.ip)
+      Session.create(socket.assigns.client_id)
 
       {:noreply,
        socket
@@ -272,7 +274,7 @@ defmodule TunneldWeb.Live.Login do
     {_status, auth} = Auth.read_file()
 
     if user == auth["user"] and Bcrypt.verify_pass(pass, auth["pass"]) do
-      Session.create(socket.assigns.ip)
+      Session.create(socket.assigns.client_id)
       true
     else
       false

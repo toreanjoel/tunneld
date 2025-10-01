@@ -38,6 +38,7 @@ defmodule TunneldWeb.Live.Components.Modal do
             phx-click="modal_action"
             phx-value-type={@actions["payload"]["type"]}
             phx-value-data={Jason.encode!(@actions["payload"]["data"])}
+            phx-value-client_id={Jason.encode!(@client_id)}
             class="text-sm font-light gap-1 bg-purple hover:bg-opacity-60 p-3 cursor-pointer rounded-md"
           >
             <%= @actions["title"] %>
@@ -53,8 +54,8 @@ defmodule TunneldWeb.Live.Components.Modal do
   # TODO: this needs to be expanded on but the the actions should not be in here
   #
   @impl true
-  def handle_event("modal_action", %{"type" => action, "data" => data}, socket) do
-    Phoenix.PubSub.broadcast(Tunneld.PubSub, "modal:form:action", %{
+  def handle_event("modal_action", %{"type" => action, "data" => data, "client_id" => client_id}, socket) do
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "modal:form:action:#{client_id}", %{
       action: action,
       data: data
     })

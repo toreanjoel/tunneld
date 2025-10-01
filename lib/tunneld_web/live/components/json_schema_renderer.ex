@@ -17,6 +17,8 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
   @spec update(map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
   def update(assigns, socket) do
     schema = Schema.resolve(assigns.schema)
+    client_id = Map.get(assigns, :client_id, nil)
+
     # Defaults to empty if not provided
     title = Map.get(assigns, :title, 'Submit')
     values = Map.get(assigns, :values, %{})
@@ -26,7 +28,8 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
     ui_order = Map.get(assigns.schema, "ui:order", assigns.schema["properties"] |> Map.keys())
 
     fields =
-       ui_order |> Enum.map(fn key ->
+      ui_order
+      |> Enum.map(fn key ->
         props = Map.get(assigns.schema["properties"], key, "")
 
         %{
@@ -51,6 +54,7 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
      |> assign(schema: schema)
      |> assign(fields: fields)
      |> assign(changeset: values)
+     |> assign(client_id: client_id)
      |> assign(errors: nil)}
   end
 
@@ -68,13 +72,19 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
           <label class={"#{hidden} text-white text-sm font-semibold mb-1"}>
             <%= field.name %>
           </label>
-          <label :if={field.description} class={"#{hidden} block text-white text-xs font-semibold mb-1"}>
+          <label
+            :if={field.description}
+            class={"#{hidden} block text-white text-xs font-semibold mb-1"}
+          >
             <%= field.description %>
           </label>
 
           <%= if is_list(field.enum) do %>
             <!-- Enum dropdown -->
-            <select name={"form[#{field.name}]"} class={"#{hidden} bg-primary rounded-md px-3 py-2 w-full"}>
+            <select
+              name={"form[#{field.name}]"}
+              class={"#{hidden} bg-primary rounded-md px-3 py-2 w-full"}
+            >
               <%= for option <- field.enum do %>
                 <option value={option} selected={Map.get(@changeset, field.name, "") == option}>
                   <%= option %>
@@ -161,7 +171,7 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
 
     case Validator.validate(socket.assigns.schema, params) do
       :ok ->
-        Phoenix.PubSub.broadcast(Tunneld.PubSub, "modal:form:action", %{
+        Phoenix.PubSub.broadcast(Tunneld.PubSub, "modal:form:action:#{socket.assigns.client_id}", %{
           action: socket.assigns.action,
           data: params
         })

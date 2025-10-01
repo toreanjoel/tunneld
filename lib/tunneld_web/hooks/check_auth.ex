@@ -15,25 +15,25 @@ defmodule TunneldWeb.Hooks.CheckAuth do
   end
 
   # Redirect if the user is authenticated on public routes
-  defp check_blocked_routes(session, socket) when socket.view in [TunneldWeb.Live.Login, TunneldWeb.Live.NotFound] do
-    case Session.get(session["ip"]) do
-      {:ok, _} ->
-        Session.create(session["ip"])
+  defp check_blocked_routes(session, socket)
+       when socket.view in [TunneldWeb.Live.Login, TunneldWeb.Live.NotFound] do
+    case Session.valid?(session["client_id"]) do
+      true ->
         {:halt, push_navigate(socket, to: Routes.live_path(socket, TunneldWeb.Live.Dashboard))}
 
-      _ ->
+      false ->
         {:cont, socket}
     end
   end
 
   # Redirect to login for private routes if the user is unauthenticated
   defp check_blocked_routes(session, socket) do
-    case Session.get(session["ip"]) do
-      {:ok, _} ->
-        Session.create(session["ip"])
+    case Session.valid?(session["client_id"]) do
+      true ->
+        Session.renew(session["client_id"])
         {:cont, socket}
 
-      _ ->
+      false ->
         {:halt, push_navigate(socket, to: Routes.live_path(socket, TunneldWeb.Live.Login))}
     end
   end

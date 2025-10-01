@@ -14,13 +14,13 @@ defmodule TunneldWeb.Router do
     plug :accepts, ["json"]
   end
 
-  pipeline :set_ip do
-    plug TunneldWeb.Plugs.SetIp
+  pipeline :set_client_id do
+    plug TunneldWeb.Plugs.SetClientId
   end
 
   # These are the open routes
   scope "/", TunneldWeb do
-    pipe_through [:browser, :set_ip]
+    pipe_through [:browser, :set_client_id]
 
     live "/", Live.Login
     # live "/network_diagram", Live.NetworkDiagram

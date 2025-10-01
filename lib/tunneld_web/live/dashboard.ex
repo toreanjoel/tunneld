@@ -22,11 +22,11 @@ defmodule TunneldWeb.Live.Dashboard do
   @doc """
   Initialize the dashboard with sidebar set to false.
   """
-  def mount(_params, %{"ip" => ip} = _session, socket) do
+  def mount(_params, %{"client_id" => client_id} = _session, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "notifications")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "show_details")
-      Phoenix.PubSub.subscribe(Tunneld.PubSub, "modal:form:action")
+      Phoenix.PubSub.subscribe(Tunneld.PubSub, "modal:form:action:#{client_id}")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "status:internet")
     end
 
@@ -39,7 +39,7 @@ defmodule TunneldWeb.Live.Dashboard do
 
     socket =
       socket
-      |> assign(:ip, ip)
+      |> assign(:client_id, client_id)
       |> assign(:uri_info, uri_info)
       |> assign(:allow_webauthn?, correct_domain?)
       |> assign(
@@ -94,6 +94,7 @@ defmodule TunneldWeb.Live.Dashboard do
         title={@modal.title}
         body={@modal.body}
         actions={@modal.actions}
+        client_id={@client_id}
       />
     </div>
     """
@@ -315,7 +316,7 @@ defmodule TunneldWeb.Live.Dashboard do
   # Log out of the tunneld dashboard
   #
   def handle_event("logout", _, socket) do
-    Session.delete(socket.assigns.ip)
+    Session.delete(socket.assigns.client_id)
     {:noreply, socket |> push_navigate(to: Routes.live_path(socket, TunneldWeb.Live.Login))}
   end
 
