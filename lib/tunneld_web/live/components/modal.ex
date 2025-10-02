@@ -5,6 +5,7 @@ defmodule TunneldWeb.Live.Components.Modal do
   attr :modal_body, :any, required: true
   attr :modal_actions, :map, required: false
   attr :type, :atom, default: :default
+  attr :client_id, :string, required: true
 
   @impl true
   def render(assigns) do
@@ -38,7 +39,7 @@ defmodule TunneldWeb.Live.Components.Modal do
             phx-click="modal_action"
             phx-value-type={@actions["payload"]["type"]}
             phx-value-data={Jason.encode!(@actions["payload"]["data"])}
-            phx-value-client_id={Jason.encode!(@client_id)}
+            phx-value-client_id={@client_id}
             class="text-sm font-light gap-1 bg-purple hover:bg-opacity-60 p-3 cursor-pointer rounded-md"
           >
             <%= @actions["title"] %>
@@ -54,8 +55,8 @@ defmodule TunneldWeb.Live.Components.Modal do
   # TODO: this needs to be expanded on but the the actions should not be in here
   #
   @impl true
-  def handle_event("modal_action", %{"type" => action, "data" => data, "client_id" => _client_id}, socket) do
-    Phoenix.PubSub.broadcast(Tunneld.PubSub, "modal:form:action", %{
+  def handle_event("modal_action", %{"type" => action, "data" => data, "client_id" => client_id}, socket) do
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "modal:form:action:#{client_id}", %{
       action: action,
       data: data
     })
@@ -97,6 +98,7 @@ defmodule TunneldWeb.Live.Components.Modal do
         values={@default_values}
         action={@action}
         title={@title}
+        client_id={@client_id}
       />
     </div>
     """

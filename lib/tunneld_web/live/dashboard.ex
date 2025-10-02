@@ -26,7 +26,7 @@ defmodule TunneldWeb.Live.Dashboard do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "notifications")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "show_details")
-      Phoenix.PubSub.subscribe(Tunneld.PubSub, "modal:form:action")
+      Phoenix.PubSub.subscribe(Tunneld.PubSub, "modal:form:action:#{client_id}")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "status:internet")
     end
 

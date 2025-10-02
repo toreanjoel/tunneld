@@ -79,7 +79,7 @@ config :tunneld, :network,
   mullvad: "wg0-mullvad",
   gateway: "10.0.0.1"
 
-config :tunneld, version: "0.3.0"
+config :tunneld, version: "0.3.1"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
