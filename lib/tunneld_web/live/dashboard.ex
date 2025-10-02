@@ -26,7 +26,7 @@ defmodule TunneldWeb.Live.Dashboard do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "notifications")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "show_details")
-      Phoenix.PubSub.subscribe(Tunneld.PubSub, "modal:form:action:#{client_id}")
+      Phoenix.PubSub.subscribe(Tunneld.PubSub, "modal:form:action")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "status:internet")
     end
 
@@ -122,7 +122,7 @@ defmodule TunneldWeb.Live.Dashboard do
     ~H"""
     <div
       :if={@sidebar.is_open}
-      class="fixed top-0 right-0 z-40 h-screen w-screen lg:w-[30%] lg:max-w-[600px] bg-secondary system-scroll shadow-lg transition-transform duration-300 ease-in-out"
+      class="fixed top-0 right-0 z-19 h-screen w-screen lg:w-[30%] lg:max-w-[600px] bg-secondary system-scroll shadow-lg transition-transform duration-300 ease-in-out"
     >
       <button phx-click="close_details" class="absolute top-4 right-4">
         <.icon class="w-5 h-5" name="hero-x-mark" />
@@ -367,7 +367,10 @@ defmodule TunneldWeb.Live.Dashboard do
   This will have the parent dashboard view be responsible for sending update messages to components
   """
   def handle_info(%{id: id, module: module, data: data}, socket) do
-    send_update(module, id: id, data: data)
+    if not is_nil(id) do
+      send_update(module, id: id, data: data)
+    end
+
     {:noreply, socket}
   end
 
@@ -467,6 +470,8 @@ defmodule TunneldWeb.Live.Dashboard do
           Tunneld.Servers.Cloudflare.remove_host(subdomain)
         end
 
+        send(self(), :close_details)
+
       "tunneld_settings" ->
         Tunneld.Servers.Artifacts.update_artifact(data, :tunneld)
 
@@ -563,6 +568,18 @@ defmodule TunneldWeb.Live.Dashboard do
   def handle_info(:revoke_login_creds, socket) do
     {:noreply,
      put_flash(socket, :info, "Auth reset. Next login will require a new password to be setup")}
+  end
+
+  #
+  # Close the sidebar programatically without user interaction
+  #
+  def handle_info(:close_details, socket) do
+    sidebar = %{
+      is_open: false,
+      view: Map.get(socket.assigns.sidebar, :view)
+    }
+
+    {:noreply, assign(socket, :sidebar, sidebar)}
   end
 
   #

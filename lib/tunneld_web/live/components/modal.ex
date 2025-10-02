@@ -54,8 +54,8 @@ defmodule TunneldWeb.Live.Components.Modal do
   # TODO: this needs to be expanded on but the the actions should not be in here
   #
   @impl true
-  def handle_event("modal_action", %{"type" => action, "data" => data, "client_id" => client_id}, socket) do
-    Phoenix.PubSub.broadcast(Tunneld.PubSub, "modal:form:action:#{client_id}", %{
+  def handle_event("modal_action", %{"type" => action, "data" => data, "client_id" => _client_id}, socket) do
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "modal:form:action", %{
       action: action,
       data: data
     })

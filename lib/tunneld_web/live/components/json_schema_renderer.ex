@@ -171,7 +171,7 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
 
     case Validator.validate(socket.assigns.schema, params) do
       :ok ->
-        Phoenix.PubSub.broadcast(Tunneld.PubSub, "modal:form:action:#{socket.assigns.client_id}", %{
+        Phoenix.PubSub.broadcast(Tunneld.PubSub, "modal:form:action", %{
           action: socket.assigns.action,
           data: params
         })

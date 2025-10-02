@@ -240,14 +240,9 @@ defmodule Tunneld.Servers.Artifacts do
           Phoenix.PubSub.broadcast(Tunneld.PubSub, @broadcast_topic, %{
             id: @component_desktop_id,
             module: @component_module,
-            data: %{}
-          })
-
-          # Broadcast the new data structure for the sidebar component - mobile
-          Phoenix.PubSub.broadcast(Tunneld.PubSub, @broadcast_topic, %{
-            id: @component_mobile_id,
-            module: @component_module,
-            data: %{}
+            data: %{
+              id: id
+            }
           })
 
           # Broadcast to notification server
