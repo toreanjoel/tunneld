@@ -111,15 +111,16 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       assigns
       |> assign(has_data: !Enum.empty?(data))
       |> assign(gateway: Application.get_env(:tunneld, :network)[:gateway])
+      |> assign(data: data)
 
     ~H"""
     <div class="bg-secondary p-2 h-full">
       <div :if={@has_data}>
         <%!-- Sidebar header that will house metadat?  --%>
         <%= sidebar_header(assigns, %{
-          header: data.name,
+          header: @data.name,
           body:
-            data.description ||
+            @data.description ||
               "A reference to a running service accessible from this device over the network. This tracks availability and allows exposure to the internet"
         }) %>
       </div>
@@ -142,7 +143,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               "title" => "Remove",
               "payload" => %{
                 "type" => "remove_artifact",
-                "data" => %{"id" => data.id}
+                "data" => %{"id" => @data.id}
               }
             })
           }
@@ -161,20 +162,20 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         <div :if={@has_data}>
           <div class="flex flex-col p-3 mb-2 bg-primary rounded-lg font-light">
             <div class="text-sm truncate">
-              <span class="font-bold">Name:</span> <%= data.name %>
+              <span class="font-bold">Name:</span> <%= @data.name %>
             </div>
             <div class="text-sm truncate">
-              <span class="font-bold">IP:</span> <%= data.ip %>
+              <span class="font-bold">IP:</span> <%= @data.ip %>
             </div>
             <div class="text-sm truncate">
-              <span class="font-bold">Port:</span> <%= data.port %>
+              <span class="font-bold">Port:</span> <%= @data.port %>
             </div>
           </div>
 
           <div class="flex flex-row gap-2">
             <%!-- Actions Connect/Disconnect Tunnel --%>
             <div
-              :if={!Enum.empty?(data.tunneld)}
+              :if={!Enum.empty?(@data.tunneld)}
               phx-click="modal_open"
               phx-value-modal_title="Disconnect Tunnel Share?"
               phx-value-modal_body={
@@ -207,8 +208,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                   "type" => "schema",
                   "data" => Tunneld.Schema.PrivateNet.data(:settings),
                   "default_values" =>
-                    Map.merge(data.tunneld, %{
-                      "id" => data.id
+                    Map.merge(@data.tunneld, %{
+                      "id" => @data.id
                     }),
                   "action" => "tunneld_settings"
                 })

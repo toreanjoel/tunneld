@@ -3,7 +3,6 @@ defmodule TunneldWeb.Live.Components.Devices do
   The connected devices to the network and their access
   """
   use TunneldWeb, :live_component
-  alias Tunneld.Servers.Whitelist
 
   def mount(socket) do
     if connected?(socket) do

@@ -3,6 +3,7 @@ defmodule TunneldWeb.Live.Dashboard do
   Dashboard V2 Page
   """
   use TunneldWeb, :live_view
+  require Logger
   alias Tunneld.Servers.{Session}
   alias TunneldWeb.Router.Helpers, as: Routes
 

@@ -8,6 +8,7 @@ defmodule TunneldWeb.Live.Components.Services do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:services")
     end
+
     {:ok, socket}
   end
 
@@ -41,9 +42,14 @@ defmodule TunneldWeb.Live.Components.Services do
       </div>
 
       <div :if={!@loading} class="grid grid-cols-2 xl:grid-cols-3 gap-2">
-        <%= for {service, status} <- @status do %>
-          <div phx-click="show_details" phx-value-type="service" phx-value-id={service} class="bg-primary flex flex-row gap-3 py-2 px-3 items-center rounded-md hover:bg-secondary cursor-pointer">
-            <div class={"w-[13px] h-[13px] rounded-full #{status(status)}"}></div>
+        <%= for {service, service_status} <- @status do %>
+          <div
+            phx-click="show_details"
+            phx-value-type="service"
+            phx-value-id={service}
+            class="bg-primary flex flex-row gap-3 py-2 px-3 items-center rounded-md hover:bg-secondary cursor-pointer"
+          >
+            <div class={"w-[13px] h-[13px] rounded-full #{status_class(service_status)}"}></div>
             <div class="text-sm truncate"><%= service %></div>
           </div>
         <% end %>
@@ -53,6 +59,6 @@ defmodule TunneldWeb.Live.Components.Services do
   end
 
   # The status of the services on the operating system
-  defp status(service) when service === true, do: "bg-green"
-  defp status(_), do: "bg-red"
+  defp status_class(true), do: "bg-green"
+  defp status_class(_), do: "bg-red"
 end

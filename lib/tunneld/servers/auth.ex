@@ -101,8 +101,8 @@ defmodule Tunneld.Servers.Auth do
   def path(), do: "./" <> config_fs(:root) <> config_fs(:auth)
 
   # Config helper
-  defp config_fs(), do: Application.get_env(:tunneld, :fs)
-  defp config_fs(key), do: config_fs()[key]
-  defp config_auth(), do: Application.get_env(:tunneld, :auth)
-  defp config_auth(key), do: config_auth()[key]
+  defp config_fs(key), do: Application.get_env(:tunneld, :fs)[key]
+
+  # TODO: we need this?
+  # defp config_auth(key), do: Application.get_env(:tunneld, :auth)[key]
 end

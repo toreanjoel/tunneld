@@ -20,7 +20,7 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
     client_id = Map.get(assigns, :client_id, nil)
 
     # Defaults to empty if not provided
-    title = Map.get(assigns, :title, 'Submit')
+    title = Map.get(assigns, :title, "Submit")
     values = Map.get(assigns, :values, %{})
     loading = Map.get(assigns, :loading, false)
 
