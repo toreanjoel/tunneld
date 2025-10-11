@@ -23,30 +23,7 @@ defmodule TunneldWeb.Router do
     pipe_through [:browser, :set_client_id]
 
     live "/", Live.Login
-    # live "/network_diagram", Live.NetworkDiagram
     live "/dashboard", Live.Dashboard
-  end
-
-  scope "/api", TunneldWeb do
-    pipe_through [:fetch_session, :api]
-
-    # Health
-    get "/health", Controller.CLI, :health_check
-
-    # Artifacts
-    get "/artifacts", Controller.CLI, :list_artifacts
-    get "/artifacts/:id", Controller.CLI, :get_artifact
-    post "/artifacts", Controller.CLI, :add_artifact
-    post "/artifacts/:id/publish", Controller.CLI, :publish_artifact
-    post "/artifacts/:id/unpublish", Controller.CLI, :unpublish_artifact
-    post "/artifacts/:id/call", Controller.CLI, :call_artifact
-    delete "/artifacts/:id", Controller.CLI, :remove_artifact
-
-    # Nodes
-    post "/nodes/host", Controller.CLI, :host_node
-    post "/nodes/connect", Controller.CLI, :connect_node
-    post "/nodes/disconnect", Controller.CLI, :disconnect_node
-    get "/nodes", Controller.CLI, :list_nodes
   end
 
   if Application.compile_env(:tunneld, :dev_routes) do

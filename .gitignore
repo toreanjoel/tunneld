@@ -1,4 +1,4 @@
-# The directory Mix will write compiled artifacts to.
+# The directory Mix will write compiled shares to.
 /_build/
 
 # If you run "mix test --cover", coverage assets end up here.
@@ -16,7 +16,7 @@
 # If the VM crashes, it generates a dump, let's ignore it too.
 erl_crash.dump
 
-# Also ignore archive artifacts (built via "mix archive.build").
+# Also ignore archive shares (built via "mix archive.build").
 *.ez
 
 # Temporary files, for example, from tests.

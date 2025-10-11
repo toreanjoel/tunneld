@@ -4,26 +4,21 @@ defmodule Tunneld.Application do
   @moduledoc false
 
   use Application
-  alias Tunneld.Servers.FakeData.Whitelist
-
   alias Tunneld.Servers.{
     Auth,
     Session,
     Services,
     Devices,
-    Whitelist,
     Resources,
     Wlan,
-    Cloudflare,
-    Artifacts,
-    Notification,
-    Encryption
+    Shares,
   }
 
   @impl true
   def start(_type, _args) do
     IO.inspect("MAKE SURE TO SET THE MOCK_DATA ENV VAR for development")
 
+    # TODO: we need to move away from iptables if we can
     IO.inspect(
       "MAKE SURE THE OS IS USING LEGACY IPTABLES: sudo update-alternatives --set iptables /usr/sbin/iptables-legacy"
     )
@@ -37,16 +32,12 @@ defmodule Tunneld.Application do
       # Start to serve requests, typically the last entry
       TunneldWeb.Endpoint,
       {Wlan, []},
-      {Cloudflare, []},
       {Session, []},
       {Resources, []},
       {Services, []},
-      {Artifacts, []},
+      {Shares, []},
       {Devices, []},
       {Auth, []},
-      {Whitelist, []},
-      {Notification, []},
-      {Encryption, []}
     ]
 
     # This should not be async, we want this to complete before any other servers init data

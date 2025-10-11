@@ -48,8 +48,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       <%= sidebar_header(assigns, %{
         header: "Authentication",
         body:
-          "Authentication options to access the application dashboard. WebAuthn (required) after you expose dashboard as an artifact.
-        This is needed in order to remotely access artifacts"
+          "Authentication options to access the application dashboard. WebAuthn (required) after you expose dashboard as an share.
+        This is needed in order to remotely access shares"
       }) %>
 
       <div class="flex flex-row gap-1 justify-end my-2">
@@ -103,8 +103,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     """
   end
 
-  @spec render(%{:view => :artifact, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
-  def render(%{view: :artifact} = assigns) do
+  @spec render(%{:view => :share, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{view: :share} = assigns) do
     data = Map.get(assigns, :data)
 
     assigns =
@@ -127,15 +127,14 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       <div :if={@has_data} class="flex flex-row gap-1 justify-end my-2">
         <%!-- Actions to take --%>
 
-        <%!-- Actions Remove Artifact --%>
+        <%!-- Actions Remove Share --%>
         <div
           phx-click="modal_open"
-          phx-value-modal_title="Remove Artifact?"
+          phx-value-modal_title="Remove Share?"
           phx-value-modal_body={
             Jason.encode!(%{
               "type" => "string",
-              "data" =>
-                "Are you sure you want to remove the artifact? (note if there is a tunnel, this will be disconnected as well)"
+              "data" => "Are you sure you want to remove the share?"
             })
           }
           phx-value-modal_actions={
@@ -143,20 +142,20 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               "title" => "Remove",
               "payload" => %{
                 "type" => "remove_artifact",
-                "data" => %{"id" => data.id, "subdomain" => data.tunnel["subdomain"]}
+                "data" => %{"id" => data.id}
               }
             })
           }
           class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
         >
           <.icon name="hero-no-symbol" class="h-5 w-5" />
-          <div class="truncate text-xs">Remove Artifact</div>
+          <div class="truncate text-xs">Remove Share</div>
         </div>
       </div>
 
       <div class={"flex flex-col #{if !@has_data, do: "items-center justify-center p-3 h-full", else: ""}"}>
         <h1 :if={!@has_data} class="text-2xl font-light text-gray-2 my-4 text-center">
-          No Artifact details
+          No Share details
         </h1>
 
         <div :if={@has_data}>
@@ -174,56 +173,35 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
           <div class="flex flex-row gap-2">
             <%!-- Actions Connect/Disconnect Tunnel --%>
-            <div class="grow">
-              <div
-                :if={Enum.empty?(data.tunnel)}
-                phx-click="modal_open"
-                phx-value-modal_title="Connect to Cloudflare Tunnel"
-                phx-value-modal_body={
-                  Jason.encode!(%{
-                    "type" => "schema",
-                    "data" => Tunneld.Schema.Cloudflare.data(:add),
-                    "default_values" => %{
-                      service: "#{data.ip}:#{data.port}"
-                    },
-                    "action" => "connect_cloudflare"
-                  })
-                }
-                class="flex items-center justify-center gap-1 bg-orange p-2 cursor-pointer rounded-md"
-              >
-                <.icon name="hero-globe-alt" class="h-5 w-5" />
-                <div class="truncate text-xs">Connect Tunnel</div>
-              </div>
-
-              <div
-                :if={!Enum.empty?(data.tunnel)}
-                phx-click="modal_open"
-                phx-value-modal_title="Disconnect Cloudflare Tunnel?"
-                phx-value-modal_body={
-                  Jason.encode!(%{
-                    "type" => "string",
-                    "data" => "Are you sure you want make artifact inaccessible over the internet?"
-                  })
-                }
-                phx-value-modal_actions={
-                  Jason.encode!(%{
-                    "title" => "Remove Tunnel",
-                    "payload" => %{
-                      "type" => "disconnect_cloudflare",
-                      "data" => %{"subdomain" => data.tunnel["subdomain"]}
-                    }
-                  })
-                }
-                class="flex items-center justify-center gap-1 bg-orange p-2 cursor-pointer rounded-md"
-              >
-                <.icon name="hero-globe-alt" class="h-5 w-5" />
-                <div class="truncate text-xs">Disconnect Tunnel</div>
-              </div>
+            <div
+              :if={!Enum.empty?(data.tunneld)}
+              phx-click="modal_open"
+              phx-value-modal_title="Disconnect Tunnel Share?"
+              phx-value-modal_body={
+                Jason.encode!(%{
+                  "type" => "string",
+                  "data" => "Are you sure you want make share inaccessible?"
+                })
+              }
+              phx-value-modal_actions={
+                Jason.encode!(%{
+                  "title" => "Disconnect Tunnel Share",
+                  "payload" => %{
+                    "type" => "disconnect_cloudflare",
+                    # TODO: this needs to be an identifier for the share
+                    "data" => %{}
+                  }
+                })
+              }
+              class="flex items-center justify-center gap-1 bg-orange p-2 cursor-pointer rounded-md"
+            >
+              <.icon name="hero-globe-alt" class="h-5 w-5" />
+              <div class="truncate text-xs">Disconnect Tunnel Share</div>
             </div>
 
             <div
               phx-click="modal_open"
-              phx-value-modal_title="Tunneld Settings"
+              phx-value-modal_title="Tunneld Share Settings"
               phx-value-modal_body={
                 Jason.encode!(%{
                   "type" => "schema",
@@ -238,15 +216,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               class="flex grow items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
             >
               <.icon name="hero-globe-alt" class="h-5 w-5" />
-              <div class="truncate text-xs">Tunneld Settings</div>
+              <div class="truncate text-xs">Tunneld Share Settings</div>
             </div>
-          </div>
-
-          <div
-            :if={data.ip === Application.get_env(:tunneld, :network)[:gateway]}
-            class="text-xs border-2 border-solid rounded border-red p-2 text-red mt-3"
-          >
-            Note: It is highly recommended that you enable WebAuthn after exposing the gateway as a tunnel
           </div>
         </div>
       </div>

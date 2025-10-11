@@ -70,16 +70,8 @@ defmodule Tunneld.Servers.Devices do
         do: [],
         else: String.split(clean_data, "\n")
 
-    # Read whitelist policies
-    whitelist =
-      case Tunneld.Servers.Whitelist.read_file() do
-        {:ok, policies} -> policies
-        _ -> []
-      end
-
     Enum.map(leases, fn lease ->
       [lease_expiry, mac, ip, hostname, client_id] = String.split(lease, " ")
-      access = Enum.any?(whitelist, fn policy -> policy["mac"] == mac end)
 
       %{
         expiry: lease_expiry,
@@ -88,9 +80,7 @@ defmodule Tunneld.Servers.Devices do
         hostname: hostname,
         client_id: client_id,
         # You can later determine type dynamically if needed.
-        type: "",
-        # This will be true if the device is in the whitelist.
-        access: access
+        type: ""
       }
     end)
   end

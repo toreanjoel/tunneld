@@ -18,7 +18,7 @@ defmodule Iptables do
     # Make sure the devices can forward data between the different interfaces
     System.cmd("sysctl", ["-w", "net.ipv4.ip_forward=1"])
 
-    drop_all_connections()
+    # drop_all_connections()
     gateway_access()
     internet_forwarding()
     vpn_forwarding()
@@ -36,93 +36,6 @@ defmodule Iptables do
     System.cmd("iptables", ["-t", "nat", "-F"])
     System.cmd("iptables", ["-t", "mangle", "-F"])
     IO.puts("Iptables flushed.")
-  end
-
-  @doc """
-  Add user MAC entry to block internet access.
-  """
-  def add_user_entry(ip, mac) do
-    System.cmd("iptables", [
-      "-t", "mangle", "-I", "PREROUTING", "-m", "mac", "--mac-source", mac, "-d", ip, "-j", "DROP"
-    ])
-  end
-
-  def remove_user_entry(ip, mac) do
-    System.cmd("iptables", [
-      "-t", "mangle", "-D", "PREROUTING", "-m", "mac", "--mac-source", mac, "-d", ip, "-j", "DROP"
-    ])
-  end
-
-  @doc """
-  Add system-wide blocking rule.
-  """
-  def add_system_entry(ip) do
-    System.cmd("iptables", [
-      "-t", "mangle", "-I", "PREROUTING", "-d", ip, "-j", "DROP"
-    ])
-  end
-
-  def remove_system_entry(ip) do
-    System.cmd("iptables", [
-      "-t", "mangle", "-D", "PREROUTING", "-d", ip, "-j", "DROP"
-    ])
-  end
-
-  @spec has_user_entry?(binary(), binary()) :: {any(), non_neg_integer()}
-  @doc """
-  Check if a user is already blocked.
-  """
-  def has_user_entry?(ip, mac) do
-    System.cmd("iptables", [
-      "-t", "mangle", "-C", "PREROUTING", "-m", "mac", "--mac-source", mac, "-d", ip, "-j", "DROP"
-    ])
-  end
-
-  @doc """
-  Check if a system-wide block exists.
-  """
-  def has_system_entry?(ip) do
-    System.cmd("iptables", [
-      "-t", "mangle", "-C", "PREROUTING", "-d", ip, "-j", "DROP"
-    ])
-  end
-
-  @doc """
-  Grant a device (by MAC and IP) internet access by allowing FORWARD and POSTROUTING.
-  """
-  def grant_access(ip, mac) do
-    # Ensure the device can forward traffic through the internet interface
-    System.cmd("iptables", ["-I", "FORWARD", "1", "-s", ip, "-m", "mac", "--mac-source", mac, "-o", @internet_interface, "-j", "ACCEPT"])
-    System.cmd("iptables", ["-I", "FORWARD", "1", "-s", ip, "-m", "mac", "--mac-source", mac, "-o", @vpn_interface, "-j", "ACCEPT"])
-    System.cmd("iptables", ["-I", "FORWARD", "1", "-i", @internet_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
-
-    # Ensure the device is allowed through NAT
-    System.cmd("iptables", ["-I", "POSTROUTING", "1", "-t", "nat", "-s", ip, "-j", "MASQUERADE"])
-
-    IO.puts("Granted internet access to #{ip} (MAC: #{mac})")
-  end
-
-  @doc """
-  Revoke a device's internet access (block MAC and IP).
-  """
-  def revoke_access(ip, mac) do
-    System.cmd("iptables", ["-D", "FORWARD", "-s", ip, "-m", "mac", "--mac-source", mac, "-o", @internet_interface, "-j", "ACCEPT"])
-    System.cmd("iptables", ["-D", "FORWARD", "-s", ip, "-m", "mac", "--mac-source", mac, "-o", @vpn_interface, "-j", "ACCEPT"])
-    System.cmd("iptables", ["-D", "FORWARD", "-i", @internet_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
-    System.cmd("iptables", ["-D", "POSTROUTING", "-t", "nat", "-s", ip, "-j", "MASQUERADE"])
-
-    IO.puts("Revoked internet access for #{ip} (MAC: #{mac})")
-  end
-
-  @doc """
-  Drop connections from the main interfaces initially
-  """
-  defp drop_all_connections() do
-    # Block all forwarding by default
-    System.cmd("iptables", ["-P", "FORWARD", "DROP"])
-    # Block non-whitelisted users from VPN access
-    # System.cmd("iptables", ["-A", "FORWARD", "-i", @wlan0_interface, "-o", @vpn_interface, "-j", "DROP"])
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @eth_interface, "-o", @vpn_interface, "-j", "DROP"])
   end
 
   @doc """

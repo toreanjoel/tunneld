@@ -43,36 +43,8 @@ defmodule TunneldWeb.Live.Components.Devices do
           <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
         </div>
         <div class="grid grid-cols-1 gap-1">
-          <%!-- SSH interaction? --%>
-          <%!-- <div
-            phx-click="modal_open"
-            phx-value-modal_title="SSH Session Request"
-            phx-value-modal_body={
-              Jason.encode!(%{
-                "type" => "schema",
-                "data" => Tunneld.Schema.SshSession.data(),
-                "default_values" => %{
-                  ip: Tunneld.Servers.Devices.fetch_devices() |> Enum.map(fn item -> item.ip end)
-                },
-                "action" => "open_ssh_session"
-              })
-            }
-            class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1"
-          >
-            <.icon class="w-4 h-4" name="hero-command-line" />
-            <div class="truncate text-xs">SSH Session</div>
-          </div> --%>
-
           <%!-- This is the button above the devices --%>
-          <div
-            phx-click="trigger_action"
-            phx-value-action="open_node_connect"
-            phx-value-data={Jason.encode!(%{})}
-            class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
-          >
-            <.icon class="w-4 h-4" name="hero-command-line" />
-            <div class="truncate text-xs">Connect to Node</div>
-          </div>
+
         </div>
       </div>
 
@@ -98,18 +70,6 @@ defmodule TunneldWeb.Live.Components.Devices do
               <div class="grow truncate ellipsis">
                 <div class="text-sm truncate ellipsis"><%= device.hostname %></div>
               </div>
-              <div>
-                <label
-                  phx-click="toggle_access"
-                  phx-target={@myself}
-                  phx-value-mac={device.mac}
-                  class="relative inline-flex items-center cursor-pointer"
-                >
-                  <input type="checkbox" class="sr-only peer" checked={device.access} />
-                  <div class="w-9 h-5 bg-light_purple rounded-full peer-checked:bg-purple relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-light_purple after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4">
-                  </div>
-                </label>
-              </div>
             </div>
             <div class="grow" />
             <div class="text-xs"><%= device.ip %></div>
@@ -119,32 +79,5 @@ defmodule TunneldWeb.Live.Components.Devices do
       </div>
     </div>
     """
-  end
-
-  @doc """
-  Handle toggle event for granting/revoking access.
-  """
-  def handle_event("toggle_access", %{"mac" => mac}, socket) do
-    data = socket.assigns.data
-    device = Enum.find(data.devices, fn d -> d.mac == mac end)
-
-    if device do
-      if device.access do
-        IO.puts("Revoking access for device with MAC: #{mac}")
-        Whitelist.remove_device_access(mac)
-      else
-        IO.puts("Granting access for device with MAC: #{mac}")
-
-        Whitelist.add_device_access(%{
-          hostname: device.hostname,
-          ip: device.ip,
-          mac: device.mac,
-          ttl: nil,
-          status: "granted"
-        })
-      end
-    end
-
-    {:noreply, socket}
   end
 end

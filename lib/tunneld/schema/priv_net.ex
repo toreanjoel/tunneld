@@ -1,6 +1,6 @@
 defmodule Tunneld.Schema.PrivateNet do
   @moduledoc """
-  Setup PrivateNet settings to manage access over a private network to your artifacts
+  Setup PrivateNet settings to manage access over a private network to your shares
   """
 
   @spec data(atom()) :: map()
@@ -10,17 +10,17 @@ defmodule Tunneld.Schema.PrivateNet do
   def data(:settings) do
     %{
       "title" => "PrivateNet Settings",
-      "description" => "Setup artifact settings and access over the private Tunneld network",
+      "description" => "Setup share settings and access over the private Tunneld network",
       "type" => "object",
       "properties" => %{
         "id" => %{
           "type" => "string",
-          "description" => "The Id of the Artifact instance",
+          "description" => "The Id of the Share instance",
           "ui:widget" => "hidden"
         },
         "enabled" => %{
           "type" => "boolean",
-          "description" => "Enable or disable artifact availibility to other trusted users"
+          "description" => "Enable or disable share availibility to other trusted users"
         },
         "request_type" => %{
           "type" => "string",
@@ -36,7 +36,7 @@ defmodule Tunneld.Schema.PrivateNet do
         "schema" => %{
           "type" => "string",
           "description" =>
-            "The JSON schema in which the trusted user will render to interact with your artifact",
+            "The JSON schema in which the trusted user will render to interact with your share",
           "ui:widget" => "textarea"
         }
       },

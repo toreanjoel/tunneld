@@ -11,7 +11,7 @@ defmodule TunneldWeb.Live.Dashboard do
   alias TunneldWeb.Live.Components.Welcome
   alias TunneldWeb.Live.Components.Resources
   alias TunneldWeb.Live.Components.Services
-  alias TunneldWeb.Live.Components.Artifacts
+  alias TunneldWeb.Live.Components.Shares
   alias TunneldWeb.Live.Components.Devices
   alias TunneldWeb.Live.Components.Modal
 
@@ -31,17 +31,14 @@ defmodule TunneldWeb.Live.Dashboard do
     end
 
     # Check the scheme and domain to make sure it is possible to show
-    # Turn to a helper?
     uri_info = get_connect_info(socket, :uri)
-
-    correct_domain? =
-      uri_info && URI.parse(uri_info) |> Map.get(:host) == System.get_env("CF_DOMAIN")
 
     socket =
       socket
       |> assign(:client_id, client_id)
       |> assign(:uri_info, uri_info)
-      |> assign(:allow_webauthn?, correct_domain?)
+      # TODO: we need to setup web auth once we have a local cert for the device to be able to use it?
+      |> assign(:allow_webauthn?, false)
       |> assign(
         modal: %{
           show: false,
@@ -62,12 +59,6 @@ defmodule TunneldWeb.Live.Dashboard do
           internet: false
         }
       )
-      |> assign(
-        settings: %{
-          notifications: Tunneld.Servers.Notification.fetch_settings(),
-          encryption_key: Tunneld.Servers.Encryption.fetch_settings()
-        }
-      )
 
     {:ok, socket}
   end
@@ -85,7 +76,6 @@ defmodule TunneldWeb.Live.Dashboard do
       <% end %>
       <!-- Sidebar for more details -->
       <%= if not is_nil(@sidebar.view), do: sidebar(assigns) %>
-      <%!-- Modal to render confirmations and show data --%>
 
       <.live_component
         :if={@modal.show && @modal.type === :default}
@@ -100,9 +90,6 @@ defmodule TunneldWeb.Live.Dashboard do
     """
   end
 
-  #
-  # ---- Views :: Components For Dashboard----
-  #
   @spec sidebar(%{
           :allow_webauthn? => boolean(),
           :sidebar => %{is_open: boolean(), view: atom()},
@@ -129,7 +116,6 @@ defmodule TunneldWeb.Live.Dashboard do
       </button>
 
       <div class="h-full">
-        <!-- pt-14 makes room for close button -->
         <.live_component
           id="sidebar_details"
           module={SidebarDetails}
@@ -169,42 +155,6 @@ defmodule TunneldWeb.Live.Dashboard do
             Internet Access
           </div>
 
-          <%!-- General Settings --%>
-          <div
-            phx-click="modal_open"
-            phx-value-modal_title="Notification Settings"
-            phx-value-modal_body={
-              Jason.encode!(%{
-                "type" => "schema",
-                "data" => Tunneld.Schema.Settings.data(:notifications),
-                "default_values" => @settings.notifications,
-                "action" => "update_notifications"
-              })
-            }
-            class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1"
-          >
-            <.icon name="hero-cog-6-tooth" class="h-15 w-15" />
-          </div>
-
-          <div
-            phx-click="modal_open"
-            phx-value-modal_title="Encryption Settings"
-            phx-value-modal_body={
-              Jason.encode!(%{
-                "type" => "schema",
-                "data" => Tunneld.Schema.Settings.data(:encryption),
-                "default_values" => %{
-                  "encryption_key" => @settings.encryption_key
-                },
-                "action" => "copy_encryption_key",
-                "title" => "Copy"
-              })
-            }
-            class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1"
-          >
-            <.icon name="hero-key" class="h-15 w-15" />
-          </div>
-
           <%!-- Auth Settings  --%>
           <div
             phx-click="show_details"
@@ -224,7 +174,7 @@ defmodule TunneldWeb.Live.Dashboard do
         </div>
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
-        <%!-- Resources, Artifacts and Services  --%>
+        <%!-- Resources, Shares and Services  --%>
         <div class="flex flex-col md:flex-row w-full gap-6">
           <div class="flex-1"><.live_component id="resources" module={Resources} /></div>
           <div class="flex-1">
@@ -234,9 +184,9 @@ defmodule TunneldWeb.Live.Dashboard do
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
 
-        <%!-- Artifacts --%>
+        <%!-- Shares --%>
         <div class="min-h-[200px]">
-          <.live_component id="artifacts" module={Artifacts} />
+          <.live_component id="shares" module={Shares} />
         </div>
 
         <%!-- Devices --%>
@@ -260,9 +210,6 @@ defmodule TunneldWeb.Live.Dashboard do
     """
   end
 
-  #
-  # ---- Events :: Client Side Interaction ----
-  #
   @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
   @doc """
@@ -321,6 +268,17 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   #
+  # Trigger actions
+  #
+  def handle_event("trigger_action", params, socket) do
+    action = params["action"]
+    data = Jason.decode!(params["data"])
+
+    send(self(), %{action: action, data: data})
+    {:noreply, socket}
+  end
+
+  #
   # Open the modal
   #
   def handle_event("modal_open", params, socket) do
@@ -339,17 +297,6 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   #
-  # Trigger actions
-  #
-  def handle_event("trigger_action", params, socket) do
-    action = params["action"]
-    data = Jason.decode!(params["data"])
-
-    send(self(), %{action: action, data: data})
-    {:noreply, socket}
-  end
-
-  #
   # Close the modal
   #
   def handle_event("modal_close", _params, socket) do
@@ -358,9 +305,6 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, assign(socket, :modal, modal_data)}
   end
 
-  #
-  # ---- handle component updated message :: Client Side Interaction ----
-  #
   @spec handle_info(%{id: String.t(), module: atom(), data: map()}, Phoenix.LiveView.Socket.t()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
   @doc """
@@ -433,47 +377,18 @@ defmodule TunneldWeb.Live.Dashboard do
         send(self(), :revoke_login_creds)
 
       #
-      # Cloudflare
-      #
-      "connect_cloudflare" ->
-        Tunneld.Servers.Cloudflare.add_host(data["service"], data["domain"])
-
-      "disconnect_cloudflare" ->
-        %{"subdomain" => subdomain} = Jason.decode!(data)
-        Tunneld.Servers.Cloudflare.remove_host(subdomain)
-
-      #
-      # Artifacts
+      # Shares
       #
       "add_artifact" ->
-        Tunneld.Servers.Artifacts.add_artifact(data)
-
-      #
-      # Notification Settings
-      #
-      "update_notifications" ->
-        resp = Tunneld.Servers.Notification.update_settings(data)
-        send(self(), {:update_notification_settings, resp})
-
-      #
-      # Encryption Settings
-      #
-      "copy_encryption_key" ->
-        %{"encryption_key" => key} = data
-        send(self(), {:copy_encyption_key, key})
+        Tunneld.Servers.Shares.add_artifact(data)
 
       "remove_artifact" ->
-        %{"id" => id, "subdomain" => subdomain} = Jason.decode!(data)
-        Tunneld.Servers.Artifacts.remove_artifact(id)
-
-        if subdomain do
-          Tunneld.Servers.Cloudflare.remove_host(subdomain)
-        end
-
+        %{"id" => id} = Jason.decode!(data)
+        Tunneld.Servers.Shares.remove_artifact(id)
         send(self(), :close_details)
 
       "tunneld_settings" ->
-        Tunneld.Servers.Artifacts.update_artifact(data, :tunneld)
+        Tunneld.Servers.Shares.update_artifact(data, :tunneld)
 
       _ ->
         Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
@@ -501,31 +416,6 @@ defmodule TunneldWeb.Live.Dashboard do
     IO.inspect("Staring delayed scan for wireless networks")
     Tunneld.Servers.Wlan.scan_networks()
     {:noreply, socket}
-  end
-
-  #
-  # Copy the encryption key to the client clipboard
-  #
-  def handle_info({:copy_encyption_key, key}, socket) do
-    socket =
-      socket
-      |> push_event("copy_to_clipboard", %{text: key})
-      |> put_flash(:info, "Copied to clipboard!")
-
-    {:noreply, socket}
-  end
-
-  #
-  # Handle the success case of updating notification settings
-  # We update the state for the form
-  #
-  def handle_info({:update_notification_settings, {:ok, data}}, socket) do
-    settings = %{
-      socket.assigns.settings
-      | notifications: data
-    }
-
-    {:noreply, assign(socket, :settings, settings)}
   end
 
   #
@@ -600,9 +490,9 @@ defmodule TunneldWeb.Live.Dashboard do
   #
   defp get_sidebar_details(type, id) do
     case type do
-      "artifact" ->
-        Tunneld.Servers.Artifacts.get_artifact(id)
-        :artifact
+      "share" ->
+        Tunneld.Servers.Shares.get_artifact(id)
+        :share
 
       "service" ->
         Tunneld.Servers.Services.get_service_logs(id)

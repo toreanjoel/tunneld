@@ -65,9 +65,6 @@ defmodule Tunneld.Servers.Wlan do
       Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{ type: :info, message: "Disconnected from network"})
       Logger.info("Disconencted from network")
 
-      # Broadcast to notification server
-      Tunneld.Servers.Notification.trigger({:info, "Disconnected from wireless network"})
-
       # send relevant events to the main dashboard
       check_connection()
       {:reply, :ok, state}
@@ -115,6 +112,7 @@ defmodule Tunneld.Servers.Wlan do
   def handle_cast({:connect, ssid, password}, state) do
     Logger.info("Connecting to Wi-Fi: #{ssid}...")
 
+    # TODO: The country and the freq needs to change, freq is a bug but ZA needs to be set on env
     new_config = """
     country=ZA
     ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
@@ -125,6 +123,7 @@ defmodule Tunneld.Servers.Wlan do
         psk="#{password}"
         auth_alg=OPEN
         key_mgmt=WPA-PSK
+        freq_list=2412 2437 2462
     }
     """
 
@@ -141,9 +140,6 @@ defmodule Tunneld.Servers.Wlan do
     System.cmd("dhcpcd", [@interface])
 
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{ type: :info, message: "Connected to network #{ssid} successfully"})
-
-    # Broadcast to notification server
-    Tunneld.Servers.Notification.trigger({:info, "Connected from wireless network"})
     # send relevant events to the main dashboard
     check_connection()
 

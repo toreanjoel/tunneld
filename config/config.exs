@@ -66,13 +66,9 @@ config :tunneld, :auth,
 config :tunneld, :fs,
   root: "/data",
   auth: "/auth.json",
-  whitelist: "/whitelist.json",
-  tunnels: "/cloudflare_tunnels.json",
-  artifacts: "/artifacts.json",
-  notifications: "/notifications.json",
-  encryption: "/encryption.json"
+  shares: "/shares.json"
 
-# TODO: This needs to come from env variables from runtime config
+# TODO: Pull WIFI interface from system or env after user setup
 config :tunneld, :network,
   wlan: "wlx202351114745",
   eth: "end0",
