@@ -28,16 +28,30 @@ end
 # Get the set gateway address
 if System.get_env("GATEWAY") do
   config :tunneld, :network, gateway: System.get_env("GATEWAY")
+else
+  raise "Missing ENV. Required GATEWAY"
 end
 
 # Set the upstream internet wireless interface
 if System.get_env("WIFI_INTERFACE") do
   config :tunneld, :network, wlan: System.get_env("WIFI_INTERFACE")
+else
+  raise "Missing ENV. Required WIFI_INTERFACE"
 end
 
 # Set the downstream interface for internet passthrough
 if System.get_env("LAN_INTERFACE") do
   config :tunneld, :network, eth: System.get_env("LAN_INTERFACE")
+else
+  raise "Missing ENV. Required LAN_INTERFACE"
+end
+
+# NOTE: this might change and be removed down the line
+# Mullvad virtual interface setup
+if System.get_env("MULLVAD_INTERFACE") do
+  config :tunneld, :network, mullvad: System.get_env("MULLVAD_INTERFACE")
+else
+  raise "Missing ENV. Required MULLVAD_INTERFACE"
 end
 
 if config_env() == :prod do

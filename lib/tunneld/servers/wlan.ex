@@ -5,10 +5,7 @@ defmodule Tunneld.Servers.Wlan do
   use GenServer
   require Logger
 
-  # TODO: Add the dynamic from config for the interface and the broadcasting to the UI
-
   # Define the Wi-Fi interface used for internet
-  @interface Application.compile_env!(:tunneld, [:network, :wlan])
   @wpa_config "/etc/wpa_supplicant/wpa_supplicant.conf"
   @conn_interval_checker 15_000
 
@@ -60,7 +57,7 @@ defmodule Tunneld.Servers.Wlan do
       {:reply, :ok, state}
     else
       # Disconnect from current network
-      System.cmd("wpa_cli", ["-i", @interface, "disconnect"])
+      System.cmd("wpa_cli", ["-i", Application.fetch_env!(:tunneld, [:network, :wlan]), "disconnect"])
 
       Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{ type: :info, message: "Disconnected from network"})
       Logger.info("Disconencted from network")

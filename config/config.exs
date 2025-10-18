@@ -68,13 +68,6 @@ config :tunneld, :fs,
   auth: "/auth.json",
   shares: "/shares.json"
 
-# TODO: Pull WIFI interface from system or env after user setup
-config :tunneld, :network,
-  wlan: "wlx202351114745",
-  eth: "end0",
-  mullvad: "wg0-mullvad",
-  gateway: "10.0.0.1"
-
 config :tunneld, version: "0.4.0"
 
 # Import environment specific config. This must remain at the bottom
