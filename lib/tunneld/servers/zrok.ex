@@ -4,13 +4,15 @@ defmodule Tunneld.Servers.Zrok do
   require Logger
 
   @pubsub Tunneld.PubSub
-  @topic_main "component:shares"
   @topic_notif "notifications"
+
+  @broadcast_topic "component:details"
+  @component_desktop_id "sidebar_details"
+  @component_module TunneldWeb.Live.Components.Sidebar.Details
 
   @linux_systemd_dir "/etc/systemd/system"
   @unit_prefix "zrok-"
   @unit_suffix ".service"
-  @status_interval 10_000
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -31,50 +33,43 @@ defmodule Tunneld.Servers.Zrok do
       mock?: mock?
     }
 
-    Process.send_after(self(), :tick, @status_interval)
+    # TODO: we need to check the cmd and check the data existing there and not the file, that is the source of truth
+
     {:ok, state}
   end
 
   @impl true
-  def handle_call({:configure, endpoint}, _from, state) do
-    case zrok_config_set(endpoint) do
-      :ok ->
-        notify(:info, "zrok apiEndpoint set")
-        {:reply, :ok, %{state | api_endpoint: endpoint}}
-
-      {:error, r} ->
-        notify(:error, "failed to set zrok apiEndpoint")
-        {:reply, {:error, r}, state}
-    end
+  def handle_cast(:details, state) do
+    send(self(), :broadcast_details)
+    {:noreply, state}
   end
 
+  @impl true
   def handle_call({:set_api_endpoint, endpoint}, _from, state) do
     case zrok_config_set(endpoint) do
       :ok ->
-        notify(:info, "zrok apiEndpoint updated")
+        send(self(), :broadcast_details)
+        notify(:info, "Endpoint to network set")
         {:reply, :ok, %{state | api_endpoint: endpoint}}
 
       {:error, r} ->
-        notify(:error, "failed to update zrok apiEndpoint")
+        notify(:error, "Failed to set endpoint")
         {:reply, {:error, r}, state}
     end
   end
 
-  def handle_call(:get_api_endpoint, _from, state) do
-    case zrok_config_get() do
-      {:ok, ep} -> {:reply, {:ok, ep}, %{state | api_endpoint: ep}}
-      {:error, r} -> {:reply, {:error, r}, state}
-    end
-  end
-
+  # We disable before removing from the network
   def handle_call(:unset_api_endpoint, _from, state) do
+    # This might fail but we need to try and do this first - need better checks
+    run(zrok_bin(), ["disable"])
     case zrok_config_unset() do
       :ok ->
-        notify(:info, "zrok apiEndpoint unset")
+        send(self(), :broadcast_details)
+        notify(:info, "Unset the network endpoint successfully")
         {:reply, :ok, %{state | api_endpoint: nil}}
 
       {:error, r} ->
-        notify(:error, "failed to unset zrok apiEndpoint")
+        notify(:error, "Failed to unset network endpoint")
         {:reply, {:error, r}, state}
     end
   end
@@ -82,11 +77,12 @@ defmodule Tunneld.Servers.Zrok do
   def handle_call({:enable_env, token}, _from, state) do
     case run(zrok_bin(), ["enable", token]) do
       {_, 0} ->
-        notify(:info, "zrok environment enabled")
+        send(self(), :broadcast_details)
+        notify(:info, "Device enabled successfully to network account")
         {:reply, :ok, %{state | enabled?: true}}
 
       err ->
-        notify(:error, "failed to enable zrok environment")
+        notify(:error, "Failed to enable device on network account")
         {:reply, {:error, err}, state}
     end
   end
@@ -94,11 +90,12 @@ defmodule Tunneld.Servers.Zrok do
   def handle_call(:disable_env, _from, state) do
     case run(zrok_bin(), ["disable"]) do
       {_, 0} ->
-        notify(:info, "zrok environment disabled")
+        send(self(), :broadcast_details)
+        notify(:info, "Environment disabled")
         {:reply, :ok, %{state | enabled?: false}}
 
       err ->
-        notify(:error, "failed to disable zrok environment")
+        notify(:error, "Failed to disable environment")
         {:reply, {:error, err}, state}
     end
   end
@@ -145,11 +142,11 @@ defmodule Tunneld.Servers.Zrok do
          :ok <- write_unit(state.systemd_dir, unit_name, content),
          :ok <- daemon_reload(state) do
       units = Map.put(state.units, id, %{unit: unit_name, id: id})
-      notify(:info, "zrok unit created: #{unit_name}")
+      notify(:info, "Unit created: #{unit_name}")
       {:reply, {:ok, %{id: id, unit: unit_name}}, %{state | units: units}}
     else
       {:error, reason} ->
-        notify(:error, "failed to create zrok unit")
+        notify(:error, "Failed to create unit")
         {:reply, {:error, reason}, state}
     end
   end
@@ -159,11 +156,11 @@ defmodule Tunneld.Servers.Zrok do
       {:ok, %{unit: unit}} ->
         case do_enable(unit, state) do
           :ok ->
-            notify(:info, "zrok share enabled: #{id}")
+            notify(:info, "Share enabled: #{id}")
             {:reply, :ok, state}
 
           {:error, r} ->
-            notify(:error, "failed to enable share: #{id}")
+            notify(:error, "Failed to enable share: #{id}")
             {:reply, {:error, r}, state}
         end
 
@@ -177,11 +174,11 @@ defmodule Tunneld.Servers.Zrok do
       {:ok, %{unit: unit}} ->
         case do_disable(unit, state) do
           :ok ->
-            notify(:info, "zrok share disabled: #{id}")
+            notify(:info, "Share disabled: #{id}")
             {:reply, :ok, state}
 
           {:error, r} ->
-            notify(:error, "failed to disable share: #{id}")
+            notify(:error, "Failed to disable share: #{id}")
             {:reply, {:error, r}, state}
         end
 
@@ -198,11 +195,11 @@ defmodule Tunneld.Servers.Zrok do
         case File.rm(unit_path(state.systemd_dir, unit)) do
           :ok ->
             _ = daemon_reload(state)
-            notify(:info, "zrok share removed: #{id}")
+            notify(:info, "Share removed: #{id}")
             {:reply, :ok, %{state | units: Map.delete(state.units, id)}}
 
           {:error, r} ->
-            notify(:error, "failed to remove service file: #{unit}")
+            notify(:error, "Failed to remove service file: #{unit}")
             {:reply, {:error, r}, state}
         end
 
@@ -228,15 +225,37 @@ defmodule Tunneld.Servers.Zrok do
   end
 
   @impl true
-  def handle_info(:tick, state) do
-    Phoenix.PubSub.broadcast(@pubsub, @topic_main, %{
-      id: "zrok_units",
-      module: TunneldWeb.Live.Components.Shares,
-      data: discover_units_list(state)
+  def handle_info(:broadcast_details, state) do
+    enabled = zrok_enabled?()
+
+    endpoint =
+      case zrok_config_get() do
+        {:ok, ep} -> ep |> String.split(" = ") |> Enum.at(1)
+        _ -> nil
+      end
+
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, @broadcast_topic, %{
+      id: @component_desktop_id,
+      module: @component_module,
+      data: %{
+        enabled?: enabled,
+        api_endpoint: endpoint || false
+      }
     })
 
-    Process.send_after(self(), :tick, @status_interval)
     {:noreply, state}
+  end
+
+  defp zrok_enabled?() do
+    case run(zrok_bin(), ["status"]) do
+      {out, 0} ->
+        # look for definitive keywords in the output
+        String.contains?(out, "enabled") or String.contains?(out, "logged in") or
+          String.contains?(out, "Environment")
+
+      _ ->
+        false
+    end
   end
 
   defp zrok_config_set(endpoint) do
@@ -341,7 +360,7 @@ defmodule Tunneld.Servers.Zrok do
   defp daemon_reload(_), do: systemctl(["daemon-reload"])
   defp unit_path(dir, unit), do: Path.join(dir, unit)
 
-  defp unit_active?(unit, %{mock?: true, systemd_dir: dir} = state) do
+  defp unit_active?(unit, %{mock?: true, systemd_dir: dir} = _state) do
     marker = Path.join(dir, unit <> ".enabled")
 
     case File.exists?(marker) do
@@ -509,9 +528,6 @@ defmodule Tunneld.Servers.Zrok do
     Phoenix.PubSub.broadcast(@pubsub, @topic_notif, %{type: type, message: message})
   end
 
-  def configure(%{api_endpoint: endpoint}),
-    do: GenServer.call(__MODULE__, {:configure, endpoint}, 30_000)
-
   def set_api_endpoint(endpoint),
     do: GenServer.call(__MODULE__, {:set_api_endpoint, endpoint}, 30_000)
 
@@ -537,6 +553,6 @@ defmodule Tunneld.Servers.Zrok do
   def enable_share(id), do: GenServer.call(__MODULE__, {:enable_share, id}, 30_000)
   def disable_share(id), do: GenServer.call(__MODULE__, {:disable_share, id}, 30_000)
   def remove_share(id), do: GenServer.call(__MODULE__, {:remove_share, id}, 30_000)
-  def status(id), do: GenServer.call(__MODULE__, {:status, id}, 15_000)
   def list(), do: GenServer.call(__MODULE__, :list, 15_000)
+  def get_details(), do: GenServer.cast(__MODULE__, :details)
 end

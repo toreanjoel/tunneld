@@ -228,13 +228,18 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
   @spec render(%{:view => :zrok, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :zrok} = assigns) do
-    data = Map.get(assigns, :data)
+    data = Map.get(assigns, :data, %{})
 
-    # assigns =
-    #   assigns
-    #   |> assign(networks: Map.get(data, :networks, []))
-    #   |> assign(info: Map.get(data, :info, %{}))
-    #   |> assign(count: data |> List.wrap() |> length())
+    # unset check
+    unset_check = Map.get(data, :api_endpoint, "") |> String.contains?("unset")
+    default_endpoint = if unset_check, do: nil, else: Map.get(data, :api_endpoint, nil)
+
+    assigns =
+      assigns
+      |> assign(enabled: Map.get(data, :enabled?, nil))
+      |> assign(endpoint: default_endpoint)
+      |> assign(is_unset: unset_check)
+      |> assign(has_data: not Enum.empty?(data))
 
     ~H"""
     <div class="bg-secondary p-2 h-full">
@@ -244,17 +249,46 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         body: "Set up this device to operate within your overlay control plane environment"
       }) %>
 
-      <div class="flex flex-row gap-1 justify-end my-2">
-        <%!-- Actions to take --%>
+      <div :if={@has_data} class="flex flex-row gap-1 justify-end my-2">
+        <%!-- Setup endpoint  --%>
         <div
+          :if={not @is_unset}
+          phx-click="modal_open"
+          phx-value-modal_title="Remove Network Endpoint?"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "string",
+              "data" =>
+                "This will remove the server you are set to connec to, you need to disable from the env to add to a new network"
+            })
+          }
+          phx-value-modal_actions={
+            Jason.encode!(%{
+              "title" => "Remove Network Endpoint",
+              "payload" => %{
+                "type" => "configure_disable_control_plane",
+                "data" => %{}
+              }
+            })
+          }
+          class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
+        >
+          <.icon name="hero-no-symbol" class="h-5 w-5" />
+          <div class="truncate text-xs">Remove Control Plane</div>
+        </div>
+
+        <div
+          :if={@is_unset}
           phx-click="modal_open"
           phx-value-modal_title="Configure Network Endpoint"
           phx-value-modal_body={
             Jason.encode!(%{
               "type" => "schema",
               "data" => Tunneld.Schema.Zrok.data(:endpoint),
-              "default_values" => %{},
-              "action" => "configure_control_plane"
+              "default_values" => %{
+                url: @endpoint
+              },
+              "action" => "configure_enable_control_plane"
             })
           }
           class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
@@ -263,7 +297,35 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <div class="truncate text-xs text-gray-1">Configure Control Plane</div>
         </div>
 
+        <%!-- enabled options --%>
         <div
+          :if={@enabled}
+          phx-click="modal_open"
+          phx-value-modal_title="Disable and disconnect device?"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "string",
+              "data" =>
+                "This will disable your device and disconnect it from the current account as an environment"
+            })
+          }
+          phx-value-modal_actions={
+            Jason.encode!(%{
+              "title" => "Disable Environment",
+              "payload" => %{
+                "type" => "configure_disable_environment",
+                "data" => %{}
+              }
+            })
+          }
+          class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
+        >
+          <.icon name="hero-no-symbol" class="h-5 w-5" />
+          <div class="truncate text-xs">Disable Device</div>
+        </div>
+
+        <div
+          :if={not @enabled}
           phx-click="modal_open"
           phx-value-modal_title="Configure device"
           phx-value-modal_body={
@@ -271,7 +333,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               "type" => "schema",
               "data" => Tunneld.Schema.Zrok.data(:conf_device),
               "default_values" => %{},
-              "action" => "configure_environment"
+              "action" => "configure_enable_environment"
             })
           }
           class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"

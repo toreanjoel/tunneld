@@ -12,8 +12,10 @@ defmodule Tunneld.Schema.Zrok do
       "properties" => %{
         "url" => %{
           "type" => "string",
-          "description" => "The URL endpoint of the control plane",
-        },
+          "format" => "uri",
+          "minLength" => 1,
+          "description" => "The URL endpoint of the control plane"
+        }
       },
       "required" => ["url"]
     }
@@ -28,8 +30,10 @@ defmodule Tunneld.Schema.Zrok do
       "properties" => %{
         "account_token" => %{
           "type" => "string",
-          "description" => "The account token to enable this device against",
-        },
+          "format" => "password",
+          "minLength" => 1,
+          "description" => "The account token to enable this device against"
+        }
       },
       "required" => ["account_token"]
     }

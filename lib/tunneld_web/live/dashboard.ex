@@ -383,14 +383,26 @@ defmodule TunneldWeb.Live.Dashboard do
       #
       # The setup to configure control plane domain
       #
-      "configure_control_plane" ->
-        IO.inspect(data["url"], label: "configure_control_plane")
+      "configure_disable_control_plane" ->
+        Tunneld.Servers.Zrok.unset_api_endpoint()
 
       #
-      # Configure device
+      # The setup to configure control plane domain
       #
-      "configure_environment" ->
-        IO.inspect(data["account_token"], label: "configure_environment")
+      "configure_enable_control_plane" ->
+        Tunneld.Servers.Zrok.set_api_endpoint(data["url"])
+
+      #
+      # Configure device - enable
+      #
+      "configure_enable_environment" ->
+        Tunneld.Servers.Zrok.enable_env(data["account_token"])
+
+      #
+      # Configure device - disable
+      #
+      "configure_disable_environment" ->
+        Tunneld.Servers.Zrok.disable_env()
 
       #
       # Revoke Login Credentials
@@ -514,7 +526,6 @@ defmodule TunneldWeb.Live.Dashboard do
   defp get_sidebar_details(type, id) do
     case type do
       "share" ->
-        IO.inspect("fetching")
         Tunneld.Servers.Shares.get_share(id)
         :share
 
@@ -527,6 +538,8 @@ defmodule TunneldWeb.Live.Dashboard do
         :wlan
 
       "zrok" ->
+        # Get the current state so we can prepopulate
+        Tunneld.Servers.Zrok.get_details()
         :zrok
 
       "authentication" ->
