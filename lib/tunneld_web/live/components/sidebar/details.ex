@@ -226,6 +226,64 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     """
   end
 
+  @spec render(%{:view => :zrok, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{view: :zrok} = assigns) do
+    data = Map.get(assigns, :data)
+
+    # assigns =
+    #   assigns
+    #   |> assign(networks: Map.get(data, :networks, []))
+    #   |> assign(info: Map.get(data, :info, %{}))
+    #   |> assign(count: data |> List.wrap() |> length())
+
+    ~H"""
+    <div class="bg-secondary p-2 h-full">
+      <%!-- Sidebar header that will house metadat?  --%>
+      <%= sidebar_header(assigns, %{
+        header: "Overlay Network Settings",
+        body: "Set up this device to operate within your overlay control plane environment"
+      }) %>
+
+      <div class="flex flex-row gap-1 justify-end my-2">
+        <%!-- Actions to take --%>
+        <div
+          phx-click="modal_open"
+          phx-value-modal_title="Configure Network Endpoint"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "schema",
+              "data" => Tunneld.Schema.Zrok.data(:endpoint),
+              "default_values" => %{},
+              "action" => "configure_control_plane"
+            })
+          }
+          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+        >
+          <.icon class="w-4 h-4" name="hero-globe-alt" />
+          <div class="truncate text-xs text-gray-1">Configure Control Plane</div>
+        </div>
+
+        <div
+          phx-click="modal_open"
+          phx-value-modal_title="Configure device"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "schema",
+              "data" => Tunneld.Schema.Zrok.data(:conf_device),
+              "default_values" => %{},
+              "action" => "configure_environment"
+            })
+          }
+          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+        >
+          <.icon class="w-4 h-4" name="hero-link" />
+          <div class="truncate text-xs text-gray-1">Enable Device</div>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
   @spec render(%{:view => :wlan, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :wlan} = assigns) do
     data = Map.get(assigns, :data)

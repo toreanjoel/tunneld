@@ -146,7 +146,17 @@ defmodule TunneldWeb.Live.Dashboard do
         <div class="flex-1" />
 
         <div class="flex flex-row gap-1">
-          <%!-- Internet Access Placeholder --%>
+          <%!-- Private Network Access --%>
+          <div
+            phx-click="show_details"
+            phx-value-type="zrok"
+            phx-value-id="_"
+            class="bg-purple flex flex-row gap-3 py-2 px-3 items-center rounded-md cursor-pointer"
+          >
+            Configure Network
+          </div>
+
+          <%!-- Internet Access --%>
           <div
             phx-click="show_details"
             phx-value-type="wlan"
@@ -371,6 +381,18 @@ defmodule TunneldWeb.Live.Dashboard do
         send(self(), :configure_web_authn)
 
       #
+      # The setup to configure control plane domain
+      #
+      "configure_control_plane" ->
+        IO.inspect(data["url"], label: "configure_control_plane")
+
+      #
+      # Configure device
+      #
+      "configure_environment" ->
+        IO.inspect(data["account_token"], label: "configure_environment")
+
+      #
       # Revoke Login Credentials
       #
       "revoke_login_creds" ->
@@ -503,6 +525,9 @@ defmodule TunneldWeb.Live.Dashboard do
       "wlan" ->
         Tunneld.Servers.Wlan.scan_networks()
         :wlan
+
+      "zrok" ->
+        :zrok
 
       "authentication" ->
         :authentication
