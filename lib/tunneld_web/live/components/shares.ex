@@ -44,7 +44,7 @@ defmodule TunneldWeb.Live.Components.Shares do
               "type" => "schema",
               "data" => Tunneld.Schema.Share.data(:add),
               "default_values" => %{},
-              "action" => "add_artifact"
+              "action" => "add_share"
             })
           }
           class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"

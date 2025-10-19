@@ -47,12 +47,8 @@ else
 end
 
 # NOTE: this might change and be removed down the line
-# Mullvad virtual interface setup
-if System.get_env("MULLVAD_INTERFACE") do
-  config :tunneld, :network, mullvad: System.get_env("MULLVAD_INTERFACE")
-else
-  raise "Missing ENV. Required MULLVAD_INTERFACE"
-end
+# This is optional - users that use mullvad, need to add the device interface
+config :tunneld, :network, mullvad: System.get_env("MULLVAD_INTERFACE", "")
 
 if config_env() == :prod do
   # The secret key base is used to sign/encrypt cookies and other secrets.

@@ -1,0 +1,542 @@
+defmodule Tunneld.Servers.Zrok do
+  @moduledoc false
+  use GenServer
+  require Logger
+
+  @pubsub Tunneld.PubSub
+  @topic_main "component:shares"
+  @topic_notif "notifications"
+
+  @linux_systemd_dir "/etc/systemd/system"
+  @unit_prefix "zrok-"
+  @unit_suffix ".service"
+  @status_interval 10_000
+
+  def start_link(_) do
+    GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
+  end
+
+  @impl true
+  def init(_) do
+    mock? = Application.get_env(:tunneld, :mock_data, false)
+    sdir = if mock?, do: Path.join([cwd(), fs_root(), "zrok", "units"]), else: @linux_systemd_dir
+    :ok = ensure_dir(sdir)
+    units = discover_units(sdir, mock?)
+
+    state = %{
+      api_endpoint: nil,
+      enabled?: false,
+      units: units,
+      systemd_dir: sdir,
+      mock?: mock?
+    }
+
+    Process.send_after(self(), :tick, @status_interval)
+    {:ok, state}
+  end
+
+  @impl true
+  def handle_call({:configure, endpoint}, _from, state) do
+    case zrok_config_set(endpoint) do
+      :ok ->
+        notify(:info, "zrok apiEndpoint set")
+        {:reply, :ok, %{state | api_endpoint: endpoint}}
+
+      {:error, r} ->
+        notify(:error, "failed to set zrok apiEndpoint")
+        {:reply, {:error, r}, state}
+    end
+  end
+
+  def handle_call({:set_api_endpoint, endpoint}, _from, state) do
+    case zrok_config_set(endpoint) do
+      :ok ->
+        notify(:info, "zrok apiEndpoint updated")
+        {:reply, :ok, %{state | api_endpoint: endpoint}}
+
+      {:error, r} ->
+        notify(:error, "failed to update zrok apiEndpoint")
+        {:reply, {:error, r}, state}
+    end
+  end
+
+  def handle_call(:get_api_endpoint, _from, state) do
+    case zrok_config_get() do
+      {:ok, ep} -> {:reply, {:ok, ep}, %{state | api_endpoint: ep}}
+      {:error, r} -> {:reply, {:error, r}, state}
+    end
+  end
+
+  def handle_call(:unset_api_endpoint, _from, state) do
+    case zrok_config_unset() do
+      :ok ->
+        notify(:info, "zrok apiEndpoint unset")
+        {:reply, :ok, %{state | api_endpoint: nil}}
+
+      {:error, r} ->
+        notify(:error, "failed to unset zrok apiEndpoint")
+        {:reply, {:error, r}, state}
+    end
+  end
+
+  def handle_call({:enable_env, token}, _from, state) do
+    case run(zrok_bin(), ["enable", token]) do
+      {_, 0} ->
+        notify(:info, "zrok environment enabled")
+        {:reply, :ok, %{state | enabled?: true}}
+
+      err ->
+        notify(:error, "failed to enable zrok environment")
+        {:reply, {:error, err}, state}
+    end
+  end
+
+  def handle_call(:disable_env, _from, state) do
+    case run(zrok_bin(), ["disable"]) do
+      {_, 0} ->
+        notify(:info, "zrok environment disabled")
+        {:reply, :ok, %{state | enabled?: false}}
+
+      err ->
+        notify(:error, "failed to disable zrok environment")
+        {:reply, {:error, err}, state}
+    end
+  end
+
+  def handle_call({:reserve_public, %{name: name, ip: ip, port: port}}, _from, state) do
+    case run(zrok_bin(), [
+           "reserve",
+           "public",
+           "--unique-name",
+           name,
+           "--backend-mode",
+           "proxy",
+           "#{ip}:#{port}"
+         ]) do
+      {_, 0} -> {:reply, :ok, state}
+      err -> {:reply, {:error, err}, state}
+    end
+  end
+
+  def handle_call({:reserve_private, %{name: name, ip: ip, port: port}}, _from, state) do
+    case run(zrok_bin(), [
+           "reserve",
+           "private",
+           "--unique-name",
+           name,
+           "--backend-mode",
+           "proxy",
+           "#{ip}:#{port}"
+         ]) do
+      {_, 0} -> {:reply, :ok, state}
+      err -> {:reply, {:error, err}, state}
+    end
+  end
+
+  def handle_call({:release_reserved, name}, _from, state) do
+    case run(zrok_bin(), ["release", name]) do
+      {_, 0} -> {:reply, :ok, state}
+      err -> {:reply, {:error, err}, state}
+    end
+  end
+
+  def handle_call({:create_share_unit, share_map}, _from, state) do
+    with {:ok, {id, unit_name, content}} <- build_unit(share_map, state),
+         :ok <- write_unit(state.systemd_dir, unit_name, content),
+         :ok <- daemon_reload(state) do
+      units = Map.put(state.units, id, %{unit: unit_name, id: id})
+      notify(:info, "zrok unit created: #{unit_name}")
+      {:reply, {:ok, %{id: id, unit: unit_name}}, %{state | units: units}}
+    else
+      {:error, reason} ->
+        notify(:error, "failed to create zrok unit")
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call({:enable_share, id}, _from, state) do
+    case Map.fetch(state.units, id) do
+      {:ok, %{unit: unit}} ->
+        case do_enable(unit, state) do
+          :ok ->
+            notify(:info, "zrok share enabled: #{id}")
+            {:reply, :ok, state}
+
+          {:error, r} ->
+            notify(:error, "failed to enable share: #{id}")
+            {:reply, {:error, r}, state}
+        end
+
+      :error ->
+        {:reply, {:error, :not_found}, state}
+    end
+  end
+
+  def handle_call({:disable_share, id}, _from, state) do
+    case Map.fetch(state.units, id) do
+      {:ok, %{unit: unit}} ->
+        case do_disable(unit, state) do
+          :ok ->
+            notify(:info, "zrok share disabled: #{id}")
+            {:reply, :ok, state}
+
+          {:error, r} ->
+            notify(:error, "failed to disable share: #{id}")
+            {:reply, {:error, r}, state}
+        end
+
+      :error ->
+        {:reply, {:error, :not_found}, state}
+    end
+  end
+
+  def handle_call({:remove_share, id}, _from, state) do
+    case Map.fetch(state.units, id) do
+      {:ok, %{unit: unit}} ->
+        _ = do_disable(unit, state)
+
+        case File.rm(unit_path(state.systemd_dir, unit)) do
+          :ok ->
+            _ = daemon_reload(state)
+            notify(:info, "zrok share removed: #{id}")
+            {:reply, :ok, %{state | units: Map.delete(state.units, id)}}
+
+          {:error, r} ->
+            notify(:error, "failed to remove service file: #{unit}")
+            {:reply, {:error, r}, state}
+        end
+
+      :error ->
+        {:reply, {:error, :not_found}, state}
+    end
+  end
+
+  def handle_call({:status, id}, _from, state) do
+    case Map.fetch(state.units, id) do
+      {:ok, %{unit: unit}} -> {:reply, {:ok, unit_status(unit, state)}, state}
+      :error -> {:reply, {:error, :not_found}, state}
+    end
+  end
+
+  def handle_call(:list, _from, state) do
+    items =
+      Enum.map(state.units, fn {id, %{unit: unit}} ->
+        %{id: id, unit: unit, active: unit_active?(unit, state)}
+      end)
+
+    {:reply, {:ok, items}, state}
+  end
+
+  @impl true
+  def handle_info(:tick, state) do
+    Phoenix.PubSub.broadcast(@pubsub, @topic_main, %{
+      id: "zrok_units",
+      module: TunneldWeb.Live.Components.Shares,
+      data: discover_units_list(state)
+    })
+
+    Process.send_after(self(), :tick, @status_interval)
+    {:noreply, state}
+  end
+
+  defp zrok_config_set(endpoint) do
+    case run(zrok_bin(), ["config", "set", "apiEndpoint", endpoint]) do
+      {_, 0} -> :ok
+      err -> {:error, err}
+    end
+  end
+
+  defp zrok_config_get() do
+    case run(zrok_bin(), ["config", "get", "apiEndpoint"]) do
+      {out, 0} ->
+        {:ok,
+         out
+         |> String.trim()
+         |> case do
+           "" -> nil
+           v -> v
+         end}
+
+      err ->
+        {:error, err}
+    end
+  end
+
+  defp zrok_config_unset() do
+    case run(zrok_bin(), ["config", "unset", "apiEndpoint"]) do
+      {_, 0} -> :ok
+      err -> {:error, err}
+    end
+  end
+
+  defp zrok_bin() do
+    System.find_executable("zrok") || "zrok"
+  end
+
+  defp build_unit(share, _state) do
+    id = normalize_id(share["id"] || share[:id])
+    name = share["name"] || share[:name] || id
+    tun = share["tunneld"] || share[:tunneld] || %{}
+    reserved_token = to_string(tun["reserved_token"] || tun[:reserved_token] || name)
+    headless = Map.get(tun, "headless", Map.get(tun, :headless, true))
+
+    bin = zrok_bin()
+
+    exec =
+      ([bin, "share", "reserved", reserved_token] ++ if(headless, do: ["--headless"], else: []))
+      |> Enum.map(&to_string/1)
+      |> Enum.join(" ")
+
+    unit_name = @unit_prefix <> id <> @unit_suffix
+
+    unit =
+      [
+        "[Unit]",
+        "Description=Zrok Share (#{name})",
+        "Wants=network-online.target",
+        "After=network-online.target",
+        "StartLimitIntervalSec=60",
+        "StartLimitBurst=5",
+        "",
+        "[Service]",
+        "Type=simple",
+        "User=root",
+        "Environment=GOMEMLIMIT=80MiB",
+        "Environment=GOGC=70",
+        "Environment=GOMAXPROCS=1",
+        "ExecStart=/bin/sh -c \"#{exec}\"",
+        "Restart=always",
+        "RestartSec=3s",
+        "MemoryHigh=80M",
+        "MemoryMax=96M",
+        "MemorySwapMax=0",
+        "CPUQuota=35%",
+        "TasksMax=128",
+        "LimitNOFILE=65535",
+        "KillMode=mixed",
+        "KillSignal=SIGTERM",
+        "TimeoutStopSec=15s",
+        "StandardOutput=journal",
+        "StandardError=journal",
+        "",
+        "[Install]",
+        "WantedBy=multi-user.target"
+      ]
+      |> Enum.reject(&is_nil/1)
+      |> Enum.join("\n")
+
+    {:ok, {id, unit_name, unit}}
+  end
+
+  defp write_unit(dir, unit_name, content) do
+    ensure_dir(dir)
+
+    case File.write(unit_path(dir, unit_name), content, [:write]) do
+      :ok -> :ok
+      {:error, r} -> {:error, r}
+    end
+  end
+
+  defp daemon_reload(%{mock?: true}), do: :ok
+  defp daemon_reload(_), do: systemctl(["daemon-reload"])
+  defp unit_path(dir, unit), do: Path.join(dir, unit)
+
+  defp unit_active?(unit, %{mock?: true, systemd_dir: dir} = state) do
+    marker = Path.join(dir, unit <> ".enabled")
+
+    case File.exists?(marker) do
+      true ->
+        case parse_ip_port_from_unit(Path.join(dir, unit)) do
+          {ip, port} -> port_open?(ip, port)
+          :unknown -> true
+        end
+
+      false ->
+        false
+    end
+  end
+
+  defp unit_active?(unit, _state) do
+    case run("systemctl", ["is-active", unit]) do
+      {"active\n", 0} -> true
+      _ -> false
+    end
+  end
+
+  defp unit_status(unit, %{mock?: true} = state) do
+    active = unit_active?(unit, state)
+
+    %{
+      unit: unit,
+      active: active,
+      status: if(active, do: "active (mock)", else: "inactive (mock)")
+    }
+  end
+
+  defp unit_status(unit, state) do
+    active = unit_active?(unit, state)
+    {out, _} = run("systemctl", ["status", unit, "--no-pager"])
+    %{unit: unit, active: active, status: out}
+  end
+
+  defp do_enable(unit, %{mock?: true, systemd_dir: dir}) do
+    marker = Path.join(dir, unit <> ".enabled")
+
+    case File.write(marker, "1") do
+      :ok -> :ok
+      {:error, r} -> {:error, r}
+    end
+  end
+
+  defp do_enable(unit, _state) do
+    with :ok <- systemctl(["enable", unit]),
+         :ok <- systemctl(["start", unit]) do
+      :ok
+    else
+      {:error, r} -> {:error, r}
+    end
+  end
+
+  defp do_disable(unit, %{mock?: true, systemd_dir: dir}) do
+    marker = Path.join(dir, unit <> ".enabled")
+    _ = File.rm(marker)
+    :ok
+  end
+
+  defp do_disable(unit, _state) do
+    with :ok <- systemctl(["stop", unit]),
+         :ok <- systemctl(["disable", unit]) do
+      :ok
+    else
+      {:error, r} -> {:error, r}
+    end
+  end
+
+  defp systemctl(args) when is_list(args) do
+    case run("systemctl", args) do
+      {_, 0} -> :ok
+      err -> {:error, err}
+    end
+  end
+
+  defp run(cmd, args) do
+    try do
+      System.cmd(cmd, args, stderr_to_stdout: true, into: "")
+    rescue
+      e -> {:error, e}
+    end
+  end
+
+  defp normalize_id(nil), do: to_string(System.system_time(:second))
+
+  defp normalize_id(id) when is_binary(id) do
+    id
+    |> String.downcase()
+    |> String.replace(~r/[^a-z0-9\-]/, "-")
+    |> String.trim("-")
+    |> case do
+      "" -> to_string(System.system_time(:second))
+      v -> v
+    end
+  end
+
+  defp discover_units(dir, mock?) do
+    list = discover_units_list(%{systemd_dir: dir, mock?: mock?})
+    Map.new(list, fn %{id: id, unit: unit} -> {id, %{unit: unit, id: id}} end)
+  end
+
+  defp discover_units_list(%{systemd_dir: dir} = state) do
+    case File.ls(dir) do
+      {:ok, files} ->
+        files
+        |> Enum.filter(&String.starts_with?(&1, @unit_prefix))
+        |> Enum.filter(&String.ends_with?(&1, @unit_suffix))
+        |> Enum.map(fn unit ->
+          id =
+            unit
+            |> String.replace_prefix(@unit_prefix, "")
+            |> String.replace_suffix(@unit_suffix, "")
+
+          %{id: id, unit: unit, active: unit_active?(unit, state)}
+        end)
+
+      _ ->
+        []
+    end
+  end
+
+  defp parse_ip_port_from_unit(path) do
+    with {:ok, content} <- File.read(path),
+         [exec_line] <-
+           Regex.run(~r/^ExecStart=.*?zrok.*?(?<host>\d+\.\d+\.\d+\.\d+):(?<port>\d+)/m, content,
+             capture: :all_but_first
+           ),
+         [host, port] <-
+           Regex.run(~r/(\d+\.\d+\.\d+\.\d+):(\d+)/, exec_line, capture: :all_but_first) do
+      {host, String.to_integer(port)}
+    else
+      _ -> :unknown
+    end
+  end
+
+  defp port_open?(ip, port) do
+    case :gen_tcp.connect(String.to_charlist(ip), port, [:binary, active: false], 1500) do
+      {:ok, sock} ->
+        :gen_tcp.close(sock)
+        true
+
+      _ ->
+        false
+    end
+  end
+
+  defp ensure_dir(dir) do
+    case File.mkdir_p(dir) do
+      :ok -> :ok
+      {:error, :eexist} -> :ok
+      {:error, r} -> {:error, r}
+    end
+  end
+
+  defp fs_root() do
+    fs = Application.get_env(:tunneld, :fs) || %{root: "/data"}
+    fs[:root] || "/data"
+  end
+
+  defp cwd(), do: "."
+
+  defp notify(type, message) do
+    Phoenix.PubSub.broadcast(@pubsub, @topic_notif, %{type: type, message: message})
+  end
+
+  def configure(%{api_endpoint: endpoint}),
+    do: GenServer.call(__MODULE__, {:configure, endpoint}, 30_000)
+
+  def set_api_endpoint(endpoint),
+    do: GenServer.call(__MODULE__, {:set_api_endpoint, endpoint}, 30_000)
+
+  def get_api_endpoint(), do: GenServer.call(__MODULE__, :get_api_endpoint, 15_000)
+  def unset_api_endpoint(), do: GenServer.call(__MODULE__, :unset_api_endpoint, 30_000)
+
+  def enable_env(account_token),
+    do: GenServer.call(__MODULE__, {:enable_env, account_token}, 60_000)
+
+  def disable_env(), do: GenServer.call(__MODULE__, :disable_env, 60_000)
+
+  def reserve_public(name, ip, port),
+    do: GenServer.call(__MODULE__, {:reserve_public, %{name: name, ip: ip, port: port}}, 30_000)
+
+  def reserve_private(name, ip, port),
+    do: GenServer.call(__MODULE__, {:reserve_private, %{name: name, ip: ip, port: port}}, 30_000)
+
+  def release_reserved(name), do: GenServer.call(__MODULE__, {:release_reserved, name}, 30_000)
+
+  def create_share_unit(share_map),
+    do: GenServer.call(__MODULE__, {:create_share_unit, share_map}, 30_000)
+
+  def enable_share(id), do: GenServer.call(__MODULE__, {:enable_share, id}, 30_000)
+  def disable_share(id), do: GenServer.call(__MODULE__, {:disable_share, id}, 30_000)
+  def remove_share(id), do: GenServer.call(__MODULE__, {:remove_share, id}, 30_000)
+  def status(id), do: GenServer.call(__MODULE__, {:status, id}, 15_000)
+  def list(), do: GenServer.call(__MODULE__, :list, 15_000)
+end

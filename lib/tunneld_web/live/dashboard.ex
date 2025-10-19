@@ -380,16 +380,16 @@ defmodule TunneldWeb.Live.Dashboard do
       #
       # Shares
       #
-      "add_artifact" ->
-        Tunneld.Servers.Shares.add_artifact(data)
+      "add_share" ->
+        Tunneld.Servers.Shares.add_share(data)
 
-      "remove_artifact" ->
+      "remove_share" ->
         %{"id" => id} = Jason.decode!(data)
-        Tunneld.Servers.Shares.remove_artifact(id)
+        Tunneld.Servers.Shares.remove_share(id)
         send(self(), :close_details)
 
       "tunneld_settings" ->
-        Tunneld.Servers.Shares.update_artifact(data, :tunneld)
+        Tunneld.Servers.Shares.update_share(data, :tunneld)
 
       _ ->
         Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
@@ -492,7 +492,8 @@ defmodule TunneldWeb.Live.Dashboard do
   defp get_sidebar_details(type, id) do
     case type do
       "share" ->
-        Tunneld.Servers.Shares.get_artifact(id)
+        IO.inspect("fetching")
+        Tunneld.Servers.Shares.get_share(id)
         :share
 
       "service" ->

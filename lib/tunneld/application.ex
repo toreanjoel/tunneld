@@ -7,6 +7,7 @@ defmodule Tunneld.Application do
   alias Tunneld.Servers.{
     Auth,
     Session,
+    Zrok,
     Services,
     Devices,
     Resources,
@@ -32,6 +33,7 @@ defmodule Tunneld.Application do
       # Start to serve requests, typically the last entry
       TunneldWeb.Endpoint,
       {Wlan, []},
+      {Zrok, []},
       {Session, []},
       {Resources, []},
       {Services, []},

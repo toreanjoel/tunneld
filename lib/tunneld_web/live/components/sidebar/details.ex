@@ -142,7 +142,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             Jason.encode!(%{
               "title" => "Remove",
               "payload" => %{
-                "type" => "remove_artifact",
+                "type" => "remove_share",
                 "data" => %{"id" => @data.id}
               }
             })
