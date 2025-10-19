@@ -325,7 +325,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         </div>
 
         <div
-          :if={not @enabled}
+          :if={not @is_unset and not @enabled}
           phx-click="modal_open"
           phx-value-modal_title="Configure device"
           phx-value-modal_body={
