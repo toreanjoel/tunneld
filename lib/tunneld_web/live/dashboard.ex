@@ -236,6 +236,14 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   #
+  # Catch the toggle event to enable/disable the shares and their resources
+  #
+  def handle_event("toggle_share_access", params, socket) do
+    send(self(), %{action: "toggle_share_access", data: params})
+    {:noreply, socket}
+  end
+
+  #
   # Close the details bar (relevant when we are in mobile mode)
   #
   def handle_event("close_details", _, socket) do
@@ -416,6 +424,10 @@ defmodule TunneldWeb.Live.Dashboard do
       #
       "add_share" ->
         Tunneld.Servers.Shares.add_share(data)
+
+      "toggle_share_access" ->
+        %{"id" => id, "enable" => enable} = Jason.decode!(data["payload"])
+        Tunneld.Servers.Shares.toggle_share(id, enable)
 
       "remove_share" ->
         %{"id" => id} = Jason.decode!(data)

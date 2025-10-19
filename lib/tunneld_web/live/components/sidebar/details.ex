@@ -109,14 +109,13 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
     assigns =
       assigns
-      |> assign(has_data: !Enum.empty?(data))
+      |> assign(has_data: is_map(data) and map_size(data) > 0)
       |> assign(gateway: Application.get_env(:tunneld, :network)[:gateway])
       |> assign(data: data)
 
     ~H"""
     <div class="bg-secondary p-2 h-full">
       <div :if={@has_data}>
-        <%!-- Sidebar header that will house metadat?  --%>
         <%= sidebar_header(assigns, %{
           header: @data.name,
           body:
@@ -126,9 +125,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       </div>
 
       <div :if={@has_data} class="flex flex-row gap-1 justify-end my-2">
-        <%!-- Actions to take --%>
-
-        <%!-- Actions Remove Share --%>
+        <%!-- Actions: Remove Share only --%>
         <div
           phx-click="modal_open"
           phx-value-modal_title="Remove Share?"
@@ -172,52 +169,52 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             </div>
           </div>
 
-          <div class="flex flex-row gap-2">
-            <%!-- Actions Connect/Disconnect Tunnel --%>
-            <div
-              :if={!Enum.empty?(@data.tunneld)}
-              phx-click="modal_open"
-              phx-value-modal_title="Disconnect Tunnel Share?"
-              phx-value-modal_body={
-                Jason.encode!(%{
-                  "type" => "string",
-                  "data" => "Are you sure you want make share inaccessible?"
-                })
-              }
-              phx-value-modal_actions={
-                Jason.encode!(%{
-                  "title" => "Disconnect Tunnel Share",
-                  "payload" => %{
-                    "type" => "disconnect_cloudflare",
-                    # TODO: this needs to be an identifier for the share
-                    "data" => %{}
-                  }
-                })
-              }
-              class="flex items-center justify-center gap-1 bg-orange p-2 cursor-pointer rounded-md"
-            >
-              <.icon name="hero-globe-alt" class="h-5 w-5" />
-              <div class="truncate text-xs">Disconnect Tunnel Share</div>
+          <% tunneld = @data.tunneld || %{} %>
+          <div :if={!Enum.empty?(tunneld)} class="mt-3">
+            <div class="py-2">
+              <h2 class="text-sm font-semibold">Tunneld Instances</h2>
             </div>
 
-            <div
-              phx-click="modal_open"
-              phx-value-modal_title="Tunneld Share Settings"
-              phx-value-modal_body={
-                Jason.encode!(%{
-                  "type" => "schema",
-                  "data" => Tunneld.Schema.PrivateNet.data(:settings),
-                  "default_values" =>
-                    Map.merge(@data.tunneld, %{
-                      "id" => @data.id
-                    }),
-                  "action" => "tunneld_settings"
-                })
-              }
-              class="flex grow items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
-            >
-              <.icon name="hero-globe-alt" class="h-5 w-5" />
-              <div class="truncate text-xs">Tunneld Share Settings</div>
+            <div class="grid grid-cols-1 gap-2">
+              <%= for kind <- ~w(public private) do %>
+                <% reserved = get_in(tunneld, ["reserved", kind]) %>
+                <% enabled? = get_in(tunneld, ["enabled", kind]) == true %>
+                <% unit = get_in(tunneld, ["units", kind, "unit"]) %>
+                <% unit_id = get_in(tunneld, ["units", kind, "id"]) %>
+
+                <div class="bg-primary rounded-lg p-3">
+                  <div class="flex items-center justify-between">
+                    <div class="text-sm font-medium capitalize"><%= kind %> instance</div>
+                    <label
+                      phx-click="toggle_share_access"
+                      phx-value-payload={Jason.encode!(%{
+                        "id" => unit_id,
+                        "enable" => !enabled?
+                      })}
+                      class="relative inline-flex items-center cursor-pointer"
+                    >
+                      <input type="checkbox" class="sr-only peer" checked={enabled?} />
+                      <div class="w-9 h-5 bg-light_purple rounded-full peer-checked:bg-purple relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-light_purple after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4">
+                      </div>
+                    </label>
+                  </div>
+
+                  <div class="mt-2 grid grid-rows-1 md:grid-rows-3 gap-2 text-xs">
+                    <div class="truncate">
+                      <span class="font-semibold">Reserved:</span>
+                      <span class="ml-1"><%= reserved || "—" %></span>
+                    </div>
+                    <div class="truncate">
+                      <span class="font-semibold">Systemd Unit:</span>
+                      <span class="ml-1"><%= unit || "—" %></span>
+                    </div>
+                    <div class="truncate">
+                      <span class="font-semibold">Unit ID:</span>
+                      <span class="ml-1"><%= unit_id || "—" %></span>
+                    </div>
+                  </div>
+                </div>
+              <% end %>
             </div>
           </div>
         </div>

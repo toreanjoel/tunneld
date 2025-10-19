@@ -116,6 +116,105 @@ defmodule Tunneld.Servers.Shares do
     {:noreply, state}
   end
 
+  def handle_cast({:toggle_share, unit_id, enable}, state) do
+    enable? =
+      case enable do
+        true -> true
+        "true" -> true
+        "on" -> true
+        _ -> false
+      end
+
+    {_status, data} = read_file()
+    shares = if data == "", do: [], else: data
+
+    {share, kind} =
+      Enum.reduce_while(shares, {nil, nil}, fn s, _acc ->
+        units = get_in(s, ["tunneld", "units"]) || %{}
+
+        cond do
+          get_in(units, ["public", "id"]) == unit_id -> {:halt, {s, "public"}}
+          get_in(units, ["private", "id"]) == unit_id -> {:halt, {s, "private"}}
+          true -> {:cont, {nil, nil}}
+        end
+      end)
+
+    case {share, kind} do
+      {nil, _} ->
+        Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+          type: :error,
+          message: "Share for unit not found"
+        })
+
+        {:noreply, state}
+
+      {share, kind} ->
+        result =
+          if enable? do
+            Tunneld.Servers.Zrok.enable_share(unit_id)
+          else
+            Tunneld.Servers.Zrok.disable_share(unit_id)
+          end
+
+        case result do
+          :ok ->
+            updated_shares =
+              Enum.map(shares, fn s ->
+                if s["id"] == share["id"] do
+                  put_in(s, ["tunneld", "enabled", kind], enable?)
+                else
+                  s
+                end
+              end)
+
+            case File.write(path(), Jason.encode!(updated_shares)) do
+              :ok ->
+                broadcast_shares()
+
+                updated_atom_share =
+                  updated_shares
+                  |> Enum.find(&(&1["id"] == share["id"]))
+                  |> then(fn s ->
+                    %{
+                      id: s["id"],
+                      name: s["name"],
+                      ip: s["ip"],
+                      description: s["description"],
+                      port: s["port"],
+                      status: port_busy?(s["ip"], s["port"]),
+                      tunneld: s["tunneld"]
+                    }
+                  end)
+
+                Phoenix.PubSub.broadcast(Tunneld.PubSub, @broadcast_topic, %{
+                  id: @component_desktop_id,
+                  module: @component_module,
+                  data: updated_atom_share
+                })
+
+                {:noreply, Map.put(state, :shares, updated_shares)}
+
+              {:error, err} ->
+                Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+                  type: :error,
+                  message: "Failed to persist share state: #{inspect(err)}"
+                })
+
+                {:noreply, state}
+            end
+
+          {:error, err} ->
+            Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+              type: :error,
+              message:
+                "Failed to #{if enable?, do: "enable", else: "disable"} share: #{inspect(err)}"
+            })
+
+            {:noreply, state}
+        end
+    end
+  end
+
   def handle_cast({:update_share, type, data}, state) do
     shares = fetch_shares()
 
@@ -372,6 +471,10 @@ defmodule Tunneld.Servers.Shares do
 
   def get_enabled_shares(), do: GenServer.call(__MODULE__, :get_enabled_shares, 25_000)
   def get_share(id), do: GenServer.cast(__MODULE__, {:get_share, id})
+
+  def toggle_share(unit_id, enable),
+    do: GenServer.cast(__MODULE__, {:toggle_share, unit_id, enable})
+
   def get_share_details(id), do: GenServer.call(__MODULE__, {:get_share_details, id})
   def add_share(share), do: GenServer.call(__MODULE__, {:add_share, share}, 25_000)
   def remove_share(id), do: GenServer.cast(__MODULE__, {:remove_share, id})
