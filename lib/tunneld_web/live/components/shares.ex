@@ -38,11 +38,28 @@ defmodule TunneldWeb.Live.Components.Shares do
         </div>
         <div
           phx-click="modal_open"
-          phx-value-modal_title="Add an Share"
+          phx-value-modal_title="Add Private Share"
           phx-value-modal_body={
             Jason.encode!(%{
               "type" => "schema",
-              "data" => Tunneld.Schema.Share.data(:add),
+              "data" => Tunneld.Schema.Share.data(:add_private),
+              "default_values" => %{},
+              "action" => "add_private_share"
+            })
+          }
+          class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
+        >
+          <.icon class="w-6 h-6" name="hero-cpu-chip" />
+          <div class="truncate text-xs">Bind Private</div>
+        </div>
+
+        <div
+          phx-click="modal_open"
+          phx-value-modal_title="Add Share"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "schema",
+              "data" => Tunneld.Schema.Share.data(:add_public),
               "default_values" => %{},
               "action" => "add_share"
             })
@@ -65,23 +82,32 @@ defmodule TunneldWeb.Live.Components.Shares do
         <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
           <%= if !Enum.empty?(@shares) do %>
             <%= for share <- @shares do %>
+              <% kind = share.kind || "host" %>
+              <% IO.inspect(share) %>
               <div
                 phx-click="show_details"
                 phx-value-type="share"
                 phx-value-id={share.id || share["id"]}
-                class="p-4 flex flex-col bg-secondary rounded-lg w-full h-[80px] cursor-pointer"
+                class="p-3 gap-2 flex flex-col rounded-lg w-full h-[80px] cursor-pointer bg-secondary transition-colors duration-150"
                 style="animation: fadeIn 0.5s ease-out forwards;"
               >
-                <div class="flex flex-row items-center">
+                <div class="flex items-center gap-2 grow">
+                  <.icon class="w-5 h-5 shrink-0" name={kind_icon(kind)} />
                   <div class="grow">
-                    <div class="text-lg bold truncate"><%= share.name %></div>
+                    <div class="text-md font-semibold truncate"><%= share.name %></div>
                   </div>
-                  <div class={"w-3 h-3 rounded-full " <> get_status_color(share.status || false)} />
+                  <div class={["w-3 h-3 rounded-full", get_status_color(share.status || false)]} />
                 </div>
-                <div class="grow py-2" />
-                <div class="text-sm truncate"><%= share.port %></div>
-                <div class="text-sm truncate">
-                 <%!-- TODO: add details on teh share here once exposed --%>
+
+                <div class="flex items-center justify-between text-xs flex-shrink-0">
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded-full bg-white/10 text-gray-200 uppercase text-[10px] font-medium">
+                      <%= kind %>
+                    </span>
+                    <span class="px-2 py-0.5 rounded-full bg-white/10 text-gray-200 text-[10px] font-medium">
+                      <%= share.ip %>:<%= share.port %>
+                    </span>
+                  </div>
                 </div>
               </div>
             <% end %>
@@ -95,4 +121,8 @@ defmodule TunneldWeb.Live.Components.Shares do
   # Helper function to set a status indicator color based on share status.
   defp get_status_color(true), do: "bg-green"
   defp get_status_color(_), do: "bg-red"
+
+  defp kind_icon("access"), do: "hero-arrows-right-left"
+  defp kind_icon("host"), do: "hero-server-stack"
+  defp kind_icon(_), do: "hero-question-mark-circle"
 end

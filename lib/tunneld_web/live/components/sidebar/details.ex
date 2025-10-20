@@ -106,7 +106,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   @spec render(%{:view => :share, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :share} = assigns) do
     data = Map.get(assigns, :data)
-
     assigns =
       assigns
       |> assign(has_data: is_map(data) and map_size(data) > 0)
@@ -176,8 +175,16 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             </div>
 
             <div class="grid grid-cols-1 gap-2">
-              <%= for kind <- ~w(public private) do %>
-                <% reserved = get_in(tunneld, ["reserved", kind]) %>
+              <% available_kinds =
+                ~w(public private access)
+                |> Enum.filter(fn k -> not is_nil(get_in(tunneld, ["units", k])) end) %>
+
+              <%= for kind <- available_kinds do %>
+                <% reserved =
+                  case kind do
+                    "access" -> get_in(tunneld, ["reserved", "private"])
+                    _ -> get_in(tunneld, ["reserved", kind])
+                  end %>
                 <% enabled? = get_in(tunneld, ["enabled", kind]) == true %>
                 <% unit = get_in(tunneld, ["units", kind, "unit"]) %>
                 <% unit_id = get_in(tunneld, ["units", kind, "id"]) %>
@@ -187,10 +194,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                     <div class="text-sm font-medium capitalize"><%= kind %> instance</div>
                     <label
                       phx-click="toggle_share_access"
-                      phx-value-payload={Jason.encode!(%{
-                        "id" => unit_id,
-                        "enable" => !enabled?
-                      })}
+                      phx-value-payload={Jason.encode!(%{"id" => unit_id, "enable" => !enabled?, "kind" => @data.kind})}
                       class="relative inline-flex items-center cursor-pointer"
                     >
                       <input type="checkbox" class="sr-only peer" checked={enabled?} />

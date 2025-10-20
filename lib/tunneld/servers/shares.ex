@@ -50,6 +50,7 @@ defmodule Tunneld.Servers.Shares do
           share
           |> Map.merge(%{
             "id" => DateTime.utc_now() |> DateTime.to_unix() |> to_string,
+            "kind" => "host",
             "tunneld" => %{}
           })
 
@@ -98,6 +99,79 @@ defmodule Tunneld.Servers.Shares do
     {:reply, {:ok, share}, state}
   end
 
+  def handle_call({:add_access, access}, _from, state) do
+    shares =
+      case read_file() do
+        {:ok, list} when is_list(list) -> list
+        _ -> []
+      end
+
+    new_id = DateTime.utc_now() |> DateTime.to_unix() |> to_string()
+    id = new_id <> "acc"
+
+    name = access["name"] || access[:name] || "access-" <> new_id
+    ip = access["ip"] || access[:ip]
+    port = access["port"] || access[:port]
+
+    if is_binary(ip) and ip != "" and is_binary(port) and port != "" do
+      bind = "#{ip}:#{port}"
+
+      create_payload =
+        %{
+          "id" => id,
+          "name" => name,
+          # NOTE: later this needs to be separate
+          "reserved_name" => name,
+          "bind" => bind
+        }
+
+      case Zrok.create_access_unit(create_payload) do
+        {:ok, %{id: acc_id, unit: acc_unit}} ->
+          access_entry = %{
+            "id" => new_id,
+            "name" => name,
+            "kind" => "access",
+            "bind" => bind,
+            "description" => access["description"] || "",
+            "tunneld" => %{
+              # "reserved" => %{"private" => reserved_name},
+              "reserved" => %{"private" => name},
+              "units" => %{"access" => %{"id" => acc_id, "unit" => acc_unit}},
+              "enabled" => %{"access" => false}
+            }
+          }
+
+          updated0 = shares ++ [access_entry]
+          :ok = File.write(path(), Jason.encode!(updated0))
+
+          broadcast_shares()
+
+          Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+            type: :info,
+            message: "access added successfully"
+          })
+
+          new_state = Map.put(state, :shares, updated0)
+          {:reply, new_state, new_state}
+
+        {:error, err} ->
+          Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+            type: :error,
+            message: "Failed to add access: #{inspect(err)}"
+          })
+
+          {:reply, state, state}
+      end
+    else
+      Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+        type: :error,
+        message: "ip and port are required"
+      })
+
+      {:reply, state, state}
+    end
+  end
+
   def handle_cast({:get_share, id}, state) do
     shares = fetch_shares()
 
@@ -114,6 +188,115 @@ defmodule Tunneld.Servers.Shares do
     end
 
     {:noreply, state}
+  end
+
+  def handle_cast({:toggle_access, unit_id, enable}, state) do
+    enable? =
+      case enable do
+        true -> true
+        "true" -> true
+        "on" -> true
+        _ -> false
+      end
+
+    {_status, data} = read_file()
+    shares = if data == "", do: [], else: data
+
+    {entry, _kind} =
+      Enum.reduce_while(shares, {nil, nil}, fn s, _acc ->
+        units = get_in(s, ["tunneld", "units"]) || %{}
+
+        if get_in(units, ["access", "id"]) == unit_id,
+          do: {:halt, {s, "access"}},
+          else: {:cont, {nil, nil}}
+      end)
+
+    case entry do
+      nil ->
+        Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+          type: :error,
+          message: "Access for unit not found"
+        })
+
+        {:noreply, state}
+
+      _ ->
+        result = if enable?, do: Zrok.enable_access(unit_id), else: Zrok.disable_access(unit_id)
+
+        case result do
+          :ok ->
+            updated_shares =
+              Enum.map(shares, fn s ->
+                if s["id"] == entry["id"] do
+                  put_in(s, ["tunneld", "enabled", "access"], enable?)
+                else
+                  s
+                end
+              end)
+
+            case File.write(path(), Jason.encode!(updated_shares)) do
+              :ok ->
+                broadcast_shares()
+                {:noreply, Map.put(state, :shares, updated_shares)}
+
+              {:error, err} ->
+                Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+                  type: :error,
+                  message: "Failed to persist access state: #{inspect(err)}"
+                })
+
+                {:noreply, state}
+            end
+
+          {:error, err} ->
+            Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+              type: :error,
+              message:
+                "Failed to #{if enable?, do: "enable", else: "disable"} access: #{inspect(err)}"
+            })
+
+            {:noreply, state}
+        end
+    end
+  end
+
+  def handle_cast({:remove_access, id}, state) do
+    {_, data} = read_file()
+    victim = Enum.find(data, fn s -> s["id"] === id and s["kind"] == "access" end)
+
+    _ =
+      if victim do
+        units = get_in(victim, ["tunneld", "units"]) || %{}
+
+        case units["access"] do
+          %{"id" => aid} -> Zrok.remove_access(aid)
+          _ -> :ok
+        end
+      end
+
+    updated_nodes = Enum.reject(data, fn s -> s["id"] === id and s["kind"] == "access" end)
+
+    update_state =
+      case File.write(path(), Jason.encode!(updated_nodes)) do
+        :ok ->
+          Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+            type: :info,
+            message: "access removed successfully"
+          })
+
+          broadcast_shares()
+          Map.put(state, :shares, updated_nodes)
+
+        {:error, err} ->
+          Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+            type: :error,
+            message: "Failed to remove access: #{inspect(err)}"
+          })
+
+          state
+      end
+
+    {:noreply, update_state}
   end
 
   def handle_cast({:toggle_share, unit_id, enable}, state) do
@@ -182,7 +365,8 @@ defmodule Tunneld.Servers.Shares do
                       description: s["description"],
                       port: s["port"],
                       status: port_busy?(s["ip"], s["port"]),
-                      tunneld: s["tunneld"]
+                      tunneld: s["tunneld"],
+                      kind: s["kind"]
                     }
                   end)
 
@@ -416,19 +600,38 @@ defmodule Tunneld.Servers.Shares do
     String.slice(token, 0, 32)
   end
 
+  defp parse_bind(<<>>), do: {nil, nil}
+  defp parse_bind(nil), do: {nil, nil}
+
+  defp parse_bind(bind) do
+    case String.split(bind, ":", parts: 2) do
+      [ip, port] -> {ip, port}
+      _ -> {nil, nil}
+    end
+  end
+
   def fetch_shares() do
     {_status, data} = read_file()
     shares = if data == "", do: [], else: data
 
-    Enum.map(shares, fn share ->
+    Enum.map(shares, fn s ->
+      kind = s["kind"] || "host"
+
+      {ip, port} =
+        case kind do
+          "access" -> parse_bind(s["bind"])
+          _ -> {s["ip"], s["port"]}
+        end
+
       %{
-        id: share["id"],
-        name: share["name"],
-        ip: share["ip"],
-        description: share["description"],
-        port: share["port"],
-        status: port_busy?(share["ip"], share["port"]),
-        tunneld: share["tunneld"]
+        id: s["id"],
+        name: s["name"],
+        ip: ip,
+        description: s["description"],
+        port: port,
+        status: (ip && port && port_busy?(ip, port)) || false,
+        tunneld: s["tunneld"],
+        kind: kind
       }
     end)
   end
@@ -478,6 +681,13 @@ defmodule Tunneld.Servers.Shares do
   def get_share_details(id), do: GenServer.call(__MODULE__, {:get_share_details, id})
   def add_share(share), do: GenServer.call(__MODULE__, {:add_share, share}, 25_000)
   def remove_share(id), do: GenServer.cast(__MODULE__, {:remove_share, id})
+
+  def add_access(access), do: GenServer.call(__MODULE__, {:add_access, access}, 25_000)
+
+  def toggle_access(unit_id, enable),
+    do: GenServer.cast(__MODULE__, {:toggle_access, unit_id, enable})
+
+  def remove_access(id), do: GenServer.cast(__MODULE__, {:remove_access, id})
 
   def update_share(data, :tunneld),
     do: GenServer.cast(__MODULE__, {:update_share, :tunneld, data})

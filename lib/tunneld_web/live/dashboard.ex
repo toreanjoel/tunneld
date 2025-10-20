@@ -425,9 +425,19 @@ defmodule TunneldWeb.Live.Dashboard do
       "add_share" ->
         Tunneld.Servers.Shares.add_share(data)
 
+      "add_private_share" ->
+        Tunneld.Servers.Shares.add_access(data)
+
       "toggle_share_access" ->
-        %{"id" => id, "enable" => enable} = Jason.decode!(data["payload"])
-        Tunneld.Servers.Shares.toggle_share(id, enable)
+        %{"id" => id, "enable" => enable, "kind" => kind} = Jason.decode!(data["payload"])
+        case kind do
+          "host" ->
+            Tunneld.Servers.Shares.toggle_share(id, enable)
+          "access" ->
+            Tunneld.Servers.Shares.toggle_access(id, enable)
+          _ ->
+            raise "Kind not found, make sure share is setup with correct kind"
+        end
 
       "remove_share" ->
         %{"id" => id} = Jason.decode!(data)

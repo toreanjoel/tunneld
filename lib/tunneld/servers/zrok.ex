@@ -13,6 +13,7 @@ defmodule Tunneld.Servers.Zrok do
   @linux_systemd_dir "/etc/systemd/system"
   @unit_prefix "zrok-"
   @unit_suffix ".service"
+  @access_prefix "zrok-access-"
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -62,6 +63,7 @@ defmodule Tunneld.Servers.Zrok do
   def handle_call(:unset_api_endpoint, _from, state) do
     # This might fail but we need to try and do this first - need better checks
     run(zrok_bin(), ["disable"])
+
     case zrok_config_unset() do
       :ok ->
         send(self(), :broadcast_details)
@@ -224,6 +226,77 @@ defmodule Tunneld.Servers.Zrok do
     {:reply, {:ok, items}, state}
   end
 
+  def handle_call({:create_access_unit, access_map}, _from, state) do
+    with {:ok, {id, unit_name, content}} <- build_access_unit(access_map, state),
+         :ok <- write_unit(state.systemd_dir, unit_name, content),
+         :ok <- daemon_reload(state) do
+      units = Map.put(state.units, id, %{unit: unit_name, id: id})
+      notify(:info, "Unit created: #{unit_name}")
+      {:reply, {:ok, %{id: id, unit: unit_name}}, %{state | units: units}}
+    else
+      {:error, reason} ->
+        notify(:error, "Failed to create access unit")
+        {:reply, {:error, reason}, state}
+    end
+  end
+
+  def handle_call({:enable_access, id}, _from, state) do
+    case Map.fetch(state.units, id) do
+      {:ok, %{unit: unit}} ->
+        case do_enable(unit, state) do
+          :ok ->
+            notify(:info, "Access enabled: #{id}")
+            {:reply, :ok, state}
+
+          {:error, r} ->
+            notify(:error, "Failed to enable access: #{id}")
+            {:reply, {:error, r}, state}
+        end
+
+      :error ->
+        {:reply, {:error, :not_found}, state}
+    end
+  end
+
+  def handle_call({:disable_access, id}, _from, state) do
+    case Map.fetch(state.units, id) do
+      {:ok, %{unit: unit}} ->
+        case do_disable(unit, state) do
+          :ok ->
+            notify(:info, "Access disabled: #{id}")
+            {:reply, :ok, state}
+
+          {:error, r} ->
+            notify(:error, "Failed to disable access: #{id}")
+            {:reply, {:error, r}, state}
+        end
+
+      :error ->
+        {:reply, {:error, :not_found}, state}
+    end
+  end
+
+  def handle_call({:remove_access, id}, _from, state) do
+    case Map.fetch(state.units, id) do
+      {:ok, %{unit: unit}} ->
+        _ = do_disable(unit, state)
+
+        case File.rm(unit_path(state.systemd_dir, unit)) do
+          :ok ->
+            _ = daemon_reload(state)
+            notify(:info, "Access removed: #{id}")
+            {:reply, :ok, %{state | units: Map.delete(state.units, id)}}
+
+          {:error, r} ->
+            notify(:error, "Failed to remove access service file: #{unit}")
+            {:reply, {:error, r}, state}
+        end
+
+      :error ->
+        {:reply, {:error, :not_found}, state}
+    end
+  end
+
   @impl true
   def handle_info(:broadcast_details, state) do
     enabled = zrok_enabled?()
@@ -292,17 +365,67 @@ defmodule Tunneld.Servers.Zrok do
     System.find_executable("zrok") || "zrok"
   end
 
+  defp build_access_unit(access, _state) do
+    id = normalize_id(access["id"] || access[:id])
+    name = access["name"] || access[:name] || id
+    # TODO: we use the normal name so this needs to match, we could later make it possible to use a custom reserve locally
+    reserved = to_string(access["reserved_name"] || access[:reserved_name] || name)
+    bind = to_string(access["bind"] || access[:bind])
+
+    # TODO: make this something the user can pass, at the moment we know we fallback regardless
+    cpu_q =
+      access["cpu_quota"] || access[:cpu_quota] || 40
+
+    cpu_quota =
+      cpu_q
+      |> then(&max(5, min(&1, 90)))
+      |> Integer.to_string()
+      |> Kernel.<>("%")
+
+    bin = zrok_bin()
+
+    exec =
+      [bin, "access", "private", reserved, "-b", bind, "--headless"]
+      |> Enum.map(&to_string/1)
+      |> Enum.join(" ")
+
+    unit_name = @access_prefix <> id <> @unit_suffix
+
+    unit =
+      [
+        "[Unit]",
+        "Description=Zrok Access (#{name})",
+        "Wants=network-online.target",
+        "After=network-online.target",
+        "",
+        "[Service]",
+        "Type=simple",
+        "User=root",
+        "ExecStart=/bin/sh -lc \"#{exec}\"",
+        "Restart=always",
+        "RestartSec=3s",
+        "CPUQuota=#{cpu_quota}",
+        "KillMode=control-group",
+        "TimeoutStopSec=15s",
+        "",
+        "[Install]",
+        "WantedBy=multi-user.target"
+      ]
+      |> Enum.join("\n")
+
+    {:ok, {id, unit_name, unit}}
+  end
+
   defp build_unit(share, _state) do
     id = normalize_id(share["id"] || share[:id])
     name = share["name"] || share[:name] || id
     tun = share["tunneld"] || share[:tunneld] || %{}
     reserved_token = to_string(tun["reserved_token"] || tun[:reserved_token] || name)
-    headless = Map.get(tun, "headless", Map.get(tun, :headless, true))
 
     bin = zrok_bin()
 
     exec =
-      ([bin, "share", "reserved", reserved_token] ++ if(headless, do: ["--headless"], else: []))
+      [bin, "share", "reserved", reserved_token, "--headless"]
       |> Enum.map(&to_string/1)
       |> Enum.join(" ")
 
@@ -555,4 +678,11 @@ defmodule Tunneld.Servers.Zrok do
   def remove_share(id), do: GenServer.call(__MODULE__, {:remove_share, id}, 30_000)
   def list(), do: GenServer.call(__MODULE__, :list, 15_000)
   def get_details(), do: GenServer.cast(__MODULE__, :details)
+
+  def create_access_unit(access_map),
+    do: GenServer.call(__MODULE__, {:create_access_unit, access_map}, 30_000)
+
+  def enable_access(id), do: GenServer.call(__MODULE__, {:enable_access, id}, 30_000)
+  def disable_access(id), do: GenServer.call(__MODULE__, {:disable_access, id}, 30_000)
+  def remove_access(id), do: GenServer.call(__MODULE__, {:remove_access, id}, 30_000)
 end
