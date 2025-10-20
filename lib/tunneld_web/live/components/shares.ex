@@ -83,7 +83,6 @@ defmodule TunneldWeb.Live.Components.Shares do
           <%= if !Enum.empty?(@shares) do %>
             <%= for share <- @shares do %>
               <% kind = share.kind || "host" %>
-              <% IO.inspect(share) %>
               <div
                 phx-click="show_details"
                 phx-value-type="share"
