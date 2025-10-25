@@ -57,7 +57,7 @@ defmodule Tunneld.Servers.Wlan do
       {:reply, :ok, state}
     else
       # Disconnect from current network
-      System.cmd("wpa_cli", ["-i", Application.get_env(:tunneld, [:network, :wlan]), "disconnect"])
+      System.cmd("wpa_cli", ["-i", Application.get_env(:tunneld, :network)[:wlan], "disconnect"])
 
       Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
         type: :info,
