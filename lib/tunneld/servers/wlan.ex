@@ -59,7 +59,11 @@ defmodule Tunneld.Servers.Wlan do
       # Disconnect from current network
       System.cmd("wpa_cli", ["-i", Application.get_env(:tunneld, [:network, :wlan]), "disconnect"])
 
-      Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{ type: :info, message: "Disconnected from network"})
+      Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+        type: :info,
+        message: "Disconnected from network"
+      })
+
       Logger.info("Disconencted from network")
 
       # send relevant events to the main dashboard
@@ -136,7 +140,11 @@ defmodule Tunneld.Servers.Wlan do
     # Request new DHCP lease to get an IP
     System.cmd("dhcpcd", [@interface])
 
-    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{ type: :info, message: "Connected to network #{ssid} successfully"})
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+      type: :info,
+      message: "Connected to network #{ssid} successfully"
+    })
+
     # send relevant events to the main dashboard
     check_connection()
 
@@ -202,7 +210,11 @@ defmodule Tunneld.Servers.Wlan do
           _ -> true
         end
 
-      Phoenix.PubSub.broadcast(Tunneld.PubSub, "status:internet", %{ type: :internet,  status: is_connected})
+      Phoenix.PubSub.broadcast(Tunneld.PubSub, "status:internet", %{
+        type: :internet,
+        status: is_connected
+      })
+
       if(is_connected, do: :connected, else: :disconnected)
     end
   end
@@ -220,7 +232,14 @@ defmodule Tunneld.Servers.Wlan do
       Process.sleep(2000)
 
       # Restart wpa_supplicant
-      {_, exit_code} = System.cmd("wpa_supplicant", ["-B", "-i", @interface, "-c", @wpa_config])
+      {_, exit_code} =
+        System.cmd("wpa_supplicant", [
+          "-B",
+          "-i",
+          Application.get_env(:tunneld, :network)[:wlan],
+          "-c",
+          @wpa_config
+        ])
 
       if exit_code == 0 do
         Logger.info("wpa_supplicant restarted successfully")
