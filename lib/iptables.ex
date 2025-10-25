@@ -22,6 +22,11 @@ defmodule Iptables do
     dns_forwarding()
   end
 
+  def get_env(:gateway), do: Application.get_env(:tunneld, :network)[:gateway]
+  def get_env(:wlan), do: Application.get_env(:tunneld, :network)[:wlan]
+  def get_env(:eth), do: Application.get_env(:tunneld, :network)[:eth]
+  def get_env(:mullvad), do: Application.get_env(:tunneld, :network)[:mullvad]
+
   @doc """
   Flush all iptables rules.
   """
@@ -39,9 +44,9 @@ defmodule Iptables do
       "-A",
       "FORWARD",
       "-i",
-      Application.get_env(:tunneld, [:network, :eth]),
+      get_env(:eth),
       "-d",
-      Application.get_env(:tunneld, [:network, :gateway]),
+      get_env(:gateway),
       "-j",
       "ACCEPT"
     ])
@@ -57,9 +62,9 @@ defmodule Iptables do
       "-A",
       "FORWARD",
       "-i",
-      Application.get_env(:tunneld, [:network, :eth]),
+      get_env(:eth),
       "-o",
-      Application.get_env(:tunneld, [:network, :wlan]),
+      get_env(:wlan),
       "-m",
       "state",
       "--state",
@@ -74,9 +79,9 @@ defmodule Iptables do
       "-A",
       "FORWARD",
       "-i",
-      Application.get_env(:tunneld, [:network, :wlan]),
+      get_env(:wlan),
       "-o",
-      Application.get_env(:tunneld, [:network, :eth]),
+      get_env(:eth),
       "-m",
       "state",
       "--state",
@@ -95,7 +100,7 @@ defmodule Iptables do
       "-A",
       "POSTROUTING",
       "-o",
-      Application.get_env(:tunneld, [:network, :wlan]),
+      get_env(:wlan),
       "-j",
       "MASQUERADE"
     ])
@@ -106,7 +111,7 @@ defmodule Iptables do
       "-A",
       "POSTROUTING",
       "-o",
-      Application.get_env(:tunneld, [:network, :mullvad]),
+      get_env(:mullvad),
       "-j",
       "MASQUERADE"
     ])
@@ -153,9 +158,9 @@ defmodule Iptables do
       "-A",
       "FORWARD",
       "-i",
-      Application.get_env(:tunneld, [:network, :eth]),
+      get_env(:eth),
       "-o",
-      Application.get_env(:tunneld, [:network, :mullvad]),
+      get_env(:mullvad),
       "-j",
       "ACCEPT"
     ])
@@ -166,9 +171,9 @@ defmodule Iptables do
       "-A",
       "FORWARD",
       "-i",
-      Application.get_env(:tunneld, [:network, :mullvad]),
+      get_env(:mullvad),
       "-o",
-      Application.get_env(:tunneld, [:network, :eth]),
+      get_env(:eth),
       "-m",
       "state",
       "--state",

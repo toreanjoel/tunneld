@@ -27,21 +27,21 @@ end
 
 # Get the set gateway address
 if System.get_env("GATEWAY") do
-  config :tunneld, :network, gateway: System.get_env("GATEWAY")
+  config :tunneld, :network, gateway: System.get_env("GATEWAY", "")
 else
   raise "Missing ENV. Required GATEWAY"
 end
 
 # Set the upstream internet wireless interface
 if System.get_env("WIFI_INTERFACE") do
-  config :tunneld, :network, wlan: System.get_env("WIFI_INTERFACE")
+  config :tunneld, :network, wlan: System.get_env("WIFI_INTERFACE", "")
 else
   raise "Missing ENV. Required WIFI_INTERFACE"
 end
 
 # Set the downstream interface for internet passthrough
 if System.get_env("LAN_INTERFACE") do
-  config :tunneld, :network, eth: System.get_env("LAN_INTERFACE")
+  config :tunneld, :network, eth: System.get_env("LAN_INTERFACE", "")
 else
   raise "Missing ENV. Required LAN_INTERFACE"
 end
