@@ -135,10 +135,10 @@ defmodule Tunneld.Servers.Wlan do
     init_wp_supplicant()
 
     # Reconnect to last known network setup
-    System.cmd("wpa_cli", ["-i", @interface, "reconnect"])
+    System.cmd("wpa_cli", ["-i", Application.get_env(:tunneld, :network)[:wlan], "reconnect"])
 
     # Request new DHCP lease to get an IP
-    System.cmd("dhcpcd", [@interface])
+    System.cmd("dhcpcd", [Application.get_env(:tunneld, :network)[:wlan]])
 
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
       type: :info,
@@ -202,7 +202,8 @@ defmodule Tunneld.Servers.Wlan do
     if Application.get_env(:tunneld, :mock_data, false) do
       :local_development_mode
     else
-      {output, _} = System.cmd("iw", ["dev", @interface, "link"])
+      {output, _} =
+        System.cmd("iw", ["dev", Application.get_env(:tunneld, :network)[:wlan], "link"])
 
       is_connected =
         case output |> String.trim() do
