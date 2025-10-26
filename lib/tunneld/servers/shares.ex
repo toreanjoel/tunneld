@@ -96,6 +96,7 @@ defmodule Tunneld.Servers.Shares do
         %{}
       end
 
+    IO.inspect(share, label: "SHARE DETAILS")
     {:reply, {:ok, share}, state}
   end
 
@@ -183,7 +184,7 @@ defmodule Tunneld.Servers.Shares do
       Phoenix.PubSub.broadcast(Tunneld.PubSub, @broadcast_topic, %{
         id: @component_desktop_id,
         module: @component_module,
-        data: share
+        data: share |> Map.put_new(:server, Tunneld.Servers.Zrok.get_api_endpoint())
       })
     end
 
@@ -262,11 +263,11 @@ defmodule Tunneld.Servers.Shares do
 
   def handle_cast({:remove_access, id}, state) do
     {_, data} = read_file()
-    victim = Enum.find(data, fn s -> s["id"] === id and s["kind"] == "access" end)
+    resource = Enum.find(data, fn s -> s["id"] === id and s["kind"] == "access" end)
 
     _ =
-      if victim do
-        units = get_in(victim, ["tunneld", "units"]) || %{}
+      if resource do
+        units = get_in(resource, ["tunneld", "units"]) || %{}
 
         case units["access"] do
           %{"id" => aid} -> Zrok.remove_access(aid)
@@ -453,11 +454,11 @@ defmodule Tunneld.Servers.Shares do
 
   def handle_cast({:remove_share, id}, state) do
     {_, data} = read_file()
-    victim = Enum.find(data, fn s -> s["id"] === id end)
+    resource = Enum.find(data, fn s -> s["id"] === id end)
 
     _ =
-      if victim do
-        tunneld = victim["tunneld"] || %{}
+      if resource do
+        tunneld = resource["tunneld"] || %{}
         units = tunneld["units"] || %{}
 
         _ =

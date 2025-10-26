@@ -59,6 +59,23 @@ defmodule Tunneld.Servers.Zrok do
     end
   end
 
+  @impl true
+  def handle_call(:get_api_endpoint, _from, state) do
+    ep =
+      case state.api_endpoint do
+        nil ->
+          case zrok_config_get() do
+            {:ok, v} -> v |> String.split(" = ") |> List.last()
+            _ -> nil
+          end
+
+        v ->
+          v
+      end
+
+    {:reply, ep, %{state | api_endpoint: ep}}
+  end
+
   # We disable before removing from the network
   def handle_call(:unset_api_endpoint, _from, state) do
     # This might fail but we need to try and do this first - need better checks
@@ -368,6 +385,7 @@ defmodule Tunneld.Servers.Zrok do
   defp build_access_unit(access, _state) do
     id = normalize_id(access["id"] || access[:id])
     name = access["name"] || access[:name] || id
+
     # TODO: we use the normal name so this needs to match, we could later make it possible to use a custom reserve locally
     reserved = to_string(access["reserved_name"] || access[:reserved_name] || name)
     bind = to_string(access["bind"] || access[:bind])

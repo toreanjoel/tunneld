@@ -43,7 +43,9 @@ defmodule TunneldWeb.Live.Components.Shares do
             Jason.encode!(%{
               "type" => "schema",
               "data" => Tunneld.Schema.Share.data(:add_private),
-              "default_values" => %{},
+              "default_values" => %{
+                "ip" => "0.0.0.0"
+              },
               "action" => "add_private_share"
             })
           }

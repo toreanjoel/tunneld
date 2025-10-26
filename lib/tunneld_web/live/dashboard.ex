@@ -392,12 +392,16 @@ defmodule TunneldWeb.Live.Dashboard do
       # The setup to configure control plane domain
       #
       "configure_disable_control_plane" ->
+        # TODO: disable any shares (private or public) - DONT DELETE
+        # TOOD: UI NEED TO REFLECT THIS RESET INIT SHARES
         Tunneld.Servers.Zrok.unset_api_endpoint()
 
       #
       # The setup to configure control plane domain
       #
       "configure_enable_control_plane" ->
+        # TODO: Make sure shares are added to the new network but disabled - IF THERE IS
+        # TOOD: UI NEED TO REFLECT THIS RESET INIT SHARES
         Tunneld.Servers.Zrok.set_api_endpoint(data["url"])
 
       #
@@ -430,18 +434,32 @@ defmodule TunneldWeb.Live.Dashboard do
 
       "toggle_share_access" ->
         %{"id" => id, "enable" => enable, "kind" => kind} = Jason.decode!(data["payload"])
+
         case kind do
           "host" ->
             Tunneld.Servers.Shares.toggle_share(id, enable)
+
           "access" ->
             Tunneld.Servers.Shares.toggle_access(id, enable)
+
           _ ->
             raise "Kind not found, make sure share is setup with correct kind"
         end
 
       "remove_share" ->
-        %{"id" => id} = Jason.decode!(data)
-        Tunneld.Servers.Shares.remove_share(id)
+        %{"id" => id, "kind" => kind} = Jason.decode!(data)
+
+        case kind do
+          "host" ->
+            Tunneld.Servers.Shares.remove_share(id)
+
+          "access" ->
+            Tunneld.Servers.Shares.remove_access(id)
+
+          _ ->
+            raise "Kind not found, make sure share is setup with correct kind"
+        end
+
         send(self(), :close_details)
 
       "tunneld_settings" ->

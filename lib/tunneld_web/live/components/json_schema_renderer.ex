@@ -42,7 +42,8 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
           default: props["default"],
           hidden: props["ui:widget"] == "hidden",
           readonly: props["readOnly"] == true,
-          widget: props["ui:widget"]
+          widget: props["ui:widget"],
+          help: props["ui:help"]
         }
       end)
 
@@ -66,10 +67,10 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
     ~H"""
     <form phx-target={@myself} phx-submit="submit">
       <%= for field <- @fields do %>
-        <div class="mb-4 capitalize">
+        <div class="mb-4">
           <% hidden = if field.hidden, do: "hidden", else: "" %>
 
-          <label class={"#{hidden} text-white text-sm font-semibold mb-1"}>
+          <label class={"#{hidden} text-white text-sm font-semibold mb-1 capitalize"}>
             <%= field.name %>
           </label>
           <label
@@ -117,17 +118,20 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
                   class={"#{hidden} bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200"}
                   readonly={field.readonly}
                 />
+                <div :if={field.help} class="bg-blue-800 bg-opacity-20 py-2 px-3 rounded-md my-2 text-xs text-blue-500">
+                  <%= field.help %>
+                </div>
               <% end %>
             <% end %>
           <% end %>
         </div>
       <% end %>
 
-      <ul :if={@errors} class="bg-red bg-opacity-20 p-3 rounded-md mb-4">
+      <div :if={@errors} class="bg-red bg-opacity-20 p-3 rounded-md mb-4">
         <%= for error <- @errors do %>
-          <li class="text-red text-sm"><%= error %></li>
+          <p class="text-red text-sm"><%= error %></p>
         <% end %>
-      </ul>
+      </div>
 
       <div class="flex flex-row">
         <div class="grow w-full" />

@@ -11,29 +11,37 @@ defmodule Tunneld.Schema.Share do
   def data(:add_public) do
     %{
       "title" => "Share Add",
-      "description" => "Add a reference to a device running on the tunneld network",
+      "description" =>
+        "Register a LAN device and port for this share. (Internal, shown on the dashboard.)",
       "type" => "object",
       "ui:order" => ["name", "description", "ip", "port"],
       "properties" => %{
         "name" => %{
           "type" => "string",
-          "description" => "Name the share to make it easy to reference",
+          "description" =>
+            "Name of the share (bucket) that groups its public and private references.",
+          "ui:help" =>
+            "This label appears in the dashboard and groups the related access references.",
           "minLength" => 1
         },
         "description" => %{
           "type" => "string",
-          "description" =>
-            "Describe what this share or application instance is that you is monitored",
+          "description" => "Internal note about what this shared application/service is.",
+          "ui:help" =>
+            "Only for your own context on the dashboard (e.g., owner, purpose, login URL).",
           "ui:widget" => "textarea"
         },
         "ip" => %{
           "type" => "string",
-          "description" => "IP address of the machine hosting the application",
+          "description" => "IP address of the LAN device running the application.",
+          "ui:help" =>
+            "Example: 192.168.1.50. This is the local IP address of a device on the network running the resource",
           "minLength" => 1
         },
         "port" => %{
           "type" => "string",
-          "description" => "The port where the application is accessible from"
+          "description" => "Port on that device where the application is listening.",
+          "ui:help" => "Examples: 8000. The port you have the running application instance on"
         }
       },
       "required" => ["ip", "port", "name"]
@@ -44,36 +52,38 @@ defmodule Tunneld.Schema.Share do
   def data(:add_private) do
     %{
       "title" => "Private Access",
-      "description" => "Connect to a private reserved share on the same control plane",
+      "description" =>
+        "Connect this gateway to a private reserved share (you were given its name).",
       "type" => "object",
-      "ui:order" => [
-        "name",
-        "description",
-        "ip",
-        "port"
-      ],
+      "ui:order" => ["name", "description", "ip", "port"],
       "properties" => %{
         "name" => %{
           "type" => "string",
-          "description" => "The private reserve name will be derived from this.",
+          "description" =>
+            "Exact name of the private share you are accessing (from the share’s owner).",
+          "ui:help" => "Must match the owner’s private share name exactly.",
           "minLength" => 1
         },
         "description" => %{
           "type" => "string",
-          "description" => "Describe what this access connects to.",
+          "description" => "Internal note about what this private access is for.",
+          "ui:help" =>
+            "Helps you distinguish multiple private accesses (e.g., device/user/purpose).",
           "ui:widget" => "textarea"
         },
         "ip" => %{
           "type" => "string",
-          "description" => "Local IP to bind on THIS device (where you'll consume the service).",
+          "default" => "0.0.0.0",
           "format" => "ipv4",
-          "ui:help" => "Common: 127.0.0.1 (loopback) or 0.0.0.0 (all interfaces)"
+          "ui:widget" => "hidden",
+          "readOnly" => true
         },
         "port" => %{
           "type" => "string",
-          "description" => "Local port to bind the access to.",
-          "pattern" => "^[0-9]{1,5}$",
-          "ui:help" => "1-65535 (ensure it's free)"
+          "description" =>
+            "Gateway port that devices on the subnet will use to reach this private share.",
+          "ui:help" => "Devices will connect via gateway_ip:PORT. Choose a free port (1–65535).",
+          "pattern" => "^[0-9]{1,5}$"
         }
       },
       "required" => ["name", "ip", "port"]

@@ -106,11 +106,23 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   @spec render(%{:view => :share, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :share} = assigns) do
     data = Map.get(assigns, :data)
+
+    # try and get the base url if the server exists - the unset check is not good, needs to change
+    server =
+      case data && (data[:server] || data["server"]) do
+        s when is_binary(s) and s != "" and s != "<unset>" ->
+          s |> String.split(".") |> Enum.take(-2) |> Enum.join(".")
+
+        _ ->
+          nil
+      end
+
     assigns =
       assigns
       |> assign(has_data: is_map(data) and map_size(data) > 0)
       |> assign(gateway: Application.get_env(:tunneld, :network)[:gateway])
       |> assign(data: data)
+      |> assign(server: server)
 
     ~H"""
     <div class="bg-secondary p-2 h-full">
@@ -139,7 +151,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               "title" => "Remove",
               "payload" => %{
                 "type" => "remove_share",
-                "data" => %{"id" => @data.id}
+                "data" => %{"id" => @data.id, "kind" => @data.kind}
               }
             })
           }
@@ -171,7 +183,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <% tunneld = @data.tunneld || %{} %>
           <div :if={!Enum.empty?(tunneld)} class="mt-3">
             <div class="py-2">
-              <h2 class="text-sm font-semibold">Tunneld Instances</h2>
+              <h2 class="text-sm font-semibold">Resources</h2>
             </div>
 
             <div class="grid grid-cols-1 gap-2">
@@ -194,7 +206,9 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                     <div class="text-sm font-medium capitalize"><%= kind %> instance</div>
                     <label
                       phx-click="toggle_share_access"
-                      phx-value-payload={Jason.encode!(%{"id" => unit_id, "enable" => !enabled?, "kind" => @data.kind})}
+                      phx-value-payload={
+                        Jason.encode!(%{"id" => unit_id, "enable" => !enabled?, "kind" => @data.kind})
+                      }
                       class="relative inline-flex items-center cursor-pointer"
                     >
                       <input type="checkbox" class="sr-only peer" checked={enabled?} />
@@ -215,6 +229,16 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                     <div class="truncate">
                       <span class="font-semibold">Unit ID:</span>
                       <span class="ml-1"><%= unit_id || "—" %></span>
+                    </div>
+                    <div :if={@server && reserved && reserved != ""} class="truncate">
+                      <span class="font-semibold">URL:</span>
+                      <.link
+                        href={"https://#{reserved}.#{@server}"}
+                        target="_blank"
+                        class="ml-1 underline"
+                      >
+                        <%= "#{reserved}.#{@server}" %>
+                      </.link>
                     </div>
                   </div>
                 </div>
@@ -255,17 +279,17 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         <div
           :if={not @is_unset}
           phx-click="modal_open"
-          phx-value-modal_title="Remove Network Endpoint?"
+          phx-value-modal_title="Disconnect from Control Plane?"
           phx-value-modal_body={
             Jason.encode!(%{
               "type" => "string",
               "data" =>
-                "This will remove the server you are set to connec to, you need to disable from the env to add to a new network"
+                "This will disconnect the gateway from the current network. All shares and private access will stop working. You will need to enable them once you connect to a network again."
             })
           }
           phx-value-modal_actions={
             Jason.encode!(%{
-              "title" => "Remove Network Endpoint",
+              "title" => "Disconnect Control Plane",
               "payload" => %{
                 "type" => "configure_disable_control_plane",
                 "data" => %{}
@@ -275,7 +299,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
         >
           <.icon name="hero-no-symbol" class="h-5 w-5" />
-          <div class="truncate text-xs">Remove Control Plane</div>
+          <div class="truncate text-xs">Disconnect Control Plane</div>
         </div>
 
         <div
