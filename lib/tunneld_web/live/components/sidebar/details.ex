@@ -107,22 +107,11 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   def render(%{view: :share} = assigns) do
     data = Map.get(assigns, :data)
 
-    # try and get the base url if the server exists - the unset check is not good, needs to change
-    server =
-      case data && (data[:server] || data["server"]) do
-        s when is_binary(s) and s != "" and s != "<unset>" ->
-          s |> String.split(".") |> Enum.take(-2) |> Enum.join(".")
-
-        _ ->
-          nil
-      end
-
     assigns =
       assigns
       |> assign(has_data: is_map(data) and map_size(data) > 0)
       |> assign(gateway: Application.get_env(:tunneld, :network)[:gateway])
       |> assign(data: data)
-      |> assign(server: server)
 
     ~H"""
     <div class="bg-secondary p-2 h-full">
@@ -229,16 +218,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                     <div class="truncate">
                       <span class="font-semibold">Unit ID:</span>
                       <span class="ml-1"><%= unit_id || "—" %></span>
-                    </div>
-                    <div :if={@server && reserved && reserved != ""} class="truncate">
-                      <span class="font-semibold">URL:</span>
-                      <.link
-                        href={"https://#{reserved}.#{@server}"}
-                        target="_blank"
-                        class="ml-1 underline"
-                      >
-                        <%= "#{reserved}.#{@server}" %>
-                      </.link>
                     </div>
                   </div>
                 </div>

@@ -392,16 +392,13 @@ defmodule TunneldWeb.Live.Dashboard do
       # The setup to configure control plane domain
       #
       "configure_disable_control_plane" ->
-        # TODO: disable any shares (private or public) - DONT DELETE
-        # TOOD: UI NEED TO REFLECT THIS RESET INIT SHARES
         Tunneld.Servers.Zrok.unset_api_endpoint()
+        Tunneld.Servers.Shares.try_hibernate_shares()
 
       #
       # The setup to configure control plane domain
       #
       "configure_enable_control_plane" ->
-        # TODO: Make sure shares are added to the new network but disabled - IF THERE IS
-        # TOOD: UI NEED TO REFLECT THIS RESET INIT SHARES
         Tunneld.Servers.Zrok.set_api_endpoint(data["url"])
 
       #
@@ -409,13 +406,14 @@ defmodule TunneldWeb.Live.Dashboard do
       #
       "configure_enable_environment" ->
         Tunneld.Servers.Zrok.enable_env(data["account_token"])
-        Tunneld.Servers.Shares.try_set_local_shares()
+        Tunneld.Servers.Shares.try_init_local_shares()
 
       #
       # Configure device - disable
       #
       "configure_disable_environment" ->
         Tunneld.Servers.Zrok.disable_env()
+        Tunneld.Servers.Shares.try_hibernate_shares()
 
       #
       # Revoke Login Credentials
