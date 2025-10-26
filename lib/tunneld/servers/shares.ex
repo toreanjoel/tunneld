@@ -32,6 +32,39 @@ defmodule Tunneld.Servers.Shares do
     {:reply, {:ok, data}, state}
   end
 
+  def handle_call(:set_local_shares, _from, state) do
+    shares =
+      case read_file() do
+        {:ok, list} when is_list(list) -> list
+        _ -> []
+      end
+
+    # We try and add all the shares we had locally
+    try do
+      if not Enum.empty?(shares) do
+        shares
+        |> Enum.each(fn s ->
+          name = s["name"]
+          ip = s["ip"]
+          port = s["port"]
+
+          base = sanitize_base(name)
+          pub_token = make_token(base, "pub")
+          priv_token = make_token(base, "priv")
+
+          Zrok.reserve_public(pub_token, ip, port)
+          Zrok.reserve_private(priv_token, ip, port)
+        end)
+      end
+    rescue
+      _e ->
+        Logger.error("There was a problem setting the shares on the cloud env")
+        :error
+    end
+
+    {:reply, state, state}
+  end
+
   def handle_call({:add_share, share}, _from, state) do
     shares =
       case read_file() do
@@ -44,7 +77,7 @@ defmodule Tunneld.Servers.Shares do
         item["port"] === share["port"] and item["ip"] === share["ip"]
       end)
 
-    updated_state =
+    state =
       if is_nil(exists) do
         new_share =
           share
@@ -82,7 +115,7 @@ defmodule Tunneld.Servers.Shares do
         state
       end
 
-    {:reply, updated_state, updated_state}
+    {:reply, state, state}
   end
 
   def handle_call({:get_share_details, id}, _from, state) do
@@ -681,6 +714,7 @@ defmodule Tunneld.Servers.Shares do
 
   def get_share_details(id), do: GenServer.call(__MODULE__, {:get_share_details, id})
   def add_share(share), do: GenServer.call(__MODULE__, {:add_share, share}, 25_000)
+  def try_set_local_shares(), do: GenServer.call(__MODULE__, :set_local_shares, 25_000)
   def remove_share(id), do: GenServer.cast(__MODULE__, {:remove_share, id})
 
   def add_access(access), do: GenServer.call(__MODULE__, {:add_access, access}, 25_000)

@@ -409,6 +409,7 @@ defmodule TunneldWeb.Live.Dashboard do
       #
       "configure_enable_environment" ->
         Tunneld.Servers.Zrok.enable_env(data["account_token"])
+        Tunneld.Servers.Shares.try_set_local_shares()
 
       #
       # Configure device - disable
