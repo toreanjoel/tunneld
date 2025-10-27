@@ -8,6 +8,13 @@ defmodule Tunneld.MixProject do
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
+      releases: [
+        tunneld: [
+          include_erts: true,
+          include_src: false,
+          applications: [runtime_tools: :permanent]
+        ]
+      ],
       aliases: aliases(),
       deps: deps()
     ]
