@@ -773,9 +773,6 @@ defmodule Tunneld.Servers.Shares do
   def file_exists?(), do: File.exists?(path())
 
   def path(), do: Path.join(config_fs(:root), config_fs(:shares))
-
-  defp config_fs(), do: Application.get_env(:tunneld, :fs)
-
   defp config_fs(key) do
     case Application.get_env(:tunneld, :fs) do
       kw when is_list(kw) -> Keyword.get(kw, key)

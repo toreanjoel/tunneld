@@ -38,7 +38,8 @@ if config_env() == :prod do
     url: [host: host, port: 80, scheme: "http"],
     http: [ip: {0, 0, 0, 0}, port: port],
     check_origin: check_origins,
-    secret_key_base: secret_key_base
+    secret_key_base: secret_key_base,
+    server: true
 
   # Prod data paths (overrideable via ENV)
   config :tunneld, :fs,
