@@ -10,6 +10,7 @@ defmodule Tunneld.MixProject do
       start_permanent: Mix.env() == :prod,
       releases: [
         tunneld: [
+          steps: [:assemble, :tar],
           include_erts: true,
           include_src: false,
           applications: [runtime_tools: :permanent]
