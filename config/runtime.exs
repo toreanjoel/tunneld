@@ -26,7 +26,7 @@ if config_env() == :prod do
       raise "ENV SECRET_KEY_BASE is missing. Generate with: mix phx.gen.secret"
 
   host = System.get_env("PHX_HOST", "localhost")
-  port = String.to_integer(System.getenv("PORT") || "80")
+  port = String.to_integer(System.get_env("PORT") || "80")
 
   config :tunneld, :dns_cluster_query, System.get_env("DNS_CLUSTER_QUERY")
 
