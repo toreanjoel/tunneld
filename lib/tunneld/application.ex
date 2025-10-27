@@ -4,6 +4,7 @@ defmodule Tunneld.Application do
   @moduledoc false
 
   use Application
+
   alias Tunneld.Servers.{
     Auth,
     Session,
@@ -12,7 +13,7 @@ defmodule Tunneld.Application do
     Devices,
     Resources,
     Wlan,
-    Shares,
+    Shares
   }
 
   @impl true
@@ -39,7 +40,7 @@ defmodule Tunneld.Application do
       {Services, []},
       {Shares, []},
       {Devices, []},
-      {Auth, []},
+      {Auth, []}
     ]
 
     # This should not be async, we want this to complete before any other servers init data

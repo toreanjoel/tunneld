@@ -771,7 +771,16 @@ defmodule Tunneld.Servers.Shares do
     do: GenServer.cast(__MODULE__, {:update_share, :tunneld, data})
 
   def file_exists?(), do: File.exists?(path())
-  def path(), do: "./" <> config_fs(:root) <> config_fs(:shares)
+
+  def path(), do: Path.join(config_fs(:root), config_fs(:shares))
+
   defp config_fs(), do: Application.get_env(:tunneld, :fs)
-  defp config_fs(key), do: config_fs()[key]
+
+  defp config_fs(key) do
+    case Application.get_env(:tunneld, :fs) do
+      kw when is_list(kw) -> Keyword.get(kw, key)
+      map when is_map(map) -> Map.get(map, key) || Map.get(map, to_string(key))
+      _ -> nil
+    end
+  end
 end

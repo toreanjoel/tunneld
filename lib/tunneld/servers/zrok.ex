@@ -22,7 +22,14 @@ defmodule Tunneld.Servers.Zrok do
   @impl true
   def init(_) do
     mock? = Application.get_env(:tunneld, :mock_data, false)
-    sdir = if mock?, do: Path.join([cwd(), fs_root(), "zrok", "units"]), else: @linux_systemd_dir
+
+    sdir =
+      if mock? do
+        Path.join([fs_root(), "zrok", "units"])
+      else
+        @linux_systemd_dir
+      end
+
     :ok = ensure_dir(sdir)
     units = discover_units(sdir, mock?)
 
@@ -659,8 +666,12 @@ defmodule Tunneld.Servers.Zrok do
   end
 
   defp fs_root() do
-    fs = Application.get_env(:tunneld, :fs) || %{root: "/data"}
-    fs[:root] || "/data"
+    case Application.get_env(:tunneld, :fs) do
+      nil -> "/var/lib/tunneld"
+      kw when is_list(kw) -> Keyword.get(kw, :root, "/var/lib/tunneld")
+      map when is_map(map) -> Map.get(map, :root) || Map.get(map, "root") || "/var/lib/tunneld"
+      bin when is_binary(bin) -> bin
+    end
   end
 
   defp cwd(), do: "."

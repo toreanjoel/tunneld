@@ -63,11 +63,6 @@ config :phoenix, :json_library, Jason
 config :tunneld, :auth,
   ttl: 900 # 15 minutes
 
-config :tunneld, :fs,
-  root: "/data",
-  auth: "/auth.json",
-  shares: "/shares.json"
-
 config :tunneld, version: "0.4.0"
 
 # Import environment specific config. This must remain at the bottom
