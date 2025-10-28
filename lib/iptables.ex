@@ -52,6 +52,21 @@ defmodule Iptables do
     ])
 
     # System.cmd("iptables", ["-A", "FORWARD", "-i", @wlan0_interface, "-d", Application.get_env(:tunneld, [:network, :gateway]), "-j", "ACCEPT"])
+
+    for proto <- ["udp", "tcp"] do
+      System.cmd("iptables", [
+        "-A",
+        "INPUT",
+        "-i",
+        get_env(:eth),
+        "-p",
+        proto,
+        "--dport",
+        "5336",
+        "-j",
+        "ACCEPT"
+      ])
+    end
   end
 
   # Make sure client interfaces can send/recieve packets from the internet interface
@@ -68,7 +83,7 @@ defmodule Iptables do
       "-m",
       "state",
       "--state",
-      "RELATED,ESTABLISHED",
+      "NEW,ESTABLISHED,RELATED",
       "-j",
       "ACCEPT"
     ])
@@ -85,7 +100,7 @@ defmodule Iptables do
       "-m",
       "state",
       "--state",
-      "RELATED,ESTABLISHED",
+      "ESTABLISHED,RELATED",
       "-j",
       "ACCEPT"
     ])
@@ -161,6 +176,10 @@ defmodule Iptables do
       get_env(:eth),
       "-o",
       get_env(:mullvad),
+      "-m",
+      "state",
+      "--state",
+      "NEW,ESTABLISHED,RELATED",
       "-j",
       "ACCEPT"
     ])
@@ -177,7 +196,7 @@ defmodule Iptables do
       "-m",
       "state",
       "--state",
-      "RELATED,ESTABLISHED",
+      "ESTABLISHED,RELATED",
       "-j",
       "ACCEPT"
     ])
