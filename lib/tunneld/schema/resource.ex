@@ -1,25 +1,25 @@
-defmodule Tunneld.Schema.Share do
+defmodule Tunneld.Schema.Resource do
   @moduledoc """
-  Share JSON Schema - This is the schema that will be used to generate a form how we interact with the share
+  Resource JSON Schema - This is the schema that will be used to generate a form how we interact with the resource
   """
 
   @spec data(atom()) :: map()
   @doc """
   The JSON schema data that will be used to render the form structure.
   """
-  # TODO: validation to map to what we are expected on a zrok share
+  # TODO: validation to map to what we are expected on a zrok resource
   def data(:add_public) do
     %{
-      "title" => "Share Add",
+      "title" => "Resource Add",
       "description" =>
-        "Register a LAN device and port for this share. (Internal, shown on the dashboard.)",
+        "Register a LAN device and port for this resource. (Internal, shown on the dashboard.)",
       "type" => "object",
       "ui:order" => ["name", "description", "ip", "port"],
       "properties" => %{
         "name" => %{
           "type" => "string",
           "description" =>
-            "Name of the share (bucket) that groups its public and private references.",
+            "Name of the resource (bucket) that groups its public and private references.",
           "ui:help" =>
             "This label appears in the dashboard and groups the related access references.",
           "minLength" => 1
@@ -53,15 +53,15 @@ defmodule Tunneld.Schema.Share do
     %{
       "title" => "Private Access",
       "description" =>
-        "Connect this gateway to a private reserved share (you were given its name).",
+        "Connect this gateway to a private reserved resource (you were given its name).",
       "type" => "object",
       "ui:order" => ["name", "description", "ip", "port"],
       "properties" => %{
         "name" => %{
           "type" => "string",
           "description" =>
-            "Exact name of the private share you are accessing (from the share’s owner).",
-          "ui:help" => "Must match the owner’s private share name exactly.",
+            "Exact name of the private resource you are accessing (from the resource’s owner).",
+          "ui:help" => "Must match the owner’s private resource name exactly.",
           "minLength" => 1
         },
         "description" => %{
@@ -81,7 +81,7 @@ defmodule Tunneld.Schema.Share do
         "port" => %{
           "type" => "string",
           "description" =>
-            "Gateway port that devices on the subnet will use to reach this private share.",
+            "Gateway port that devices on the subnet will use to reach this private resource.",
           "ui:help" => "Devices will connect via gateway_ip:PORT. Choose a free port (1–65535).",
           "pattern" => "^[0-9]{1,5}$"
         }

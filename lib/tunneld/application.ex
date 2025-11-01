@@ -11,9 +11,9 @@ defmodule Tunneld.Application do
     Zrok,
     Services,
     Devices,
-    Resources,
+    SystemResources,
     Wlan,
-    Shares
+    Resources
   }
 
   @impl true
@@ -36,9 +36,9 @@ defmodule Tunneld.Application do
       {Wlan, []},
       {Zrok, []},
       {Session, []},
-      {Resources, []},
+      {SystemResources, []},
       {Services, []},
-      {Shares, []},
+      {Resources, []},
       {Devices, []},
       {Auth, []}
     ]

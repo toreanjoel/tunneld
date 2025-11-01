@@ -184,11 +184,11 @@ defmodule Tunneld.Servers.Zrok do
       {:ok, %{unit: unit}} ->
         case do_enable(unit, state) do
           :ok ->
-            notify(:info, "Share enabled: #{id}")
+            notify(:info, "Resource enabled: #{id}")
             {:reply, :ok, state}
 
           {:error, r} ->
-            notify(:error, "Failed to enable share: #{id}")
+            notify(:error, "Failed to enable resource: #{id}")
             {:reply, {:error, r}, state}
         end
 
@@ -202,11 +202,11 @@ defmodule Tunneld.Servers.Zrok do
       {:ok, %{unit: unit}} ->
         case do_disable(unit, state) do
           :ok ->
-            notify(:info, "Share disabled: #{id}")
+            notify(:info, "Resource disabled: #{id}")
             {:reply, :ok, state}
 
           {:error, r} ->
-            notify(:error, "Failed to disable share: #{id}")
+            notify(:error, "Failed to disable resource: #{id}")
             {:reply, {:error, r}, state}
         end
 
@@ -223,7 +223,7 @@ defmodule Tunneld.Servers.Zrok do
         case File.rm(unit_path(state.systemd_dir, unit)) do
           :ok ->
             _ = daemon_reload(state)
-            notify(:info, "Share removed: #{id}")
+            notify(:info, "Resource removed: #{id}")
             {:reply, :ok, %{state | units: Map.delete(state.units, id)}}
 
           {:error, r} ->
@@ -388,7 +388,9 @@ defmodule Tunneld.Servers.Zrok do
   end
 
   defp zrok_bin() do
-    @zrok_path <> "/zrok"
+    # We fallback to the manual installed as the user could have installed separately
+    mock? = Application.get_env(:tunneld, :mock_data, false)
+    if not mock?, do: @zrok_path <> "/zrok", else: "zrok"
   end
 
   defp build_access_unit(access, _state) do
@@ -443,16 +445,16 @@ defmodule Tunneld.Servers.Zrok do
     {:ok, {id, unit_name, unit}}
   end
 
-  defp build_unit(share, _state) do
-    id = normalize_id(share["id"] || share[:id])
-    name = share["name"] || share[:name] || id
-    tun = share["tunneld"] || share[:tunneld] || %{}
+  defp build_unit(resource, _state) do
+    id = normalize_id(resource["id"] || resource[:id])
+    name = resource["name"] || resource[:name] || id
+    tun = resource["tunneld"] || resource[:tunneld] || %{}
     reserved_token = to_string(tun["reserved_token"] || tun[:reserved_token] || name)
 
     bin = zrok_bin()
 
     exec =
-      [bin, "share", "reserved", reserved_token, "--headless"]
+      [bin, "resource", "reserved", reserved_token, "--headless"]
       |> Enum.map(&to_string/1)
       |> Enum.join(" ")
 
@@ -461,7 +463,7 @@ defmodule Tunneld.Servers.Zrok do
     unit =
       [
         "[Unit]",
-        "Description=Zrok Share (#{name})",
+        "Description=Zrok Resource (#{name})",
         "Wants=network-online.target",
         "After=network-online.target",
         "StartLimitIntervalSec=60",
@@ -675,8 +677,6 @@ defmodule Tunneld.Servers.Zrok do
       bin when is_binary(bin) -> bin
     end
   end
-
-  defp cwd(), do: "."
 
   defp notify(type, message) do
     Phoenix.PubSub.broadcast(@pubsub, @topic_notif, %{type: type, message: message})

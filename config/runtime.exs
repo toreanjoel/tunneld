@@ -45,7 +45,7 @@ if config_env() == :prod do
   config :tunneld, :fs,
     root: System.get_env("TUNNELD_DATA", "/var/lib/tunneld"),
     auth: System.get_env("TUNNELD_AUTH_FILE", "auth.json"),
-    shares: System.get_env("TUNNELD_SHARES_FILE", "shares.json")
+    resources: System.get_env("TUNNELD_SHARES_FILE", "resources.json")
 
   config :tunneld, :config_dir, path: System.get_env("TUNNELD_CONFIG", "/etc/tunneld")
 end

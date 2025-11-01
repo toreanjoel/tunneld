@@ -10,9 +10,9 @@ defmodule TunneldWeb.Live.Dashboard do
   # Components
   alias TunneldWeb.Live.Components.Sidebar.Details, as: SidebarDetails
   alias TunneldWeb.Live.Components.Welcome
-  alias TunneldWeb.Live.Components.Resources
+  alias TunneldWeb.Live.Components.SystemResources
   alias TunneldWeb.Live.Components.Services
-  alias TunneldWeb.Live.Components.Shares
+  alias TunneldWeb.Live.Components.Resources
   alias TunneldWeb.Live.Components.Devices
   alias TunneldWeb.Live.Components.Modal
 
@@ -185,9 +185,9 @@ defmodule TunneldWeb.Live.Dashboard do
         </div>
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
-        <%!-- Resources, Shares and Services  --%>
+        <%!-- Resources, Resources and Services  --%>
         <div class="flex flex-col md:flex-row w-full gap-6">
-          <div class="flex-1"><.live_component id="resources" module={Resources} /></div>
+          <div class="flex-1"><.live_component id="system_resources" module={SystemResources} /></div>
           <div class="flex-1">
             <.live_component id="services" module={Services} />
           </div>
@@ -195,9 +195,9 @@ defmodule TunneldWeb.Live.Dashboard do
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
 
-        <%!-- Shares --%>
+        <%!-- Resources --%>
         <div class="min-h-[200px]">
-          <.live_component id="shares" module={Shares} />
+          <.live_component id="resources" module={Resources} />
         </div>
 
         <%!-- Devices --%>
@@ -236,7 +236,7 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   #
-  # Catch the toggle event to enable/disable the shares and their resources
+  # Catch the toggle event to enable/disable the resources and their resources
   #
   def handle_event("toggle_share_access", params, socket) do
     send(self(), %{action: "toggle_share_access", data: params})
@@ -373,15 +373,16 @@ defmodule TunneldWeb.Live.Dashboard do
       # Device management
       #
       "revoke_release_ip" ->
-         %{"mac" => mac} = Jason.decode!(data)
-         if (not is_nil(mac)) do
-           Tunneld.Servers.Devices.revoke_lease(mac)
-         end
+        %{"mac" => mac} = Jason.decode!(data)
+
+        if not is_nil(mac) do
+          Tunneld.Servers.Devices.revoke_lease(mac)
+        end
+
       #
       # Wireless networking
       #
       "connect_to_wireless_network" ->
-
         Tunneld.Servers.Wlan.connect_with_pass(data["ssid"], data["password"])
 
       "disconnect_from_wireless_network" ->
@@ -402,7 +403,7 @@ defmodule TunneldWeb.Live.Dashboard do
       #
       "configure_disable_control_plane" ->
         Tunneld.Servers.Zrok.unset_api_endpoint()
-        Tunneld.Servers.Shares.try_hibernate_shares()
+        Tunneld.Servers.Resources.try_hibernate_shares()
 
       #
       # The setup to configure control plane domain
@@ -415,14 +416,14 @@ defmodule TunneldWeb.Live.Dashboard do
       #
       "configure_enable_environment" ->
         Tunneld.Servers.Zrok.enable_env(data["account_token"])
-        Tunneld.Servers.Shares.try_init_local_shares()
+        Tunneld.Servers.Resources.try_init_local_shares()
 
       #
       # Configure device - disable
       #
       "configure_disable_environment" ->
         Tunneld.Servers.Zrok.disable_env()
-        Tunneld.Servers.Shares.try_hibernate_shares()
+        Tunneld.Servers.Resources.try_hibernate_shares()
 
       #
       # Revoke Login Credentials
@@ -432,26 +433,26 @@ defmodule TunneldWeb.Live.Dashboard do
         send(self(), :revoke_login_creds)
 
       #
-      # Shares
+      # Resources
       #
       "add_share" ->
-        Tunneld.Servers.Shares.add_share(data)
+        Tunneld.Servers.Resources.add_share(data)
 
       "add_private_share" ->
-        Tunneld.Servers.Shares.add_access(data)
+        Tunneld.Servers.Resources.add_access(data)
 
       "toggle_share_access" ->
         %{"id" => id, "enable" => enable, "kind" => kind} = Jason.decode!(data["payload"])
 
         case kind do
           "host" ->
-            Tunneld.Servers.Shares.toggle_share(id, enable)
+            Tunneld.Servers.Resources.toggle_share(id, enable)
 
           "access" ->
-            Tunneld.Servers.Shares.toggle_access(id, enable)
+            Tunneld.Servers.Resources.toggle_access(id, enable)
 
           _ ->
-            raise "Kind not found, make sure share is setup with correct kind"
+            raise "Kind not found, make sure resource is setup with correct kind"
         end
 
       "remove_share" ->
@@ -459,19 +460,19 @@ defmodule TunneldWeb.Live.Dashboard do
 
         case kind do
           "host" ->
-            Tunneld.Servers.Shares.remove_share(id)
+            Tunneld.Servers.Resources.remove_share(id)
 
           "access" ->
-            Tunneld.Servers.Shares.remove_access(id)
+            Tunneld.Servers.Resources.remove_access(id)
 
           _ ->
-            raise "Kind not found, make sure share is setup with correct kind"
+            raise "Kind not found, make sure resource is setup with correct kind"
         end
 
         send(self(), :close_details)
 
       "tunneld_settings" ->
-        Tunneld.Servers.Shares.update_share(data, :tunneld)
+        Tunneld.Servers.Resources.update_share(data, :tunneld)
 
       _ ->
         Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
@@ -573,9 +574,9 @@ defmodule TunneldWeb.Live.Dashboard do
   #
   defp get_sidebar_details(type, id) do
     case type do
-      "share" ->
-        Tunneld.Servers.Shares.get_share(id)
-        :share
+      "resource" ->
+        Tunneld.Servers.Resources.get_resource(id)
+        :resource
 
       "service" ->
         Tunneld.Servers.Services.get_service_logs(id)

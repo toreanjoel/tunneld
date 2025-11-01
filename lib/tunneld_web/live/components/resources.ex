@@ -1,38 +1,19 @@
 defmodule TunneldWeb.Live.Components.Resources do
   @moduledoc """
-  Resources of the devices and available resources
-
-  Example of how the data will be sent but will be sent with real data using os_mon
-
-  alias TunneldWeb.Live.Components.Resources, as: Resources
-
-    data = %{
-      resources: %{
-        cpu: Enum.random(1..100),
-        mem: Enum.random(1..100),
-        storage: Enum.random(1..100)
-      }
-    }
-
-    id = "resources"
-    module = Resources
-
-
-    Phoenix.PubSub.broadcast(Tunneld.PubSub, "component:resources", %{id: id, module: module, data: data})
+  Resources that are available and connected as devices to the system.
   """
   use TunneldWeb, :live_component
-
-  # The constant for the gauge radius
-  @radius 65
 
   def mount(socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:resources")
     end
+
     {:ok, socket}
   end
 
   def update(assigns, socket) do
+    # Example list of resources, each with a type and a status.
     socket =
       socket
       |> assign(data: Map.get(assigns, :data, %{}))
@@ -41,65 +22,96 @@ defmodule TunneldWeb.Live.Components.Resources do
   end
 
   @doc """
-  Render the resource usage as gauges.
+  Render the resources.
   """
   def render(assigns) do
-    data = Map.get(assigns, :data)
-    resources = Map.get(data, :resources, %{
-      cpu: 0,
-      mem: 0,
-      storage: 0
-    })
-
-    # Calculate the circumference for the progress circles
     assigns =
       assigns
-      |> assign(resources: resources)
-      |> assign(radius: @radius)
-      |> assign(circumference: 2 * :math.pi() * @radius)
+      |> assign(resources: assigns.data)
 
     ~H"""
     <div class="p-5">
-      <div class="mb-5 flex flex-col">
-        <div class="text-xl text-gray-1 font-medium">Resources</div>
-        <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
+      <div class="mb-5 flex flex-row">
+        <div class="flex-1">
+          <div class="text-xl text-gray-1 font-medium">Resources</div>
+          <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
+        </div>
+        <div
+          phx-click="modal_open"
+          phx-value-modal_title="Add Private Resource"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "schema",
+              "data" => Tunneld.Schema.Resource.data(:add_private),
+              "default_values" => %{
+                "ip" => "0.0.0.0"
+              },
+              "action" => "add_private_share"
+            })
+          }
+          class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
+        >
+          <.icon class="w-6 h-6" name="hero-cpu-chip" />
+          <div class="truncate text-xs">Bind Private</div>
+        </div>
+
+        <div
+          phx-click="modal_open"
+          phx-value-modal_title="Add Resource"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "schema",
+              "data" => Tunneld.Schema.Resource.data(:add_public),
+              "default_values" => %{},
+              "action" => "add_share"
+            })
+          }
+          class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
+        >
+          <.icon class="w-6 h-6" name="hero-cpu-chip" />
+          <div class="truncate text-xs">Add Resource</div>
+        </div>
       </div>
 
-      <div class="flex items-center justify-center">
-        <div class="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-2">
-          <%= for {resource, percent} <- @resources do %>
-            <!-- On small screens: full width; on md and above, limit width -->
-            <div class="bg-primary relative w-full md:max-w-[200px] rounded-lg">
-              <svg class="w-full h-full" viewBox="0 0 170 170">
-                <!-- Background circle -->
-                <circle
-                  cx="85"
-                  cy="85"
-                  r={@radius}
-                  stroke-width="5"
-                  fill="none"
-                />
-                <!-- Progress circle -->
-                <circle
-                  cx="85"
-                  cy="85"
-                  r={@radius}
-                  class={get_percent_color(percent) <> " animate-dashoffset"}
-                  stroke-width="10"
-                  fill="#202226"
-                  stroke-dasharray={@circumference}
-                  stroke-dashoffset={@circumference * (1 - percent / 100)}
-                  stroke-linecap="round"
-                  style="transform: rotate(-90deg); transform-origin: center;"
-                  stroke="currentColor"
-                />
-              </svg>
-              <!-- Percentage and label -->
-              <div class="absolute inset-0 flex flex-col items-center justify-center text-2xl md:text-lg text-white">
-                <%= "#{percent}%" %>
-                <div class="text-xs"><%= String.upcase(to_string(resource)) %></div>
+      <div>
+        <div
+          :if={Enum.empty?(@resources)}
+          class="w-[100px] md:w-[60px] h-[100px] md:h-[60px] bg-secondary flex items-center justify-center rounded-md opacity-10"
+        >
+          <.icon class="w-8 h-8 text-white" name="hero-cpu-chip" />
+        </div>
+
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <%= if !Enum.empty?(@resources) do %>
+            <%= for resource <- @resources do %>
+              <% kind = resource.kind || "host" %>
+              <div
+                phx-click="show_details"
+                phx-value-type="resource"
+                phx-value-id={resource.id || resource["id"]}
+                class="p-3 gap-2 flex flex-col rounded-lg w-full h-[80px] cursor-pointer bg-secondary transition-colors duration-150"
+                style="animation: fadeIn 0.5s ease-out forwards;"
+              >
+                <div class="flex items-center gap-2 grow">
+                  <.icon class="w-5 h-5 shrink-0" name={kind_icon(kind)} />
+                  <div class="grow">
+                    <div class="text-md font-semibold truncate"><%= resource.name %></div>
+                  </div>
+                  <div class={["w-3 h-3 rounded-full", get_status_color(resource.status || false)]} />
+                </div>
+
+                <div class="flex items-center justify-between text-xs flex-shrink-0">
+                  <div class="flex items-center gap-2">
+                    <span class="px-2 py-0.5 rounded-full bg-white/10 text-gray-200 uppercase text-[10px] font-medium">
+                      <%= kind %>
+                    </span>
+                    <span class="px-2 py-0.5 rounded-full bg-white/10 text-gray-200 text-[10px] font-medium">
+                      <%= resource.ip %>:<%= resource.port %>
+                    </span>
+                  </div>
+                </div>
               </div>
-            </div>
+            <% end %>
           <% end %>
         </div>
       </div>
@@ -107,12 +119,11 @@ defmodule TunneldWeb.Live.Components.Resources do
     """
   end
 
-  # Check the percent and return relevant color
-  defp get_percent_color(val) do
-    cond do
-      val > 60 and val <= 80 -> "text-yellow"
-      val > 80 -> "text-red"
-      true -> "text-green"
-    end
-  end
+  # Helper function to set a status indicator color based on resource status.
+  defp get_status_color(true), do: "bg-green"
+  defp get_status_color(_), do: "bg-red"
+
+  defp kind_icon("access"), do: "hero-arrows-right-left"
+  defp kind_icon("host"), do: "hero-server-stack"
+  defp kind_icon(_), do: "hero-question-mark-circle"
 end

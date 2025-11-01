@@ -107,7 +107,7 @@ defmodule TunneldWeb.Live.Login do
           />
         </div>
         <div class="py-2" />
-        <%!-- We need to only show the option for this auth if the share for the gateway is exposed? --%>
+        <%!-- We need to only show the option for this auth if the resource for the gateway is exposed? --%>
         <div :if={@show_webauthn} class="mt-4 text-center flex flex-col text-gray-500 gap-2">
           <h1 class="text-lg text-white font-bold mb-4 text-center">Login (WebAuthn)</h1>
           <button phx-click="trigger_webauthn_login">

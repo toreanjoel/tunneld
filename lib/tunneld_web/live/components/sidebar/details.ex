@@ -48,8 +48,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       <%= sidebar_header(assigns, %{
         header: "Authentication",
         body:
-          "Authentication options to access the application dashboard. WebAuthn (required) after you expose dashboard as an share.
-        This is needed in order to remotely access shares"
+          "Authentication options to access the application dashboard. WebAuthn (required) after you expose dashboard as an resource.
+        This is needed in order to remotely access resources"
       }) %>
 
       <div class="flex flex-row gap-1 justify-end my-2">
@@ -103,8 +103,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     """
   end
 
-  @spec render(%{:view => :share, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
-  def render(%{view: :share} = assigns) do
+  @spec render(%{:view => :resource, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{view: :resource} = assigns) do
     data = Map.get(assigns, :data)
 
     assigns =
@@ -125,14 +125,14 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       </div>
 
       <div :if={@has_data} class="flex flex-row gap-1 justify-end my-2">
-        <%!-- Actions: Remove Share only --%>
+        <%!-- Actions: Remove Resource only --%>
         <div
           phx-click="modal_open"
-          phx-value-modal_title="Remove Share?"
+          phx-value-modal_title="Remove Resource?"
           phx-value-modal_body={
             Jason.encode!(%{
               "type" => "string",
-              "data" => "Are you sure you want to remove the share?"
+              "data" => "Are you sure you want to remove the resource?"
             })
           }
           phx-value-modal_actions={
@@ -147,13 +147,13 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
         >
           <.icon name="hero-no-symbol" class="h-5 w-5" />
-          <div class="truncate text-xs">Remove Share</div>
+          <div class="truncate text-xs">Remove Resource</div>
         </div>
       </div>
 
       <div class={"flex flex-col #{if !@has_data, do: "items-center justify-center p-3 h-full", else: ""}"}>
         <h1 :if={!@has_data} class="text-2xl font-light text-gray-2 my-4 text-center">
-          No Share details
+          No Resource details
         </h1>
 
         <div :if={@has_data}>
@@ -263,7 +263,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             Jason.encode!(%{
               "type" => "string",
               "data" =>
-                "This will disconnect the gateway from the current network. All shares and private access will stop working. You will need to enable them once you connect to a network again."
+                "This will disconnect the gateway from the current network. All resources and private access will stop working. You will need to enable them once you connect to a network again."
             })
           }
           phx-value-modal_actions={
