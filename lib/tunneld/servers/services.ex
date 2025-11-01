@@ -70,7 +70,16 @@ defmodule Tunneld.Servers.Services do
     end
   end
 
-  # Restart a service
+  # Restart a service - can be broken to be more modular
+  def handle_cast({:restart_service, service, :no_notify}, state) do
+    service_name = service |> to_string
+
+    Task.start(fn ->
+      System.cmd("systemctl", ["restart", service_name])
+    end)
+    {:noreply, state}
+  end
+
   def handle_cast({:restart_service, service}, state) do
     service_name = service |> to_string
 
@@ -79,8 +88,8 @@ defmodule Tunneld.Servers.Services do
     end)
 
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-      type: :error,
-      message: "Restarting serice: #{service_name}"
+      type: :info,
+      message: "Restarting service: #{service_name}"
     })
 
     {:noreply, state}
@@ -131,4 +140,5 @@ defmodule Tunneld.Servers.Services do
   # Public API
   def get_service_logs(service), do: GenServer.call(__MODULE__, {:get_service_logs, service})
   def restart_service(service), do: GenServer.cast(__MODULE__, {:restart_service, service})
+  def restart_service(service, :no_notify), do: GenServer.cast(__MODULE__, {:restart_service, service, :no_notify})
 end

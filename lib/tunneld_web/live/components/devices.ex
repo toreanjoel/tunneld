@@ -43,7 +43,6 @@ defmodule TunneldWeb.Live.Components.Devices do
         </div>
         <div class="grid grid-cols-1 gap-1">
           <%!-- This is the button above the devices --%>
-
         </div>
       </div>
 
@@ -66,8 +65,31 @@ defmodule TunneldWeb.Live.Components.Devices do
             style="animation: fadeIn 0.5s ease-out forwards;"
           >
             <div class="flex flex-row gap-2">
-              <div class="grow truncate ellipsis">
-                <div class="text-sm truncate ellipsis"><%= device.hostname %></div>
+              <div class="flex-1 truncate ellipsis"><%= device.hostname %></div>
+              <div
+                phx-click="modal_open"
+                phx-value-modal_title="Revoke devices IP address?"
+                phx-value-modal_body={
+                  Jason.encode!(%{
+                    "type" => "string",
+                    "data" =>
+                      "This will release the device #{device.hostname} (#{device.ip}). The device will get a new ip address when connecting"
+                  })
+                }
+                phx-value-modal_actions={
+                  Jason.encode!(%{
+                    "title" => "Revoke",
+                    "payload" => %{
+                      "type" => "revoke_release_ip",
+                      "data" => %{
+                        "mac" => device.mac
+                      }
+                    }
+                  })
+                }
+                class="cursor-pointer"
+              >
+                <.icon name="hero-x-mark-solid" class="h-4 w-4 text-red" />
               </div>
             </div>
             <div class="grow" />

@@ -388,7 +388,7 @@ defmodule Tunneld.Servers.Zrok do
   end
 
   defp zrok_bin() do
-    @zrok_path
+    @zrok_path <> "/zrok"
   end
 
   defp build_access_unit(access, _state) do

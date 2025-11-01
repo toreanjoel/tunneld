@@ -370,9 +370,18 @@ defmodule TunneldWeb.Live.Dashboard do
   def handle_info(%{action: action, data: data}, socket) do
     case action do
       #
+      # Device management
+      #
+      "revoke_release_ip" ->
+         %{"mac" => mac} = Jason.decode!(data)
+         if (not is_nil(mac)) do
+           Tunneld.Servers.Devices.revoke_lease(mac)
+         end
+      #
       # Wireless networking
       #
       "connect_to_wireless_network" ->
+
         Tunneld.Servers.Wlan.connect_with_pass(data["ssid"], data["password"])
 
       "disconnect_from_wireless_network" ->
