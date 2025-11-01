@@ -10,6 +10,8 @@ defmodule Tunneld.Servers.Zrok do
   @component_desktop_id "sidebar_details"
   @component_module TunneldWeb.Live.Components.Sidebar.Details
 
+  # this is hardcoded but we need to get from the installed path
+  @zrok_path "/opt/openziti/bin"
   @linux_systemd_dir "/etc/systemd/system"
   @unit_prefix "zrok-"
   @unit_suffix ".service"
@@ -386,7 +388,7 @@ defmodule Tunneld.Servers.Zrok do
   end
 
   defp zrok_bin() do
-    System.find_executable("zrok") || "zrok"
+    @zrok_path
   end
 
   defp build_access_unit(access, _state) do

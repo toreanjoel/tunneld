@@ -24,7 +24,7 @@ Everything you need can be controlled through the tunneld dashboard
 - Ensures all DNS queries are filtered and resolved securely
 
 ### 📡 Local & Remote Share Monitoring
-Tunneld monitors active services (e.g., dnsmasq, hostapd, doh proxy) and connected devices. It also allows you to setup shares that setup intent to potentially sharing a resource that exists on some machine on your tunneld network.
+Tunneld monitors active services (e.g., dnsmasq, doh proxy) and connected devices. It also allows you to setup shares that setup intent to potentially sharing a resource that exists on some machine on your tunneld network.
 
 ### 🌍 Cloudflare Tunnel First class citizen
 Expose your local Tunneld UI or custom services to the internet via secure Cloudflare Tunnels. Great for accessing your dashboard while away from home, self host applications running on any device on its network, or connecting peer tunneld instances together.
@@ -44,11 +44,10 @@ Run Tunneld in:
 | Component        | Description                                                                 |
 |------------------|-----------------------------------------------------------------------------|
 | `dnsmasq`        | DHCP and DNS resolution with caching and ad blocking                       |
-| `hostapd`        | Broadcasts the wireless access point                                        |
 | `dnscrypt-proxy` | Enforces DNS-over-HTTPS (DoH) with preloaded secure resolvers              |
 | `Elixir + Phoenix` | Manages the UI, session-based device approval, sahre discovery, and services |
 | `iptables`       | Controls packet forwarding and filtering                                    |
-| `cloudflared`    | The tunnel provider that will be orchestrated through the tool              |
+| `Zrok/OpenZiti`    | The tunnel provider that will be orchestrated through the tool              |
 
 ---
 
