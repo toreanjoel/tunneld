@@ -11,7 +11,6 @@ defmodule Tunneld.Servers.Zrok do
   @component_module TunneldWeb.Live.Components.Sidebar.Details
 
   # this is hardcoded but we need to get from the installed path
-  @zrok_path "/opt/openziti/bin"
   @linux_systemd_dir "/etc/systemd/system"
   @unit_prefix "zrok-"
   @unit_suffix ".service"
@@ -388,9 +387,7 @@ defmodule Tunneld.Servers.Zrok do
   end
 
   defp zrok_bin() do
-    # We fallback to the manual installed as the user could have installed separately
-    mock? = Application.get_env(:tunneld, :mock_data, false)
-    if not mock?, do: @zrok_path <> "/zrok", else: "zrok"
+    System.find_executable("zrok") || "zrok"
   end
 
   defp build_access_unit(access, _state) do
@@ -411,10 +408,8 @@ defmodule Tunneld.Servers.Zrok do
       |> Integer.to_string()
       |> Kernel.<>("%")
 
-    bin = zrok_bin()
-
     exec =
-      [bin, "access", "private", reserved, "-b", bind, "--headless"]
+      [zrok_bin(), "access", "private", reserved, "-b", bind, "--headless"]
       |> Enum.map(&to_string/1)
       |> Enum.join(" ")
 
@@ -451,10 +446,8 @@ defmodule Tunneld.Servers.Zrok do
     tun = resource["tunneld"] || resource[:tunneld] || %{}
     reserved_token = to_string(tun["reserved_token"] || tun[:reserved_token] || name)
 
-    bin = zrok_bin()
-
     exec =
-      [bin, "resource", "reserved", reserved_token, "--headless"]
+      [zrok_bin(), "share", "reserved", reserved_token, "--headless"]
       |> Enum.map(&to_string/1)
       |> Enum.join(" ")
 
