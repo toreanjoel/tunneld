@@ -15,11 +15,13 @@ if config_env() == :prod do
   wlan = System.get_env("WIFI_INTERFACE") || raise "Missing ENV: WIFI_INTERFACE"
   lan = System.get_env("LAN_INTERFACE") || raise "Missing ENV: LAN_INTERFACE"
 
+  wifi_country = System.get_env("WIFI_COUNTRY")
   config :tunneld, :network,
     gateway: gateway,
     wlan: wlan,
     eth: lan,
-    mullvad: System.get_env("MULLVAD_INTERFACE", "")
+    mullvad: System.get_env("MULLVAD_INTERFACE", ""),
+    country: wifi_country
 
   secret_key_base =
     System.get_env("SECRET_KEY_BASE") ||

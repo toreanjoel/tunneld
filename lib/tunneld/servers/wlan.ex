@@ -113,9 +113,12 @@ defmodule Tunneld.Servers.Wlan do
   def handle_cast({:connect, ssid, password}, state) do
     Logger.info("Connecting to Wi-Fi: #{ssid}...")
 
-    # TODO: The country and the freq needs to change, freq is a bug but ZA needs to be set on env
+    network_conf = Application.get_env(:tunneld, :network)
+    wlan_iface = network_conf[:wlan]
+    country = network_conf[:country] || ""
+
     new_config = """
-    country=ZA
+    country=#{country}
     ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
     update_config=1
 
@@ -124,28 +127,21 @@ defmodule Tunneld.Servers.Wlan do
         psk="#{password}"
         auth_alg=OPEN
         key_mgmt=WPA-PSK
-        freq_list=2412 2437 2462
     }
     """
 
-    # Overwrite the wpa_supplicant.conf file
     :ok = File.write(@wpa_config, new_config)
 
-    # init with removing any cache or stored info on the prev used config
     init_wp_supplicant()
 
-    # Reconnect to last known network setup
-    System.cmd("wpa_cli", ["-i", Application.get_env(:tunneld, :network)[:wlan], "reconnect"])
-
-    # Request new DHCP lease to get an IP
-    System.cmd("dhcpcd", [Application.get_env(:tunneld, :network)[:wlan]])
+    System.cmd("wpa_cli", ["-i", wlan_iface, "reconnect"])
+    System.cmd("dhcpcd", [wlan_iface])
 
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
       type: :info,
       message: "Connected to network #{ssid} successfully"
     })
 
-    # send relevant events to the main dashboard
     check_connection()
 
     {:noreply, state}
