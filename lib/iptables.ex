@@ -134,6 +134,7 @@ defmodule Iptables do
 
   # DNS forwarding to a custom running service on a specific port (dnsmasq)
   defp dns_forwarding() do
+    # LAN clients to 5336
     System.cmd("iptables", [
       "-t",
       "nat",
@@ -163,6 +164,45 @@ defmodule Iptables do
       "--to-port",
       "5336"
     ])
+
+    # LOCAL processes (host) to 5336 — this fixes zrok
+    for proto <- ["udp", "tcp"] do
+      # resolv.conf → 127.0.0.1
+      System.cmd("iptables", [
+        "-t",
+        "nat",
+        "-A",
+        "OUTPUT",
+        "-d",
+        "127.0.0.1",
+        "-p",
+        proto,
+        "--dport",
+        "53",
+        "-j",
+        "REDIRECT",
+        "--to-port",
+        "5336"
+      ])
+
+      # if resolv.conf ever points to gateway (10.0.10.1), cover that too
+      System.cmd("iptables", [
+        "-t",
+        "nat",
+        "-A",
+        "OUTPUT",
+        "-d",
+        get_env(:gateway),
+        "-p",
+        proto,
+        "--dport",
+        "53",
+        "-j",
+        "REDIRECT",
+        "--to-port",
+        "5336"
+      ])
+    end
   end
 
   # VPN forwarding - Note this may change if the vpn server is running on another machine
