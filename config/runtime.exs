@@ -14,8 +14,12 @@ if config_env() == :prod do
   gateway = System.get_env("GATEWAY") || raise "Missing ENV: GATEWAY"
   wlan = System.get_env("WIFI_INTERFACE") || raise "Missing ENV: WIFI_INTERFACE"
   lan = System.get_env("LAN_INTERFACE") || raise "Missing ENV: LAN_INTERFACE"
+  lan = System.get_env("LAN_INTERFACE") || raise "Missing ENV: LAN_INTERFACE"
 
   wifi_country = System.get_env("WIFI_COUNTRY")
+  config :tunneld, :metadata,
+    device_id: device_id
+
   config :tunneld, :network,
     gateway: gateway,
     wlan: wlan,
