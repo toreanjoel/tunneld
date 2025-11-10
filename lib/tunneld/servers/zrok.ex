@@ -419,8 +419,8 @@ defmodule Tunneld.Servers.Zrok do
       [
         "[Unit]",
         "Description=Zrok Access (#{name})",
-        "Wants=network-online.target",
-        "After=network-online.target",
+        "Wants=network-online.target tunneld.service",
+        "After=network-online.target tunneld.service",
         "",
         "[Service]",
         "Type=simple",
@@ -457,8 +457,8 @@ defmodule Tunneld.Servers.Zrok do
       [
         "[Unit]",
         "Description=Zrok Resource (#{name})",
-        "Wants=network-online.target",
-        "After=network-online.target",
+        "Wants=network-online.target tunneld.service",
+        "After=network-online.target tunneld.service",
         "StartLimitIntervalSec=60",
         "StartLimitBurst=5",
         "",
