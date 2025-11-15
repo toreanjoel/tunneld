@@ -45,8 +45,11 @@ mkdir -p "$DEST_DIR"
 DEST_TAR="$DEST_DIR/$APP-pre-alpha.tar.gz"
 cp -f "$SRC" "$DEST_TAR"
 
-# Create checksums.txt with ONLY the hash (no filename/path)
-sha256sum "$DEST_TAR" | awk '{print $1}' > "$DEST_DIR/checksums.txt"
+# Create checksums.txt in standard 'hash  filename' format
+(
+  cd "$DEST_DIR"
+  sha256sum "$(basename "$DEST_TAR")" > "$DEST_DIR/checksums.txt"
+)
 
 echo "Saved build: $DEST_TAR"
 echo "SHA256 written to: $DEST_DIR/checksums.txt"
