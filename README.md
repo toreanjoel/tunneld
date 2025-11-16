@@ -4,7 +4,7 @@ A wireless-first, zero-trust network manager built for portability, performance,
 
 ---
 
-Tunneld acts as your network's intelligent gateway — managing devices, assigning IPs via DHCP, resolving DNS securely, sharing local compute and exposing optional network services through Cloudflare Tunnels. Designed to be lightweight, modular, and artifact-driven, Tunneld works both at home and on the move. The goal, you focus on building and can plug the device in your network, keeping it isolated and allowing you expose and share resources publicly or private over a private tunneld network.
+Tunneld acts as your network's intelligent gateway — managing devices, assigning IPs via DHCP, resolving DNS securely, sharing local compute and exposing optional network services through Zrok Tunnels. Designed to be lightweight, modular, and resource-driven, Tunneld works both at home and on the move. The goal, you focus on building and can plug the device in your network, keeping it isolated and allowing you expose and resource resources publicly or private over a private tunneld network.
 
 ---
 
@@ -23,19 +23,19 @@ Everything you need can be controlled through the tunneld dashboard
 - Integrates DNS-over-HTTPS (DoH) to block ads, tracking domains, and fingerprinting 
 - Ensures all DNS queries are filtered and resolved securely
 
-### 📡 Local & Remote Artifact Monitoring
-Tunneld monitors active services (e.g., dnsmasq, hostapd, doh proxy) and connected devices. It also allows you to setup artifacts that setup intent to potentially sharing a resource that exists on some machine on your tunneld network.
+### 📡 Local & Remote Resource Monitoring
+Tunneld monitors active services (e.g., dnsmasq, doh proxy) and connected devices. It also allows you to setup resources that setup intent to potentially sharing a resource that exists on some machine on your tunneld network.
 
-### 🌍 Cloudflare Tunnel First class citizen
-Expose your local Tunneld UI or custom services to the internet via secure Cloudflare Tunnels. Great for accessing your dashboard while away from home, self host applications running on any device on its network, or connecting peer tunneld instances together.
+### 🌍 Zrok Tunnel First class citizen
+Expose your local Tunneld UI or custom services to the internet via secure Zrok Tunnels. Great for accessing your dashboard while away from home, self host applications running on any device on its network, or connecting peer tunneld instances together.
 
 ### 🖥️ Optional Compute sharing
-Tunneld is the gateway, once setting up nodes to be montored, you can share compute between Tunneld devices through APIs, sharing local services to trusted parites i.e AI APIs access etc. that others can access through their Tunneld Host
+Tunneld is the gateway, once setting up nodes to be montored, you can resource compute between Tunneld devices through APIs, sharing local services to trusted parites i.e AI APIs access etc. that others can access through their Tunneld Host
 
 ### 🧩 Static or Portable
 Run Tunneld in:
 - **Static mode**: At home, replacing your router's weak UI — manage every device, filter content, and control network flow.
-- **Portable mode**: Take it with you. Share access, deploy temporary networks, or integrate Tunneld with mobile data.
+- **Portable mode**: Take it with you. Resource access, deploy temporary networks, or integrate Tunneld with mobile data.
 
 ---
 
@@ -44,11 +44,10 @@ Run Tunneld in:
 | Component        | Description                                                                 |
 |------------------|-----------------------------------------------------------------------------|
 | `dnsmasq`        | DHCP and DNS resolution with caching and ad blocking                       |
-| `hostapd`        | Broadcasts the wireless access point                                        |
 | `dnscrypt-proxy` | Enforces DNS-over-HTTPS (DoH) with preloaded secure resolvers              |
-| `Elixir + Phoenix` | Manages the UI, session-based device approval, artifact discovery, and services |
+| `Elixir + Phoenix` | Manages the UI, session-based device approval, sahre discovery, and services |
 | `iptables`       | Controls packet forwarding and filtering                                    |
-| `cloudflared`    | The tunnel provider that will be orchestrated through the tool              |
+| `Zrok/OpenZiti`    | The tunnel provider that will be orchestrated through the tool              |
 
 ---
 
@@ -57,8 +56,8 @@ Run Tunneld in:
 - Approve or deny internet access per device
 - See service status and restart components if needed
 - Dynamic refresh — minimal design, efficient interaction
-- Creating Artifacts (references with intent to share and monitor for any selfhosted application on its network)
-- Expose Services to the internet using Cloudflare tunnels
+- Creating Resources (references with intent to resource and monitor for any selfhosted application on its network)
+- Expose Services to the internet using Zrok tunnels
 - Enable sharing and connect to other tunneld devices to access shared/enabled resources
 - Tunneld sends device health and overview information to a device on its network (get events when activity takes place)
 
@@ -78,7 +77,7 @@ Install via install script that will walk through the entire setup with all need
 
 Tunneld exposes endpoints for:
 - Getting current tunneld instance overview details (Internal health and monitoring)
-- Artifact registration and schema-based contract sharing over tunneld private network
+- Resource registration and schema-based contract sharing over tunneld private network
 
 > This allows custom nodes (AI inference, file servers, etc.) to announce themselves and expose UIs or APIs back to Tunneld.
 

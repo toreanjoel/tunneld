@@ -32,7 +32,7 @@ defmodule TunneldWeb.Live.Components.Modal do
         <!-- Render the dynamic body -->
         <div class="text-sm"><%= render_body(assigns, @body) %></div>
         <!-- Modal Actions -->
-        <div :if={@body["type"] !== "schema"} class="flex justify-end space-x-3 pt-2">
+        <div :if={@body["type"] !== "schema"} class="flex justify-end space-x-3 pt-2 mt-3">
           <button
             :if={@actions["title"]}
             phx-target={@myself}
@@ -40,7 +40,7 @@ defmodule TunneldWeb.Live.Components.Modal do
             phx-value-type={@actions["payload"]["type"]}
             phx-value-data={Jason.encode!(@actions["payload"]["data"])}
             phx-value-client_id={@client_id}
-            class="text-sm font-light gap-1 bg-purple hover:bg-opacity-60 p-3 cursor-pointer rounded-md"
+            class="text-sm font-light gap-1 bg-red hover:bg-opacity-60 p-3 cursor-pointer rounded-md"
           >
             <%= @actions["title"] %>
           </button>

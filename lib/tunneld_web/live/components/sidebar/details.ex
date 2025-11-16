@@ -48,8 +48,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       <%= sidebar_header(assigns, %{
         header: "Authentication",
         body:
-          "Authentication options to access the application dashboard. WebAuthn (required) after you expose dashboard as an artifact.
-        This is needed in order to remotely access artifacts"
+          "Authentication options to access the application dashboard. WebAuthn (required) after you expose dashboard as an resource.
+        This is needed in order to remotely access resources"
       }) %>
 
       <div class="flex flex-row gap-1 justify-end my-2">
@@ -103,151 +103,247 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     """
   end
 
-  @spec render(%{:view => :artifact, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
-  def render(%{view: :artifact} = assigns) do
+  @spec render(%{:view => :resource, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{view: :resource} = assigns) do
     data = Map.get(assigns, :data)
 
     assigns =
       assigns
-      |> assign(has_data: !Enum.empty?(data))
+      |> assign(has_data: is_map(data) and map_size(data) > 0)
       |> assign(gateway: Application.get_env(:tunneld, :network)[:gateway])
+      |> assign(data: data)
 
     ~H"""
     <div class="bg-secondary p-2 h-full">
       <div :if={@has_data}>
-        <%!-- Sidebar header that will house metadat?  --%>
         <%= sidebar_header(assigns, %{
-          header: data.name,
+          header: @data.name,
           body:
-            data.description ||
+            @data.description ||
               "A reference to a running service accessible from this device over the network. This tracks availability and allows exposure to the internet"
         }) %>
       </div>
 
       <div :if={@has_data} class="flex flex-row gap-1 justify-end my-2">
-        <%!-- Actions to take --%>
-
-        <%!-- Actions Remove Artifact --%>
+        <%!-- Actions: Remove Resource only --%>
         <div
           phx-click="modal_open"
-          phx-value-modal_title="Remove Artifact?"
+          phx-value-modal_title="Remove Resource?"
           phx-value-modal_body={
             Jason.encode!(%{
               "type" => "string",
-              "data" =>
-                "Are you sure you want to remove the artifact? (note if there is a tunnel, this will be disconnected as well)"
+              "data" => "Are you sure you want to remove the resource?"
             })
           }
           phx-value-modal_actions={
             Jason.encode!(%{
               "title" => "Remove",
               "payload" => %{
-                "type" => "remove_artifact",
-                "data" => %{"id" => data.id, "subdomain" => data.tunnel["subdomain"]}
+                "type" => "remove_share",
+                "data" => %{"id" => @data.id, "kind" => @data.kind}
               }
             })
           }
           class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
         >
           <.icon name="hero-no-symbol" class="h-5 w-5" />
-          <div class="truncate text-xs">Remove Artifact</div>
+          <div class="truncate text-xs">Remove Resource</div>
         </div>
       </div>
 
       <div class={"flex flex-col #{if !@has_data, do: "items-center justify-center p-3 h-full", else: ""}"}>
         <h1 :if={!@has_data} class="text-2xl font-light text-gray-2 my-4 text-center">
-          No Artifact details
+          No Resource details
         </h1>
 
         <div :if={@has_data}>
           <div class="flex flex-col p-3 mb-2 bg-primary rounded-lg font-light">
             <div class="text-sm truncate">
-              <span class="font-bold">Name:</span> <%= data.name %>
+              <span class="font-bold">Name:</span> <%= @data.name %>
             </div>
             <div class="text-sm truncate">
-              <span class="font-bold">IP:</span> <%= data.ip %>
+              <span class="font-bold">IP:</span> <%= @data.ip %>
             </div>
             <div class="text-sm truncate">
-              <span class="font-bold">Port:</span> <%= data.port %>
+              <span class="font-bold">Port:</span> <%= @data.port %>
             </div>
           </div>
 
-          <div class="flex flex-row gap-2">
-            <%!-- Actions Connect/Disconnect Tunnel --%>
-            <div class="grow">
-              <div
-                :if={Enum.empty?(data.tunnel)}
-                phx-click="modal_open"
-                phx-value-modal_title="Connect to Cloudflare Tunnel"
-                phx-value-modal_body={
-                  Jason.encode!(%{
-                    "type" => "schema",
-                    "data" => Tunneld.Schema.Cloudflare.data(:add),
-                    "default_values" => %{
-                      service: "#{data.ip}:#{data.port}"
-                    },
-                    "action" => "connect_cloudflare"
-                  })
-                }
-                class="flex items-center justify-center gap-1 bg-orange p-2 cursor-pointer rounded-md"
-              >
-                <.icon name="hero-globe-alt" class="h-5 w-5" />
-                <div class="truncate text-xs">Connect Tunnel</div>
-              </div>
-
-              <div
-                :if={!Enum.empty?(data.tunnel)}
-                phx-click="modal_open"
-                phx-value-modal_title="Disconnect Cloudflare Tunnel?"
-                phx-value-modal_body={
-                  Jason.encode!(%{
-                    "type" => "string",
-                    "data" => "Are you sure you want make artifact inaccessible over the internet?"
-                  })
-                }
-                phx-value-modal_actions={
-                  Jason.encode!(%{
-                    "title" => "Remove Tunnel",
-                    "payload" => %{
-                      "type" => "disconnect_cloudflare",
-                      "data" => %{"subdomain" => data.tunnel["subdomain"]}
-                    }
-                  })
-                }
-                class="flex items-center justify-center gap-1 bg-orange p-2 cursor-pointer rounded-md"
-              >
-                <.icon name="hero-globe-alt" class="h-5 w-5" />
-                <div class="truncate text-xs">Disconnect Tunnel</div>
-              </div>
+          <% tunneld = @data.tunneld || %{} %>
+          <div :if={!Enum.empty?(tunneld)} class="mt-3">
+            <div class="py-2">
+              <h2 class="text-sm font-semibold">Resources</h2>
             </div>
 
-            <div
-              phx-click="modal_open"
-              phx-value-modal_title="Tunneld Settings"
-              phx-value-modal_body={
-                Jason.encode!(%{
-                  "type" => "schema",
-                  "data" => Tunneld.Schema.PrivateNet.data(:settings),
-                  "default_values" =>
-                    Map.merge(data.tunneld, %{
-                      "id" => data.id
-                    }),
-                  "action" => "tunneld_settings"
-                })
+            <div class="grid grid-cols-1 gap-2">
+              <% available_kinds =
+                ~w(public private access)
+                |> Enum.filter(fn k -> not is_nil(get_in(tunneld, ["units", k])) end) %>
+
+              <%= for kind <- available_kinds do %>
+                <% reserved =
+                  case kind do
+                    "access" -> get_in(tunneld, ["reserved", "private"])
+                    _ -> get_in(tunneld, ["reserved", kind])
+                  end %>
+                <% enabled? = get_in(tunneld, ["enabled", kind]) == true %>
+                <% unit = get_in(tunneld, ["units", kind, "unit"]) %>
+                <% unit_id = get_in(tunneld, ["units", kind, "id"]) %>
+
+                <div class="bg-primary rounded-lg p-3">
+                  <div class="flex items-center justify-between">
+                    <div class="text-sm font-medium capitalize"><%= kind %> instance</div>
+                    <label
+                      phx-click="toggle_share_access"
+                      phx-value-payload={
+                        Jason.encode!(%{"id" => unit_id, "enable" => !enabled?, "kind" => @data.kind})
+                      }
+                      class="relative inline-flex items-center cursor-pointer"
+                    >
+                      <input type="checkbox" class="sr-only peer" checked={enabled?} />
+                      <div class="w-9 h-5 bg-light_purple rounded-full peer-checked:bg-purple relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-light_purple after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4">
+                      </div>
+                    </label>
+                  </div>
+
+                  <div class="mt-2 grid grid-rows-1 md:grid-rows-3 gap-2 text-xs">
+                    <div class="truncate">
+                      <span class="font-semibold">Reserved:</span>
+                      <span class="ml-1"><%= reserved || "—" %></span>
+                    </div>
+                    <div class="truncate">
+                      <span class="font-semibold">Systemd Unit:</span>
+                      <span class="ml-1"><%= unit || "—" %></span>
+                    </div>
+                    <div class="truncate">
+                      <span class="font-semibold">Unit ID:</span>
+                      <span class="ml-1"><%= unit_id || "—" %></span>
+                    </div>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
+  @spec render(%{:view => :zrok, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{view: :zrok} = assigns) do
+    data = Map.get(assigns, :data, %{})
+
+    # unset check
+    unset_check = Map.get(data, :api_endpoint, "") |> String.contains?("unset")
+    default_endpoint = if unset_check, do: nil, else: Map.get(data, :api_endpoint, nil)
+
+    assigns =
+      assigns
+      |> assign(enabled: Map.get(data, :enabled?, nil))
+      |> assign(endpoint: default_endpoint)
+      |> assign(is_unset: unset_check)
+      |> assign(has_data: not Enum.empty?(data))
+
+    ~H"""
+    <div class="bg-secondary p-2 h-full">
+      <%!-- Sidebar header that will house metadat?  --%>
+      <%= sidebar_header(assigns, %{
+        header: "Overlay Network Settings",
+        body: "Set up this device to operate within your overlay control plane environment"
+      }) %>
+
+      <div :if={@has_data} class="flex flex-row gap-1 justify-end my-2">
+        <%!-- Setup endpoint  --%>
+        <div
+          :if={not @is_unset}
+          phx-click="modal_open"
+          phx-value-modal_title="Disconnect from Control Plane?"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "string",
+              "data" =>
+                "This will disconnect the gateway from the current network. All resources and private access will stop working. You will need to enable them once you connect to a network again."
+            })
+          }
+          phx-value-modal_actions={
+            Jason.encode!(%{
+              "title" => "Disconnect Control Plane",
+              "payload" => %{
+                "type" => "configure_disable_control_plane",
+                "data" => %{}
               }
-              class="flex grow items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
-            >
-              <.icon name="hero-globe-alt" class="h-5 w-5" />
-              <div class="truncate text-xs">Tunneld Settings</div>
-            </div>
-          </div>
+            })
+          }
+          class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
+        >
+          <.icon name="hero-no-symbol" class="h-5 w-5" />
+          <div class="truncate text-xs">Disconnect Control Plane</div>
+        </div>
 
-          <div
-            :if={data.ip === Application.get_env(:tunneld, :network)[:gateway]}
-            class="text-xs border-2 border-solid rounded border-red p-2 text-red mt-3"
-          >
-            Note: It is highly recommended that you enable WebAuthn after exposing the gateway as a tunnel
-          </div>
+        <div
+          :if={@is_unset}
+          phx-click="modal_open"
+          phx-value-modal_title="Configure Network Endpoint"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "schema",
+              "data" => Tunneld.Schema.Zrok.data(:endpoint),
+              "default_values" => %{
+                url: @endpoint
+              },
+              "action" => "configure_enable_control_plane"
+            })
+          }
+          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+        >
+          <.icon class="w-4 h-4" name="hero-globe-alt" />
+          <div class="truncate text-xs text-gray-1">Configure Control Plane</div>
+        </div>
+
+        <%!-- enabled options --%>
+        <div
+          :if={@enabled}
+          phx-click="modal_open"
+          phx-value-modal_title="Disable and disconnect device?"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "string",
+              "data" =>
+                "This will disable your device and disconnect it from the current account as an environment"
+            })
+          }
+          phx-value-modal_actions={
+            Jason.encode!(%{
+              "title" => "Disable Environment",
+              "payload" => %{
+                "type" => "configure_disable_environment",
+                "data" => %{}
+              }
+            })
+          }
+          class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
+        >
+          <.icon name="hero-no-symbol" class="h-5 w-5" />
+          <div class="truncate text-xs">Disable Device</div>
+        </div>
+
+        <div
+          :if={not @is_unset and not @enabled}
+          phx-click="modal_open"
+          phx-value-modal_title="Configure device"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "schema",
+              "data" => Tunneld.Schema.Zrok.data(:conf_device),
+              "default_values" => %{},
+              "action" => "configure_enable_environment"
+            })
+          }
+          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+        >
+          <.icon class="w-4 h-4" name="hero-link" />
+          <div class="truncate text-xs text-gray-1">Enable Device</div>
         </div>
       </div>
     </div>

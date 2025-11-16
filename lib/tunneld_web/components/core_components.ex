@@ -17,7 +17,7 @@ defmodule TunneldWeb.CoreComponents do
   use Phoenix.Component
 
   alias Phoenix.LiveView.JS
-  import TunneldWeb.Gettext
+  use Gettext, backend: TunneldWeb.Gettext
 
   @doc """
   Renders a modal.

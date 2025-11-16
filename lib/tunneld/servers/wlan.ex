@@ -5,10 +5,7 @@ defmodule Tunneld.Servers.Wlan do
   use GenServer
   require Logger
 
-  # TODO: Add the dynamic from config for the interface and the broadcasting to the UI
-
   # Define the Wi-Fi interface used for internet
-  @interface Application.compile_env!(:tunneld, [:network, :wlan])
   @wpa_config "/etc/wpa_supplicant/wpa_supplicant.conf"
   @conn_interval_checker 15_000
 
@@ -60,13 +57,14 @@ defmodule Tunneld.Servers.Wlan do
       {:reply, :ok, state}
     else
       # Disconnect from current network
-      System.cmd("wpa_cli", ["-i", @interface, "disconnect"])
+      System.cmd("wpa_cli", ["-i", Application.get_env(:tunneld, :network)[:wlan], "disconnect"])
 
-      Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{ type: :info, message: "Disconnected from network"})
+      Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+        type: :info,
+        message: "Disconnected from network"
+      })
+
       Logger.info("Disconencted from network")
-
-      # Broadcast to notification server
-      Tunneld.Servers.Notification.trigger({:info, "Disconnected from wireless network"})
 
       # send relevant events to the main dashboard
       check_connection()
@@ -115,8 +113,12 @@ defmodule Tunneld.Servers.Wlan do
   def handle_cast({:connect, ssid, password}, state) do
     Logger.info("Connecting to Wi-Fi: #{ssid}...")
 
+    network_conf = Application.get_env(:tunneld, :network)
+    wlan_iface = network_conf[:wlan]
+    country = network_conf[:country] || ""
+
     new_config = """
-    country=ZA
+    country=#{country}
     ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
     update_config=1
 
@@ -128,23 +130,18 @@ defmodule Tunneld.Servers.Wlan do
     }
     """
 
-    # Overwrite the wpa_supplicant.conf file
     :ok = File.write(@wpa_config, new_config)
 
-    # init with removing any cache or stored info on the prev used config
     init_wp_supplicant()
 
-    # Reconnect to last known network setup
-    System.cmd("wpa_cli", ["-i", @interface, "reconnect"])
+    System.cmd("wpa_cli", ["-i", wlan_iface, "reconnect"])
+    System.cmd("dhcpcd", [wlan_iface])
 
-    # Request new DHCP lease to get an IP
-    System.cmd("dhcpcd", [@interface])
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+      type: :info,
+      message: "Connected to network #{ssid} successfully"
+    })
 
-    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{ type: :info, message: "Connected to network #{ssid} successfully"})
-
-    # Broadcast to notification server
-    Tunneld.Servers.Notification.trigger({:info, "Connected from wireless network"})
-    # send relevant events to the main dashboard
     check_connection()
 
     {:noreply, state}
@@ -201,7 +198,8 @@ defmodule Tunneld.Servers.Wlan do
     if Application.get_env(:tunneld, :mock_data, false) do
       :local_development_mode
     else
-      {output, _} = System.cmd("iw", ["dev", @interface, "link"])
+      {output, _} =
+        System.cmd("iw", ["dev", Application.get_env(:tunneld, :network)[:wlan], "link"])
 
       is_connected =
         case output |> String.trim() do
@@ -209,7 +207,11 @@ defmodule Tunneld.Servers.Wlan do
           _ -> true
         end
 
-      Phoenix.PubSub.broadcast(Tunneld.PubSub, "status:internet", %{ type: :internet,  status: is_connected})
+      Phoenix.PubSub.broadcast(Tunneld.PubSub, "status:internet", %{
+        type: :internet,
+        status: is_connected
+      })
+
       if(is_connected, do: :connected, else: :disconnected)
     end
   end
@@ -227,7 +229,14 @@ defmodule Tunneld.Servers.Wlan do
       Process.sleep(2000)
 
       # Restart wpa_supplicant
-      {_, exit_code} = System.cmd("wpa_supplicant", ["-B", "-i", @interface, "-c", @wpa_config])
+      {_, exit_code} =
+        System.cmd("wpa_supplicant", [
+          "-B",
+          "-i",
+          Application.get_env(:tunneld, :network)[:wlan],
+          "-c",
+          @wpa_config
+        ])
 
       if exit_code == 0 do
         Logger.info("wpa_supplicant restarted successfully")

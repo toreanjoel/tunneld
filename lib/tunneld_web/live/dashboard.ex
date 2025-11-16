@@ -3,15 +3,16 @@ defmodule TunneldWeb.Live.Dashboard do
   Dashboard V2 Page
   """
   use TunneldWeb, :live_view
+  require Logger
   alias Tunneld.Servers.{Session}
   alias TunneldWeb.Router.Helpers, as: Routes
 
   # Components
   alias TunneldWeb.Live.Components.Sidebar.Details, as: SidebarDetails
   alias TunneldWeb.Live.Components.Welcome
-  alias TunneldWeb.Live.Components.Resources
+  alias TunneldWeb.Live.Components.SystemResources
   alias TunneldWeb.Live.Components.Services
-  alias TunneldWeb.Live.Components.Artifacts
+  alias TunneldWeb.Live.Components.Resources
   alias TunneldWeb.Live.Components.Devices
   alias TunneldWeb.Live.Components.Modal
 
@@ -31,17 +32,14 @@ defmodule TunneldWeb.Live.Dashboard do
     end
 
     # Check the scheme and domain to make sure it is possible to show
-    # Turn to a helper?
     uri_info = get_connect_info(socket, :uri)
-
-    correct_domain? =
-      uri_info && URI.parse(uri_info) |> Map.get(:host) == System.get_env("CF_DOMAIN")
 
     socket =
       socket
       |> assign(:client_id, client_id)
       |> assign(:uri_info, uri_info)
-      |> assign(:allow_webauthn?, correct_domain?)
+      # TODO: we need to setup web auth once we have a local cert for the device to be able to use it?
+      |> assign(:allow_webauthn?, false)
       |> assign(
         modal: %{
           show: false,
@@ -62,12 +60,6 @@ defmodule TunneldWeb.Live.Dashboard do
           internet: false
         }
       )
-      |> assign(
-        settings: %{
-          notifications: Tunneld.Servers.Notification.fetch_settings(),
-          encryption_key: Tunneld.Servers.Encryption.fetch_settings()
-        }
-      )
 
     {:ok, socket}
   end
@@ -85,7 +77,6 @@ defmodule TunneldWeb.Live.Dashboard do
       <% end %>
       <!-- Sidebar for more details -->
       <%= if not is_nil(@sidebar.view), do: sidebar(assigns) %>
-      <%!-- Modal to render confirmations and show data --%>
 
       <.live_component
         :if={@modal.show && @modal.type === :default}
@@ -100,9 +91,6 @@ defmodule TunneldWeb.Live.Dashboard do
     """
   end
 
-  #
-  # ---- Views :: Components For Dashboard----
-  #
   @spec sidebar(%{
           :allow_webauthn? => boolean(),
           :sidebar => %{is_open: boolean(), view: atom()},
@@ -129,7 +117,6 @@ defmodule TunneldWeb.Live.Dashboard do
       </button>
 
       <div class="h-full">
-        <!-- pt-14 makes room for close button -->
         <.live_component
           id="sidebar_details"
           module={SidebarDetails}
@@ -159,7 +146,17 @@ defmodule TunneldWeb.Live.Dashboard do
         <div class="flex-1" />
 
         <div class="flex flex-row gap-1">
-          <%!-- Internet Access Placeholder --%>
+          <%!-- Private Network Access --%>
+          <div
+            phx-click="show_details"
+            phx-value-type="zrok"
+            phx-value-id="_"
+            class="bg-purple flex flex-row gap-3 py-2 px-3 items-center rounded-md cursor-pointer"
+          >
+            Configure Network
+          </div>
+
+          <%!-- Internet Access --%>
           <div
             phx-click="show_details"
             phx-value-type="wlan"
@@ -167,42 +164,6 @@ defmodule TunneldWeb.Live.Dashboard do
             class={"#{if @status.internet, do: "bg-green", else: "bg-red"} flex flex-row gap-3 py-2 px-3 items-center rounded-md cursor-pointer"}
           >
             Internet Access
-          </div>
-
-          <%!-- General Settings --%>
-          <div
-            phx-click="modal_open"
-            phx-value-modal_title="Notification Settings"
-            phx-value-modal_body={
-              Jason.encode!(%{
-                "type" => "schema",
-                "data" => Tunneld.Schema.Settings.data(:notifications),
-                "default_values" => @settings.notifications,
-                "action" => "update_notifications"
-              })
-            }
-            class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1"
-          >
-            <.icon name="hero-cog-6-tooth" class="h-15 w-15" />
-          </div>
-
-          <div
-            phx-click="modal_open"
-            phx-value-modal_title="Encryption Settings"
-            phx-value-modal_body={
-              Jason.encode!(%{
-                "type" => "schema",
-                "data" => Tunneld.Schema.Settings.data(:encryption),
-                "default_values" => %{
-                  "encryption_key" => @settings.encryption_key
-                },
-                "action" => "copy_encryption_key",
-                "title" => "Copy"
-              })
-            }
-            class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1"
-          >
-            <.icon name="hero-key" class="h-15 w-15" />
           </div>
 
           <%!-- Auth Settings  --%>
@@ -224,9 +185,9 @@ defmodule TunneldWeb.Live.Dashboard do
         </div>
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
-        <%!-- Resources, Artifacts and Services  --%>
+        <%!-- Resources, Resources and Services  --%>
         <div class="flex flex-col md:flex-row w-full gap-6">
-          <div class="flex-1"><.live_component id="resources" module={Resources} /></div>
+          <div class="flex-1"><.live_component id="system_resources" module={SystemResources} /></div>
           <div class="flex-1">
             <.live_component id="services" module={Services} />
           </div>
@@ -234,9 +195,9 @@ defmodule TunneldWeb.Live.Dashboard do
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
 
-        <%!-- Artifacts --%>
+        <%!-- Resources --%>
         <div class="min-h-[200px]">
-          <.live_component id="artifacts" module={Artifacts} />
+          <.live_component id="resources" module={Resources} />
         </div>
 
         <%!-- Devices --%>
@@ -260,9 +221,6 @@ defmodule TunneldWeb.Live.Dashboard do
     """
   end
 
-  #
-  # ---- Events :: Client Side Interaction ----
-  #
   @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
   @doc """
@@ -275,6 +233,14 @@ defmodule TunneldWeb.Live.Dashboard do
     }
 
     {:noreply, assign(socket, :sidebar, sidebar)}
+  end
+
+  #
+  # Catch the toggle event to enable/disable the resources and their resources
+  #
+  def handle_event("toggle_share_access", params, socket) do
+    send(self(), %{action: "toggle_share_access", data: params})
+    {:noreply, socket}
   end
 
   #
@@ -321,6 +287,17 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   #
+  # Trigger actions
+  #
+  def handle_event("trigger_action", params, socket) do
+    action = params["action"]
+    data = Jason.decode!(params["data"])
+
+    send(self(), %{action: action, data: data})
+    {:noreply, socket}
+  end
+
+  #
   # Open the modal
   #
   def handle_event("modal_open", params, socket) do
@@ -339,17 +316,6 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   #
-  # Trigger actions
-  #
-  def handle_event("trigger_action", params, socket) do
-    action = params["action"]
-    data = Jason.decode!(params["data"])
-
-    send(self(), %{action: action, data: data})
-    {:noreply, socket}
-  end
-
-  #
   # Close the modal
   #
   def handle_event("modal_close", _params, socket) do
@@ -358,9 +324,6 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, assign(socket, :modal, modal_data)}
   end
 
-  #
-  # ---- handle component updated message :: Client Side Interaction ----
-  #
   @spec handle_info(%{id: String.t(), module: atom(), data: map()}, Phoenix.LiveView.Socket.t()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
   @doc """
@@ -407,6 +370,16 @@ defmodule TunneldWeb.Live.Dashboard do
   def handle_info(%{action: action, data: data}, socket) do
     case action do
       #
+      # Device management
+      #
+      "revoke_release_ip" ->
+        %{"mac" => mac} = Jason.decode!(data)
+
+        if not is_nil(mac) do
+          Tunneld.Servers.Devices.revoke_lease(mac)
+        end
+
+      #
       # Wireless networking
       #
       "connect_to_wireless_network" ->
@@ -426,6 +399,33 @@ defmodule TunneldWeb.Live.Dashboard do
         send(self(), :configure_web_authn)
 
       #
+      # The setup to configure control plane domain
+      #
+      "configure_disable_control_plane" ->
+        Tunneld.Servers.Zrok.unset_api_endpoint()
+        Tunneld.Servers.Resources.try_hibernate_shares()
+
+      #
+      # The setup to configure control plane domain
+      #
+      "configure_enable_control_plane" ->
+        Tunneld.Servers.Zrok.set_api_endpoint(data["url"])
+
+      #
+      # Configure device - enable
+      #
+      "configure_enable_environment" ->
+        Tunneld.Servers.Zrok.enable_env(data["account_token"])
+        Tunneld.Servers.Resources.try_init_local_shares()
+
+      #
+      # Configure device - disable
+      #
+      "configure_disable_environment" ->
+        Tunneld.Servers.Zrok.disable_env()
+        Tunneld.Servers.Resources.try_hibernate_shares()
+
+      #
       # Revoke Login Credentials
       #
       "revoke_login_creds" ->
@@ -433,47 +433,46 @@ defmodule TunneldWeb.Live.Dashboard do
         send(self(), :revoke_login_creds)
 
       #
-      # Cloudflare
+      # Resources
       #
-      "connect_cloudflare" ->
-        Tunneld.Servers.Cloudflare.add_host(data["service"], data["domain"])
+      "add_share" ->
+        Tunneld.Servers.Resources.add_share(data)
 
-      "disconnect_cloudflare" ->
-        %{"subdomain" => subdomain} = Jason.decode!(data)
-        Tunneld.Servers.Cloudflare.remove_host(subdomain)
+      "add_private_share" ->
+        Tunneld.Servers.Resources.add_access(data)
 
-      #
-      # Artifacts
-      #
-      "add_artifact" ->
-        Tunneld.Servers.Artifacts.add_artifact(data)
+      "toggle_share_access" ->
+        %{"id" => id, "enable" => enable, "kind" => kind} = Jason.decode!(data["payload"])
 
-      #
-      # Notification Settings
-      #
-      "update_notifications" ->
-        resp = Tunneld.Servers.Notification.update_settings(data)
-        send(self(), {:update_notification_settings, resp})
+        case kind do
+          "host" ->
+            Tunneld.Servers.Resources.toggle_share(id, enable)
 
-      #
-      # Encryption Settings
-      #
-      "copy_encryption_key" ->
-        %{"encryption_key" => key} = data
-        send(self(), {:copy_encyption_key, key})
+          "access" ->
+            Tunneld.Servers.Resources.toggle_access(id, enable)
 
-      "remove_artifact" ->
-        %{"id" => id, "subdomain" => subdomain} = Jason.decode!(data)
-        Tunneld.Servers.Artifacts.remove_artifact(id)
+          _ ->
+            raise "Kind not found, make sure resource is setup with correct kind"
+        end
 
-        if subdomain do
-          Tunneld.Servers.Cloudflare.remove_host(subdomain)
+      "remove_share" ->
+        %{"id" => id, "kind" => kind} = Jason.decode!(data)
+
+        case kind do
+          "host" ->
+            Tunneld.Servers.Resources.remove_share(id)
+
+          "access" ->
+            Tunneld.Servers.Resources.remove_access(id)
+
+          _ ->
+            raise "Kind not found, make sure resource is setup with correct kind"
         end
 
         send(self(), :close_details)
 
       "tunneld_settings" ->
-        Tunneld.Servers.Artifacts.update_artifact(data, :tunneld)
+        Tunneld.Servers.Resources.update_share(data, :tunneld)
 
       _ ->
         Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
@@ -501,31 +500,6 @@ defmodule TunneldWeb.Live.Dashboard do
     IO.inspect("Staring delayed scan for wireless networks")
     Tunneld.Servers.Wlan.scan_networks()
     {:noreply, socket}
-  end
-
-  #
-  # Copy the encryption key to the client clipboard
-  #
-  def handle_info({:copy_encyption_key, key}, socket) do
-    socket =
-      socket
-      |> push_event("copy_to_clipboard", %{text: key})
-      |> put_flash(:info, "Copied to clipboard!")
-
-    {:noreply, socket}
-  end
-
-  #
-  # Handle the success case of updating notification settings
-  # We update the state for the form
-  #
-  def handle_info({:update_notification_settings, {:ok, data}}, socket) do
-    settings = %{
-      socket.assigns.settings
-      | notifications: data
-    }
-
-    {:noreply, assign(socket, :settings, settings)}
   end
 
   #
@@ -600,9 +574,9 @@ defmodule TunneldWeb.Live.Dashboard do
   #
   defp get_sidebar_details(type, id) do
     case type do
-      "artifact" ->
-        Tunneld.Servers.Artifacts.get_artifact(id)
-        :artifact
+      "resource" ->
+        Tunneld.Servers.Resources.get_resource(id)
+        :resource
 
       "service" ->
         Tunneld.Servers.Services.get_service_logs(id)
@@ -611,6 +585,11 @@ defmodule TunneldWeb.Live.Dashboard do
       "wlan" ->
         Tunneld.Servers.Wlan.scan_networks()
         :wlan
+
+      "zrok" ->
+        # Get the current state so we can prepopulate
+        Tunneld.Servers.Zrok.get_details()
+        :zrok
 
       "authentication" ->
         :authentication

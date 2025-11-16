@@ -63,23 +63,7 @@ config :phoenix, :json_library, Jason
 config :tunneld, :auth,
   ttl: 900 # 15 minutes
 
-config :tunneld, :fs,
-  root: "/data",
-  auth: "/auth.json",
-  whitelist: "/whitelist.json",
-  tunnels: "/cloudflare_tunnels.json",
-  artifacts: "/artifacts.json",
-  notifications: "/notifications.json",
-  encryption: "/encryption.json"
-
-# TODO: This needs to come from env variables from runtime config
-config :tunneld, :network,
-  wlan: "wlx202351114745",
-  eth: "end0",
-  mullvad: "wg0-mullvad",
-  gateway: "10.0.0.1"
-
-config :tunneld, version: "0.3.1"
+config :tunneld, version: "0.4.0"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

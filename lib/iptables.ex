@@ -4,10 +4,7 @@ defmodule Iptables do
   This ensures all devices are blocked by default except for access to Tunneld.
   """
 
-  @internet_interface Application.compile_env!(:tunneld, [:network, :wlan])
-  @vpn_interface Application.compile_env!(:tunneld, [:network, :mullvad])
-  @eth_interface Application.compile_env!(:tunneld, [:network, :eth])
-  @gateway Application.compile_env!(:tunneld, [:network, :gateway])
+  # NOTE: we need to make a config file later to get the env from that change with the system
 
   @doc """
   Flush iptables and reinitialize firewall rules.
@@ -18,15 +15,17 @@ defmodule Iptables do
     # Make sure the devices can forward data between the different interfaces
     System.cmd("sysctl", ["-w", "net.ipv4.ip_forward=1"])
 
-    drop_all_connections()
     gateway_access()
     internet_forwarding()
     vpn_forwarding()
     internet_passthrough()
     dns_forwarding()
-
-    IO.puts("Iptables reset: All traffic blocked by default. Only Tunneld UI is accessible.")
   end
+
+  def get_env(:gateway), do: Application.get_env(:tunneld, :network)[:gateway]
+  def get_env(:wlan), do: Application.get_env(:tunneld, :network)[:wlan]
+  def get_env(:eth), do: Application.get_env(:tunneld, :network)[:eth]
+  def get_env(:mullvad), do: Application.get_env(:tunneld, :network)[:mullvad]
 
   @doc """
   Flush all iptables rules.
@@ -38,142 +37,208 @@ defmodule Iptables do
     IO.puts("Iptables flushed.")
   end
 
-  @doc """
-  Add user MAC entry to block internet access.
-  """
-  def add_user_entry(ip, mac) do
-    System.cmd("iptables", [
-      "-t", "mangle", "-I", "PREROUTING", "-m", "mac", "--mac-source", mac, "-d", ip, "-j", "DROP"
-    ])
-  end
-
-  def remove_user_entry(ip, mac) do
-    System.cmd("iptables", [
-      "-t", "mangle", "-D", "PREROUTING", "-m", "mac", "--mac-source", mac, "-d", ip, "-j", "DROP"
-    ])
-  end
-
-  @doc """
-  Add system-wide blocking rule.
-  """
-  def add_system_entry(ip) do
-    System.cmd("iptables", [
-      "-t", "mangle", "-I", "PREROUTING", "-d", ip, "-j", "DROP"
-    ])
-  end
-
-  def remove_system_entry(ip) do
-    System.cmd("iptables", [
-      "-t", "mangle", "-D", "PREROUTING", "-d", ip, "-j", "DROP"
-    ])
-  end
-
-  @spec has_user_entry?(binary(), binary()) :: {any(), non_neg_integer()}
-  @doc """
-  Check if a user is already blocked.
-  """
-  def has_user_entry?(ip, mac) do
-    System.cmd("iptables", [
-      "-t", "mangle", "-C", "PREROUTING", "-m", "mac", "--mac-source", mac, "-d", ip, "-j", "DROP"
-    ])
-  end
-
-  @doc """
-  Check if a system-wide block exists.
-  """
-  def has_system_entry?(ip) do
-    System.cmd("iptables", [
-      "-t", "mangle", "-C", "PREROUTING", "-d", ip, "-j", "DROP"
-    ])
-  end
-
-  @doc """
-  Grant a device (by MAC and IP) internet access by allowing FORWARD and POSTROUTING.
-  """
-  def grant_access(ip, mac) do
-    # Ensure the device can forward traffic through the internet interface
-    System.cmd("iptables", ["-I", "FORWARD", "1", "-s", ip, "-m", "mac", "--mac-source", mac, "-o", @internet_interface, "-j", "ACCEPT"])
-    System.cmd("iptables", ["-I", "FORWARD", "1", "-s", ip, "-m", "mac", "--mac-source", mac, "-o", @vpn_interface, "-j", "ACCEPT"])
-    System.cmd("iptables", ["-I", "FORWARD", "1", "-i", @internet_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
-
-    # Ensure the device is allowed through NAT
-    System.cmd("iptables", ["-I", "POSTROUTING", "1", "-t", "nat", "-s", ip, "-j", "MASQUERADE"])
-
-    IO.puts("Granted internet access to #{ip} (MAC: #{mac})")
-  end
-
-  @doc """
-  Revoke a device's internet access (block MAC and IP).
-  """
-  def revoke_access(ip, mac) do
-    System.cmd("iptables", ["-D", "FORWARD", "-s", ip, "-m", "mac", "--mac-source", mac, "-o", @internet_interface, "-j", "ACCEPT"])
-    System.cmd("iptables", ["-D", "FORWARD", "-s", ip, "-m", "mac", "--mac-source", mac, "-o", @vpn_interface, "-j", "ACCEPT"])
-    System.cmd("iptables", ["-D", "FORWARD", "-i", @internet_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
-    System.cmd("iptables", ["-D", "POSTROUTING", "-t", "nat", "-s", ip, "-j", "MASQUERADE"])
-
-    IO.puts("Revoked internet access for #{ip} (MAC: #{mac})")
-  end
-
-  @doc """
-  Drop connections from the main interfaces initially
-  """
-  defp drop_all_connections() do
-    # Block all forwarding by default
-    System.cmd("iptables", ["-P", "FORWARD", "DROP"])
-    # Block non-whitelisted users from VPN access
-    # System.cmd("iptables", ["-A", "FORWARD", "-i", @wlan0_interface, "-o", @vpn_interface, "-j", "DROP"])
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @eth_interface, "-o", @vpn_interface, "-j", "DROP"])
-  end
-
-  @doc """
-  Gateway for interfaces regardless of blocking or dropping by default
-  """
+  # Gateway for interfaces regardless of blocking or dropping by default
   defp gateway_access() do
     # Allow clients to access Tunneld UI (gateway)
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @eth_interface, "-d", @gateway, "-j", "ACCEPT"])
-    # System.cmd("iptables", ["-A", "FORWARD", "-i", @wlan0_interface, "-d", @gateway, "-j", "ACCEPT"])
+    System.cmd("iptables", [
+      "-A",
+      "FORWARD",
+      "-i",
+      get_env(:eth),
+      "-d",
+      get_env(:gateway),
+      "-j",
+      "ACCEPT"
+    ])
+
+    # System.cmd("iptables", ["-A", "FORWARD", "-i", @wlan0_interface, "-d", Application.get_env(:tunneld, [:network, :gateway]), "-j", "ACCEPT"])
+
+    for proto <- ["udp", "tcp"] do
+      System.cmd("iptables", [
+        "-A",
+        "INPUT",
+        "-i",
+        get_env(:eth),
+        "-p",
+        proto,
+        "--dport",
+        "5336",
+        "-j",
+        "ACCEPT"
+      ])
+    end
   end
 
-  @doc """
-  Make sure client interfaces can send/recieve packets from the internet interface
-  """
+  # Make sure client interfaces can send/recieve packets from the internet interface
   defp internet_forwarding() do
     # interface > internet
-    # System.cmd("iptables", ["-A", "FORWARD", "-i", @wlan0_interface, "-o", @internet_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @eth_interface, "-o", @internet_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
+    # System.cmd("iptables", ["-A", "FORWARD", "-i", @wlan0_interface, "-o", Application.get_env(:tunneld, [:network, :wlan]), "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
+    System.cmd("iptables", [
+      "-A",
+      "FORWARD",
+      "-i",
+      get_env(:eth),
+      "-o",
+      get_env(:wlan),
+      "-m",
+      "state",
+      "--state",
+      "NEW,ESTABLISHED,RELATED",
+      "-j",
+      "ACCEPT"
+    ])
 
     # internet > interface
-    # System.cmd("iptables", ["-A", "FORWARD", "-i", @internet_interface, "-o", @wlan0_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @internet_interface, "-o", @eth_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
+    # System.cmd("iptables", ["-A", "FORWARD", "-i", Application.get_env(:tunneld, [:network, :wlan]), "-o", @wlan0_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
+    System.cmd("iptables", [
+      "-A",
+      "FORWARD",
+      "-i",
+      get_env(:wlan),
+      "-o",
+      get_env(:eth),
+      "-m",
+      "state",
+      "--state",
+      "ESTABLISHED,RELATED",
+      "-j",
+      "ACCEPT"
+    ])
   end
 
-  @doc """
-  Allow internet packets through specific interfaces
-  """
+  # Allow internet packets through specific interfaces
   defp internet_passthrough() do
     # Enable NAT for whitelisted devices
-    System.cmd("iptables", ["-t", "nat", "-A", "POSTROUTING", "-o", @internet_interface, "-j", "MASQUERADE"])
-    System.cmd("iptables", ["-t", "nat", "-A", "POSTROUTING", "-o", @vpn_interface, "-j", "MASQUERADE"])
+    System.cmd("iptables", [
+      "-t",
+      "nat",
+      "-A",
+      "POSTROUTING",
+      "-o",
+      get_env(:wlan),
+      "-j",
+      "MASQUERADE"
+    ])
+
+    System.cmd("iptables", [
+      "-t",
+      "nat",
+      "-A",
+      "POSTROUTING",
+      "-o",
+      get_env(:mullvad),
+      "-j",
+      "MASQUERADE"
+    ])
   end
 
-  @doc """
-  DNS forwarding to a custom running service on a specific port (dnsmasq)
-  """
+  # DNS forwarding to a custom running service on a specific port (dnsmasq)
   defp dns_forwarding() do
-    System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "udp", "--dport", "53", "-j", "REDIRECT", "--to-port", "5336"])
-    System.cmd("iptables", ["-t", "nat", "-A", "PREROUTING", "-p", "tcp", "--dport", "53", "-j", "REDIRECT", "--to-port", "5336"])
+    # LAN clients to 5336
+    System.cmd("iptables", [
+      "-t",
+      "nat",
+      "-A",
+      "PREROUTING",
+      "-p",
+      "udp",
+      "--dport",
+      "53",
+      "-j",
+      "REDIRECT",
+      "--to-port",
+      "5336"
+    ])
+
+    System.cmd("iptables", [
+      "-t",
+      "nat",
+      "-A",
+      "PREROUTING",
+      "-p",
+      "tcp",
+      "--dport",
+      "53",
+      "-j",
+      "REDIRECT",
+      "--to-port",
+      "5336"
+    ])
+
+    # LOCAL processes (host) to 5336 — this fixes zrok
+    for proto <- ["udp", "tcp"] do
+      # resolv.conf → 127.0.0.1
+      System.cmd("iptables", [
+        "-t",
+        "nat",
+        "-A",
+        "OUTPUT",
+        "-d",
+        "127.0.0.1",
+        "-p",
+        proto,
+        "--dport",
+        "53",
+        "-j",
+        "REDIRECT",
+        "--to-port",
+        "5336"
+      ])
+
+      # if resolv.conf ever points to gateway (10.0.10.1), cover that too
+      System.cmd("iptables", [
+        "-t",
+        "nat",
+        "-A",
+        "OUTPUT",
+        "-d",
+        get_env(:gateway),
+        "-p",
+        proto,
+        "--dport",
+        "53",
+        "-j",
+        "REDIRECT",
+        "--to-port",
+        "5336"
+      ])
+    end
   end
 
-  @doc """
-  VPN forwarding - Note this may change if the vpn server is running on another machine
-  """
+  # VPN forwarding - Note this may change if the vpn server is running on another machine
   defp vpn_forwarding() do
     # Allow outgoing Wi-Fi -> VPN connections (this will need to be removed for a sentry later)
-    # System.cmd("iptables", ["-A", "FORWARD", "-i", @wlan0_interface, "-o", @vpn_interface, "-j", "ACCEPT"])
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @eth_interface, "-o", @vpn_interface, "-j", "ACCEPT"])
+    # System.cmd("iptables", ["-A", "FORWARD", "-i", @wlan0_interface, "-o", Application.get_env(:tunneld, [:network, :mullvad]), "-j", "ACCEPT"])
+    System.cmd("iptables", [
+      "-A",
+      "FORWARD",
+      "-i",
+      get_env(:eth),
+      "-o",
+      get_env(:mullvad),
+      "-m",
+      "state",
+      "--state",
+      "NEW,ESTABLISHED,RELATED",
+      "-j",
+      "ACCEPT"
+    ])
 
     # Allow bidirectional forwarding between Wi-Fi and VPN (this will need to be removed for a sentry later)
-    # System.cmd("iptables", ["-A", "FORWARD", "-i", @vpn_interface, "-o", @wlan0_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
-    System.cmd("iptables", ["-A", "FORWARD", "-i", @vpn_interface, "-o", @eth_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
+    # System.cmd("iptables", ["-A", "FORWARD", "-i", Application.get_env(:tunneld, [:network, :mullvad]), "-o", @wlan0_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
+    System.cmd("iptables", [
+      "-A",
+      "FORWARD",
+      "-i",
+      get_env(:mullvad),
+      "-o",
+      get_env(:eth),
+      "-m",
+      "state",
+      "--state",
+      "ESTABLISHED,RELATED",
+      "-j",
+      "ACCEPT"
+    ])
   end
 end

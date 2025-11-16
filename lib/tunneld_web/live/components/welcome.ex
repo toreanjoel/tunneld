@@ -26,6 +26,7 @@ defmodule TunneldWeb.Live.Components.Welcome do
       <div class="text-4xl font-medium bg-gradient-to-r from-slate-300 to-slate-600 bg-clip-text text-transparent">
         tunneld.lan
       </div>
+      <div class="text-xs text-gray-500"><%= Application.get_env(:tunneld, :metadata)[:device_id] || System.get_env("DEVICE_ID") %></div>
       <div class="text-lg text-gray-2 font-light">
         <%= @version %>
       </div>

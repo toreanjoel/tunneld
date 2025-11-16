@@ -27,46 +27,59 @@ defmodule Tunneld.Servers.Services do
   def handle_call({:get_service_logs, service}, _from, state) do
     service_atom = service |> String.to_atom()
 
-    if service_atom in @services do
-      data =
-        case System.cmd("journalctl", [
-               "-u",
-               service |> to_string,
-               "-n",
-               @service_log_limit,
-               "--no-pager"
-             ]) do
-          {resp, 0} ->
-            resp
+    try do
+      if service_atom in @services do
+        data =
+          case System.cmd("journalctl", [
+                 "-u",
+                 service |> to_string,
+                 "-n",
+                 @service_log_limit,
+                 "--no-pager"
+               ]) do
+            {resp, 0} ->
+              resp
 
-          _ ->
-            "There was an error fetching the service logs"
-        end
+            _ ->
+              "There was an error fetching the service logs"
+          end
 
-      data =
-        data |> String.split("\n") |> Enum.filter(fn item -> item !== "" end) |> Enum.reverse()
+        data =
+          data |> String.split("\n") |> Enum.filter(fn item -> item !== "" end) |> Enum.reverse()
 
-      # Broadcast to sidebar details for desktop:
-      Phoenix.PubSub.broadcast(Tunneld.PubSub, "component:details", %{
-        id: "sidebar_details",
-        module: TunneldWeb.Live.Components.Sidebar.Details,
-        data: %{
-          logs: data
-        }
-      })
+        # Broadcast to sidebar details for desktop:
+        Phoenix.PubSub.broadcast(Tunneld.PubSub, "component:details", %{
+          id: "sidebar_details",
+          module: TunneldWeb.Live.Components.Sidebar.Details,
+          data: %{
+            logs: data
+          }
+        })
 
-      {:reply, {:ok, data}, state}
-    else
-      Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-        type: :error,
-        message: "Make sure the service selected is allowed"
-      })
+        {:reply, {:ok, data}, state}
+      else
+        Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+          type: :error,
+          message: "Make sure the service selected is allowed"
+        })
 
-      {:reply, {:error, "Make sure the service selected is allowed"}, state}
+        {:reply, {:error, "Make sure the service selected is allowed"}, state}
+      end
+    rescue _ ->
+      {:reply, {:ok, ""}, state}
     end
   end
 
-  # Restart a service
+  # Restart a service - can be broken to be more modular
+  def handle_cast({:restart_service, service, :no_notify}, state) do
+    service_name = service |> to_string
+
+    Task.start(fn ->
+      System.cmd("systemctl", ["restart", service_name])
+    end)
+    {:noreply, state}
+  end
+
   def handle_cast({:restart_service, service}, state) do
     service_name = service |> to_string
 
@@ -75,12 +88,10 @@ defmodule Tunneld.Servers.Services do
     end)
 
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-      type: :error,
-      message: "Restarting serice: #{service_name}"
+      type: :info,
+      message: "Restarting service: #{service_name}"
     })
 
-    # Broadcast to notification server
-    Tunneld.Servers.Notification.trigger({:info, "Restarting service #{service_name}"})
     {:noreply, state}
   end
 
@@ -129,4 +140,5 @@ defmodule Tunneld.Servers.Services do
   # Public API
   def get_service_logs(service), do: GenServer.call(__MODULE__, {:get_service_logs, service})
   def restart_service(service), do: GenServer.cast(__MODULE__, {:restart_service, service})
+  def restart_service(service, :no_notify), do: GenServer.cast(__MODULE__, {:restart_service, service, :no_notify})
 end
