@@ -29,6 +29,7 @@ defmodule TunneldWeb.Live.Dashboard do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "show_details")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "modal:form:action:#{client_id}")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "status:internet")
+      Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:details")
     end
 
     # Check the scheme and domain to make sure it is possible to show
@@ -433,6 +434,12 @@ defmodule TunneldWeb.Live.Dashboard do
         send(self(), :revoke_login_creds)
 
       #
+      # Blocklist
+      #
+      "update_blocklist" ->
+        Tunneld.Servers.Blocklist.update()
+
+      #
       # Resources
       #
       "add_share" ->
@@ -587,7 +594,7 @@ defmodule TunneldWeb.Live.Dashboard do
         :wlan
 
       "blocklist" ->
-        Tunneld.Servers.Blocklist.details()
+        Tunneld.Servers.Blocklist.get_details()
         :blocklist
 
       "zrok" ->

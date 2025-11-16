@@ -54,4 +54,5 @@ if config_env() == :prod do
     resources: System.get_env("TUNNELD_SHARES_FILE", "resources.json")
 
   config :tunneld, :config_dir, path: System.get_env("TUNNELD_CONFIG", "/etc/tunneld")
+  config :tunneld, :build_dir, path: System.get_env("TUNNELD_BUILD", "/opt/tunneld")
 end

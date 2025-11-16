@@ -5,7 +5,9 @@ defmodule Tunneld.Servers.Blocklist do
 
   @pubsub Tunneld.PubSub
   @topic_notif "notifications"
-  @system_blacklist_path "/blacklists/dnsmasq-system.blacklist"
+
+  @system_blacklist "/blacklists/dnsmasq-system.blacklist"
+  @update_script "/update_blacklist.sh"
 
   @broadcast_topic "component:details"
   @component_desktop_id "sidebar_details"
@@ -22,52 +24,122 @@ defmodule Tunneld.Servers.Blocklist do
 
   @impl true
   def handle_cast(:details, state) do
-    send(self(), :broadcast_details)
-    {:noreply, state}
-  end
+    case load_blocklist_meta() do
+      {:ok, meta} ->
+        broadcast_meta(meta)
 
-  @impl true
-  def handle_cast(:fetch_details, state) do
-    try do
-      conf =
-        Application.get_env(:tunneld, :config_dir)[:path] <> @system_blacklist_path
-
-      File.stream!(conf)
-      |> Enum.take(11)
-      |> Enum.map(&String.trim/1)
-      |> Enum.filter(&String.starts_with?(&1, "#"))
-      |> Enum.map(fn "#" <> rest ->
-        [key, value] = String.split(rest, ":", parts: 2)
-        {String.trim(key), String.trim(value)}
-      end)
-      |> Enum.into(%{})
-
-      IO.inspect(conf, label: "CONF")
-      Phoenix.PubSub.broadcast(Tunneld.PubSub, @broadcast_topic, %{
-        id: @component_desktop_id,
-        module: @component_module,
-        # We send the details of the current file on disk here
-        data: conf
-      })
-    catch
-      e ->
-        Logger.error("There was a problem processing the file: #{inspect(e)}")
-        notify(:critical, "There was a problem processing the file")
+      {:error, reason} ->
+        Logger.error("There was a problem processing the file: #{inspect(reason)}")
+        notify(:error, "There was a problem processing the file")
     end
 
     {:noreply, state}
   end
 
-  # funciton to update using the script
-  # notify(:info, "Endpoint to network set")
+  @impl true
+  def handle_cast(:update, state) do
+    spawn(fn ->
+      case update_blocklist() do
+        :ok ->
+          case load_blocklist_meta(updated: true) do
+            {:ok, meta} ->
+              broadcast_meta(meta)
+              notify(:info, "Blacklist was updated")
 
-  # function to get the current deatils we have at the moment
+            {:error, reason} ->
+              Logger.error(
+                "There was a problem processing the file after update: #{inspect(reason)}"
+              )
+
+              notify(:error, "There was a problem processing the file after update")
+          end
+
+        {:error, reason} ->
+          Logger.error("There was a problem running the update script: #{inspect(reason)}")
+          notify(:error, "There was a problem updating the blacklist")
+      end
+    end)
+
+    {:noreply, state}
+  end
+
+  defp update_blocklist do
+    if Application.get_env(:tunneld, :mock_data, false) do
+      :ok
+    else
+      try do
+        case Application.get_env(:tunneld, :build_dir) do
+          %{path: build_dir} ->
+            script = build_dir <> @update_script
+
+            case System.cmd(script, []) do
+              {_output, 0} ->
+                :ok
+
+              {output, exit_code} ->
+                {:error, {:non_zero_exit, exit_code, output}}
+            end
+
+          nil ->
+            {:error, :missing_build_dir}
+        end
+      rescue
+        e -> {:error, e}
+      end
+    end
+  end
+
+  defp load_blocklist_meta(opts \\ []) do
+    mock? = Application.get_env(:tunneld, :mock_data, false)
+    updated? = Keyword.get(opts, :updated, false)
+
+    try do
+      meta =
+        if mock? do
+          data = Tunneld.Servers.FakeData.Blocklist.get_data()
+
+          if updated? do
+            Map.put(data, "title", "UPDATED")
+          else
+            data
+          end
+        else
+          conf = Application.get_env(:tunneld, :config_dir)[:path] <> @system_blacklist
+
+          conf
+          |> File.stream!()
+          |> Enum.take(11)
+          |> Enum.map(&String.trim/1)
+          |> Enum.filter(&String.starts_with?(&1, "#"))
+          |> Enum.map(fn "#" <> rest ->
+            [key, value] = String.split(rest, ":", parts: 2)
+
+            {
+              key |> String.downcase() |> String.trim(),
+              value |> String.trim()
+            }
+          end)
+          |> Enum.into(%{})
+        end
+
+      {:ok, meta}
+    rescue
+      e -> {:error, e}
+    end
+  end
+
+  defp broadcast_meta(meta) do
+    Phoenix.PubSub.broadcast(@pubsub, @broadcast_topic, %{
+      id: @component_desktop_id,
+      module: @component_module,
+      data: meta
+    })
+  end
 
   defp notify(type, message) do
     Phoenix.PubSub.broadcast(@pubsub, @topic_notif, %{type: type, message: message})
   end
 
-  # APIs to the server to request and update the deatils
-  def details(), do: GenServer.cast(__MODULE__, :fetch_details)
-  def remove_access(id), do: GenServer.call(__MODULE__, {:remove_access, id}, 30_000)
+  def get_details(), do: GenServer.cast(__MODULE__, :details)
+  def update(), do: GenServer.cast(__MODULE__, :update)
 end
