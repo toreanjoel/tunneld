@@ -4,7 +4,7 @@ A wireless-first, zero-trust network manager built for portability, performance,
 
 ---
 
-Tunneld acts as your network's intelligent gateway — managing devices, assigning IPs via DHCP, resolving DNS securely, sharing local compute and exposing optional network services through Cloudflare Tunnels. Designed to be lightweight, modular, and resource-driven, Tunneld works both at home and on the move. The goal, you focus on building and can plug the device in your network, keeping it isolated and allowing you expose and resource resources publicly or private over a private tunneld network.
+Tunneld acts as your network's intelligent gateway — managing devices, assigning IPs via DHCP, resolving DNS securely, sharing local compute and exposing optional network services through Zrok Tunnels. Designed to be lightweight, modular, and resource-driven, Tunneld works both at home and on the move. The goal, you focus on building and can plug the device in your network, keeping it isolated and allowing you expose and resource resources publicly or private over a private tunneld network.
 
 ---
 
@@ -26,8 +26,8 @@ Everything you need can be controlled through the tunneld dashboard
 ### 📡 Local & Remote Resource Monitoring
 Tunneld monitors active services (e.g., dnsmasq, doh proxy) and connected devices. It also allows you to setup resources that setup intent to potentially sharing a resource that exists on some machine on your tunneld network.
 
-### 🌍 Cloudflare Tunnel First class citizen
-Expose your local Tunneld UI or custom services to the internet via secure Cloudflare Tunnels. Great for accessing your dashboard while away from home, self host applications running on any device on its network, or connecting peer tunneld instances together.
+### 🌍 Zrok Tunnel First class citizen
+Expose your local Tunneld UI or custom services to the internet via secure Zrok Tunnels. Great for accessing your dashboard while away from home, self host applications running on any device on its network, or connecting peer tunneld instances together.
 
 ### 🖥️ Optional Compute sharing
 Tunneld is the gateway, once setting up nodes to be montored, you can resource compute between Tunneld devices through APIs, sharing local services to trusted parites i.e AI APIs access etc. that others can access through their Tunneld Host
@@ -57,7 +57,7 @@ Run Tunneld in:
 - See service status and restart components if needed
 - Dynamic refresh — minimal design, efficient interaction
 - Creating Resources (references with intent to resource and monitor for any selfhosted application on its network)
-- Expose Services to the internet using Cloudflare tunnels
+- Expose Services to the internet using Zrok tunnels
 - Enable sharing and connect to other tunneld devices to access shared/enabled resources
 - Tunneld sends device health and overview information to a device on its network (get events when activity takes place)
 
