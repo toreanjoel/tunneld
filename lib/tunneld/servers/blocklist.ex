@@ -69,7 +69,7 @@ defmodule Tunneld.Servers.Blocklist do
     else
       try do
         case Application.get_env(:tunneld, :build_dir) do
-          %{path: build_dir} ->
+          [path: build_dir] ->
             script = build_dir <> @update_script
 
             case System.cmd(script, []) do
