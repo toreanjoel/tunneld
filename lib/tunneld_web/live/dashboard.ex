@@ -586,6 +586,10 @@ defmodule TunneldWeb.Live.Dashboard do
         Tunneld.Servers.Wlan.scan_networks()
         :wlan
 
+      "blocklist" ->
+        Tunneld.Servers.Blocklist.details()
+        :blocklist
+
       "zrok" ->
         # Get the current state so we can prepopulate
         Tunneld.Servers.Zrok.get_details()

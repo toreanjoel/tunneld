@@ -350,6 +350,39 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     """
   end
 
+  @spec render(%{:view => :blocklist, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{view: :blocklist} = assigns) do
+    data = Map.get(assigns, :data)
+
+    ~H"""
+    <div class="bg-secondary p-2 h-full">
+      <%!-- Sidebar header that will house blocklist metadata --%>
+      <%= sidebar_header(assigns, %{
+        header: "DNS Blocklist",
+        body:
+          "This shows the metadata for the DNS sinkhole currently in use on this device. You can review the details below or fetch the latest version."
+      }) %>
+
+      <pre
+        class="bg-gray-900 text-gray-100 text-xs p-3 rounded-md overflow-auto"
+      ><%= Jason.encode!(data, pretty: true) %></pre>
+
+      <div class="flex flex-row gap-1 justify-end my-2">
+        <%!-- Actions to take --%>
+        <div
+          phx-click="trigger_action"
+          phx-value-action="update_blacklist"
+          phx-value-data={Jason.encode!(%{})}
+          class="flex items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
+        >
+          <.icon class="w-4 h-4" name="hero-arrow-path" />
+          <div class="truncate text-xs">Update</div>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
   @spec render(%{:view => :wlan, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :wlan} = assigns) do
     data = Map.get(assigns, :data)

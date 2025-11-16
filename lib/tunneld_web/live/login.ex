@@ -76,7 +76,7 @@ defmodule TunneldWeb.Live.Login do
           <div class="text-xs text-gray-500"><%= Application.get_env(:tunneld, :metadata)[:device_id]  || System.get_env("DEVICE_ID") %></div>
         </div>
         <div class="text-sm text-gray-1">
-          <a href="https://github.com/toreanjoel/tunneld" target="_blank">
+          <a href="https://github.com/toreanjoel/tunneld-installer" target="_blank">
             Made with ☕ | <span class="underline"> self-host your own tunneld instance </span>
           </a>
         </div>
