@@ -89,7 +89,7 @@ Tunneld exposes endpoints for:
 Tunneld is built for users who:
 - Want **control without overhead** exposing services, resources and compute without firewall punching
 - Need a plug and play installation to self host on a debian based OS and SBC
-- Want to focus on building instead of infrastructure (being your own cloud private cloud)
+- Want to focus on building instead of infrastructure (being your own private cloud)
 
 ---
 
