@@ -13,7 +13,8 @@ defmodule Tunneld.Application do
     Devices,
     SystemResources,
     Wlan,
-    Resources
+    Resources,
+    Blocklist
   }
 
   @impl true
@@ -40,7 +41,8 @@ defmodule Tunneld.Application do
       {Services, []},
       {Resources, []},
       {Devices, []},
-      {Auth, []}
+      {Auth, []},
+      {Blocklist, []}
     ]
 
     # This should not be async, we want this to complete before any other servers init data

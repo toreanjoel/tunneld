@@ -350,6 +350,75 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     """
   end
 
+  @spec render(%{:view => :blocklist, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{view: :blocklist} = assigns) do
+    data = Map.get(assigns, :data)
+
+    assigns =
+      assigns
+      |> assign(:title, Map.get(data, "title", ""))
+      |> assign(:description, Map.get(data, "description", ""))
+      |> assign(:version, Map.get(data, "version", ""))
+      |> assign(:last_mod, Map.get(data, "last modified", ""))
+      |> assign(:link, Map.get(data, "homepage", ""))
+
+    ~H"""
+    <div class="bg-secondary p-2 h-full">
+      <%!-- Sidebar header that will house blocklist metadata --%>
+      <%= sidebar_header(assigns, %{
+        header: "Blocklist Details",
+        body: @description
+      }) %>
+
+      <div class="flex flex-row gap-1 justify-end my-2">
+        <%!-- Actions to take --%>
+        <div
+          phx-click="trigger_action"
+          phx-value-action="update_blocklist"
+          phx-value-data={Jason.encode!(%{})}
+          class="flex items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
+        >
+          <.icon class="w-4 h-4" name="hero-arrow-path" />
+          <div class="truncate text-xs">Update</div>
+        </div>
+      </div>
+
+      <div class="bg-primary rounded-lg p-3">
+        <div class="mt-2 grid grid-rows-1 md:grid-rows-3 gap-2 text-xs">
+          <div class="truncate">
+            <span class="font-semibold">Creator:</span>
+            <span class="ml-1"><%= @title || "—" %></span>
+          </div>
+          <div class="truncate">
+            <span class="font-semibold">Version:</span>
+            <span class="ml-1"><%= @version || "—" %></span>
+          </div>
+          <div class="truncate">
+            <span class="font-semibold">Last Modified:</span>
+            <span class="ml-1"><%= @last_mod || "—" %></span>
+          </div>
+          <div class="truncate">
+            <span class="font-semibold">Link:</span>
+
+            <%= if @link do %>
+              <a
+                href={@link}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="ml-1 underline text-blue-400 hover:text-blue-300"
+              >
+                <%= @link %>
+              </a>
+            <% else %>
+              <span class="ml-1">—</span>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
   @spec render(%{:view => :wlan, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :wlan} = assigns) do
     data = Map.get(assigns, :data)
