@@ -67,8 +67,9 @@ Run Tunneld in:
 
 You can deploy Tunneld to:
 - Raspberry Pi
-- NanoPi / ZimaBoard / x86 mini PC
+- NanoPi
 - Custom Debian-based OS SBCs (Current using Armbian)
+- [Insert any ARM + debian based SBC setup] etc
 
 Install via install script that will walk through the entire setup with all needed dependencies. You can also build from source.
 ---
