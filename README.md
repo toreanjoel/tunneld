@@ -101,11 +101,4 @@ Tunneld is built for users who:
 - Secure DNS encryption
 - Access to your APIs and tools over a trusted application level encrypted network (your own compute or friends sharing APIs)
 
----
-
-## 📦 Getting Started
-
-> Build From Source
-[TDOD]
-
 > [Install Script](https://github.com/toreanjoel/tunneld-installer)
