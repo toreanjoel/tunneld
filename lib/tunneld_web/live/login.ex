@@ -41,7 +41,7 @@ defmodule TunneldWeb.Live.Login do
       |> assign(:loading, false)
       |> assign(:client_id, client_id)
       |> assign(:type, type)
-      |> assign(:info_content, "👋 Hello")
+      |> assign(:info_content, "👋 Hello Hello")
       |> assign(:show_form, show_form)
       |> assign(:show_webauthn, show_webauthn)
 
