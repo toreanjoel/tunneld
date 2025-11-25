@@ -530,13 +530,93 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     logs = Map.get(data, :logs, [])
     count = length(logs)
 
+    service = case service = Map.get(data, :service) do
+      :dnsmasq ->
+        %{
+          id: service,
+          name: service |> Atom.to_string() |> String.capitalize(),
+          description: "Lightweight DNS/DHCP daemon handling local name resolution and leases."
+        }
+
+      :dhcpcd ->
+        %{
+          id: service,
+          name: service |> Atom.to_string() |> String.capitalize(),
+          description: "Client daemon that manages the upstream network lease and interface config"
+        }
+
+      :"dnscrypt-proxy" ->
+        %{
+          id: service,
+          name: service |> Atom.to_string() |> String.capitalize(),
+          description: "Encrypts and filters DNS with DoH/DoT to block ads/trackers and prevent snooping."
+        }
+
+      :nginx ->
+        %{
+          id: service,
+          name: service |> Atom.to_string() |> String.capitalize(),
+          description: "Reverse proxy/load balancer that fronts your exposed resources and distributes traffic."
+        }
+
+        # This is needed so when the component updates, we have some default value
+        _ -> %{
+          id: "-",
+          name: "-",
+          description: "-"
+        }
+    end
+
     assigns =
       assigns
       |> assign(logs: logs)
       |> assign(count: count)
+      |> assign(service: service)
 
     ~H"""
     <div class="bg-secondary p-2 h-full">
+      <%!-- Sidebar header that will house metadat?  --%>
+      <%= sidebar_header(assigns, %{
+        header: Map.get(@service, :name),
+        body: Map.get(@service, :description)
+      }) %>
+
+      <div class="flex flex-row gap-1 justify-end my-2">
+        <%!-- Actions to take --%>
+        <div
+          phx-click="trigger_action"
+          phx-value-action="refresh_service_logs"
+          phx-value-data={Jason.encode!(%{ "id" => Map.get(@service, :id)})}
+          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+        >
+          <.icon class="w-4 h-4" name="hero-arrow-path" />
+          <div class="truncate text-xs text-gray-1">Refresh</div>
+        </div>
+        <div
+          phx-click="modal_open"
+          phx-value-modal_title="Restart Service?"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "string",
+              "data" => "Are you sure you want to restart the service?"
+            })
+          }
+          phx-value-modal_actions={
+            Jason.encode!(%{
+              "title" => "Restart",
+              "payload" => %{
+                "type" => "restart_service",
+                "data" => %{"id" => Map.get(@service, :id)}
+              }
+            })
+          }
+          class="flex items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
+        >
+          <.icon name="hero-arrow-path" class="h-4 w-4" />
+          <div class="truncate text-xs">Restart Service</div>
+        </div>
+      </div>
+
       <div class={"flex flex-col #{if @count == 0, do: "items-center justify-center", else: ""}"}>
         <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">
           No Service Logs

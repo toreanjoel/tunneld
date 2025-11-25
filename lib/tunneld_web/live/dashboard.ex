@@ -481,6 +481,15 @@ defmodule TunneldWeb.Live.Dashboard do
       "tunneld_settings" ->
         Tunneld.Servers.Resources.update_share(data, :tunneld)
 
+      "restart_service" ->
+        %{ "id" => id} = Jason.decode!(data)
+        # we need to decode to a atom as the encoding is needed to pass events as strings
+        id |> String.to_atom |> Tunneld.Servers.Services.restart_service()
+
+      "refresh_service_logs" ->
+        %{"id" => id} = data
+        Tunneld.Servers.Services.get_service_logs(id)
+
       _ ->
         Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
           type: :error,

@@ -5,7 +5,7 @@ defmodule Tunneld.Servers.Services do
   use GenServer
   require Logger
 
-  @services [:dnsmasq, :dhcpcd, :"dnscrypt-proxy"]
+  @services [:dnsmasq, :dhcpcd, :"dnscrypt-proxy", :nginx]
   @service_log_limit "25"
   @interval 10_000
 
@@ -52,6 +52,7 @@ defmodule Tunneld.Servers.Services do
           id: "sidebar_details",
           module: TunneldWeb.Live.Components.Sidebar.Details,
           data: %{
+            service: service_atom,
             logs: data
           }
         })
@@ -65,8 +66,9 @@ defmodule Tunneld.Servers.Services do
 
         {:reply, {:error, "Make sure the service selected is allowed"}, state}
       end
-    rescue _ ->
-      {:reply, {:ok, ""}, state}
+    rescue
+      _ ->
+        {:reply, {:ok, ""}, state}
     end
   end
 
@@ -77,6 +79,7 @@ defmodule Tunneld.Servers.Services do
     Task.start(fn ->
       System.cmd("systemctl", ["restart", service_name])
     end)
+
     {:noreply, state}
   end
 
@@ -140,5 +143,7 @@ defmodule Tunneld.Servers.Services do
   # Public API
   def get_service_logs(service), do: GenServer.call(__MODULE__, {:get_service_logs, service})
   def restart_service(service), do: GenServer.cast(__MODULE__, {:restart_service, service})
-  def restart_service(service, :no_notify), do: GenServer.cast(__MODULE__, {:restart_service, service, :no_notify})
+
+  def restart_service(service, :no_notify),
+    do: GenServer.cast(__MODULE__, {:restart_service, service, :no_notify})
 end
