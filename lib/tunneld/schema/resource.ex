@@ -7,7 +7,6 @@ defmodule Tunneld.Schema.Resource do
   @doc """
   The JSON schema data that will be used to render the form structure.
   """
-  # TODO: validation to map to what we are expected on a zrok resource
   def data(:add_public) do
     %{
       "title" => "Resource Add",

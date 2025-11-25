@@ -1,6 +1,4 @@
 defmodule Tunneld.Application do
-  # See https://hexdocs.pm/elixir/Application.html
-  # for more information on OTP Applications
   @moduledoc false
 
   use Application
@@ -19,13 +17,6 @@ defmodule Tunneld.Application do
 
   @impl true
   def start(_type, _args) do
-    IO.inspect("MAKE SURE TO SET THE MOCK_DATA ENV VAR for development")
-
-    # TODO: we need to move away from iptables if we can
-    IO.inspect(
-      "MAKE SURE THE OS IS USING LEGACY IPTABLES: sudo update-alternatives --set iptables /usr/sbin/iptables-legacy"
-    )
-
     children = [
       TunneldWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:tunneld, :dns_cluster_query) || :ignore},
@@ -45,14 +36,10 @@ defmodule Tunneld.Application do
       {Blocklist, []}
     ]
 
-    # This should not be async, we want this to complete before any other servers init data
-    # This will prevent race conditions
     if not Application.get_env(:tunneld, :mock_data, false) do
       Iptables.reset()
     end
 
-    # See https://hexdocs.pm/elixir/Supervisor.html
-    # for other strategies and supported options
     opts = [strategy: :one_for_one, name: Tunneld.Supervisor]
 
     Supervisor.start_link(children, opts)

@@ -21,13 +21,6 @@ defmodule Tunneld.Servers.Devices do
     {:ok, %{}}
   end
 
-  # return initial state to callers
-  def handle_call(:init_state, _from, state) do
-    leases = fetch_devices()
-    state = Map.put(state, :leases, leases)
-    {:reply, {:ok, leases}, state}
-  end
-
   # periodic sync/broadcast
   def handle_info(:sync, state) do
     devices = fetch_devices()
@@ -83,8 +76,6 @@ defmodule Tunneld.Servers.Devices do
       kind, err -> {:error, {:restart_failed, {kind, err}}}
     end
   end
-
-  def init_state(), do: GenServer.call(__MODULE__, :init_state)
 
   @doc """
   Read current devices from dnsmasq.leases (or mock), format them,

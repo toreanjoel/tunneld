@@ -655,8 +655,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         <h1 class="text-2xl font-light text-gray-2 my-4 text-center">
           No device Information
         </h1>
-
-        <%!-- TODO: Adding custom device detail settings here --%>
       </div>
     </div>
     """

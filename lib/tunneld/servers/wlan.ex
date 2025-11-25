@@ -21,36 +21,6 @@ defmodule Tunneld.Servers.Wlan do
     {:ok, %{}}
   end
 
-  # Checks if a Wi-Fi network is open or secured
-  def handle_call({:network_security, ssid}, _from, state) do
-    if Application.get_env(:tunneld, :mock_data, false) do
-      {:reply, {:secure, true}, state}
-    else
-      {output, _} = System.cmd("wpa_cli", ["scan_results"])
-
-      security_flags =
-        output
-        |> String.split("\n")
-        |> Enum.find(fn line -> String.contains?(line, ssid) end)
-
-      is_secure =
-        case security_flags do
-          nil ->
-            {:error, "SSID not found"}
-
-          _ ->
-            if String.contains?(security_flags, "[WPA") or
-                 String.contains?(security_flags, "[WEP") do
-              {:secure, true}
-            else
-              {:secure, false}
-            end
-        end
-
-      {:reply, is_secure, state}
-    end
-  end
-
   # Disconenct from the current connected wireless network
   def handle_call(:disconnect, _from, state) do
     if Application.get_env(:tunneld, :mock_data, false) do
@@ -157,11 +127,6 @@ defmodule Tunneld.Servers.Wlan do
   @doc "Scans for available Wi-Fi networks"
   def scan_networks() do
     GenServer.cast(__MODULE__, :scan)
-  end
-
-  @doc "Checks if a Wi-Fi network requires a password"
-  def get_network_security(ssid) do
-    GenServer.call(__MODULE__, {:network_security, ssid})
   end
 
   @doc "Connects to a Wi-Fi network with a password (overwrites config)"

@@ -39,7 +39,6 @@ defmodule TunneldWeb.Live.Dashboard do
       socket
       |> assign(:client_id, client_id)
       |> assign(:uri_info, uri_info)
-      # TODO: we need to setup web auth once we have a local cert for the device to be able to use it?
       |> assign(:allow_webauthn?, false)
       |> assign(
         modal: %{
@@ -399,19 +398,9 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   #
-  # Handle clearing the flash after the delay
-  # NOTE: This will be deprecated as we dont need to clear automatically
-  # Useful if we keep a timestamp in future to decide accumulated is all shown too
-  #
-  def handle_info(:clear_flash, socket) do
-    {:noreply, clear_flash(socket)}
-  end
-
-  #
   # handle delayed scan for wireless networks
   #
   def handle_info(:delayed_scan, socket) do
-    IO.inspect("Staring delayed scan for wireless networks")
     Tunneld.Servers.Wlan.scan_networks()
     {:noreply, socket}
   end
@@ -470,10 +459,6 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, assign(socket, :sidebar, sidebar)}
   end
 
-  #
-  # Show details - server request
-  # NOTE: we have a function to do this client side but this is a listener for the server
-  #
   def handle_info({:show_details, %{"id" => id, "type" => type}}, socket) do
     sidebar = %{
       is_open: true,

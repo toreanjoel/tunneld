@@ -65,10 +65,6 @@ defmodule TunneldWeb.Live.Components.Modal do
     """
   end
 
-  #
-  # Handle the modal action passed - this comes from the generated modal data
-  # TODO: this needs to be expanded on but the the actions should not be in here
-  #
   @impl true
   def handle_event("modal_action", %{"type" => action, "data" => data, "client_id" => client_id}, socket) do
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "modal:form:action:#{client_id}", %{
@@ -79,9 +75,6 @@ defmodule TunneldWeb.Live.Components.Modal do
     {:noreply, socket}
   end
 
-  #
-  # This is the renderer that will either use the schema or the string
-  # TODO: if string and using normal actions, we need to try execute the function
   defp render_body(_assigns, %{"type" => "string", "data" => data}) do
     data
   end

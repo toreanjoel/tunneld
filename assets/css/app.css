@@ -2,8 +2,6 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
-/* TODO: Make separate utils and component files */
-
 @layer utilities {
   .bg-grid {
     background-image:

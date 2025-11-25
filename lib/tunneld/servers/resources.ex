@@ -26,12 +26,6 @@ defmodule Tunneld.Servers.Resources do
     {:ok, %{}}
   end
 
-  def handle_call(:get_enabled_shares, _from, state) do
-    resources = fetch_shares()
-    data = resources |> Enum.filter(fn a -> a.tunneld["enabled"] end)
-    {:reply, {:ok, data}, state}
-  end
-
   def handle_call({:add_share, resource}, _from, state) do
     resources =
       case read_file() do
@@ -85,21 +79,6 @@ defmodule Tunneld.Servers.Resources do
     {:reply, state, state}
   end
 
-  def handle_call({:get_share_details, id}, _from, state) do
-    resources = fetch_shares()
-
-    resource =
-      if !Enum.empty?(resources) do
-        Enum.filter(resources, fn resource -> resource.id === id or resource["id"] === id end)
-        |> Enum.at(0)
-      else
-        %{}
-      end
-
-    IO.inspect(resource, label: "SHARE DETAILS")
-    {:reply, {:ok, resource}, state}
-  end
-
   def handle_call({:add_access, access}, _from, state) do
     resources =
       case read_file() do
@@ -121,7 +100,6 @@ defmodule Tunneld.Servers.Resources do
         %{
           "id" => id,
           "name" => name,
-          # NOTE: later this needs to be separate
           "reserved_name" => name,
           "bind" => bind
         }
@@ -135,7 +113,6 @@ defmodule Tunneld.Servers.Resources do
             "bind" => bind,
             "description" => access["description"] || "",
             "tunneld" => %{
-              # "reserved" => %{"private" => reserved_name},
               "reserved" => %{"private" => name},
               "units" => %{"access" => %{"id" => acc_id, "unit" => acc_unit}},
               "enabled" => %{"access" => false}
@@ -748,13 +725,11 @@ defmodule Tunneld.Servers.Resources do
     end
   end
 
-  def get_enabled_shares(), do: GenServer.call(__MODULE__, :get_enabled_shares, 25_000)
   def get_resource(id), do: GenServer.cast(__MODULE__, {:get_resource, id})
 
   def toggle_share(unit_id, enable),
     do: GenServer.cast(__MODULE__, {:toggle_share, unit_id, enable})
 
-  def get_share_details(id), do: GenServer.call(__MODULE__, {:get_share_details, id})
   def add_share(resource), do: GenServer.call(__MODULE__, {:add_share, resource}, 25_000)
   def try_init_local_shares(), do: GenServer.cast(__MODULE__, :init_local_shares)
   def try_hibernate_shares(), do: GenServer.cast(__MODULE__, :hibernate_shares)
