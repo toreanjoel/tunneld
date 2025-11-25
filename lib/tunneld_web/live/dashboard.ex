@@ -243,13 +243,13 @@ defmodule TunneldWeb.Live.Dashboard do
               </button>
             </div>
             <div class="flex-1" />
-            <button
+            <%!-- <button
               :if={@view_tab == :map}
               id="download-network-map" phx-hook="DownloadNetworkMap"
               class="ml-auto px-4 py-2 rounded-md text-sm font-semibold border bg-primary border-secondary text-gray-1 hover:text-white hover:border-white transition"
             >
               Download map
-            </button>
+            </button> --%>
           </div>
 
           <div class={"#{if @view_tab == :map, do: "hidden"}"}>
@@ -844,25 +844,25 @@ defmodule TunneldWeb.Live.Dashboard do
         type: "cloud",
         pos: %{x: 0, y: -4, z: 0.2},
         size: 1,
-        color: "#8b9bff",
+        color: "#9afbff",
         icon: %{variant: "cloud", state: "enabled"}
       },
       %{
         id: "uplink",
-        label: "WiFi Upstream",
+        label: "WiFi",
         type: "router",
         pos: %{x: 0, y: -1.6, z: 0.2},
         size: 1,
-        color: "#60e8c2",
+        color: "#e69df9",
         icon: %{variant: "router", state: uplink_state}
       },
       %{
         id: "gateway",
-        label: "Tunneld Router",
+        label: "Tunneld",
         type: "router",
         pos: %{x: 0, y: 0, z: 0.2},
         size: 1,
-        color: "#ffb85c",
+        color: "#a6b5fd",
         icon: %{variant: "switch", state: "enabled"}
       }
     ]
@@ -872,7 +872,7 @@ defmodule TunneldWeb.Live.Dashboard do
       |> Enum.sort_by(&device_sort_key/1)
       |> Enum.with_index()
       |> Enum.map(fn {device, idx} ->
-        pos = device_position(idx, max(length(device_list), 1))
+        pos = device_position(idx)
 
         %{
           id: "device-#{idx}",
@@ -880,7 +880,7 @@ defmodule TunneldWeb.Live.Dashboard do
           type: "device",
           pos: pos,
           size: 1,
-          color: "#8b9bff",
+          color: "#7bfee0",
           icon: %{variant: "device", state: "enabled"},
           meta: device_meta(device)
         }
@@ -918,26 +918,23 @@ defmodule TunneldWeb.Live.Dashboard do
     }
   end
 
-  defp device_position(index, total) do
-    # Group devices into lower-left arcs so they stay below/left of the router instead of a full ring.
-    per_ring = 6
-    ring = div(index, per_ring)
-    pos_in_ring = rem(index, per_ring)
-    arc_start = :math.pi() * 11 / 18   # ~110°
-    arc_end = :math.pi() * 19 / 18     # ~190°
+  defp device_position(index) do
+    per_row = 4
+    row = div(index, per_row)
+    col = rem(index, per_row)
 
-    remaining = max(total - ring * per_ring, 0)
-    in_ring_count = max(min(per_ring, remaining), 1)
-    t = if in_ring_count == 1, do: 0.5, else: pos_in_ring / (in_ring_count - 1)
-    angle = arc_start + (arc_end - arc_start) * t
+    anchor_x = 3.2
+    anchor_y = 1.8
+    x_step = 2.05
+    y_step = 3.05
 
-    radius = 2.1 + ring * 0.5 + min(total - 1, 12) * 0.03
-    center_x = -1.8 - ring * 0.25
-    center_y = 3.0 + ring * 0.28
+    # Spread columns left; nudge rows further left to keep the cluster diagonally behind the router
+    x = anchor_x - col * x_step - row * 1.45
+    y = anchor_y + row * y_step
 
     %{
-      x: Float.round(center_x + :math.cos(angle) * radius, 2),
-      y: Float.round(center_y + :math.sin(angle) * radius, 2),
+      x: Float.round(x, 2),
+      y: Float.round(y, 2),
       z: 0.2
     }
   end

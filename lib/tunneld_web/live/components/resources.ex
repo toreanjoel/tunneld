@@ -97,7 +97,7 @@ defmodule TunneldWeb.Live.Components.Resources do
                 <div class="flex items-center gap-2 grow">
                   <.icon class="w-5 h-5 shrink-0" name={kind_icon(kind)} />
                   <div class="grow">
-                    <div class="text-md font-semibold truncate"><%= resource.name %></div>
+                    <div class="text-xs font-semibold truncate"><%= resource.name %></div>
                   </div>
                   <div class={["w-3 h-3 rounded-full", get_status_color(resource.status || false)]} />
                 </div>

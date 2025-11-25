@@ -3,9 +3,8 @@ import routerIcon from "../images/Access Point_v2.svg";
 import switchIcon from "../images/Router.svg";
 import wifiIcon from "../images/Access Point_v2.svg";
 import deviceIcon from "../images/Generic Device.svg";
-import cameraIcon from "../images/Generic Device.svg";
-import sensorIcon from "../images/Private Resource.svg";
-import serverIcon from "../images/Public Resource.svg";
+import resourcePrivate from "../images/Private Resource.svg";
+import resourcePublic from "../images/Public Resource.svg";
 import defaultIcon from "../images/Generic Device.svg";
 
 const ISO = Math.PI / 6;
@@ -28,12 +27,7 @@ const iconSources = {
   cloud: cloudIcon,
   router: routerIcon,
   switch: switchIcon,
-  wifi: wifiIcon,
   device: deviceIcon,
-  camera: cameraIcon,
-  sensor: sensorIcon,
-  server: serverIcon,
-  default: defaultIcon,
 };
 
 const iconCache = new Map();
@@ -405,6 +399,7 @@ function makeNetworkMap(root) {
   }
 
   function snapNodePosition(node) {
+    if (node.snap === false) return;
     node.pos.x = snapToGridCenter(node.pos.x);
     node.pos.y = snapToGridCenter(node.pos.y);
   }
@@ -420,16 +415,16 @@ function makeNetworkMap(root) {
     const cw = canvas.clientWidth || 1;
     const ch = canvas.clientHeight || 1;
     const points = nodes.map((n) => isoToScreen(n.pos.x, n.pos.y, n.pos.z));
-    const minX = Math.min(...points.map((p) => p.x));
-    const maxX = Math.max(...points.map((p) => p.x));
-    const minY = Math.min(...points.map((p) => p.y));
-    const maxY = Math.max(...points.map((p) => p.y));
+    const padPx = GRID * 1.1; // one grid block margin around content
+    const minX = Math.min(...points.map((p) => p.x)) - padPx;
+    const maxX = Math.max(...points.map((p) => p.x)) + padPx;
+    const minY = Math.min(...points.map((p) => p.y)) - padPx;
+    const maxY = Math.max(...points.map((p) => p.y)) + padPx;
     state.offset.x = -((minX + maxX) / 2);
     state.offset.y = -((minY + maxY) / 2) * 0.6;
     const spanX = Math.max(1, maxX - minX);
     const spanY = Math.max(1, maxY - minY);
-    const padding = 0.82;
-    const target = Math.min((cw * padding) / spanX, (ch * padding) / spanY);
+    const target = Math.min((cw * 0.98) / spanX, (ch * 0.98) / spanY);
     state.scale = Math.max(0.5, Math.min(2.6, target));
   }
 
@@ -720,10 +715,6 @@ function createIconLibrary() {
     cloud: { enabled: [imageFrame(pick("cloud"))], disabled: [imageFrame(pick("cloud"))], frameDuration: 800 },
     router: { enabled: [imageFrame(pick("router"))], disabled: [imageFrame(pick("router"))], frameDuration: 800 },
     switch: { enabled: [imageFrame(pick("switch"))], disabled: [imageFrame(pick("switch"))], frameDuration: 800 },
-    wifi: { enabled: [imageFrame(pick("wifi"))], disabled: [imageFrame(pick("wifi"))], frameDuration: 800 },
     device: { enabled: [imageFrame(pick("device"))], disabled: [imageFrame(pick("device"))], frameDuration: 800 },
-    camera: { enabled: [imageFrame(pick("camera"))], disabled: [imageFrame(pick("camera"))], frameDuration: 800 },
-    sensor: { enabled: [imageFrame(pick("sensor"))], disabled: [imageFrame(pick("sensor"))], frameDuration: 800 },
-    server: { enabled: [imageFrame(pick("server"))], disabled: [imageFrame(pick("server"))], frameDuration: 800 },
   };
 }
