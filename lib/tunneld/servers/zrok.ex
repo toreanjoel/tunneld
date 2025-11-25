@@ -42,8 +42,6 @@ defmodule Tunneld.Servers.Zrok do
       mock?: mock?
     }
 
-    # TODO: we need to check the cmd and check the data existing there and not the file, that is the source of truth
-
     {:ok, state}
   end
 
@@ -394,11 +392,9 @@ defmodule Tunneld.Servers.Zrok do
     id = normalize_id(access["id"] || access[:id])
     name = access["name"] || access[:name] || id
 
-    # TODO: we use the normal name so this needs to match, we could later make it possible to use a custom reserve locally
     reserved = to_string(access["reserved_name"] || access[:reserved_name] || name)
     bind = to_string(access["bind"] || access[:bind])
 
-    # TODO: make this something the user can pass, at the moment we know we fallback regardless
     cpu_q =
       access["cpu_quota"] || access[:cpu_quota] || 40
 

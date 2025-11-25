@@ -21,36 +21,6 @@ defmodule Tunneld.Servers.Wlan do
     {:ok, %{}}
   end
 
-  # Checks if a Wi-Fi network is open or secured
-  def handle_call({:network_security, ssid}, _from, state) do
-    if Application.get_env(:tunneld, :mock_data, false) do
-      {:reply, {:secure, true}, state}
-    else
-      {output, _} = System.cmd("wpa_cli", ["scan_results"])
-
-      security_flags =
-        output
-        |> String.split("\n")
-        |> Enum.find(fn line -> String.contains?(line, ssid) end)
-
-      is_secure =
-        case security_flags do
-          nil ->
-            {:error, "SSID not found"}
-
-          _ ->
-            if String.contains?(security_flags, "[WPA") or
-                 String.contains?(security_flags, "[WEP") do
-              {:secure, true}
-            else
-              {:secure, false}
-            end
-        end
-
-      {:reply, is_secure, state}
-    end
-  end
-
   # Disconenct from the current connected wireless network
   def handle_call(:disconnect, _from, state) do
     if Application.get_env(:tunneld, :mock_data, false) do
@@ -159,11 +129,6 @@ defmodule Tunneld.Servers.Wlan do
     GenServer.cast(__MODULE__, :scan)
   end
 
-  @doc "Checks if a Wi-Fi network requires a password"
-  def get_network_security(ssid) do
-    GenServer.call(__MODULE__, {:network_security, ssid})
-  end
-
   @doc "Connects to a Wi-Fi network with a password (overwrites config)"
   def connect_with_pass(ssid, password) do
     GenServer.cast(__MODULE__, {:connect, ssid, password})
@@ -172,6 +137,22 @@ defmodule Tunneld.Servers.Wlan do
   @doc "Disconnect from the current connected wireless network"
   def disconnect() do
     GenServer.call(__MODULE__, :disconnect)
+  end
+
+  @doc "Returns true if the WLAN interface reports an active connection."
+  def connected? do
+    if Application.get_env(:tunneld, :mock_data, false) do
+      true
+    else
+      iface = Application.get_env(:tunneld, :network)[:wlan]
+
+      case System.cmd("iw", ["dev", iface, "link"]) do
+        {output, _} -> String.trim(output) != "Not connected."
+        _ -> false
+      end
+    end
+  rescue
+    _ -> false
   end
 
   # parse the scan results that we get back from the network scanning

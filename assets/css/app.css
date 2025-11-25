@@ -2,8 +2,6 @@
 @import "tailwindcss/components";
 @import "tailwindcss/utilities";
 
-/* TODO: Make separate utils and component files */
-
 @layer utilities {
   .bg-grid {
     background-image:
@@ -33,4 +31,71 @@
     from { opacity: 0 }
     to { opacity: 1 }
   }
+}
+
+.html {
+  overflow-y: auto;
+}
+
+/* Network map surface */
+.network-board {
+  --bg: rgb(21 24 24);
+  --bg-2: #0c0f1f;
+  --grid: rgba(255, 255, 255, 0.14);
+  --grid-bold: rgba(255, 255, 255, 0.28);
+  --card: rgb(21 24 24);
+  --border: rgba(255, 255, 255, 0.08);
+  --text: #f0f3ff;
+  --muted: #8f9bc3;
+  --accent: #8b9bff;
+  --accent-2: #60e8c2;
+  position: relative;
+  width: 100%;
+  height: 100%;
+  background: transparent;
+  color: var(--text);
+  overflow: hidden;
+  transform-style: preserve-3d;
+  transform: perspective(1600px) rotateX(var(--tiltY, 0deg)) rotateY(var(--tiltX, 0deg));
+  transition: transform 0.35s ease;
+  border-radius: 12px;
+}
+
+.network-board * {
+  box-sizing: border-box;
+}
+
+.network-board canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+}
+
+.network-board canvas.grabbing {
+  cursor: grabbing;
+}
+
+.network-board .loader {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: rgba(32, 33, 34, 0.96);
+  backdrop-filter: blur(5px);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--muted);
+  z-index: 5;
+  transition: opacity 0.25s ease, visibility 0.35s ease;
+}
+
+.network-board .loader.hidden {
+  opacity: 0.2;
+  visibility: hidden;
+  pointer-events: none;
 }

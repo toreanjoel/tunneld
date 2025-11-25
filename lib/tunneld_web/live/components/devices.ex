@@ -76,22 +76,23 @@ defmodule TunneldWeb.Live.Components.Devices do
                       "This will release the device #{device.hostname} (#{device.ip}). The device will get a new ip address when connecting"
                   })
                 }
-                phx-value-modal_actions={
-                  Jason.encode!(%{
-                    "title" => "Revoke",
-                    "payload" => %{
-                      "type" => "revoke_release_ip",
-                      "data" => %{
-                        "mac" => device.mac
-                      }
+              phx-value-modal_actions={
+                Jason.encode!(%{
+                  "title" => "Revoke",
+                  "payload" => %{
+                    "type" => "revoke_release_ip",
+                    "data" => %{
+                      "mac" => device.mac
                     }
-                  })
-                }
-                class="cursor-pointer"
-              >
-                <.icon name="hero-x-mark-solid" class="h-4 w-4 text-red" />
-              </div>
+                  }
+                })
+              }
+              phx-click-loading="opacity-50 cursor-wait"
+              class="cursor-pointer"
+            >
+              <.icon name="hero-x-mark-solid" class="h-4 w-4 text-red" />
             </div>
+          </div>
             <div class="grow" />
             <div class="text-xs"><%= device.ip %></div>
             <div class="text-xs"><%= device.mac %></div>

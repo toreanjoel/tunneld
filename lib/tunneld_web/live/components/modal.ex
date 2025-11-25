@@ -6,6 +6,7 @@ defmodule TunneldWeb.Live.Components.Modal do
   attr :modal_actions, :map, required: false
   attr :type, :atom, default: :default
   attr :client_id, :string, required: true
+  attr :pending_actions, :map, default: %{}
 
   @impl true
   def render(assigns) do
@@ -21,6 +22,10 @@ defmodule TunneldWeb.Live.Components.Modal do
     Render the different modal content data type
   """
   def content_type(assigns, :default) do
+    pending_actions = Map.get(assigns, :pending_actions, %{})
+
+    assigns = assigns |> assign(pending_actions)
+
     ~H"""
     <div class="fixed inset-0 bg-secondary bg-opacity-80 flex items-center justify-center">
       <div class="bg-primary rounded-md p-6 max-w-[500px] lg:w-1/3 relative z-20">
@@ -29,10 +34,18 @@ defmodule TunneldWeb.Live.Components.Modal do
           <.icon name="hero-x-mark-solid" class="h-5 w-5" />
         </div>
         <h2 class="text-xl py-2"><%= @title %></h2>
-        <!-- Render the dynamic body -->
-        <div class="text-sm"><%= render_body(assigns, @body) %></div>
-        <!-- Modal Actions -->
-        <div :if={@body["type"] !== "schema"} class="flex justify-end space-x-3 pt-2 mt-3">
+         <!-- Render the dynamic body -->
+         <div class="text-sm"><%= render_body(assigns, @body) %></div>
+         <!-- Modal Actions -->
+         <div :if={@body["type"] !== "schema"} class="flex justify-end space-x-3 pt-2 mt-3">
+          <% action_loading =
+            if @actions do
+              @pending_actions
+              |> Map.values()
+              |> Enum.any?(fn %{action: pending_action} -> pending_action == @actions["payload"]["type"] end)
+            else
+              false
+            end %>
           <button
             :if={@actions["title"]}
             phx-target={@myself}
@@ -40,6 +53,8 @@ defmodule TunneldWeb.Live.Components.Modal do
             phx-value-type={@actions["payload"]["type"]}
             phx-value-data={Jason.encode!(@actions["payload"]["data"])}
             phx-value-client_id={@client_id}
+            phx-disable-with="Working..."
+            disabled={action_loading}
             class="text-sm font-light gap-1 bg-red hover:bg-opacity-60 p-3 cursor-pointer rounded-md"
           >
             <%= @actions["title"] %>
@@ -50,10 +65,6 @@ defmodule TunneldWeb.Live.Components.Modal do
     """
   end
 
-  #
-  # Handle the modal action passed - this comes from the generated modal data
-  # TODO: this needs to be expanded on but the the actions should not be in here
-  #
   @impl true
   def handle_event("modal_action", %{"type" => action, "data" => data, "client_id" => client_id}, socket) do
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "modal:form:action:#{client_id}", %{
@@ -64,9 +75,6 @@ defmodule TunneldWeb.Live.Components.Modal do
     {:noreply, socket}
   end
 
-  #
-  # This is the renderer that will either use the schema or the string
-  # TODO: if string and using normal actions, we need to try execute the function
   defp render_body(_assigns, %{"type" => "string", "data" => data}) do
     data
   end
@@ -80,6 +88,12 @@ defmodule TunneldWeb.Live.Components.Modal do
            "action" => action
          } = payload
        ) do
+    pending_actions = Map.get(assigns, :pending_actions, %{})
+    loading =
+      pending_actions
+      |> Map.values()
+      |> Enum.any?(fn %{action: pending_action} -> pending_action == action end)
+
     # Reassign the default values so we can access it in the html
     assigns =
       assigns
@@ -88,17 +102,19 @@ defmodule TunneldWeb.Live.Components.Modal do
       |> assign(action: action)
       # We do this so we can match with or without the title for backward compatibility
       |> assign(title: Map.get(payload, "title", "Submit"))
+      |> assign(loading: loading)
 
     ~H"""
     <div>
       <.live_component
-        id={DateTime.utc_now()}
+        id={"schema_form_#{@action}"}
         module={TunneldWeb.Live.Components.JsonSchemaRenderer}
         schema={@data}
         values={@default_values}
         action={@action}
         title={@title}
         client_id={@client_id}
+        loading={@loading}
       />
     </div>
     """

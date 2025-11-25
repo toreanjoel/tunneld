@@ -34,7 +34,7 @@ config :esbuild,
   version: "0.17.11",
   tunneld: [
     args:
-      ~w(js/app.js --bundle --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --external:/images/*),
+      ~w(js/app.js --bundle --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --loader:.svg=file --public-path=/assets --asset-names=images/[name]-[hash]),
     cd: Path.expand("../assets", __DIR__),
     env: %{"NODE_PATH" => Path.expand("../deps", __DIR__)}
   ]
@@ -63,7 +63,7 @@ config :phoenix, :json_library, Jason
 config :tunneld, :auth,
   ttl: 900 # 15 minutes
 
-config :tunneld, version: "0.5.0"
+config :tunneld, version: "0.6.0"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

@@ -4,8 +4,6 @@ defmodule Iptables do
   This ensures all devices are blocked by default except for access to Tunneld.
   """
 
-  # NOTE: we need to make a config file later to get the env from that change with the system
-
   @doc """
   Flush iptables and reinitialize firewall rules.
   """
@@ -34,12 +32,9 @@ defmodule Iptables do
     System.cmd("iptables", ["-F"])
     System.cmd("iptables", ["-t", "nat", "-F"])
     System.cmd("iptables", ["-t", "mangle", "-F"])
-    IO.puts("Iptables flushed.")
   end
 
-  # Gateway for interfaces regardless of blocking or dropping by default
   defp gateway_access() do
-    # Allow clients to access Tunneld UI (gateway)
     System.cmd("iptables", [
       "-A",
       "FORWARD",
@@ -50,8 +45,6 @@ defmodule Iptables do
       "-j",
       "ACCEPT"
     ])
-
-    # System.cmd("iptables", ["-A", "FORWARD", "-i", @wlan0_interface, "-d", Application.get_env(:tunneld, [:network, :gateway]), "-j", "ACCEPT"])
 
     for proto <- ["udp", "tcp"] do
       System.cmd("iptables", [
@@ -69,10 +62,7 @@ defmodule Iptables do
     end
   end
 
-  # Make sure client interfaces can send/recieve packets from the internet interface
   defp internet_forwarding() do
-    # interface > internet
-    # System.cmd("iptables", ["-A", "FORWARD", "-i", @wlan0_interface, "-o", Application.get_env(:tunneld, [:network, :wlan]), "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
     System.cmd("iptables", [
       "-A",
       "FORWARD",
@@ -88,8 +78,6 @@ defmodule Iptables do
       "ACCEPT"
     ])
 
-    # internet > interface
-    # System.cmd("iptables", ["-A", "FORWARD", "-i", Application.get_env(:tunneld, [:network, :wlan]), "-o", @wlan0_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
     System.cmd("iptables", [
       "-A",
       "FORWARD",
@@ -106,9 +94,7 @@ defmodule Iptables do
     ])
   end
 
-  # Allow internet packets through specific interfaces
   defp internet_passthrough() do
-    # Enable NAT for whitelisted devices
     System.cmd("iptables", [
       "-t",
       "nat",
@@ -132,9 +118,7 @@ defmodule Iptables do
     ])
   end
 
-  # DNS forwarding to a custom running service on a specific port (dnsmasq)
   defp dns_forwarding() do
-    # LAN clients to 5336
     System.cmd("iptables", [
       "-t",
       "nat",
@@ -165,9 +149,7 @@ defmodule Iptables do
       "5336"
     ])
 
-    # LOCAL processes (host) to 5336 — this fixes zrok
     for proto <- ["udp", "tcp"] do
-      # resolv.conf → 127.0.0.1
       System.cmd("iptables", [
         "-t",
         "nat",
@@ -185,7 +167,6 @@ defmodule Iptables do
         "5336"
       ])
 
-      # if resolv.conf ever points to gateway (10.0.10.1), cover that too
       System.cmd("iptables", [
         "-t",
         "nat",
@@ -205,10 +186,7 @@ defmodule Iptables do
     end
   end
 
-  # VPN forwarding - Note this may change if the vpn server is running on another machine
   defp vpn_forwarding() do
-    # Allow outgoing Wi-Fi -> VPN connections (this will need to be removed for a sentry later)
-    # System.cmd("iptables", ["-A", "FORWARD", "-i", @wlan0_interface, "-o", Application.get_env(:tunneld, [:network, :mullvad]), "-j", "ACCEPT"])
     System.cmd("iptables", [
       "-A",
       "FORWARD",
@@ -224,8 +202,6 @@ defmodule Iptables do
       "ACCEPT"
     ])
 
-    # Allow bidirectional forwarding between Wi-Fi and VPN (this will need to be removed for a sentry later)
-    # System.cmd("iptables", ["-A", "FORWARD", "-i", Application.get_env(:tunneld, [:network, :mullvad]), "-o", @wlan0_interface, "-m", "state", "--state", "RELATED,ESTABLISHED", "-j", "ACCEPT"])
     System.cmd("iptables", [
       "-A",
       "FORWARD",

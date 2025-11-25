@@ -49,6 +49,7 @@ defmodule TunneldWeb.Live.Components.Resources do
               "action" => "add_private_share"
             })
           }
+          phx-click-loading="opacity-50 cursor-wait"
           class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
         >
           <.icon class="w-6 h-6" name="hero-cpu-chip" />
@@ -66,6 +67,7 @@ defmodule TunneldWeb.Live.Components.Resources do
               "action" => "add_share"
             })
           }
+          phx-click-loading="opacity-50 cursor-wait"
           class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
         >
           <.icon class="w-6 h-6" name="hero-cpu-chip" />
@@ -95,7 +97,7 @@ defmodule TunneldWeb.Live.Components.Resources do
                 <div class="flex items-center gap-2 grow">
                   <.icon class="w-5 h-5 shrink-0" name={kind_icon(kind)} />
                   <div class="grow">
-                    <div class="text-md font-semibold truncate"><%= resource.name %></div>
+                    <div class="text-xs font-semibold truncate"><%= resource.name %></div>
                   </div>
                   <div class={["w-3 h-3 rounded-full", get_status_color(resource.status || false)]} />
                 </div>

@@ -4,7 +4,8 @@ defmodule TunneldWeb.Live.Dashboard do
   """
   use TunneldWeb, :live_view
   require Logger
-  alias Tunneld.Servers.{Session}
+  alias Tunneld.Servers.Session
+  alias Tunneld.Servers.Devices, as: DevicesServer
   alias TunneldWeb.Router.Helpers, as: Routes
 
   # Components
@@ -30,16 +31,23 @@ defmodule TunneldWeb.Live.Dashboard do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "modal:form:action:#{client_id}")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "status:internet")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:details")
+      Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:devices")
     end
 
     # Check the scheme and domain to make sure it is possible to show
     uri_info = get_connect_info(socket, :uri)
+    devices = DevicesServer.fetch_devices()
+    internet_status =
+      try do
+        Tunneld.Servers.Wlan.connected?()
+      rescue
+        _ -> false
+      end
 
     socket =
       socket
       |> assign(:client_id, client_id)
       |> assign(:uri_info, uri_info)
-      # TODO: we need to setup web auth once we have a local cert for the device to be able to use it?
       |> assign(:allow_webauthn?, false)
       |> assign(
         modal: %{
@@ -58,9 +66,13 @@ defmodule TunneldWeb.Live.Dashboard do
       )
       |> assign(
         status: %{
-          internet: false
+          internet: internet_status
         }
       )
+      |> assign(:devices, devices)
+      |> assign(:view_tab, :list)
+      |> assign(:network_graph, build_network_graph(internet_status, devices))
+      |> assign(:pending_actions, %{})
 
     {:ok, socket}
   end
@@ -87,6 +99,7 @@ defmodule TunneldWeb.Live.Dashboard do
         body={@modal.body}
         actions={@modal.actions}
         client_id={@client_id}
+        pending_actions={@pending_actions}
       />
     </div>
     """
@@ -179,7 +192,7 @@ defmodule TunneldWeb.Live.Dashboard do
         </div>
       </div>
 
-      <div class="flex flex-col mx-auto max-w-[1280px]">
+      <div class="flex flex-col mx-auto max-w-[1280px] w-[980px]">
         <%!-- Welcome section --%>
         <div>
           <.live_component id="welcome" module={Welcome} />
@@ -196,14 +209,74 @@ defmodule TunneldWeb.Live.Dashboard do
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
 
-        <%!-- Resources --%>
-        <div class="min-h-[200px]">
-          <.live_component id="resources" module={Resources} />
-        </div>
+        <%!-- IMPORTANT SECTION WHERE CHANGES WILL TAKE PLACE  --%>
+        <div class="mt-6">
+          <div class="flex flex-row items-center gap-2 mb-4">
+            <div class="flex flex-row gap-2">
+              <button
+                phx-click="set_view_tab"
+                phx-value-tab="list"
+                class={
+                  "px-4 py-2 rounded-md text-sm font-semibold border " <>
+                    if @view_tab == :list do
+                      "bg-secondary border-secondary text-white"
+                    else
+                      "bg-primary border-secondary text-gray-1"
+                    end
+                }
+              >
+                Resource List
+              </button>
+              <button
+                phx-click="set_view_tab"
+                phx-value-tab="map"
+                class={
+                  "px-4 py-2 rounded-md text-sm font-semibold border " <>
+                    if @view_tab == :map do
+                      "bg-secondary border-secondary text-white"
+                    else
+                      "bg-primary border-secondary text-gray-1"
+                    end
+                }
+              >
+                Network Map
+              </button>
+            </div>
+            <div class="flex-1" />
+            <%!-- <button
+              :if={@view_tab == :map}
+              id="download-network-map" phx-hook="DownloadNetworkMap"
+              class="ml-auto px-4 py-2 rounded-md text-sm font-semibold border bg-primary border-secondary text-gray-1 hover:text-white hover:border-white transition"
+            >
+              Download map
+            </button> --%>
+          </div>
 
-        <%!-- Devices --%>
-        <div class="min-h-[200px]">
-          <.live_component id="devices" module={Devices} />
+          <div class={"#{if @view_tab == :map, do: "hidden"}"}>
+            <div class="min-h-[200px]">
+              <.live_component id="resources" module={Resources} />
+            </div>
+
+            <div class="min-h-[200px]">
+              <.live_component id="devices" module={Devices} />
+            </div>
+          </div>
+
+          <div class={"#{if @view_tab == :list, do: "hidden"}"}>
+            <div>
+              <div
+                id="network-map"
+                class="network-board"
+                phx-hook="NetworkMap"
+                data-graph={Jason.encode!(@network_graph)}
+              >
+                <div class="loader" id="loader">
+                  <span>Loading…</span>
+                </div>
+                <canvas id="iso"></canvas>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -236,12 +309,22 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, assign(socket, :sidebar, sidebar)}
   end
 
+  def handle_event("set_view_tab", %{"tab" => tab}, socket) do
+    view_tab = if tab == "map", do: :map, else: :list
+
+    socket =
+      socket
+      |> assign(:view_tab, view_tab)
+      |> rebuild_network_graph()
+
+    {:noreply, socket}
+  end
+
   #
   # Catch the toggle event to enable/disable the resources and their resources
   #
   def handle_event("toggle_share_access", params, socket) do
-    send(self(), %{action: "toggle_share_access", data: params})
-    {:noreply, socket}
+    {:noreply, start_action("toggle_share_access", params, socket)}
   end
 
   #
@@ -294,8 +377,7 @@ defmodule TunneldWeb.Live.Dashboard do
     action = params["action"]
     data = Jason.decode!(params["data"])
 
-    send(self(), %{action: action, data: data})
-    {:noreply, socket}
+    {:noreply, start_action(action, data, socket)}
   end
 
   #
@@ -330,6 +412,19 @@ defmodule TunneldWeb.Live.Dashboard do
   @doc """
   This will have the parent dashboard view be responsible for sending update messages to components
   """
+  def handle_info(%{id: "devices", module: TunneldWeb.Live.Components.Devices, data: data} = message, socket) do
+    send_update(message.module, id: message.id, data: message.data)
+
+    devices = Map.get(data, :devices, [])
+
+    socket =
+      socket
+      |> assign(:devices, devices)
+      |> rebuild_network_graph()
+
+    {:noreply, socket}
+  end
+
   def handle_info(%{id: id, module: module, data: data}, socket) do
     if not is_nil(id) do
       send_update(module, id: id, data: data)
@@ -349,6 +444,7 @@ defmodule TunneldWeb.Live.Dashboard do
           internet: status
         }
       )
+      |> rebuild_network_graph()
 
     {:noreply, socket}
   end
@@ -369,142 +465,39 @@ defmodule TunneldWeb.Live.Dashboard do
   # handle the actions from the schema form
   #
   def handle_info(%{action: action, data: data}, socket) do
-    case action do
-      #
-      # Device management
-      #
-      "revoke_release_ip" ->
-        %{"mac" => mac} = Jason.decode!(data)
+    {:noreply, start_action(action, data, socket)}
+  end
+  #
+  # Handle the completion of an async action
+  #
+  def handle_info({:action_done, ref, _action, {:error, reason}}, socket) do
+    pending = Map.get(socket.assigns.pending_actions, ref, %{})
+    Logger.error("Action failed: #{inspect(reason)}")
 
-        if not is_nil(mac) do
-          Tunneld.Servers.Devices.revoke_lease(mac)
-        end
+    socket =
+      socket
+      |> assign(:pending_actions, Map.delete(socket.assigns.pending_actions, ref))
+      |> maybe_keep_modal_open(pending)
+      |> put_flash(:error, "Action failed, please retry.")
 
-      #
-      # Wireless networking
-      #
-      "connect_to_wireless_network" ->
-        Tunneld.Servers.Wlan.connect_with_pass(data["ssid"], data["password"])
-
-      "disconnect_from_wireless_network" ->
-        Tunneld.Servers.Wlan.disconnect()
-        Process.send_after(self(), :delayed_scan, 3000)
-
-      "scan_for_wireless_networks" ->
-        send(self(), :scan_for_wireless_networks)
-
-      #
-      # WebAuthn configure
-      #
-      "configure_web_authn" ->
-        send(self(), :configure_web_authn)
-
-      #
-      # The setup to configure control plane domain
-      #
-      "configure_disable_control_plane" ->
-        Tunneld.Servers.Zrok.unset_api_endpoint()
-        Tunneld.Servers.Resources.try_hibernate_shares()
-
-      #
-      # The setup to configure control plane domain
-      #
-      "configure_enable_control_plane" ->
-        Tunneld.Servers.Zrok.set_api_endpoint(data["url"])
-
-      #
-      # Configure device - enable
-      #
-      "configure_enable_environment" ->
-        Tunneld.Servers.Zrok.enable_env(data["account_token"])
-        Tunneld.Servers.Resources.try_init_local_shares()
-
-      #
-      # Configure device - disable
-      #
-      "configure_disable_environment" ->
-        Tunneld.Servers.Zrok.disable_env()
-        Tunneld.Servers.Resources.try_hibernate_shares()
-
-      #
-      # Revoke Login Credentials
-      #
-      "revoke_login_creds" ->
-        File.rm(Tunneld.Servers.Auth.path())
-        send(self(), :revoke_login_creds)
-
-      #
-      # Blocklist
-      #
-      "update_blocklist" ->
-        Tunneld.Servers.Blocklist.update()
-
-      #
-      # Resources
-      #
-      "add_share" ->
-        Tunneld.Servers.Resources.add_share(data)
-
-      "add_private_share" ->
-        Tunneld.Servers.Resources.add_access(data)
-
-      "toggle_share_access" ->
-        %{"id" => id, "enable" => enable, "kind" => kind} = Jason.decode!(data["payload"])
-
-        case kind do
-          "host" ->
-            Tunneld.Servers.Resources.toggle_share(id, enable)
-
-          "access" ->
-            Tunneld.Servers.Resources.toggle_access(id, enable)
-
-          _ ->
-            raise "Kind not found, make sure resource is setup with correct kind"
-        end
-
-      "remove_share" ->
-        %{"id" => id, "kind" => kind} = Jason.decode!(data)
-
-        case kind do
-          "host" ->
-            Tunneld.Servers.Resources.remove_share(id)
-
-          "access" ->
-            Tunneld.Servers.Resources.remove_access(id)
-
-          _ ->
-            raise "Kind not found, make sure resource is setup with correct kind"
-        end
-
-        send(self(), :close_details)
-
-      "tunneld_settings" ->
-        Tunneld.Servers.Resources.update_share(data, :tunneld)
-
-      _ ->
-        Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-          type: :error,
-          message: "Action doesnt exist and cant be handled"
-        })
-    end
-
-    {:noreply, assign(socket, modal: %{show: false, title: nil, body: %{}, actions: nil})}
+    {:noreply, socket}
   end
 
-  #
-  # Handle clearing the flash after the delay
-  # NOTE: This will be deprecated as we dont need to clear automatically
-  # Useful if we keep a timestamp in future to decide accumulated is all shown too
-  #
-  def handle_info(:clear_flash, socket) do
-    {:noreply, clear_flash(socket)}
+  def handle_info({:action_done, ref, _action, _result}, socket) do
+    pending = Map.get(socket.assigns.pending_actions, ref, %{})
+
+    socket =
+      socket
+      |> assign(:pending_actions, Map.delete(socket.assigns.pending_actions, ref))
+      |> maybe_close_modal_after_success(pending)
+
+    {:noreply, socket}
   end
 
   #
   # handle delayed scan for wireless networks
   #
   def handle_info(:delayed_scan, socket) do
-    IO.inspect("Staring delayed scan for wireless networks")
     Tunneld.Servers.Wlan.scan_networks()
     {:noreply, socket}
   end
@@ -563,10 +556,6 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, assign(socket, :sidebar, sidebar)}
   end
 
-  #
-  # Show details - server request
-  # NOTE: we have a function to do this client side but this is a listener for the server
-  #
   def handle_info({:show_details, %{"id" => id, "type" => type}}, socket) do
     sidebar = %{
       is_open: true,
@@ -606,4 +595,379 @@ defmodule TunneldWeb.Live.Dashboard do
         :authentication
     end
   end
+
+  #
+  # Wrap actions in an async task to prevent UI hangs while tracking pending state
+  #
+  defp start_action(action, data, socket) do
+    action_ref = System.unique_integer([:positive, :monotonic])
+    parent = self()
+    schema_modal? = modal_is_schema?(socket)
+
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+      type: :info,
+      message: start_message(action)
+    })
+
+    Task.start(fn ->
+      result =
+        try do
+          {:ok, perform_action(action, data, parent)}
+        rescue
+          e -> {:error, e}
+        catch
+          kind, reason -> {:error, {kind, reason}}
+        end
+
+      send(parent, {:action_done, action_ref, action, result})
+    end)
+
+    socket =
+      socket
+      |> assign(
+        :pending_actions,
+        Map.put(socket.assigns.pending_actions, action_ref, %{
+          action: action,
+          keep_modal_open: schema_modal?
+        })
+      )
+
+    if schema_modal? do
+      socket
+    else
+      reset_modal(socket)
+    end
+  end
+
+  defp reset_modal(socket) do
+    assign(socket, :modal, %{show: false, title: nil, body: %{}, actions: nil, type: :default})
+  end
+
+  defp modal_is_schema?(socket) do
+    socket.assigns
+    |> Map.get(:modal, %{})
+    |> Map.get(:body, %{})
+    |> case do
+      %{"type" => "schema"} -> true
+      _ -> false
+    end
+  end
+
+  defp maybe_keep_modal_open(socket, %{keep_modal_open: true}) do
+    modal = Map.get(socket.assigns, :modal, %{}) |> Map.put(:show, true)
+    assign(socket, :modal, modal)
+  end
+
+  defp maybe_keep_modal_open(socket, _), do: socket
+
+  defp maybe_close_modal_after_success(socket, %{keep_modal_open: true}), do: reset_modal(socket)
+  defp maybe_close_modal_after_success(socket, _), do: socket
+
+  # Human friendly messages for pending actions
+  defp start_message(action) do
+    case action do
+      "add_share" -> "Adding resource..."
+      "add_private_share" -> "Binding private resource..."
+      "remove_share" -> "Removing resource..."
+      "toggle_share_access" -> "Updating resource access..."
+      "tunneld_settings" -> "Updating resource settings..."
+      "restart_service" -> "Restarting service..."
+      "refresh_service_logs" -> "Refreshing service logs..."
+      "revoke_release_ip" -> "Releasing device IP..."
+      "connect_to_wireless_network" -> "Connecting to Wi‑Fi..."
+      "disconnect_from_wireless_network" -> "Disconnecting Wi‑Fi..."
+      "scan_for_wireless_networks" -> "Scanning Wi‑Fi..."
+      "configure_web_authn" -> "Starting WebAuthn setup..."
+      "configure_enable_control_plane" -> "Configuring control plane..."
+      "configure_disable_control_plane" -> "Disconnecting control plane..."
+      "configure_enable_environment" -> "Enabling device..."
+      "configure_disable_environment" -> "Disabling device..."
+      "revoke_login_creds" -> "Resetting login..."
+      "update_blocklist" -> "Updating blocklist..."
+      _ -> "Working on request..."
+    end
+  end
+
+  defp perform_action(action, data, parent) do
+    case action do
+      #
+      # Device management
+      #
+      "revoke_release_ip" ->
+        %{"mac" => mac} = decode_if_needed(data)
+
+        if not is_nil(mac) do
+          Tunneld.Servers.Devices.revoke_lease(mac)
+        end
+
+      #
+      # Wireless networking
+      #
+      "connect_to_wireless_network" ->
+        decoded = decode_if_needed(data)
+        Tunneld.Servers.Wlan.connect_with_pass(decoded["ssid"], decoded["password"])
+
+      "disconnect_from_wireless_network" ->
+        Tunneld.Servers.Wlan.disconnect()
+        Process.send_after(parent, :delayed_scan, 3000)
+
+      "scan_for_wireless_networks" ->
+        send(parent, :scan_for_wireless_networks)
+
+      #
+      # WebAuthn configure
+      #
+      "configure_web_authn" ->
+        send(parent, :configure_web_authn)
+
+      #
+      # The setup to configure control plane domain
+      #
+      "configure_disable_control_plane" ->
+        Tunneld.Servers.Zrok.unset_api_endpoint()
+        Tunneld.Servers.Resources.try_hibernate_shares()
+
+      #
+      # The setup to configure control plane domain
+      #
+      "configure_enable_control_plane" ->
+        decoded = decode_if_needed(data)
+        Tunneld.Servers.Zrok.set_api_endpoint(decoded["url"])
+
+      #
+      # Configure device - enable
+      #
+      "configure_enable_environment" ->
+        decoded = decode_if_needed(data)
+        Tunneld.Servers.Zrok.enable_env(decoded["account_token"])
+        Tunneld.Servers.Resources.try_init_local_shares()
+
+      #
+      # Configure device - disable
+      #
+      "configure_disable_environment" ->
+        Tunneld.Servers.Zrok.disable_env()
+        Tunneld.Servers.Resources.try_hibernate_shares()
+
+      #
+      # Revoke Login Credentials
+      #
+      "revoke_login_creds" ->
+        File.rm(Tunneld.Servers.Auth.path())
+        send(parent, :revoke_login_creds)
+
+      #
+      # Blocklist
+      #
+      "update_blocklist" ->
+        Tunneld.Servers.Blocklist.update()
+
+      #
+      # Resources
+      #
+      "add_share" ->
+        Tunneld.Servers.Resources.add_share(decode_if_needed(data))
+
+      "add_private_share" ->
+        Tunneld.Servers.Resources.add_access(decode_if_needed(data))
+
+      "toggle_share_access" ->
+        payload =
+          data
+          |> decode_if_needed()
+          |> Map.get("payload")
+          |> decode_if_needed()
+
+        %{"id" => id, "enable" => enable, "kind" => kind} = payload
+
+        case kind do
+          "host" ->
+            Tunneld.Servers.Resources.toggle_share(id, enable)
+
+          "access" ->
+            Tunneld.Servers.Resources.toggle_access(id, enable)
+
+          _ ->
+            raise "Kind not found, make sure resource is setup with correct kind"
+        end
+
+      "remove_share" ->
+        %{"id" => id, "kind" => kind} = decode_if_needed(data)
+
+        case kind do
+          "host" ->
+            Tunneld.Servers.Resources.remove_share(id)
+
+          "access" ->
+            Tunneld.Servers.Resources.remove_access(id)
+
+          _ ->
+            raise "Kind not found, make sure resource is setup with correct kind"
+        end
+
+        send(parent, :close_details)
+
+      "tunneld_settings" ->
+        Tunneld.Servers.Resources.update_share(decode_if_needed(data), :tunneld)
+
+      "restart_service" ->
+        %{"id" => id} = decode_if_needed(data)
+        id |> String.to_atom() |> Tunneld.Servers.Services.restart_service()
+
+      "refresh_service_logs" ->
+        %{"id" => id} = decode_if_needed(data)
+        Tunneld.Servers.Services.get_service_logs(id)
+
+      _ ->
+        Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+          type: :error,
+          message: "Action doesnt exist and cant be handled"
+        })
+    end
+  end
+
+  defp rebuild_network_graph(socket) do
+    internet? = get_in(socket.assigns, [:status, :internet]) || false
+    devices = Map.get(socket.assigns, :devices, [])
+
+    assign(socket, :network_graph, build_network_graph(internet?, devices))
+  end
+
+  defp build_network_graph(internet?, devices) do
+    device_list = devices || []
+    uplink_state = if internet?, do: "enabled", else: "disabled"
+
+    base_nodes = [
+      %{
+        id: "internet",
+        label: "Internet",
+        type: "cloud",
+        pos: %{x: 0, y: -4, z: 0.2},
+        size: 1,
+        color: "#9afbff",
+        icon: %{variant: "cloud", state: "enabled"}
+      },
+      %{
+        id: "uplink",
+        label: "WiFi",
+        type: "router",
+        pos: %{x: 0, y: -1.6, z: 0.2},
+        size: 1,
+        color: "#e69df9",
+        icon: %{variant: "router", state: uplink_state}
+      },
+      %{
+        id: "gateway",
+        label: "Tunneld",
+        type: "router",
+        pos: %{x: 0, y: 0, z: 0.2},
+        size: 1,
+        color: "#a6b5fd",
+        icon: %{variant: "switch", state: "enabled"}
+      }
+    ]
+
+    device_nodes =
+      device_list
+      |> Enum.sort_by(&device_sort_key/1)
+      |> Enum.with_index()
+      |> Enum.map(fn {device, idx} ->
+        pos = device_position(idx)
+
+        %{
+          id: "device-#{idx}",
+          label: device_label(device, idx),
+          type: "device",
+          pos: pos,
+          size: 1,
+          color: "#7bfee0",
+          icon: %{variant: "device", state: "enabled"},
+          meta: device_meta(device)
+        }
+      end)
+
+    base_links =
+      if internet? do
+        [
+          %{id: "internet-uplink", from: "internet", to: "uplink", activity: 1},
+          %{id: "uplink-gateway", from: "uplink", to: "gateway", activity: 0.8}
+        ]
+      else
+        []
+      end
+
+    device_links =
+      Enum.map(device_nodes, fn device ->
+        %{id: "gateway-#{device.id}", from: "gateway", to: device.id, activity: 0.4}
+      end)
+
+    %{
+      nodes: base_nodes ++ device_nodes,
+      links: base_links ++ device_links,
+      nodeSettings: %{
+        default: [
+          %{label: "Status", value: if(internet?, do: "Online", else: "Offline")},
+          %{label: "Policy", value: "Standard"}
+        ]
+      },
+      nodeServices: %{
+        default: [
+          %{name: "Edge agent", desc: "Standard policy services", status: "online"}
+        ]
+      }
+    }
+  end
+
+  defp device_position(index) do
+    per_row = 4
+    row = div(index, per_row)
+    col = rem(index, per_row)
+
+    anchor_x = 3.2
+    anchor_y = 1.8
+    x_step = 2.05
+    y_step = 3.05
+
+    # Spread columns left; nudge rows further left to keep the cluster diagonally behind the router
+    x = anchor_x - col * x_step - row * 1.45
+    y = anchor_y + row * y_step
+
+    %{
+      x: Float.round(x, 2),
+      y: Float.round(y, 2),
+      z: 0.2
+    }
+  end
+
+  defp device_label(device, index) do
+    Map.get(device, :hostname) ||
+      Map.get(device, "hostname") ||
+      Map.get(device, :ip) ||
+      Map.get(device, "ip") ||
+      "Device #{index + 1}"
+  end
+
+  defp device_sort_key(device) do
+    (Map.get(device, :hostname) || Map.get(device, "hostname") || "") <>
+      (Map.get(device, :mac) || Map.get(device, "mac") || "") <>
+      (Map.get(device, :ip) || Map.get(device, "ip") || "")
+  end
+
+  defp device_meta(device) do
+    %{
+      ip: Map.get(device, :ip) || Map.get(device, "ip"),
+      mac: Map.get(device, :mac) || Map.get(device, "mac")
+    }
+  end
+
+  defp decode_if_needed(%{} = data), do: data
+
+  defp decode_if_needed(data) when is_binary(data) do
+    case Jason.decode(data) do
+      {:ok, decoded} -> decoded
+      _ -> %{}
+    end
+  end
+
+  defp decode_if_needed(_), do: %{}
 end

@@ -33,14 +33,8 @@ defmodule Tunneld.Servers.Session do
   @spec renew(String.t()) :: :ok | {:error, String.t()}
   def renew(id), do: GenServer.call(__MODULE__, {:renew, id})
 
-  @spec get_all() :: {:ok, map()}
-  def get_all(), do: GenServer.call(__MODULE__, :get_all)
-
   @spec delete(String.t()) :: {:ok, String.t()} | {:error, String.t()}
   def delete(id), do: GenServer.call(__MODULE__, {:delete, id})
-
-  @spec delete_all() :: {:ok, String.t()}
-  def delete_all(), do: GenServer.call(__MODULE__, :delete_all)
 
   @impl true
   def init(_) do
@@ -94,18 +88,6 @@ defmodule Tunneld.Servers.Session do
       :error ->
         {:reply, {:error, "Session not found"}, state}
     end
-  end
-
-  # Get all sessions
-  @impl true
-  def handle_call(:get_all, _from, state) do
-    {:reply, {:ok, state}, state}
-  end
-
-  # Remove all sessions
-  @impl true
-  def handle_call(:delete_all, _from, _state) do
-    {:reply, {:ok, "Removed All Sessions"}, %{}}
   end
 
   # Delete one session
