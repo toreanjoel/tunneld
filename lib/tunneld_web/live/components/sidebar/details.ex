@@ -73,6 +73,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               }
             })
           }
+          phx-click-loading="opacity-50 cursor-wait"
           class="flex grow items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md w-1/2"
         >
           <.icon name="hero-no-symbol" class="h-5 w-5" />
@@ -93,6 +94,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           phx-click="trigger_action"
           phx-value-action="configure_web_authn"
           phx-value-data={Jason.encode!(%{})}
+          phx-click-loading="opacity-50 cursor-wait"
           class="flex grow items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md w-1/2"
         >
           <.icon name="hero-finger-print" class="h-5 w-5" />
@@ -144,6 +146,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               }
             })
           }
+          phx-click-loading="opacity-50 cursor-wait"
           class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
         >
           <.icon name="hero-no-symbol" class="h-5 w-5" />
@@ -275,6 +278,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               }
             })
           }
+          phx-click-loading="opacity-50 cursor-wait"
           class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
         >
           <.icon name="hero-no-symbol" class="h-5 w-5" />
@@ -295,6 +299,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               "action" => "configure_enable_control_plane"
             })
           }
+          phx-click-loading="opacity-50 cursor-wait"
           class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
         >
           <.icon class="w-4 h-4" name="hero-globe-alt" />
@@ -322,6 +327,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               }
             })
           }
+          phx-click-loading="opacity-50 cursor-wait"
           class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
         >
           <.icon name="hero-no-symbol" class="h-5 w-5" />
@@ -340,6 +346,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               "action" => "configure_enable_environment"
             })
           }
+          phx-click-loading="opacity-50 cursor-wait"
           class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
         >
           <.icon class="w-4 h-4" name="hero-link" />
@@ -376,6 +383,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           phx-click="trigger_action"
           phx-value-action="update_blocklist"
           phx-value-data={Jason.encode!(%{})}
+          phx-click-loading="opacity-50 cursor-wait"
           class="flex items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
         >
           <.icon class="w-4 h-4" name="hero-arrow-path" />
@@ -448,6 +456,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           phx-click="trigger_action"
           phx-value-action="scan_for_wireless_networks"
           phx-value-data={Jason.encode!(%{})}
+          phx-click-loading="opacity-50 cursor-wait"
           class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
         >
           <.icon class="w-4 h-4" name="hero-arrow-path" />
@@ -491,6 +500,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                   phx-click="trigger_action"
                   phx-value-action="disconnect_from_wireless_network"
                   phx-value-data={Jason.encode!(%{})}
+                  phx-click-loading="opacity-50 cursor-wait"
                   class="flex items-center justify-center gap-1 bg-secondary p-2 cursor-pointer rounded-md"
                 >
                   <div class="truncate text-xs text-gray-1">disconnect</div>
@@ -511,6 +521,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                       "action" => "connect_to_wireless_network"
                     })
                   }
+                  phx-click-loading="opacity-50 cursor-wait"
                   class="flex items-center justify-center gap-1 bg-secondary p-2 cursor-pointer rounded-md"
                 >
                   <div class="truncate text-xs text-gray-1">connect</div>
@@ -587,6 +598,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           phx-click="trigger_action"
           phx-value-action="refresh_service_logs"
           phx-value-data={Jason.encode!(%{ "id" => Map.get(@service, :id)})}
+          phx-click-loading="opacity-50 cursor-wait"
           class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
         >
           <.icon class="w-4 h-4" name="hero-arrow-path" />
@@ -610,6 +622,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               }
             })
           }
+          phx-click-loading="opacity-50 cursor-wait"
           class="flex items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
         >
           <.icon name="hero-arrow-path" class="h-4 w-4" />

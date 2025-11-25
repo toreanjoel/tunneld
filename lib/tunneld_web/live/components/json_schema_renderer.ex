@@ -23,6 +23,7 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
     title = Map.get(assigns, :title, "Submit")
     values = Map.get(assigns, :values, %{})
     loading = Map.get(assigns, :loading, false)
+    existing_changeset = Map.get(socket.assigns, :changeset, %{})
 
     # This should allow a default of the keys that is already on the form to handle fallback order
     ui_order = Map.get(assigns.schema, "ui:order", assigns.schema["properties"] |> Map.keys())
@@ -47,6 +48,8 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
         }
       end)
 
+    changeset = if map_size(existing_changeset) > 0, do: existing_changeset, else: values
+
     {:ok,
      socket
      |> assign(title: title)
@@ -54,7 +57,8 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
      |> assign(action: assigns.action)
      |> assign(schema: schema)
      |> assign(fields: fields)
-     |> assign(changeset: values)
+     # Preserve user-entered values during re-renders (e.g., while submitting)
+     |> assign(changeset: changeset)
      |> assign(client_id: client_id)
      |> assign(errors: nil)}
   end
@@ -137,11 +141,13 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
         <div class="grow w-full" />
         <button
           type="submit"
+          disabled={@loading}
           class={"
             #{if not @loading, do: "bg-purple hover:bg-light_purple", else: "bg-light_purple"}
             text-white px-4 py-2 rounded-lg font-semibold
             transition duration-200"
           }
+          phx-disable-with="Submitting..."
         >
           <%= if @loading, do: "Loading...", else: @title %>
         </button>
@@ -156,34 +162,39 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
   @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
           {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_event("submit", %{"form" => raw_params}, socket) do
-    params =
-      socket.assigns.fields
-      |> Enum.reduce(%{}, fn field, acc ->
-        value =
-          case field.type do
-            "boolean" ->
-              # HTML checkboxes only send data when checked
-              # So if the key is present, it's checked
-              Map.has_key?(raw_params, field.name)
+    if socket.assigns.loading do
+      # Ignore duplicate submits while an action is already pending
+      {:noreply, socket}
+    else
+      params =
+        socket.assigns.fields
+        |> Enum.reduce(%{}, fn field, acc ->
+          value =
+            case field.type do
+              "boolean" ->
+                # HTML checkboxes only send data when checked
+                # So if the key is present, it's checked
+                Map.has_key?(raw_params, field.name)
 
-            _ ->
-              Map.get(raw_params, field.name)
-          end
+              _ ->
+                Map.get(raw_params, field.name)
+            end
 
-        Map.put(acc, field.name, value)
-      end)
+          Map.put(acc, field.name, value)
+        end)
 
-    case Validator.validate(socket.assigns.schema, params) do
-      :ok ->
-        Phoenix.PubSub.broadcast(Tunneld.PubSub, "modal:form:action:#{socket.assigns.client_id}", %{
-          action: socket.assigns.action,
-          data: params
-        })
+      case Validator.validate(socket.assigns.schema, params) do
+        :ok ->
+          Phoenix.PubSub.broadcast(Tunneld.PubSub, "modal:form:action:#{socket.assigns.client_id}", %{
+            action: socket.assigns.action,
+            data: params
+          })
 
-        {:noreply, assign(socket, changeset: params, errors: nil)}
+          {:noreply, assign(socket, changeset: params, errors: nil, loading: true)}
 
-      {:error, errors} ->
-        {:noreply, assign(socket, changeset: params, errors: clean_errors(errors))}
+        {:error, errors} ->
+          {:noreply, assign(socket, changeset: params, errors: clean_errors(errors), loading: false)}
+      end
     end
   end
 

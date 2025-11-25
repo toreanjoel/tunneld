@@ -49,6 +49,7 @@ defmodule TunneldWeb.Live.Components.Resources do
               "action" => "add_private_share"
             })
           }
+          phx-click-loading="opacity-50 cursor-wait"
           class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
         >
           <.icon class="w-6 h-6" name="hero-cpu-chip" />
@@ -66,6 +67,7 @@ defmodule TunneldWeb.Live.Components.Resources do
               "action" => "add_share"
             })
           }
+          phx-click-loading="opacity-50 cursor-wait"
           class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
         >
           <.icon class="w-6 h-6" name="hero-cpu-chip" />

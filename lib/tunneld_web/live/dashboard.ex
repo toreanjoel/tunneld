@@ -61,6 +61,7 @@ defmodule TunneldWeb.Live.Dashboard do
           internet: false
         }
       )
+      |> assign(:pending_actions, %{})
 
     {:ok, socket}
   end
@@ -87,6 +88,7 @@ defmodule TunneldWeb.Live.Dashboard do
         body={@modal.body}
         actions={@modal.actions}
         client_id={@client_id}
+        pending_actions={@pending_actions}
       />
     </div>
     """
@@ -240,8 +242,7 @@ defmodule TunneldWeb.Live.Dashboard do
   # Catch the toggle event to enable/disable the resources and their resources
   #
   def handle_event("toggle_share_access", params, socket) do
-    send(self(), %{action: "toggle_share_access", data: params})
-    {:noreply, socket}
+    {:noreply, start_action("toggle_share_access", params, socket)}
   end
 
   #
@@ -294,8 +295,7 @@ defmodule TunneldWeb.Live.Dashboard do
     action = params["action"]
     data = Jason.decode!(params["data"])
 
-    send(self(), %{action: action, data: data})
-    {:noreply, socket}
+    {:noreply, start_action(action, data, socket)}
   end
 
   #
@@ -369,135 +369,33 @@ defmodule TunneldWeb.Live.Dashboard do
   # handle the actions from the schema form
   #
   def handle_info(%{action: action, data: data}, socket) do
-    case action do
-      #
-      # Device management
-      #
-      "revoke_release_ip" ->
-        %{"mac" => mac} = Jason.decode!(data)
+    {:noreply, start_action(action, data, socket)}
+  end
+  #
+  # Handle the completion of an async action
+  #
+  def handle_info({:action_done, ref, _action, {:error, reason}}, socket) do
+    pending = Map.get(socket.assigns.pending_actions, ref, %{})
+    Logger.error("Action failed: #{inspect(reason)}")
 
-        if not is_nil(mac) do
-          Tunneld.Servers.Devices.revoke_lease(mac)
-        end
+    socket =
+      socket
+      |> assign(:pending_actions, Map.delete(socket.assigns.pending_actions, ref))
+      |> maybe_keep_modal_open(pending)
+      |> put_flash(:error, "Action failed, please retry.")
 
-      #
-      # Wireless networking
-      #
-      "connect_to_wireless_network" ->
-        Tunneld.Servers.Wlan.connect_with_pass(data["ssid"], data["password"])
+    {:noreply, socket}
+  end
 
-      "disconnect_from_wireless_network" ->
-        Tunneld.Servers.Wlan.disconnect()
-        Process.send_after(self(), :delayed_scan, 3000)
+  def handle_info({:action_done, ref, _action, _result}, socket) do
+    pending = Map.get(socket.assigns.pending_actions, ref, %{})
 
-      "scan_for_wireless_networks" ->
-        send(self(), :scan_for_wireless_networks)
+    socket =
+      socket
+      |> assign(:pending_actions, Map.delete(socket.assigns.pending_actions, ref))
+      |> maybe_close_modal_after_success(pending)
 
-      #
-      # WebAuthn configure
-      #
-      "configure_web_authn" ->
-        send(self(), :configure_web_authn)
-
-      #
-      # The setup to configure control plane domain
-      #
-      "configure_disable_control_plane" ->
-        Tunneld.Servers.Zrok.unset_api_endpoint()
-        Tunneld.Servers.Resources.try_hibernate_shares()
-
-      #
-      # The setup to configure control plane domain
-      #
-      "configure_enable_control_plane" ->
-        Tunneld.Servers.Zrok.set_api_endpoint(data["url"])
-
-      #
-      # Configure device - enable
-      #
-      "configure_enable_environment" ->
-        Tunneld.Servers.Zrok.enable_env(data["account_token"])
-        Tunneld.Servers.Resources.try_init_local_shares()
-
-      #
-      # Configure device - disable
-      #
-      "configure_disable_environment" ->
-        Tunneld.Servers.Zrok.disable_env()
-        Tunneld.Servers.Resources.try_hibernate_shares()
-
-      #
-      # Revoke Login Credentials
-      #
-      "revoke_login_creds" ->
-        File.rm(Tunneld.Servers.Auth.path())
-        send(self(), :revoke_login_creds)
-
-      #
-      # Blocklist
-      #
-      "update_blocklist" ->
-        Tunneld.Servers.Blocklist.update()
-
-      #
-      # Resources
-      #
-      "add_share" ->
-        Tunneld.Servers.Resources.add_share(data)
-
-      "add_private_share" ->
-        Tunneld.Servers.Resources.add_access(data)
-
-      "toggle_share_access" ->
-        %{"id" => id, "enable" => enable, "kind" => kind} = Jason.decode!(data["payload"])
-
-        case kind do
-          "host" ->
-            Tunneld.Servers.Resources.toggle_share(id, enable)
-
-          "access" ->
-            Tunneld.Servers.Resources.toggle_access(id, enable)
-
-          _ ->
-            raise "Kind not found, make sure resource is setup with correct kind"
-        end
-
-      "remove_share" ->
-        %{"id" => id, "kind" => kind} = Jason.decode!(data)
-
-        case kind do
-          "host" ->
-            Tunneld.Servers.Resources.remove_share(id)
-
-          "access" ->
-            Tunneld.Servers.Resources.remove_access(id)
-
-          _ ->
-            raise "Kind not found, make sure resource is setup with correct kind"
-        end
-
-        send(self(), :close_details)
-
-      "tunneld_settings" ->
-        Tunneld.Servers.Resources.update_share(data, :tunneld)
-
-      "restart_service" ->
-        %{ "id" => id} = Jason.decode!(data)
-        # we need to decode to a atom as the encoding is needed to pass events as strings
-        id |> String.to_atom |> Tunneld.Servers.Services.restart_service()
-
-      "refresh_service_logs" ->
-        %{"id" => id} = data
-        Tunneld.Servers.Services.get_service_logs(id)
-
-      _ ->
-        Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-          type: :error,
-          message: "Action doesnt exist and cant be handled"
-        })
-    end
-
-    {:noreply, assign(socket, modal: %{show: false, title: nil, body: %{}, actions: nil})}
+    {:noreply, socket}
   end
 
   #
@@ -615,4 +513,245 @@ defmodule TunneldWeb.Live.Dashboard do
         :authentication
     end
   end
+
+  #
+  # Wrap actions in an async task to prevent UI hangs while tracking pending state
+  #
+  defp start_action(action, data, socket) do
+    action_ref = System.unique_integer([:positive, :monotonic])
+    parent = self()
+    schema_modal? = modal_is_schema?(socket)
+
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+      type: :info,
+      message: start_message(action)
+    })
+
+    Task.start(fn ->
+      result =
+        try do
+          {:ok, perform_action(action, data, parent)}
+        rescue
+          e -> {:error, e}
+        catch
+          kind, reason -> {:error, {kind, reason}}
+        end
+
+      send(parent, {:action_done, action_ref, action, result})
+    end)
+
+    socket =
+      socket
+      |> assign(
+        :pending_actions,
+        Map.put(socket.assigns.pending_actions, action_ref, %{
+          action: action,
+          keep_modal_open: schema_modal?
+        })
+      )
+
+    if schema_modal? do
+      socket
+    else
+      reset_modal(socket)
+    end
+  end
+
+  defp reset_modal(socket) do
+    assign(socket, :modal, %{show: false, title: nil, body: %{}, actions: nil, type: :default})
+  end
+
+  defp modal_is_schema?(socket) do
+    socket.assigns
+    |> Map.get(:modal, %{})
+    |> Map.get(:body, %{})
+    |> case do
+      %{"type" => "schema"} -> true
+      _ -> false
+    end
+  end
+
+  defp maybe_keep_modal_open(socket, %{keep_modal_open: true}) do
+    modal = Map.get(socket.assigns, :modal, %{}) |> Map.put(:show, true)
+    assign(socket, :modal, modal)
+  end
+
+  defp maybe_keep_modal_open(socket, _), do: socket
+
+  defp maybe_close_modal_after_success(socket, %{keep_modal_open: true}), do: reset_modal(socket)
+  defp maybe_close_modal_after_success(socket, _), do: socket
+
+  # Human friendly messages for pending actions
+  defp start_message(action) do
+    case action do
+      "add_share" -> "Adding resource..."
+      "add_private_share" -> "Binding private resource..."
+      "remove_share" -> "Removing resource..."
+      "toggle_share_access" -> "Updating resource access..."
+      "tunneld_settings" -> "Updating resource settings..."
+      "restart_service" -> "Restarting service..."
+      "refresh_service_logs" -> "Refreshing service logs..."
+      "revoke_release_ip" -> "Releasing device IP..."
+      "connect_to_wireless_network" -> "Connecting to Wi‑Fi..."
+      "disconnect_from_wireless_network" -> "Disconnecting Wi‑Fi..."
+      "scan_for_wireless_networks" -> "Scanning Wi‑Fi..."
+      "configure_web_authn" -> "Starting WebAuthn setup..."
+      "configure_enable_control_plane" -> "Configuring control plane..."
+      "configure_disable_control_plane" -> "Disconnecting control plane..."
+      "configure_enable_environment" -> "Enabling device..."
+      "configure_disable_environment" -> "Disabling device..."
+      "revoke_login_creds" -> "Resetting login..."
+      "update_blocklist" -> "Updating blocklist..."
+      _ -> "Working on request..."
+    end
+  end
+
+  defp perform_action(action, data, parent) do
+    case action do
+      #
+      # Device management
+      #
+      "revoke_release_ip" ->
+        %{"mac" => mac} = decode_if_needed(data)
+
+        if not is_nil(mac) do
+          Tunneld.Servers.Devices.revoke_lease(mac)
+        end
+
+      #
+      # Wireless networking
+      #
+      "connect_to_wireless_network" ->
+        decoded = decode_if_needed(data)
+        Tunneld.Servers.Wlan.connect_with_pass(decoded["ssid"], decoded["password"])
+
+      "disconnect_from_wireless_network" ->
+        Tunneld.Servers.Wlan.disconnect()
+        Process.send_after(parent, :delayed_scan, 3000)
+
+      "scan_for_wireless_networks" ->
+        send(parent, :scan_for_wireless_networks)
+
+      #
+      # WebAuthn configure
+      #
+      "configure_web_authn" ->
+        send(parent, :configure_web_authn)
+
+      #
+      # The setup to configure control plane domain
+      #
+      "configure_disable_control_plane" ->
+        Tunneld.Servers.Zrok.unset_api_endpoint()
+        Tunneld.Servers.Resources.try_hibernate_shares()
+
+      #
+      # The setup to configure control plane domain
+      #
+      "configure_enable_control_plane" ->
+        decoded = decode_if_needed(data)
+        Tunneld.Servers.Zrok.set_api_endpoint(decoded["url"])
+
+      #
+      # Configure device - enable
+      #
+      "configure_enable_environment" ->
+        decoded = decode_if_needed(data)
+        Tunneld.Servers.Zrok.enable_env(decoded["account_token"])
+        Tunneld.Servers.Resources.try_init_local_shares()
+
+      #
+      # Configure device - disable
+      #
+      "configure_disable_environment" ->
+        Tunneld.Servers.Zrok.disable_env()
+        Tunneld.Servers.Resources.try_hibernate_shares()
+
+      #
+      # Revoke Login Credentials
+      #
+      "revoke_login_creds" ->
+        File.rm(Tunneld.Servers.Auth.path())
+        send(parent, :revoke_login_creds)
+
+      #
+      # Blocklist
+      #
+      "update_blocklist" ->
+        Tunneld.Servers.Blocklist.update()
+
+      #
+      # Resources
+      #
+      "add_share" ->
+        Tunneld.Servers.Resources.add_share(decode_if_needed(data))
+
+      "add_private_share" ->
+        Tunneld.Servers.Resources.add_access(decode_if_needed(data))
+
+      "toggle_share_access" ->
+        payload =
+          data
+          |> decode_if_needed()
+          |> Map.get("payload")
+          |> decode_if_needed()
+
+        %{"id" => id, "enable" => enable, "kind" => kind} = payload
+
+        case kind do
+          "host" ->
+            Tunneld.Servers.Resources.toggle_share(id, enable)
+
+          "access" ->
+            Tunneld.Servers.Resources.toggle_access(id, enable)
+
+          _ ->
+            raise "Kind not found, make sure resource is setup with correct kind"
+        end
+
+      "remove_share" ->
+        %{"id" => id, "kind" => kind} = decode_if_needed(data)
+
+        case kind do
+          "host" ->
+            Tunneld.Servers.Resources.remove_share(id)
+
+          "access" ->
+            Tunneld.Servers.Resources.remove_access(id)
+
+          _ ->
+            raise "Kind not found, make sure resource is setup with correct kind"
+        end
+
+        send(parent, :close_details)
+
+      "tunneld_settings" ->
+        Tunneld.Servers.Resources.update_share(decode_if_needed(data), :tunneld)
+
+      "restart_service" ->
+        %{"id" => id} = decode_if_needed(data)
+        id |> String.to_atom() |> Tunneld.Servers.Services.restart_service()
+
+      "refresh_service_logs" ->
+        %{"id" => id} = decode_if_needed(data)
+        Tunneld.Servers.Services.get_service_logs(id)
+
+      _ ->
+        Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+          type: :error,
+          message: "Action doesnt exist and cant be handled"
+        })
+    end
+  end
+
+  defp decode_if_needed(%{} = data), do: data
+
+  defp decode_if_needed(data) when is_binary(data) do
+    case Jason.decode(data) do
+      {:ok, decoded} -> decoded
+      _ -> %{}
+    end
+  end
+
+  defp decode_if_needed(_), do: %{}
 end
