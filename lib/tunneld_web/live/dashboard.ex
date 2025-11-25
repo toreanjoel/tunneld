@@ -4,7 +4,8 @@ defmodule TunneldWeb.Live.Dashboard do
   """
   use TunneldWeb, :live_view
   require Logger
-  alias Tunneld.Servers.{Session}
+  alias Tunneld.Servers.Session
+  alias Tunneld.Servers.Devices, as: DevicesServer
   alias TunneldWeb.Router.Helpers, as: Routes
 
   # Components
@@ -30,10 +31,18 @@ defmodule TunneldWeb.Live.Dashboard do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "modal:form:action:#{client_id}")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "status:internet")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:details")
+      Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:devices")
     end
 
     # Check the scheme and domain to make sure it is possible to show
     uri_info = get_connect_info(socket, :uri)
+    devices = DevicesServer.fetch_devices()
+    internet_status =
+      try do
+        Tunneld.Servers.Wlan.connected?()
+      rescue
+        _ -> false
+      end
 
     socket =
       socket
@@ -57,9 +66,12 @@ defmodule TunneldWeb.Live.Dashboard do
       )
       |> assign(
         status: %{
-          internet: false
+          internet: internet_status
         }
       )
+      |> assign(:devices, devices)
+      |> assign(:view_tab, :list)
+      |> assign(:network_graph, build_network_graph(internet_status, devices))
       |> assign(:pending_actions, %{})
 
     {:ok, socket}
@@ -180,7 +192,7 @@ defmodule TunneldWeb.Live.Dashboard do
         </div>
       </div>
 
-      <div class="flex flex-col mx-auto max-w-[1280px]">
+      <div class="flex flex-col mx-auto max-w-[1280px] w-[980px]">
         <%!-- Welcome section --%>
         <div>
           <.live_component id="welcome" module={Welcome} />
@@ -197,14 +209,74 @@ defmodule TunneldWeb.Live.Dashboard do
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
 
-        <%!-- Resources --%>
-        <div class="min-h-[200px]">
-          <.live_component id="resources" module={Resources} />
-        </div>
+        <%!-- IMPORTANT SECTION WHERE CHANGES WILL TAKE PLACE  --%>
+        <div class="mt-6">
+          <div class="flex flex-row items-center gap-2 mb-4">
+            <div class="flex flex-row gap-2">
+              <button
+                phx-click="set_view_tab"
+                phx-value-tab="list"
+                class={
+                  "px-4 py-2 rounded-md text-sm font-semibold border " <>
+                    if @view_tab == :list do
+                      "bg-secondary border-secondary text-white"
+                    else
+                      "bg-primary border-secondary text-gray-1"
+                    end
+                }
+              >
+                Resource List
+              </button>
+              <button
+                phx-click="set_view_tab"
+                phx-value-tab="map"
+                class={
+                  "px-4 py-2 rounded-md text-sm font-semibold border " <>
+                    if @view_tab == :map do
+                      "bg-secondary border-secondary text-white"
+                    else
+                      "bg-primary border-secondary text-gray-1"
+                    end
+                }
+              >
+                Network Map
+              </button>
+            </div>
+            <div class="flex-1" />
+            <button
+              :if={@view_tab == :map}
+              id="download-network-map" phx-hook="DownloadNetworkMap"
+              class="ml-auto px-4 py-2 rounded-md text-sm font-semibold border bg-primary border-secondary text-gray-1 hover:text-white hover:border-white transition"
+            >
+              Download map
+            </button>
+          </div>
 
-        <%!-- Devices --%>
-        <div class="min-h-[200px]">
-          <.live_component id="devices" module={Devices} />
+          <div class={"#{if @view_tab == :map, do: "hidden"}"}>
+            <div class="min-h-[200px]">
+              <.live_component id="resources" module={Resources} />
+            </div>
+
+            <div class="min-h-[200px]">
+              <.live_component id="devices" module={Devices} />
+            </div>
+          </div>
+
+          <div class={"#{if @view_tab == :list, do: "hidden"}"}>
+            <div>
+              <div
+                id="network-map"
+                class="network-board"
+                phx-hook="NetworkMap"
+                data-graph={Jason.encode!(@network_graph)}
+              >
+                <div class="loader" id="loader">
+                  <span>Loading…</span>
+                </div>
+                <canvas id="iso"></canvas>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -235,6 +307,17 @@ defmodule TunneldWeb.Live.Dashboard do
     }
 
     {:noreply, assign(socket, :sidebar, sidebar)}
+  end
+
+  def handle_event("set_view_tab", %{"tab" => tab}, socket) do
+    view_tab = if tab == "map", do: :map, else: :list
+
+    socket =
+      socket
+      |> assign(:view_tab, view_tab)
+      |> rebuild_network_graph()
+
+    {:noreply, socket}
   end
 
   #
@@ -329,6 +412,19 @@ defmodule TunneldWeb.Live.Dashboard do
   @doc """
   This will have the parent dashboard view be responsible for sending update messages to components
   """
+  def handle_info(%{id: "devices", module: TunneldWeb.Live.Components.Devices, data: data} = message, socket) do
+    send_update(message.module, id: message.id, data: message.data)
+
+    devices = Map.get(data, :devices, [])
+
+    socket =
+      socket
+      |> assign(:devices, devices)
+      |> rebuild_network_graph()
+
+    {:noreply, socket}
+  end
+
   def handle_info(%{id: id, module: module, data: data}, socket) do
     if not is_nil(id) do
       send_update(module, id: id, data: data)
@@ -348,6 +444,7 @@ defmodule TunneldWeb.Live.Dashboard do
           internet: status
         }
       )
+      |> rebuild_network_graph()
 
     {:noreply, socket}
   end
@@ -727,6 +824,143 @@ defmodule TunneldWeb.Live.Dashboard do
           message: "Action doesnt exist and cant be handled"
         })
     end
+  end
+
+  defp rebuild_network_graph(socket) do
+    internet? = get_in(socket.assigns, [:status, :internet]) || false
+    devices = Map.get(socket.assigns, :devices, [])
+
+    assign(socket, :network_graph, build_network_graph(internet?, devices))
+  end
+
+  defp build_network_graph(internet?, devices) do
+    device_list = devices || []
+    uplink_state = if internet?, do: "enabled", else: "disabled"
+
+    base_nodes = [
+      %{
+        id: "internet",
+        label: "Internet",
+        type: "cloud",
+        pos: %{x: 0, y: -4, z: 0.2},
+        size: 1,
+        color: "#8b9bff",
+        icon: %{variant: "cloud", state: "enabled"}
+      },
+      %{
+        id: "uplink",
+        label: "WiFi Upstream",
+        type: "router",
+        pos: %{x: 0, y: -1.6, z: 0.2},
+        size: 1,
+        color: "#60e8c2",
+        icon: %{variant: "router", state: uplink_state}
+      },
+      %{
+        id: "gateway",
+        label: "Tunneld Router",
+        type: "router",
+        pos: %{x: 0, y: 0, z: 0.2},
+        size: 1,
+        color: "#ffb85c",
+        icon: %{variant: "switch", state: "enabled"}
+      }
+    ]
+
+    device_nodes =
+      device_list
+      |> Enum.sort_by(&device_sort_key/1)
+      |> Enum.with_index()
+      |> Enum.map(fn {device, idx} ->
+        pos = device_position(idx, max(length(device_list), 1))
+
+        %{
+          id: "device-#{idx}",
+          label: device_label(device, idx),
+          type: "device",
+          pos: pos,
+          size: 1,
+          color: "#8b9bff",
+          icon: %{variant: "device", state: "enabled"},
+          meta: device_meta(device)
+        }
+      end)
+
+    base_links =
+      if internet? do
+        [
+          %{id: "internet-uplink", from: "internet", to: "uplink", activity: 1},
+          %{id: "uplink-gateway", from: "uplink", to: "gateway", activity: 0.8}
+        ]
+      else
+        []
+      end
+
+    device_links =
+      Enum.map(device_nodes, fn device ->
+        %{id: "gateway-#{device.id}", from: "gateway", to: device.id, activity: 0.4}
+      end)
+
+    %{
+      nodes: base_nodes ++ device_nodes,
+      links: base_links ++ device_links,
+      nodeSettings: %{
+        default: [
+          %{label: "Status", value: if(internet?, do: "Online", else: "Offline")},
+          %{label: "Policy", value: "Standard"}
+        ]
+      },
+      nodeServices: %{
+        default: [
+          %{name: "Edge agent", desc: "Standard policy services", status: "online"}
+        ]
+      }
+    }
+  end
+
+  defp device_position(index, total) do
+    # Group devices into lower-left arcs so they stay below/left of the router instead of a full ring.
+    per_ring = 6
+    ring = div(index, per_ring)
+    pos_in_ring = rem(index, per_ring)
+    arc_start = :math.pi() * 11 / 18   # ~110°
+    arc_end = :math.pi() * 19 / 18     # ~190°
+
+    remaining = max(total - ring * per_ring, 0)
+    in_ring_count = max(min(per_ring, remaining), 1)
+    t = if in_ring_count == 1, do: 0.5, else: pos_in_ring / (in_ring_count - 1)
+    angle = arc_start + (arc_end - arc_start) * t
+
+    radius = 2.1 + ring * 0.5 + min(total - 1, 12) * 0.03
+    center_x = -1.8 - ring * 0.25
+    center_y = 3.0 + ring * 0.28
+
+    %{
+      x: Float.round(center_x + :math.cos(angle) * radius, 2),
+      y: Float.round(center_y + :math.sin(angle) * radius, 2),
+      z: 0.2
+    }
+  end
+
+  defp device_label(device, index) do
+    Map.get(device, :hostname) ||
+      Map.get(device, "hostname") ||
+      Map.get(device, :ip) ||
+      Map.get(device, "ip") ||
+      "Device #{index + 1}"
+  end
+
+  defp device_sort_key(device) do
+    (Map.get(device, :hostname) || Map.get(device, "hostname") || "") <>
+      (Map.get(device, :mac) || Map.get(device, "mac") || "") <>
+      (Map.get(device, :ip) || Map.get(device, "ip") || "")
+  end
+
+  defp device_meta(device) do
+    %{
+      ip: Map.get(device, :ip) || Map.get(device, "ip"),
+      mac: Map.get(device, :mac) || Map.get(device, "mac")
+    }
   end
 
   defp decode_if_needed(%{} = data), do: data

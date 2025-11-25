@@ -139,6 +139,22 @@ defmodule Tunneld.Servers.Wlan do
     GenServer.call(__MODULE__, :disconnect)
   end
 
+  @doc "Returns true if the WLAN interface reports an active connection."
+  def connected? do
+    if Application.get_env(:tunneld, :mock_data, false) do
+      true
+    else
+      iface = Application.get_env(:tunneld, :network)[:wlan]
+
+      case System.cmd("iw", ["dev", iface, "link"]) do
+        {output, _} -> String.trim(output) != "Not connected."
+        _ -> false
+      end
+    end
+  rescue
+    _ -> false
+  end
+
   # parse the scan results that we get back from the network scanning
   defp parse_scan_result(line) do
     case String.split(line) do

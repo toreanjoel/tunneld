@@ -1,4 +1,5 @@
 import NetworkDiagram from "./network_diagram"
+import NetworkMap from "./network_map"
 import Auth from "./auth.js"
 
 // Base hooks
@@ -36,8 +37,26 @@ Hooks.CopyToClipboard = {
   },
 };
 
+/**
+ * Trigger a download of the current network map canvas.
+ */
+Hooks.DownloadNetworkMap = {
+  mounted() {
+    this.onClick = () => {
+      const target = document.getElementById("network-map");
+      if (!target) return;
+      target.dispatchEvent(new CustomEvent("network-map:download", { bubbles: true }));
+    };
+    this.el.addEventListener("click", this.onClick);
+  },
+  destroyed() {
+    this.el.removeEventListener("click", this.onClick);
+  }
+};
+
 export default {
   ...Hooks,
   Auth,
-  NetworkDiagram
+  NetworkDiagram,
+  NetworkMap
 };

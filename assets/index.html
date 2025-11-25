@@ -1,0 +1,1589 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Isometric Network Canvas</title>
+  <style>
+    :root {
+      --bg: rgb(21 24 24);
+      --bg-2: #0c0f1f;
+      --grid: rgba(255, 255, 255, 0.14);
+      --grid-bold: rgba(255, 255, 255, 0.28);
+      --card: rgb(21 24 24);
+      --border: rgba(255, 255, 255, 0.08);
+      --text: #f0f3ff;
+      --muted: #8f9bc3;
+      --accent: #8b9bff;
+      --accent-2: #60e8c2;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      color: var(--text);
+      font-family: "Space Grotesk", "DM Sans", system-ui;
+      overflow: hidden;
+    }
+
+    .pill-btn {
+      border: none;
+      background: var(--accent);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-weight: 700;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: background 150ms ease, transform 150ms ease, box-shadow 150ms ease;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.28);
+    }
+
+    .pill-btn:hover {
+      background: var(--accent-2);
+      transform: translateY(-1px);
+    }
+
+    .pill-btn:active {
+      transform: translateY(0);
+      box-shadow: 0 6px 16px rgba(0, 0, 0, 0.22);
+    }
+
+    .board {
+      position: relative;
+      flex: 1;
+      width: 100vw;
+      height: 100vh;
+      background: var(--card);
+      overflow: hidden;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+      transform-style: preserve-3d;
+      transform: perspective(1600px) rotateX(var(--tiltY, 0deg)) rotateY(var(--tiltX, 0deg));
+      transition: transform 0.35s ease;
+    }
+
+    .chrome {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding: 20px 22px;
+      pointer-events: none;
+      z-index: 6;
+    }
+
+    .title-chip {
+      pointer-events: none;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      padding: 10px 16px;
+      letter-spacing: 0.24em;
+      text-transform: uppercase;
+      font-size: 12px;
+      color: var(--muted);
+      box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.02), 0 12px 30px rgba(0, 0, 0, 0.45);
+      backdrop-filter: blur(12px);
+    }
+
+    .export-btn {
+      pointer-events: auto;
+      padding: 8px 12px;
+    }
+
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+      cursor: grab;
+    }
+
+    canvas.grabbing {
+      cursor: grabbing;
+    }
+
+    .loader {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      background: rgba(32, 33, 34, 0.96);
+      backdrop-filter: blur(5px);
+      font-size: 11px;
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      color: var(--muted);
+      z-index: 5;
+      transition: opacity 0.25s ease, visibility 0.35s ease;
+    }
+
+    .loader.hidden {
+      opacity: 0.2;
+      visibility: hidden;
+      pointer-events: none;
+    }
+
+.node-detail {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+  padding: 16px;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  z-index: 7;
+  --node-accent: var(--accent);
+    }
+
+    .node-detail.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+.node-detail::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(5, 6, 12, 0.9);
+  pointer-events: none;
+}
+
+.node-detail__card {
+  position: relative;
+  width: min(420px, 90vw);
+  background: rgba(10, 11, 18, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 18px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45);
+  z-index: 1;
+  overflow: hidden;
+  max-height: calc(100vh - 36px);
+  height: calc(100vh - 36px);
+  display: flex;
+  flex-direction: column;
+}
+
+.node-detail__card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.02);
+  pointer-events: none;
+}
+
+.node-detail__card::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 100%;
+  background: var(--node-accent);
+  opacity: 0.8;
+}
+
+.detail-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+      width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--muted);
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+  font-weight: 700;
+}
+
+.detail-close:hover {
+  background: rgba(255, 255, 255, 0.07);
+  color: var(--text);
+}
+
+.detail-pin {
+  position: absolute;
+      top: 12px;
+      right: 50px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text);
+  cursor: pointer;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.detail-pin:hover {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.node-detail__icon-wrap {
+  width: 78px;
+  height: 78px;
+  margin: 2px auto 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  display: grid;
+  place-items: center;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+}
+
+#detail-icon {
+  width: 58px;
+  height: 58px;
+}
+
+.node-detail__title {
+  text-align: left;
+  font-size: 18px;
+  font-weight: 700;
+  margin: 2px 0 6px;
+  letter-spacing: 0.02em;
+  color: var(--node-accent);
+}
+
+.node-detail__meta {
+  text-align: left;
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 12px;
+}
+
+.detail-body {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 4px;
+  overflow-y: auto;
+  max-height: 32vh;
+}
+
+.section-title {
+  font-size: 12px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.55);
+  margin-bottom: 4px;
+}
+
+    .service-list {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-right: 4px;
+    }
+
+.service-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+    .service-meta {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .service-name {
+      font-weight: 700;
+    }
+
+    .service-desc {
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--border);
+      font-size: 12px;
+    }
+
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+
+    .setting-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--border);
+    }
+
+    .setting-label {
+      color: var(--muted);
+      font-size: 13px;
+      letter-spacing: 0.02em;
+    }
+
+    .setting-value {
+      font-weight: 700;
+      color: var(--node-accent);
+    }
+
+    .pinned-tray {
+      position: absolute;
+      top: 78px;
+      right: 22px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: calc(100vh - 110px);
+      overflow-y: auto;
+      z-index: 6;
+      pointer-events: auto;
+    }
+
+.pinned-card {
+  width: 260px;
+  background: rgba(8, 9, 16, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px 12px 10px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+  position: relative;
+  overflow: hidden;
+}
+
+.pinned-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.02);
+  pointer-events: none;
+}
+
+    .pinned-title {
+      margin: 0 0 4px;
+      font-weight: 700;
+      letter-spacing: 0.01em;
+      color: var(--node-accent);
+    }
+
+    .pinned-meta {
+      margin: 0 0 8px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+.pinned-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+    .pinned-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    .pinned-quick {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 6px;
+    }
+
+    .pinned-quick-item {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      padding: 6px 8px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--border);
+    }
+
+    .pinned-close {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      width: 24px;
+      height: 24px;
+      display: grid;
+      place-items: center;
+      border-radius: 50%;
+      border: 1px solid var(--border);
+      background: rgba(255, 255, 255, 0.02);
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .pinned-close:hover {
+      color: var(--text);
+      background: rgba(255, 255, 255, 0.08);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="board" id="board">
+    <div class="chrome">
+      <!-- <div class="title-chip">Network Surface</div> -->
+      <!-- <button class="export-btn" id="export-btn">Export</button> -->
+    </div>
+    <div class="pinned-tray" id="pinned-tray"></div>
+    <div class="loader" id="loader">
+      <span>Preparing network surface…</span>
+    </div>
+    <canvas id="iso"></canvas>
+    <div class="node-detail" id="node-detail">
+      <div class="node-detail__card">
+        <button class="detail-close" id="detail-close" aria-label="Close details">×</button>
+        <button class="detail-pin" id="detail-pin" aria-label="Pin details">Pin</button>
+        <div class="node-detail__icon-wrap">
+          <canvas id="detail-icon" width="96" height="96"></canvas>
+        </div>
+        <div class="node-detail__title" id="detail-title">Select a node</div>
+        <div class="node-detail__meta" id="detail-meta">Tap a node to inspect.</div>
+        <div class="detail-body">
+          <div class="settings-list" id="detail-settings"></div>
+          <div>
+            <div class="section-title">Edge services</div>
+            <div class="service-list" id="detail-services"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = document.getElementById("iso");
+    const board = document.getElementById("board");
+    const ctx = canvas.getContext("2d");
+    const DPR = window.devicePixelRatio || 1;
+    const ISO = Math.PI / 6;
+    const COS = Math.cos(ISO);
+    const SIN = Math.sin(ISO);
+    const GRID = 96;
+    const GRID_SPAN = 64;
+    const NODE_SCALE = 0.3;
+    const NODE_HEIGHT_SCALE = 0.3;
+    const LINK_PARTICLE_FACTOR = 6;
+
+    const INTRO_STAGGER = 110;
+    const INTRO_DURATION = 650;
+
+    const palette = {
+      grid: getComputedStyle(document.documentElement).getPropertyValue("--grid") || "rgba(255,255,255,0.1)",
+      gridBold: getComputedStyle(document.documentElement).getPropertyValue("--grid-bold") || "rgba(255,255,255,0.1)",
+    };
+
+    const iconCache = new Map();
+    const iconSources = {
+      cloud: "Cloud_v2.svg",
+      router: "Access Point_v2.svg",
+      switch: "Router.svg",
+      wifi: "Access Point_v2.svg",
+      device: "Generic Device.svg",
+      camera: "Generic Device.svg",
+      sensor: "Private Resource.svg",
+      server: "Public Resource.svg",
+      default: "Generic Device.svg",
+    };
+
+    const state = {
+      scale: 1,
+      offset: { x: 0, y: 0 },
+      draggingPlane: false,
+      dragStart: { x: 0, y: 0 },
+      draggingNode: null,
+      nodeDragMoved: false,
+      planeDragMoved: false,
+    };
+
+    const detailUI = {
+      panel: document.getElementById("node-detail"),
+      title: document.getElementById("detail-title"),
+      meta: document.getElementById("detail-meta"),
+      settings: document.getElementById("detail-settings"),
+      services: document.getElementById("detail-services"),
+      icon: document.getElementById("detail-icon"),
+      close: document.getElementById("detail-close"),
+      pin: document.getElementById("detail-pin"),
+      pinnedTray: document.getElementById("pinned-tray"),
+    };
+
+    const pinnedCards = new Map();
+    let currentDetailNode = null;
+
+    function applyAccentColor(color) {
+      if (!detailUI.panel) return;
+      const fallback = getComputedStyle(document.documentElement).getPropertyValue("--accent") || "#8b9bff";
+      detailUI.panel.style.setProperty("--node-accent", (color || fallback).trim());
+    }
+
+    function settingsFor(node) {
+      return nodeSettings[node.id] || nodeSettings[node.type] || nodeSettings.default;
+    }
+
+    function servicesFor(node) {
+      return nodeServices[node.id] || nodeServices[node.type] || nodeServices.default;
+    }
+
+    function drawIconToCanvas(canvasEl, node, scale = 0.4) {
+      if (!canvasEl) return;
+      const iconCtx = canvasEl.getContext("2d");
+      if (!iconCtx) return;
+      const { width, height } = canvasEl;
+      iconCtx.setTransform(1, 0, 0, 1, 0, 0);
+      iconCtx.clearRect(0, 0, width, height);
+      iconCtx.save();
+      iconCtx.translate(width / 2, height / 2);
+      const size = Math.min(width, height) * scale;
+      iconCtx.shadowColor = "rgba(0,0,0,0.35)";
+      iconCtx.shadowBlur = 12;
+      drawVectorIcon(iconCtx, node.icon?.variant || node.type, size, {
+        stroke: "rgba(255,255,255,0.9)",
+        fill: "rgba(255,255,255,0.18)",
+        opacity: 1,
+      });
+      iconCtx.restore();
+    }
+
+    function renderDetailIcon(node) {
+      drawIconToCanvas(detailUI.icon, node, 0.42);
+    }
+
+    function renderServiceList(node) {
+      if (!detailUI.services) return;
+      detailUI.services.innerHTML = "";
+      const services = servicesFor(node);
+      services.forEach((svc) => {
+        const item = document.createElement("div");
+        item.className = "service-item";
+        const meta = document.createElement("div");
+        meta.className = "service-meta";
+        const name = document.createElement("div");
+        name.className = "service-name";
+        name.textContent = svc.name;
+        const desc = document.createElement("div");
+        desc.className = "service-desc";
+        desc.textContent = svc.desc;
+        meta.appendChild(name);
+        meta.appendChild(desc);
+        const pill = document.createElement("div");
+        pill.className = "status-pill";
+        const dot = document.createElement("span");
+        dot.className = "status-dot";
+        let statusColor = "var(--muted)";
+        if (svc.status === "online") statusColor = "#5fedc3";
+        if (svc.status === "degraded") statusColor = "#ffb85c";
+        if (svc.status === "offline") statusColor = "#ff6b7a";
+        dot.style.background = statusColor;
+        const label = document.createElement("span");
+        label.textContent = svc.status ? svc.status.replace(/^\w/, (c) => c.toUpperCase()) : "Unknown";
+        pill.appendChild(dot);
+        pill.appendChild(label);
+        item.appendChild(meta);
+        item.appendChild(pill);
+        detailUI.services.appendChild(item);
+      });
+    }
+
+    function showNodeDetail(node) {
+      if (!detailUI.panel) return;
+      currentDetailNode = node;
+      applyAccentColor(node.color);
+      renderDetailIcon(node);
+      if (detailUI.title) detailUI.title.textContent = node.label || "Node";
+      if (detailUI.meta) {
+        const stateLabel = node.icon?.state === "disabled" ? "Disabled" : "Online";
+        const typeLabel = node.type ? node.type.charAt(0).toUpperCase() + node.type.slice(1) : "Node";
+        detailUI.meta.textContent = `${typeLabel} • ${stateLabel}`;
+      }
+      if (detailUI.settings) {
+        detailUI.settings.innerHTML = "";
+        settingsFor(node).forEach((item) => {
+          const row = document.createElement("div");
+          row.className = "setting-row";
+          const label = document.createElement("div");
+          label.className = "setting-label";
+          label.textContent = item.label;
+          const value = document.createElement("div");
+          value.className = "setting-value";
+          value.textContent = item.value;
+          row.appendChild(label);
+          row.appendChild(value);
+          detailUI.settings.appendChild(row);
+        });
+      }
+      renderServiceList(node);
+      detailUI.panel.classList.add("active");
+    }
+
+    function hideNodeDetail() {
+      detailUI.panel?.classList.remove("active");
+      currentDetailNode = null;
+    }
+
+    function snapToGridCenter(value) {
+      return Math.round((value - GRID_CENTER_OFFSET) / GRID_STEP) * GRID_STEP + GRID_CENTER_OFFSET;
+    }
+
+    function snapNodePosition(node) {
+      node.pos.x = snapToGridCenter(node.pos.x);
+      node.pos.y = snapToGridCenter(node.pos.y);
+    }
+
+    const defaultNodeSettings = [
+      { label: "Status", value: "Online" },
+      { label: "Policy", value: "Standard" },
+      { label: "Notes", value: "Tap to edit" },
+    ];
+
+    const defaultNodeServices = [{ name: "Edge agent", desc: "Standard policy services", status: "online" }];
+
+    const subnetFlow = {
+      nodes: [
+        { id: "internet", label: "Internet", type: "cloud", pos: { x: 0, y: -4, z: 0.2 }, size: 1, color: "#8b9bff", icon: { variant: "cloud" } },
+        { id: "uplink", label: "WiFi Upstream", type: "router", pos: { x: 0, y: -1.6, z: 0.2 }, size: 1, color: "#60e8c2", icon: { variant: "router" } },
+        { id: "gateway", label: "Tunneld", type: "router", pos: { x: 0, y: 0, z: 0.2 }, size: 1, color: "#ffb85c", icon: { variant: "switch" } },
+        // { id: "wifi", label: "WiFi Mesh", type: "switch", pos: { x: -0.6, y: 0.5, z: 0.2 }, size: 1, color: "#76a8ff", icon: { variant: "wifi" } },
+        { id: "workstation", label: "PC", type: "device", pos: { x: -3.2, y: 1.2, z: 0.2 }, size: 1, color: "#c985ff", icon: { variant: "device" } },
+        { id: "phone", label: "Phone", type: "device", pos: { x: -0.4, y: 4.1, z: 0.2 }, size: 1, color: "#8b9bff", icon: { variant: "device" } },
+        { id: "laptop", label: "Macbook", type: "device", pos: { x: 1.4, y: 3.1, z: 0.2 }, size: 1, color: "#8b9bff", icon: { variant: "device" } },
+        { id: "tv", label: "TV", type: "device", pos: { x: 2.4, y: 2.1, z: 0.2 }, size: 1, color: "#8b9bff", icon: { variant: "device" } },
+        { id: "raspberry", label: "Raspberry Pi", type: "device", pos: { x: -1.4, y: 2.1, z: 0.2 }, size: 1, color: "#60e8c2", icon: { variant: "device" } },
+      ],
+      links: [
+        { id: "internet-uplink", from: "internet", to: "uplink", activity: 1 },
+        { id: "uplink-gateway", from: "uplink", to: "gateway", activity: 1 },
+        // { id: "gateway-wifi", from: "gateway", to: "wifi", activity: 1 },
+        { id: "gateway-tv", from: "gateway", to: "tv", activity: 0.20 },
+        { id: "gateway-phone", from: "gateway", to: "phone", activity: 0.45 },
+        { id: "gateway-laptop", from: "gateway", to: "laptop", activity: 1.9 },
+        { id: "gateway-raspberry", from: "gateway", to: "raspberry", activity: 0.9 },
+        { id: "gateway-workstation", from: "gateway", to: "workstation", activity: 0 },
+      ],
+      nodeSettings: {
+        internet: [
+          { label: "Status", value: "Healthy" },
+          { label: "Latency", value: "26 ms" },
+          { label: "Throughput", value: "3.8 Gbps" },
+          { label: "Peak (24h)", value: "6.1 Gbps" },
+        ],
+        uplink: [
+          { label: "Role", value: "Transit router" },
+          { label: "BGP sessions", value: "3" },
+          { label: "Wi‑Fi Mesh", value: "Backhaul enabled" },
+          { label: "Capacity", value: "10 Gbps" },
+        ],
+        gateway: [
+          { label: "Role", value: "Core switch" },
+          { label: "Ports active", value: "18 / 24" },
+          { label: "Utilization", value: "54%" },
+          { label: "CPU / RAM", value: "32% / 41%" },
+          { label: "Block list", value: "12 entries" },
+          { label: "Services", value: "dhcpcd · dnsmasq · ntpd" },
+        ],
+        wifi: [
+          { label: "SSID", value: "Mesh-Lab" },
+          { label: "Clients", value: "12" },
+          { label: "Backhaul", value: "2.4 Gbps" },
+          { label: "Channel", value: "149 / 80 MHz" },
+          { label: "Tx Power", value: "18 dBm" },
+        ],
+        workstation: [
+          { label: "Edge role", value: "Workspace proxy" },
+          { label: "Resources", value: "Edge services (2)" },
+          { label: "Policy", value: "Trusted" },
+        ],
+        tablet: [
+          { label: "Edge role", value: "IoT controller" },
+          { label: "Resources", value: "Edge services (1)" },
+          { label: "Policy", value: "Restricted" },
+        ],
+        tv: [
+          { label: "Edge role", value: "Media endpoint" },
+          { label: "Policy", value: "LAN only" },
+          { label: "Resources", value: "Edge services (1)" },
+        ],
+        camera: [
+          { label: "Edge role", value: "Security feed" },
+          { label: "Policy", value: "Alert mode" },
+          { label: "Resources", value: "Edge services (2)" },
+        ],
+        sensor: [
+          { label: "Edge role", value: "Env telemetry" },
+          { label: "Policy", value: "Quarantined" },
+          { label: "Resources", value: "Edge services (1)" },
+        ],
+        appliance: [
+          { label: "Role", value: "Media server" },
+          { label: "Capacity", value: "12 TB" },
+          { label: "Throughput", value: "1.3 Gbps" },
+          { label: "Resources", value: "Edge services (3)" },
+        ],
+        default: defaultNodeSettings,
+      },
+      nodeServices: {
+        internet: [
+          { name: "Transit uplink", desc: "Primary provider", status: "online" },
+          { name: "DoS shield", desc: "Edge scrubber", status: "online" },
+        ],
+        uplink: [
+          { name: "BGP session :1", desc: "Peer AS 64531", status: "online" },
+          { name: "Mesh backhaul", desc: "Wi‑Fi mesh gateway", status: "online" },
+        ],
+        gateway: [
+          { name: "dhcpcd", desc: "DHCP server", status: "online" },
+          { name: "dnsmasq", desc: "DNS / DHCP relay", status: "online" },
+          { name: "ntpd", desc: "Network time", status: "degraded" },
+        ],
+        workstation: [
+          { name: "Edge proxy", desc: "Services: media, metrics", status: "online" },
+          { name: "Agent", desc: "Policy enforcement", status: "online" },
+        ],
+        tablet: [
+          { name: "Dashboard", desc: "IoT control UI", status: "online" },
+          { name: "Proxy", desc: "Edge service shim", status: "degraded" },
+        ],
+        tv: [
+          { name: "Media proxy", desc: "Stream cache", status: "online" },
+          { name: "Captive agent", desc: "Policy client", status: "online" },
+        ],
+        camera: [
+          { name: "Stream relay", desc: "RTSP/HLS edge", status: "online" },
+          { name: "Motion AI", desc: "Event processor", status: "offline" },
+        ],
+        sensor: [
+          { name: "Telemetry", desc: "MQTT forwarder", status: "online" },
+          { name: "Policy shim", desc: "Quarantine", status: "degraded" },
+        ],
+        appliance: [
+          { name: "Media server", desc: "Plex / Jellyfin", status: "online" },
+          { name: "Transcoder", desc: "GPU offload", status: "online" },
+          { name: "Metrics", desc: "Node exporter", status: "online" },
+        ],
+        default: defaultNodeServices,
+      },
+    };
+
+    // CI/CD flow example — swap nodes/links/settings with these if you want to render the pipeline
+    const cicdFlow = {
+      nodes: [
+        { id: "developer", label: "Developer", type: "device", pos: { x: -4, y: 0, z: 0.2 }, size: 1, color: "#8b9bff", icon: { variant: "device" } },
+        { id: "github", label: "GitHub Repo", type: "cloud", pos: { x: -2, y: 0, z: 0.2 }, size: 1, color: "#f3c86d", icon: { variant: "cloud" } },
+        { id: "webhook", label: "Webhook Listener", type: "server", pos: { x: 0, y: 0, z: 0.2 }, size: 1, color: "#60e8c2", icon: { variant: "server" } },
+        { id: "builder", label: "Build Server", type: "server", pos: { x: 2, y: 0, z: 0.2 }, size: 1, color: "#76a8ff", icon: { variant: "server" } },
+        { id: "release", label: "Prealpha Installer", type: "cloud", pos: { x: 4, y: 0, z: 0.2 }, size: 1, color: "#c985ff", icon: { variant: "cloud" } },
+      ],
+      links: [
+        { id: "developer-github", from: "developer", to: "github", activity: 0.85 },
+        { id: "github-webhook", from: "github", to: "webhook", activity: 0.65 },
+        { id: "webhook-builder", from: "webhook", to: "builder", activity: 0.75 },
+        { id: "builder-release", from: "builder", to: "release", activity: 0.55 },
+      ],
+      nodeSettings: {
+        developer: [
+          { label: "Action", value: "Push commits" },
+          { label: "Branch", value: "main" },
+          { label: "Last push", value: "moments ago" },
+        ],
+        github: [
+          { label: "Repository", value: "app/installer" },
+          { label: "Events", value: "push → webhook" },
+          { label: "Status", value: "Listening" },
+        ],
+        webhook: [
+          { label: "Endpoint", value: "POST /deploy" },
+          { label: "Auth", value: "Secret token" },
+          { label: "Latency", value: "142 ms" },
+        ],
+        builder: [
+          { label: "Job", value: "Pull + compile" },
+          { label: "Artifacts", value: "Installer bundle" },
+          { label: "Result", value: "Success" },
+        ],
+        release: [
+          { label: "Channel", value: "Prealpha" },
+          { label: "Target repo", value: "Public installer" },
+          { label: "Publish", value: "Latest build" },
+        ],
+        default: defaultNodeSettings,
+      },
+      nodeServices: {
+        developer: [
+          { name: "Git client", desc: "Pushes commits", status: "online" },
+          { name: "CI hook", desc: "Triggers build", status: "online" },
+        ],
+        github: [
+          { name: "Webhook", desc: "POST to listener", status: "online" },
+          { name: "Branch protection", desc: "Checks required", status: "online" },
+        ],
+        webhook: [
+          { name: "Queue", desc: "Accepts deploy jobs", status: "online" },
+          { name: "Validator", desc: "Verifies payload", status: "online" },
+        ],
+        builder: [
+          { name: "Compiler", desc: "Build + package", status: "online" },
+          { name: "Tests", desc: "Smoke suite", status: "degraded" },
+        ],
+        release: [
+          { name: "Publish", desc: "Push to installer repo", status: "online" },
+          { name: "Tagging", desc: "Prealpha channel", status: "online" },
+        ],
+        default: defaultNodeServices,
+      },
+    };
+
+    let nodes = [];
+    let links = [];
+    let nodeSettings = {};
+    let nodeServices = {};
+
+    const NODE_GRID_SIZE = 1.5;
+    const GRID_STEP = 1;
+    // Snap nodes to the center of a grid cell: grid lines at integers, centers at +0.5
+    const GRID_CENTER_OFFSET = 1;
+
+    const iconLibrary = createIconLibrary();
+    const spriteCache = new Map();
+    const linkStreams = new Map();
+    let linkRoutes = new Map();
+    let screenCache = new Map();
+    let lastTime = performance.now();
+    let introStartTime = null;
+    let introDone = false;
+
+    function cloneGraph(data) {
+      return JSON.parse(JSON.stringify(data));
+    }
+
+    function hydrateGraph(rawGraph) {
+      if (!rawGraph) return;
+      const graph = typeof rawGraph === "string" ? JSON.parse(rawGraph) : rawGraph;
+      const loader = document.getElementById("loader");
+      const cleanedNodes = (graph.nodes || []).map((node, i) => {
+        const copy = cloneGraph(node);
+        copy.pos = copy.pos || { x: 0, y: 0, z: 0 };
+        copy.size = NODE_GRID_SIZE;
+        copy.phase = i * 0.7;
+        snapNodePosition(copy);
+        return copy;
+      });
+      nodes = cleanedNodes;
+      links = (graph.links || []).map((link) => cloneGraph(link));
+      nodeSettings = { ...(graph.nodeSettings || {}) };
+      nodeServices = { ...(graph.nodeServices || {}) };
+      if (!nodeSettings.default) nodeSettings.default = defaultNodeSettings;
+      if (!nodeServices.default) nodeServices.default = defaultNodeServices;
+      linkStreams.clear();
+      linkRoutes = new Map();
+      screenCache = new Map();
+      pinnedCards.forEach((card) => card.remove());
+      pinnedCards.clear();
+      hideNodeDetail();
+      state.scale = 1;
+      state.offset = { x: 0, y: 0 };
+      introDone = false;
+      introStartTime = null;
+      loader?.classList.remove("hidden");
+      fitScene();
+    }
+
+    window.loadGraph = hydrateGraph;
+    window.sampleGraphs = { subnet: subnetFlow, cicd: cicdFlow };
+
+
+    function resize() {
+      canvas.width = canvas.clientWidth * DPR;
+      canvas.height = canvas.clientHeight * DPR;
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    }
+
+    function isoToScreen(x, y, z = 0) {
+      const sx = (x - y) * COS * GRID;
+      const sy = (x + y) * SIN * GRID - z * GRID * 0.9;
+      return { x: sx, y: sy };
+    }
+
+    function screenToIso(pt, z = 0) {
+      const xMinusY = pt.x / (COS * GRID);
+      const xPlusY = (pt.y + z * GRID * 0.9) / (SIN * GRID);
+      const x = 0.5 * (xMinusY + xPlusY);
+      const y = x - xMinusY;
+      return { x, y };
+    }
+
+    function screenPointFromEvent(e) {
+      const rect = canvas.getBoundingClientRect();
+      return {
+        x: (e.clientX - rect.left - (canvas.clientWidth / 2 + state.offset.x)) / state.scale,
+        y: (e.clientY - rect.top - (canvas.clientHeight / 2 + state.offset.y)) / state.scale,
+      };
+    }
+
+    function withViewport(fn) {
+      ctx.save();
+      ctx.translate(canvas.clientWidth / 2 + state.offset.x, canvas.clientHeight / 2 + state.offset.y);
+      ctx.scale(state.scale, state.scale);
+      fn();
+      ctx.restore();
+    }
+
+    function clear() {
+      ctx.save();
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.restore();
+    }
+
+    function cacheNodeScreens() {
+      screenCache = new Map();
+      nodes.forEach((node) => {
+        const pos = isoToScreen(node.pos.x, node.pos.y, node.pos.z);
+        const size = node.size * GRID * NODE_SCALE;
+        const height = size * NODE_HEIGHT_SCALE;
+        screenCache.set(node.id, { x: pos.x, y: pos.y, s: size, h: height });
+      });
+    }
+
+    function nodeCenter(node) {
+      // Use ground-projected center so links ride along the grid plane.
+      const snap = snappedNodePositionData(node);
+      return isoToScreen(snap.x, snap.y, 0);
+    }
+
+    function drawFloor() {
+      // Grid floor made transparent; only grid lines remain visible.
+      return;
+    }
+
+    function drawGrid() {
+      ctx.lineWidth = 1;
+      const offset = 0; // grid lines on integer coordinates
+      for (let i = -GRID_SPAN; i <= GRID_SPAN; i++) {
+        ctx.strokeStyle = palette.grid;
+        const isoLine = i + offset;
+        const aStart = isoToScreen(-GRID_SPAN + offset, isoLine);
+        const aEnd = isoToScreen(GRID_SPAN + offset, isoLine);
+        ctx.beginPath();
+        ctx.moveTo(aStart.x, aStart.y);
+        ctx.lineTo(aEnd.x, aEnd.y);
+        ctx.stroke();
+        const bStart = isoToScreen(isoLine, -GRID_SPAN + offset);
+        const bEnd = isoToScreen(isoLine, GRID_SPAN + offset);
+        ctx.beginPath();
+        ctx.moveTo(bStart.x, bStart.y);
+        ctx.lineTo(bEnd.x, bEnd.y);
+        ctx.stroke();
+      }
+    }
+
+    function drawLinks() {
+      linkRoutes = new Map();
+      ctx.lineWidth = 2.2;
+      ctx.lineCap = "round";
+      links.forEach((link) => {
+        const startNode = nodes.find((n) => n.id === link.from);
+        const endNode = nodes.find((n) => n.id === link.to);
+        if (!startNode || !endNode) return;
+        const route = orthPath(startNode, endNode);
+        const start = nodeCenter(startNode);
+        const end = nodeCenter(endNode);
+        const points = route.map((point, i) => {
+          if (i === 0) return start;
+          if (i === route.length - 1) return end;
+          return isoToScreen(point.x, point.y, point.z);
+        });
+        ctx.strokeStyle = shade(startNode.color, 8);
+        ctx.shadowColor = "rgba(0,0,0,0.35)";
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.moveTo(points[0].x, points[0].y);
+        for (let i = 1; i < points.length; i++) {
+          ctx.lineTo(points[i].x, points[i].y);
+        }
+        ctx.stroke();
+        const segments = [];
+        let total = 0;
+        let prev = points[0];
+        for (let i = 1; i < points.length; i++) {
+          const point = points[i];
+          const seg = Math.hypot(point.x - prev.x, point.y - prev.y);
+          segments.push({ length: seg, from: prev, to: point });
+          total += seg;
+          prev = point;
+        }
+        linkRoutes.set(link.id, { points, segments, length: total });
+        ctx.fillStyle = "rgba(255,255,255,0.2)";
+        for (let i = 1; i < points.length - 1; i++) {
+          const p = points[i];
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      });
+      ctx.shadowBlur = 0;
+    }
+
+    function drawLinkParticles() {
+      ctx.save();
+      ctx.fillStyle = "rgba(255,255,255,0.85)";
+      links.forEach((link) => {
+        const route = linkRoutes.get(link.id);
+        const stream = linkStreams.get(link.id);
+        if (!route || !stream) return;
+        stream.forEach((particle) => {
+          const pos = interpolateRoute(route, particle.progress % 1);
+          if (!pos) return;
+          ctx.beginPath();
+          ctx.arc(pos.x, pos.y, 3.2, 0, Math.PI * 2);
+          ctx.fill();
+        });
+      });
+      ctx.restore();
+    }
+
+    function orthPath(a, b) {
+      const start = snappedNodePositionData(a);
+      const end = snappedNodePositionData(b);
+      if (Math.abs(start.x - end.x) < 0.001 || Math.abs(start.y - end.y) < 0.001) {
+        return [start, end];
+      }
+      const midZ = (start.z + end.z) / 2;
+      const dx = Math.abs(end.x - start.x);
+      const dy = Math.abs(end.y - start.y);
+      if (dx >= dy) {
+        // go horizontal on start row, then vertical into destination center
+        return [
+          start,
+          { x: end.x, y: start.y, z: midZ },
+          end,
+        ];
+      }
+      // go vertical on start column, then horizontal into destination center
+      return [
+        start,
+        { x: start.x, y: end.y, z: midZ },
+        end,
+      ];
+    }
+
+    function snappedNodePositionData(node) {
+      return {
+        x: snapToGridCenter(node.pos.x),
+        y: snapToGridCenter(node.pos.y),
+        z: 0, // keep routes on the grid plane
+      };
+    }
+
+    function interpolateRoute(route, t) {
+      if (!route || !route.segments.length) return null;
+      const target = route.length * t;
+      let travelled = 0;
+      for (const segment of route.segments) {
+        if (!segment.length) continue;
+        if (travelled + segment.length >= target) {
+          const ratio = (target - travelled) / segment.length;
+          return {
+            x: segment.from.x + (segment.to.x - segment.from.x) * ratio,
+            y: segment.from.y + (segment.to.y - segment.from.y) * ratio,
+          };
+        }
+        travelled += segment.length;
+      }
+      const last = route.points[route.points.length - 1];
+      return { x: last.x, y: last.y };
+    }
+
+    function drawNodes(time) {
+      let allIntroComplete = true;
+
+      nodes.forEach((node, index) => {
+        const info = screenCache.get(node.id);
+        if (!info) return;
+
+        const { x, y, s: baseS } = info;
+
+        // Defaults (no intro)
+        let s = baseS;
+        let yOffset = 0;
+        let alpha = 1;
+
+        // Intro animation: staggered scale + lift + fade
+        if (!introDone && introStartTime !== null) {
+          const elapsed = time - introStartTime - index * INTRO_STAGGER;
+          const tRaw = Math.max(0, Math.min(1, elapsed / INTRO_DURATION));
+
+          if (tRaw < 1) {
+            allIntroComplete = false;
+          }
+
+          // easeOutQuad
+          const ease = tRaw * (2 - tRaw);
+
+          const scale = 0.75 + 0.25 * ease; // 0.75 → 1
+          s = baseS * scale;
+          yOffset = (1 - ease) * 24;        // drop in from below
+          alpha = ease;                     // fade in
+        }
+
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.translate(0, yOffset);
+
+        // Icon
+        ctx.save();
+        ctx.translate(x, y);
+        renderIconForNode(node, s * 3, time);
+        ctx.restore();
+
+        // Label
+        ctx.fillStyle = "rgba(0,0,0,0.35)";
+        ctx.font = "700 13px 'Space Grotesk', system-ui";
+        ctx.textAlign = "center";
+        ctx.fillText(node.label, x, y - s * 0.9);
+
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue("--text") || "#f0f3ff";
+        ctx.fillText(node.label, x, y - s);
+
+        ctx.restore();
+      });
+
+      // When the last node finishes its intro, hide the loader
+      if (!introDone && allIntroComplete) {
+        introDone = true;
+        const loader = document.getElementById("loader");
+        if (loader) loader.classList.add("hidden");
+      }
+    }
+
+    function vectorFrame(type, options = {}) {
+      return (context, size) => drawVectorIcon(context, type, size, options);
+    }
+
+    function loadSvgIcon(src) {
+      if (iconCache.has(src)) return iconCache.get(src);
+      const img = new Image();
+      img.src = encodeURI(src);
+      iconCache.set(src, img);
+      return img;
+    }
+
+    function imageFrame(src) {
+      const img = loadSvgIcon(src);
+      return (context, size) => {
+        if (!img.complete) {
+          img.onload = () => { };
+          return;
+        }
+        const w = img.width || size;
+        const h = img.height || size;
+        const scale = size / Math.max(w, h);
+        context.drawImage(img, -w * scale * 0.5, -h * scale * 0.5, w * scale, h * scale);
+      };
+    }
+
+    function createIconLibrary() {
+      const pick = (key) => iconSources[key] || iconSources.default;
+      return {
+        cloud: { enabled: [imageFrame(pick("cloud"))], disabled: [imageFrame(pick("cloud"))], frameDuration: 800 },
+        router: { enabled: [imageFrame(pick("router"))], disabled: [imageFrame(pick("router"))], frameDuration: 800 },
+        switch: { enabled: [imageFrame(pick("switch"))], disabled: [imageFrame(pick("switch"))], frameDuration: 800 },
+        wifi: { enabled: [imageFrame(pick("wifi"))], disabled: [imageFrame(pick("wifi"))], frameDuration: 800 },
+        device: { enabled: [imageFrame(pick("device"))], disabled: [imageFrame(pick("device"))], frameDuration: 800 },
+        camera: { enabled: [imageFrame(pick("camera"))], disabled: [imageFrame(pick("camera"))], frameDuration: 800 },
+        sensor: { enabled: [imageFrame(pick("sensor"))], disabled: [imageFrame(pick("sensor"))], frameDuration: 800 },
+        server: { enabled: [imageFrame(pick("server"))], disabled: [imageFrame(pick("server"))], frameDuration: 800 },
+      };
+    }
+
+    function drawVectorIcon(context, type, size, options = {}) {
+      // No built-in vector icons; external frames are expected.
+      context;
+    }
+
+    function roundedRectPath(target, x, y, w, h, r) {
+      const radius = Math.min(r, Math.abs(w) / 2, Math.abs(h) / 2);
+      target.beginPath();
+      target.moveTo(x + radius, y);
+      target.lineTo(x + w - radius, y);
+      target.arcTo(x + w, y, x + w, y + radius, radius);
+      target.lineTo(x + w, y + h - radius);
+      target.arcTo(x + w, y + h, x + w - radius, y + h, radius);
+      target.lineTo(x + radius, y + h);
+      target.arcTo(x, y + h, x, y + h - radius, radius);
+      target.lineTo(x, y + radius);
+      target.arcTo(x, y, x + radius, y, radius);
+      target.closePath();
+    }
+
+    function ensureSpriteFrames(node) {
+      if (!node.icon?.frameSources) return null;
+      if (!spriteCache.has(node.id)) {
+        const loaded = {};
+        Object.entries(node.icon.frameSources).forEach(([state, urls]) => {
+          loaded[state] = urls.map((src) => {
+            const img = new Image();
+            img.src = src;
+            return img;
+          });
+        });
+        spriteCache.set(node.id, loaded);
+      }
+      return spriteCache.get(node.id);
+    }
+
+    function resolveIconFrames(node) {
+      const icon = node.icon || {};
+      const variant = icon.variant || node.type;
+      const state = icon.state || "enabled";
+      const library = iconLibrary[variant] || iconLibrary.device;
+      const custom = icon.frames?.[state];
+      const cachedSprites = ensureSpriteFrames(node)?.[state];
+      const frames = custom?.length
+        ? custom
+        : cachedSprites?.length
+          ? cachedSprites
+          : library?.[state] || library?.enabled;
+      const frameDuration = icon.frameDuration || library?.frameDuration || 800;
+      return { frames, frameDuration };
+    }
+
+    function renderIconForNode(node, size, time) {
+      const { frames, frameDuration } = resolveIconFrames(node);
+      if (!frames || !frames.length) return;
+      const index = Math.floor(time / frameDuration) % frames.length;
+      const frame = frames[index];
+      if (typeof frame === "function") {
+        frame(ctx, size);
+      } else if (frame instanceof HTMLImageElement && frame.complete) {
+        const w = frame.width;
+        const h = frame.height;
+        const scale = size / Math.max(w, h);
+        ctx.drawImage(frame, -w * scale * 0.5, -h * scale * 0.5, w * scale, h * scale);
+      }
+    }
+
+    function shade(hex, amt) {
+      const num = parseInt(hex.replace("#", ""), 16);
+      const r = Math.min(255, Math.max(0, (num >> 16) + amt * 2));
+      const g = Math.min(255, Math.max(0, ((num >> 8) & 0xff) + amt * 2));
+      const b = Math.min(255, Math.max(0, (num & 0xff) + amt * 2));
+      return `#${(b | (g << 8) | (r << 16)).toString(16).padStart(6, "0")}`;
+    }
+
+    function hitTest(pt) {
+      let result = null;
+      let min = Infinity;
+      screenCache.forEach((info, id) => {
+        const dx = pt.x - info.x;
+        const dy = pt.y - info.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < info.s && dist < min) {
+          result = id;
+          min = dist;
+        }
+      });
+      return result;
+    }
+
+    function fitScene() {
+      if (!nodes.length) {
+        state.offset.x = 0;
+        state.offset.y = 0;
+        return;
+      }
+      const points = nodes.map((n) => isoToScreen(n.pos.x, n.pos.y, n.pos.z));
+      const minX = Math.min(...points.map((p) => p.x));
+      const maxX = Math.max(...points.map((p) => p.x));
+      const minY = Math.min(...points.map((p) => p.y));
+      const maxY = Math.max(...points.map((p) => p.y));
+      state.offset.x = -((minX + maxX) / 2);
+      state.offset.y = -((minY + maxY) / 2) * 0.6;
+    }
+
+    function updateLinkParticles(delta) {
+      links.forEach((link) => {
+        if (!linkStreams.has(link.id)) linkStreams.set(link.id, []);
+        const stream = linkStreams.get(link.id);
+        const target = Math.max(0, Math.round((link.activity ?? 0.3) * LINK_PARTICLE_FACTOR));
+        while (stream.length < target) {
+          stream.push({ progress: Math.random(), speed: 0.18 + Math.random() * 0.25 });
+        }
+        while (stream.length > target) {
+          stream.pop();
+        }
+        stream.forEach((particle) => {
+          particle.progress += particle.speed * delta;
+          if (particle.progress > 1) particle.progress -= 1;
+        });
+      });
+    }
+
+    function render(time = 0) {
+      clear();
+      withViewport(() => {
+        cacheNodeScreens();
+        drawFloor();
+        drawGrid();
+        drawLinks();
+        drawLinkParticles();
+        drawNodes(time);
+      });
+    }
+
+    function loop(timestamp) {
+      if (introStartTime === null) {
+        introStartTime = timestamp;
+      }
+
+      const delta = (timestamp - lastTime) / 1000 || 0;
+      lastTime = timestamp;
+
+      updateLinkParticles(delta);
+      render(timestamp);
+      requestAnimationFrame(loop);
+    }
+
+
+    function setDraggingCursor(active) {
+      canvas.classList.toggle("grabbing", active);
+    }
+
+    // Disable hover tilt/pan effect to keep the view static
+    board.style.setProperty("--tiltX", "0deg");
+    board.style.setProperty("--tiltY", "0deg");
+
+    canvas.addEventListener("mousedown", (e) => {
+      const pt = screenPointFromEvent(e);
+      const hit = hitTest(pt);
+      if (hit) {
+        const node = nodes.find((n) => n.id === hit);
+        const iso = screenToIso(pt, node.pos.z);
+        state.draggingNode = { node, offset: { x: node.pos.x - iso.x, y: node.pos.y - iso.y } };
+      } else {
+        state.draggingPlane = true;
+        state.dragStart = { x: e.clientX - state.offset.x, y: e.clientY - state.offset.y };
+      }
+      state.nodeDragMoved = false;
+      state.planeDragMoved = false;
+      setDraggingCursor(true);
+    });
+
+    window.addEventListener("mousemove", (e) => {
+      if (state.draggingNode) {
+        const node = state.draggingNode.node;
+        const pt = screenPointFromEvent(e);
+        const iso = screenToIso(pt, node.pos.z);
+        node.pos.x = iso.x + state.draggingNode.offset.x;
+        node.pos.y = iso.y + state.draggingNode.offset.y;
+        state.nodeDragMoved = true;
+        return;
+      }
+      if (!state.draggingPlane) return;
+      state.planeDragMoved = true;
+      state.offset.x = e.clientX - state.dragStart.x;
+      state.offset.y = e.clientY - state.dragStart.y;
+    });
+
+    window.addEventListener("mouseup", () => {
+      const clickedNode = state.draggingNode && !state.nodeDragMoved ? state.draggingNode.node : null;
+      const clickedPlane = state.draggingPlane && !state.planeDragMoved;
+      if (state.draggingNode) {
+        snapNodePosition(state.draggingNode.node);
+      }
+      state.draggingPlane = false;
+      state.draggingNode = null;
+      state.nodeDragMoved = false;
+      state.planeDragMoved = false;
+      setDraggingCursor(false);
+      if (clickedNode) {
+        showNodeDetail(clickedNode);
+      } else if (clickedPlane) {
+        hideNodeDetail();
+      }
+    });
+
+    canvas.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const delta = -e.deltaY * 0.0015;
+      const next = Math.min(2.6, Math.max(0.4, state.scale * (1 + delta)));
+      const pt = screenPointFromEvent(e);
+      state.offset.x -= pt.x * (next - state.scale);
+      state.offset.y -= pt.y * (next - state.scale);
+      state.scale = next;
+    }, { passive: false });
+
+    canvas.addEventListener("dblclick", () => {
+      state.scale = 1;
+      fitScene();
+    });
+
+    // document.getElementById("export-btn").addEventListener("click", () => {
+    //   const link = document.createElement("a");
+    //   link.href = canvas.toDataURL("image/png");
+    //   link.download = "network-map.png";
+    //   link.click();
+    // });
+
+    detailUI.close?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      hideNodeDetail();
+    });
+
+    detailUI.pin?.addEventListener("click", () => {
+      if (currentDetailNode) pinNode(currentDetailNode);
+    });
+
+    detailUI.panel?.addEventListener("click", (e) => {
+      if (e.target === detailUI.panel) hideNodeDetail();
+    });
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") hideNodeDetail();
+    });
+
+    window.setNodeState = (id, nextState = "enabled") => {
+      const node = nodes.find((n) => n.id === id);
+      if (!node) return;
+      node.icon = node.icon || {};
+      node.icon.state = nextState;
+    };
+
+    window.useSpriteFrames = (id, stateName, urls, frameDuration = 600) => {
+      const node = nodes.find((n) => n.id === id);
+      if (!node) return;
+      node.icon = node.icon || {};
+      node.icon.frameDuration = frameDuration;
+      node.icon.frameSources = node.icon.frameSources || {};
+      node.icon.frameSources[stateName] = urls;
+      spriteCache.delete(node.id);
+      ensureSpriteFrames(node);
+    };
+
+    window.setLinkActivity = (linkId, value) => {
+      const link = links.find((l) => l.id === linkId);
+      if (!link) return;
+      link.activity = Math.max(0, value);
+      linkStreams.delete(linkId);
+    };
+
+    function pinNode(node) {
+      if (!detailUI.pinnedTray || pinnedCards.has(node.id)) return;
+      const card = document.createElement("div");
+      card.className = "pinned-card";
+      card.style.setProperty("--node-accent", node.color || "#8b9bff");
+      const close = document.createElement("button");
+      close.className = "pinned-close";
+      close.textContent = "×";
+      close.addEventListener("click", () => {
+        pinnedCards.delete(node.id);
+        card.remove();
+      });
+      const row = document.createElement("div");
+      row.className = "pinned-row";
+      const iconWrap = document.createElement("div");
+      iconWrap.className = "pinned-icon";
+      const iconCanvas = document.createElement("canvas");
+      iconCanvas.width = 48;
+      iconCanvas.height = 48;
+      drawIconToCanvas(iconCanvas, node, 0.42);
+      iconWrap.appendChild(iconCanvas);
+      const titleWrap = document.createElement("div");
+      const title = document.createElement("h4");
+      title.className = "pinned-title";
+      title.textContent = node.label || "Node";
+      const meta = document.createElement("p");
+      meta.className = "pinned-meta";
+      const stateLabel = node.icon?.state === "disabled" ? "Disabled" : "Online";
+      meta.textContent = `${(node.type || "Node").toUpperCase()} • ${stateLabel}`;
+      titleWrap.appendChild(title);
+      titleWrap.appendChild(meta);
+      row.appendChild(iconWrap);
+      row.appendChild(titleWrap);
+      const quick = document.createElement("div");
+      quick.className = "pinned-quick";
+      settingsFor(node).slice(0, 3).forEach((item) => {
+        const q = document.createElement("div");
+        q.className = "pinned-quick-item";
+        const l = document.createElement("span");
+        l.textContent = item.label;
+        const v = document.createElement("span");
+        v.textContent = item.value;
+        q.appendChild(l);
+        q.appendChild(v);
+        quick.appendChild(q);
+      });
+      card.appendChild(close);
+      card.appendChild(row);
+      card.appendChild(quick);
+      detailUI.pinnedTray.appendChild(card);
+      pinnedCards.set(node.id, card);
+    }
+
+    resize();
+    window.loadGraph(subnetFlow);
+    window.addEventListener("resize", () => {
+      resize();
+      fitScene();
+    });
+    requestAnimationFrame(loop);
+  </script>
+</body>
+
+</html>
