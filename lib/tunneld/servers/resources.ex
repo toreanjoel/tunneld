@@ -4,9 +4,11 @@ defmodule Tunneld.Servers.Resources do
   """
   use GenServer
   require Logger
-  alias Tunneld.Servers.Zrok
+  alias Tunneld.Servers.{Nginx, Zrok}
 
   @interval 10_000
+  @nginx_ip "127.0.0.1"
+  @nginx_port "18000"
 
   @broadcast_topic_main "component:resources"
   @broadcast_topic "component:details"
@@ -33,23 +35,35 @@ defmodule Tunneld.Servers.Resources do
         _ -> []
       end
 
-    exists =
-      Enum.find(resources, fn item ->
-        item["port"] === resource["port"] and item["ip"] === resource["ip"]
-      end)
+    exists = Enum.find(resources, fn item -> item["name"] === resource["name"] end)
 
     state =
       if is_nil(exists) do
+        pool = normalize_pool(resource)
+
         new_share =
           resource
+          |> Map.put("ip", @nginx_ip)
+          |> Map.put("port", @nginx_port)
+          |> Map.put("pool", pool)
           |> Map.merge(%{
             "id" => DateTime.utc_now() |> DateTime.to_unix() |> to_string,
             "kind" => "host",
             "tunneld" => %{}
           })
 
+        new_share =
+          if Map.has_key?(resource, "tunneld") do
+            # In case a caller already included metadata, we still ensure our defaults
+            Map.put(new_share, "tunneld", Map.get(resource, "tunneld"))
+          else
+            new_share
+          end
+
         with {:ok, reserve_meta} <- create_reserved_and_units(new_share),
-             u_nodes <- resources ++ [Map.merge(new_share, %{"tunneld" => reserve_meta})],
+             configured_share <- Map.merge(new_share, %{"tunneld" => reserve_meta}),
+             :ok <- Nginx.upsert_resource_config(configured_share),
+             u_nodes <- resources ++ [configured_share],
              :ok <- File.write(path(), Jason.encode!(u_nodes)) do
           Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
             type: :info,
@@ -70,7 +84,7 @@ defmodule Tunneld.Servers.Resources do
       else
         Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
           type: :error,
-          message: "Only one resource instance allowed at a time"
+          message: "Resource name already exists"
         })
 
         state
@@ -163,8 +177,8 @@ defmodule Tunneld.Servers.Resources do
         resources
         |> Enum.each(fn s ->
           name = s["name"]
-          ip = s["ip"]
-          port = s["port"]
+          ip = Map.get(s, "ip", @nginx_ip)
+          port = Map.get(s, "port", @nginx_port)
 
           base = sanitize_base(name)
           pub_token = make_token(base, "pub")
@@ -172,6 +186,9 @@ defmodule Tunneld.Servers.Resources do
 
           Zrok.reserve_public(pub_token, ip, port)
           Zrok.reserve_private(priv_token, ip, port)
+
+          # Ensure nginx config is present on boot/resync
+          _ = ensure_nginx_config(s)
         end)
       end
     rescue
@@ -534,6 +551,8 @@ defmodule Tunneld.Servers.Resources do
             _ ->
               :ok
           end
+
+        _ = Nginx.remove_resource_config(id)
       end
 
     updated_nodes = Enum.reject(data, fn resource -> resource["id"] === id end)
@@ -588,8 +607,8 @@ defmodule Tunneld.Servers.Resources do
 
   defp create_reserved_and_units(new_share) do
     name = new_share["name"]
-    ip = new_share["ip"]
-    port = new_share["port"]
+    ip = Map.get(new_share, "ip", @nginx_ip)
+    port = Map.get(new_share, "port", @nginx_port)
 
     base = sanitize_base(name)
     pub_token = make_token(base, "pub")
@@ -673,7 +692,7 @@ defmodule Tunneld.Servers.Resources do
       {ip, port} =
         case kind do
           "access" -> parse_bind(s["bind"])
-          _ -> {s["ip"], s["port"]}
+          _ -> {s["ip"] || @nginx_ip, s["port"] || @nginx_port}
         end
 
       %{
@@ -682,6 +701,7 @@ defmodule Tunneld.Servers.Resources do
         ip: ip,
         description: s["description"],
         port: port,
+        pool: Map.get(s, "pool", []),
         status: (ip && port && port_busy?(ip, port)) || false,
         tunneld: s["tunneld"],
         kind: kind
@@ -712,6 +732,21 @@ defmodule Tunneld.Servers.Resources do
     end
   end
 
+  defp normalize_pool(resource) when is_map(resource) do
+    pool =
+      cond do
+        is_list(resource["pool"]) -> resource["pool"]
+        is_binary(resource["pool"]) -> [String.trim(resource["pool"])]
+        is_list(resource[:pool]) -> resource[:pool]
+        is_binary(resource[:pool]) -> [String.trim(resource[:pool])]
+        true -> []
+      end
+
+    pool
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+  end
+
   def read_file() do
     case path() |> File.read() do
       {:ok, data} ->
@@ -722,6 +757,16 @@ defmodule Tunneld.Servers.Resources do
 
       {:error, reason} ->
         {:error, "There was a problem reading the file: #{inspect(reason)}"}
+    end
+  end
+
+  defp ensure_nginx_config(resource) do
+    case Map.get(resource, "pool") do
+      pool when is_list(pool) and length(pool) > 0 ->
+        Nginx.upsert_resource_config(resource)
+
+      _ ->
+        :ok
     end
   end
 

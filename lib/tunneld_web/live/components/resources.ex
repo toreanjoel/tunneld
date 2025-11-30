@@ -44,7 +44,9 @@ defmodule TunneldWeb.Live.Components.Resources do
               "type" => "schema",
               "data" => Tunneld.Schema.Resource.data(:add_private),
               "default_values" => %{
-                "ip" => "0.0.0.0"
+                "ip" => "127.0.0.1",
+                "port" => "18000",
+                "pool" => []
               },
               "action" => "add_private_share"
             })
@@ -63,7 +65,11 @@ defmodule TunneldWeb.Live.Components.Resources do
             Jason.encode!(%{
               "type" => "schema",
               "data" => Tunneld.Schema.Resource.data(:add_public),
-              "default_values" => %{},
+              "default_values" => %{
+                "ip" => "127.0.0.1",
+                "port" => "18000",
+                "pool" => []
+              },
               "action" => "add_share"
             })
           }
