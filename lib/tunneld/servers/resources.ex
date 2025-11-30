@@ -4,9 +4,11 @@ defmodule Tunneld.Servers.Resources do
   """
   use GenServer
   require Logger
-  alias Tunneld.Servers.Zrok
+  alias Tunneld.Servers.{Nginx, Zrok}
 
   @interval 10_000
+  @nginx_ip "127.0.0.1"
+  @nginx_port "18000"
 
   @broadcast_topic_main "component:resources"
   @broadcast_topic "component:details"
@@ -33,23 +35,35 @@ defmodule Tunneld.Servers.Resources do
         _ -> []
       end
 
-    exists =
-      Enum.find(resources, fn item ->
-        item["port"] === resource["port"] and item["ip"] === resource["ip"]
-      end)
+    exists = Enum.find(resources, fn item -> item["name"] === resource["name"] end)
 
     state =
       if is_nil(exists) do
+        pool = normalize_pool(resource)
+
         new_share =
           resource
+          |> Map.put("ip", @nginx_ip)
+          |> Map.put("port", @nginx_port)
+          |> Map.put("pool", pool)
           |> Map.merge(%{
             "id" => DateTime.utc_now() |> DateTime.to_unix() |> to_string,
             "kind" => "host",
             "tunneld" => %{}
           })
 
+        new_share =
+          if Map.has_key?(resource, "tunneld") do
+            # In case a caller already included metadata, we still ensure our defaults
+            Map.put(new_share, "tunneld", Map.get(resource, "tunneld"))
+          else
+            new_share
+          end
+
         with {:ok, reserve_meta} <- create_reserved_and_units(new_share),
-             u_nodes <- resources ++ [Map.merge(new_share, %{"tunneld" => reserve_meta})],
+             configured_share <- Map.merge(new_share, %{"tunneld" => reserve_meta}),
+             :ok <- Nginx.upsert_resource_config(configured_share),
+             u_nodes <- resources ++ [configured_share],
              :ok <- File.write(path(), Jason.encode!(u_nodes)) do
           Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
             type: :info,
@@ -70,7 +84,7 @@ defmodule Tunneld.Servers.Resources do
       else
         Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
           type: :error,
-          message: "Only one resource instance allowed at a time"
+          message: "Resource name already exists"
         })
 
         state
@@ -90,7 +104,7 @@ defmodule Tunneld.Servers.Resources do
     id = new_id <> "acc"
 
     name = access["name"] || access[:name] || "access-" <> new_id
-    ip = access["ip"] || access[:ip]
+    ip = "0.0.0.0"
     port = access["port"] || access[:port]
 
     if is_binary(ip) and ip != "" and is_binary(port) and port != "" do
@@ -163,8 +177,8 @@ defmodule Tunneld.Servers.Resources do
         resources
         |> Enum.each(fn s ->
           name = s["name"]
-          ip = s["ip"]
-          port = s["port"]
+          ip = Map.get(s, "ip", @nginx_ip)
+          port = Map.get(s, "port", @nginx_port)
 
           base = sanitize_base(name)
           pub_token = make_token(base, "pub")
@@ -172,6 +186,9 @@ defmodule Tunneld.Servers.Resources do
 
           Zrok.reserve_public(pub_token, ip, port)
           Zrok.reserve_private(priv_token, ip, port)
+
+          # Ensure nginx config is present on boot/resync
+          _ = ensure_nginx_config(s)
         end)
       end
     rescue
@@ -411,13 +428,20 @@ defmodule Tunneld.Servers.Resources do
                   updated_shares
                   |> Enum.find(&(&1["id"] == resource["id"]))
                   |> then(fn s ->
+                    pool = Map.get(s, "pool", [])
+                    mock? = Application.get_env(:tunneld, :mock_data, false)
+                    kind = s["kind"] || "host"
+                    health = if kind == "host", do: pool_health(pool, mock?), else: %{status: :not_applicable}
+
                     %{
                       id: s["id"],
                       name: s["name"],
                       ip: s["ip"],
                       description: s["description"],
                       port: s["port"],
-                      status: port_busy?(s["ip"], s["port"]),
+                      status: Map.get(s, "status", false),
+                      pool: pool,
+                      health: health,
                       tunneld: s["tunneld"],
                       kind: s["kind"]
                     }
@@ -452,53 +476,131 @@ defmodule Tunneld.Servers.Resources do
     end
   end
 
+  def handle_cast({:update_share, :resource, data}, state) do
+    {_, raw} = read_file()
+    resources = if raw == "", do: [], else: raw
+
+    resource = Enum.find(resources, fn r -> r["id"] == data["id"] end)
+
+    cond do
+      is_nil(resource) ->
+        Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+          type: :error,
+          message: "Resource not found"
+        })
+
+        {:noreply, state}
+
+      resource["kind"] != "host" ->
+        Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+          type: :error,
+          message: "Only host resources can be edited"
+        })
+
+        {:noreply, state}
+
+      true ->
+        pool = normalize_pool(data)
+
+        updated_resource =
+          resource
+          |> Map.put("description", data["description"] || resource["description"] || "")
+          |> Map.put("pool", pool)
+          |> Map.put("ip", @nginx_ip)
+          |> Map.put("port", @nginx_port)
+
+        updated_shares =
+          Enum.map(resources, fn r ->
+            if r["id"] == resource["id"] do
+              updated_resource
+            else
+              r
+            end
+          end)
+
+        case File.write(path(), Jason.encode!(updated_shares)) do
+          :ok ->
+            _ = ensure_nginx_config(updated_resource)
+
+            Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+              type: :info,
+              message: "Resource updated successfully"
+            })
+
+            broadcast_shares()
+
+            Phoenix.PubSub.broadcast(
+              Tunneld.PubSub,
+              "show_details",
+              {:show_details, %{"id" => data["id"], "type" => "resource"}}
+            )
+
+            {:noreply, Map.put(state, :resources, updated_shares)}
+
+          {:error, err} ->
+            Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+              type: :error,
+              message: "Failed to update resource: #{inspect(err)}"
+            })
+
+            {:noreply, state}
+        end
+    end
+
+    {:noreply, state}
+  end
+
   def handle_cast({:update_share, type, data}, state) do
     resources = fetch_shares()
 
-    if !Enum.empty?(resources) do
-      resource =
-        Enum.filter(resources, fn resource ->
-          resource.id === data["id"] or resource["id"] === data["id"]
-        end)
-        |> Enum.at(0)
+    cond do
+      Enum.empty?(resources) ->
+        {:noreply, state}
 
-      updated_shares =
-        case type do
-          :tunneld ->
-            Enum.map(resources, fn a ->
-              if a.id === resource.id do
-                Map.put(a, :tunneld, data)
-              else
-                a
-              end
-            end)
+      true ->
+        resource =
+          Enum.filter(resources, fn resource ->
+            resource.id === data["id"] or resource["id"] === data["id"]
+          end)
+          |> Enum.at(0)
 
-          _ ->
-            Logger.error("Tried to set settings with an unhandled type")
-            resources
+        updated_shares =
+          case type do
+            :tunneld ->
+              Enum.map(resources, fn a ->
+                if a.id === resource.id do
+                  Map.put(a, :tunneld, data)
+                else
+                  a
+                end
+              end)
+
+            _ ->
+              Logger.error("Tried to set settings with an unhandled type")
+              resources
+          end
+
+        case File.write(path(), Jason.encode!(updated_shares)) do
+          :ok ->
+            Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+              type: :info,
+              message: "Resource updated successfully"
+            })
+
+            broadcast_shares()
+
+            Phoenix.PubSub.broadcast(
+              Tunneld.PubSub,
+              "show_details",
+              {:show_details, %{"id" => data["id"], "type" => "resource"}}
+            )
+
+          {:error, err} ->
+            Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+              type: :error,
+              message: "Failed to update resource: #{inspect(err)}"
+            })
         end
-
-      case File.write(path(), Jason.encode!(updated_shares)) do
-        :ok ->
-          Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-            type: :info,
-            message: "Resource updated successfully"
-          })
-
-          broadcast_shares()
-
-          Phoenix.PubSub.broadcast(
-            Tunneld.PubSub,
-            "show_details",
-            {:show_details, %{"id" => data["id"], "type" => "resource"}}
-          )
-
-        {:error, err} ->
-          Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-            type: :error,
-            message: "Failed to update resource: #{inspect(err)}"
-          })
-      end
     end
 
     {:noreply, state}
@@ -534,6 +636,8 @@ defmodule Tunneld.Servers.Resources do
             _ ->
               :ok
           end
+
+        _ = Nginx.remove_resource_config(id)
       end
 
     updated_nodes = Enum.reject(data, fn resource -> resource["id"] === id end)
@@ -588,8 +692,8 @@ defmodule Tunneld.Servers.Resources do
 
   defp create_reserved_and_units(new_share) do
     name = new_share["name"]
-    ip = new_share["ip"]
-    port = new_share["port"]
+    ip = Map.get(new_share, "ip", @nginx_ip)
+    port = Map.get(new_share, "port", @nginx_port)
 
     base = sanitize_base(name)
     pub_token = make_token(base, "pub")
@@ -664,16 +768,30 @@ defmodule Tunneld.Servers.Resources do
   end
 
   def fetch_shares() do
+    mock? = Application.get_env(:tunneld, :mock_data, false)
     {_status, data} = read_file()
     resources = if data == "", do: [], else: data
 
     Enum.map(resources, fn s ->
       kind = s["kind"] || "host"
+      pool = Map.get(s, "pool", [])
 
       {ip, port} =
         case kind do
           "access" -> parse_bind(s["bind"])
-          _ -> {s["ip"], s["port"]}
+          _ -> {s["ip"] || @nginx_ip, s["port"] || @nginx_port}
+        end
+
+      health =
+        case kind do
+          "host" -> pool_health(pool, mock?)
+          _ -> %{status: :not_applicable}
+        end
+
+      status_bool =
+        case health[:status] do
+          :all_up -> true
+          _ -> false
         end
 
       %{
@@ -682,27 +800,13 @@ defmodule Tunneld.Servers.Resources do
         ip: ip,
         description: s["description"],
         port: port,
-        status: (ip && port && port_busy?(ip, port)) || false,
+        pool: pool,
+        status: status_bool,
+        health: health,
         tunneld: s["tunneld"],
         kind: kind
       }
     end)
-  end
-
-  def port_busy?(ip, port) do
-    case :gen_tcp.connect(
-           String.to_charlist(ip),
-           port |> String.to_integer(),
-           [:binary, active: false],
-           2000
-         ) do
-      {:ok, socket} ->
-        :gen_tcp.close(socket)
-        true
-
-      {:error, _reason} ->
-        false
-    end
   end
 
   def create_file() do
@@ -710,6 +814,21 @@ defmodule Tunneld.Servers.Resources do
       :ok -> {:ok, "Resources file created"}
       {:error, reason} -> {:error, "Failed to create Resources file: #{inspect(reason)}"}
     end
+  end
+
+  defp normalize_pool(resource) when is_map(resource) do
+    pool =
+      cond do
+        is_list(resource["pool"]) -> resource["pool"]
+        is_binary(resource["pool"]) -> [String.trim(resource["pool"])]
+        is_list(resource[:pool]) -> resource[:pool]
+        is_binary(resource[:pool]) -> [String.trim(resource[:pool])]
+        true -> []
+      end
+
+    pool
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
   end
 
   def read_file() do
@@ -722,6 +841,16 @@ defmodule Tunneld.Servers.Resources do
 
       {:error, reason} ->
         {:error, "There was a problem reading the file: #{inspect(reason)}"}
+    end
+  end
+
+  defp ensure_nginx_config(resource) do
+    case Map.get(resource, "pool") do
+      pool when is_list(pool) and length(pool) > 0 ->
+        Nginx.upsert_resource_config(resource)
+
+      _ ->
+        :ok
     end
   end
 
@@ -745,9 +874,67 @@ defmodule Tunneld.Servers.Resources do
   def update_share(data, :tunneld),
     do: GenServer.cast(__MODULE__, {:update_share, :tunneld, data})
 
+  def update_share(data, :resource),
+    do: GenServer.cast(__MODULE__, {:update_share, :resource, data})
+
   def file_exists?(), do: File.exists?(path())
 
   def path(), do: Path.join(config_fs(:root), config_fs(:resources))
+
+  defp pool_health(pool, true) when is_list(pool) do
+    %{status: :mock, total: length(pool), up: nil}
+  end
+
+  defp pool_health(pool, false) when is_list(pool) do
+    totals =
+      pool
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.reduce(%{total: 0, up: 0}, fn entry, acc ->
+        case String.split(entry, ":", parts: 2) do
+          [ip, port_str] ->
+            total = acc.total + 1
+
+            up =
+              case Integer.parse(port_str) do
+                {port, _} ->
+                  if backend_up?(ip, port), do: acc.up + 1, else: acc.up
+
+                _ ->
+                  acc.up
+              end
+
+            %{acc | total: total, up: up}
+
+          _ ->
+            acc
+        end
+      end)
+
+    status =
+      cond do
+        totals.total == 0 -> :empty
+        totals.up == 0 -> :none
+        totals.up == totals.total -> :all_up
+        true -> :partial
+      end
+
+    Map.put(totals, :status, status)
+  end
+
+  defp pool_health(_, _), do: %{status: :empty, total: 0, up: 0}
+
+  defp backend_up?(ip, port) do
+    case :gen_tcp.connect(String.to_charlist(ip), port, [:binary, active: false], 1500) do
+      {:ok, socket} ->
+        :gen_tcp.close(socket)
+        true
+
+      _ ->
+        false
+    end
+  end
+
   defp config_fs(key) do
     case Application.get_env(:tunneld, :fs) do
       kw when is_list(kw) -> Keyword.get(kw, key)

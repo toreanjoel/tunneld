@@ -768,6 +768,9 @@ defmodule TunneldWeb.Live.Dashboard do
       "add_share" ->
         Tunneld.Servers.Resources.add_share(decode_if_needed(data))
 
+      "update_share" ->
+        Tunneld.Servers.Resources.update_share(decode_if_needed(data), :resource)
+
       "add_private_share" ->
         Tunneld.Servers.Resources.add_access(decode_if_needed(data))
 

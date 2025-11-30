@@ -13,7 +13,7 @@ defmodule Tunneld.Schema.Resource do
       "description" =>
         "Register a LAN device and port for this resource. (Internal, shown on the dashboard.)",
       "type" => "object",
-      "ui:order" => ["name", "description", "ip", "port"],
+      "ui:order" => ["name", "description", "pool", "ip", "port"],
       "properties" => %{
         "name" => %{
           "type" => "string",
@@ -30,20 +30,33 @@ defmodule Tunneld.Schema.Resource do
             "Only for your own context on the dashboard (e.g., owner, purpose, login URL).",
           "ui:widget" => "textarea"
         },
+        "pool" => %{
+          "type" => "array",
+          "description" =>
+            "Backend servers for this resource (IP:PORT per line). Both public and private use the same pool.",
+          "ui:help" =>
+            "Example: 10.0.10.44:8001. Add each backend on its own line; leave blank lines out.",
+          "items" => %{
+            "type" => "string",
+            "pattern" => "^[^\\s:]+:[0-9]{1,5}$"
+          },
+          "minItems" => 1
+        },
         "ip" => %{
           "type" => "string",
-          "description" => "IP address of the LAN device running the application.",
-          "ui:help" =>
-            "Example: 192.168.1.50. This is the local IP address of a device on the network running the resource",
-          "minLength" => 1
+          "default" => "127.0.0.1",
+          "format" => "ipv4",
+          "ui:widget" => "hidden",
+          "readOnly" => true
         },
         "port" => %{
           "type" => "string",
-          "description" => "Port on that device where the application is listening.",
-          "ui:help" => "Examples: 8000. The port you have the running application instance on"
+          "default" => "18000",
+          "ui:widget" => "hidden",
+          "readOnly" => true
         }
       },
-      "required" => ["ip", "port", "name"]
+      "required" => ["ip", "port", "name", "pool"]
     }
   end
 
@@ -54,7 +67,7 @@ defmodule Tunneld.Schema.Resource do
       "description" =>
         "Connect this gateway to a private reserved resource (you were given its name).",
       "type" => "object",
-      "ui:order" => ["name", "description", "ip", "port"],
+      "ui:order" => ["name", "description", "port"],
       "properties" => %{
         "name" => %{
           "type" => "string",
@@ -70,13 +83,6 @@ defmodule Tunneld.Schema.Resource do
             "Helps you distinguish multiple private accesses (e.g., device/user/purpose).",
           "ui:widget" => "textarea"
         },
-        "ip" => %{
-          "type" => "string",
-          "default" => "0.0.0.0",
-          "format" => "ipv4",
-          "ui:widget" => "hidden",
-          "readOnly" => true
-        },
         "port" => %{
           "type" => "string",
           "description" =>
@@ -85,7 +91,7 @@ defmodule Tunneld.Schema.Resource do
           "pattern" => "^[0-9]{1,5}$"
         }
       },
-      "required" => ["name", "ip", "port"]
+      "required" => ["name", "port"]
     }
   end
 end

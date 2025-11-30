@@ -38,7 +38,11 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
           type: props["type"],
           description: props["description"],
           # Prioritize enums passed in `values` (dynamic injection)
-          enum: Map.get(values, key, props["enum"]),
+          enum:
+            if(props["type"] == "array",
+              do: nil,
+              else: Map.get(values, key, props["enum"])
+            ),
           format: props["format"],
           default: props["default"],
           hidden: props["ui:widget"] == "hidden",
@@ -85,17 +89,29 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
           </label>
 
           <%= if is_list(field.enum) do %>
-            <!-- Enum dropdown -->
-            <select
-              name={"form[#{field.name}]"}
-              class={"#{hidden} bg-primary rounded-md px-3 py-2 w-full"}
-            >
-              <%= for option <- field.enum do %>
-                <option value={option} selected={Map.get(@changeset, field.name, "") == option}>
-                  <%= option %>
-                </option>
-              <% end %>
-            </select>
+            <%= if field.type == "array" do %>
+              <textarea
+                name={"form[#{field.name}]"}
+                rows="5"
+                class={"#{hidden} bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200 font-mono text-sm"}
+                readonly={field.readonly}
+              ><%= array_to_text(Map.get(@changeset, field.name, field.default || [])) %></textarea>
+              <div :if={field.help} class="bg-blue-800 bg-opacity-20 py-2 px-3 rounded-md my-2 text-xs text-blue-500">
+                <%= field.help %>
+              </div>
+            <% else %>
+              <!-- Enum dropdown -->
+              <select
+                name={"form[#{field.name}]"}
+                class={"#{hidden} bg-primary rounded-md px-3 py-2 w-full"}
+              >
+                <%= for option <- field.enum do %>
+                  <option value={option} selected={Map.get(@changeset, field.name, "") == option}>
+                    <%= option %>
+                  </option>
+                <% end %>
+              </select>
+            <% end %>
           <% else %>
             <%= if field.type == "boolean" do %>
               <input
@@ -106,25 +122,37 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
                 class={"#{hidden} rounded border-gray-300 text-purple shadow-sm focus:ring-2 focus:ring-purple"}
               />
             <% else %>
-              <%= if field.widget == "textarea" do %>
+              <%= if field.type == "array" do %>
                 <textarea
                   name={"form[#{field.name}]"}
-                  rows="6"
+                  rows="5"
                   class={"#{hidden} bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200 font-mono text-sm"}
                   readonly={field.readonly}
-                ><%= Map.get(@changeset, field.name, field.default || "") %></textarea>
-              <% else %>
-                <% input_type = if field.format == "password", do: "password", else: "text" %>
-                <input
-                  type={input_type}
-                  name={"form[#{field.name}]"}
-                  value={Map.get(@changeset, field.name, field.default || "")}
-                  class={"#{hidden} bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200"}
-                  readonly={field.readonly}
-                />
+                ><%= array_to_text(Map.get(@changeset, field.name, field.default || [])) %></textarea>
                 <div :if={field.help} class="bg-blue-800 bg-opacity-20 py-2 px-3 rounded-md my-2 text-xs text-blue-500">
                   <%= field.help %>
                 </div>
+              <% else %>
+                <%= if field.widget == "textarea" do %>
+                  <textarea
+                    name={"form[#{field.name}]"}
+                    rows="6"
+                    class={"#{hidden} bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200 font-mono text-sm"}
+                    readonly={field.readonly}
+                  ><%= Map.get(@changeset, field.name, field.default || "") %></textarea>
+                <% else %>
+                  <% input_type = if field.format == "password", do: "password", else: "text" %>
+                  <input
+                    type={input_type}
+                    name={"form[#{field.name}]"}
+                    value={Map.get(@changeset, field.name, field.default || "")}
+                    class={"#{hidden} bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200"}
+                    readonly={field.readonly}
+                  />
+                  <div :if={field.help} class="bg-blue-800 bg-opacity-20 py-2 px-3 rounded-md my-2 text-xs text-blue-500">
+                    <%= field.help %>
+                  </div>
+                <% end %>
               <% end %>
             <% end %>
           <% end %>
@@ -176,6 +204,23 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
                 # So if the key is present, it's checked
                 Map.has_key?(raw_params, field.name)
 
+              "array" ->
+                raw_value = Map.get(raw_params, field.name, "")
+
+                cond do
+                  is_list(raw_value) ->
+                    Enum.map(raw_value, &String.trim/1) |> Enum.reject(&(&1 == ""))
+
+                  is_binary(raw_value) ->
+                    raw_value
+                    |> String.split(~r/[\n,]+/, trim: true)
+                    |> Enum.map(&String.trim/1)
+                    |> Enum.reject(&(&1 == ""))
+
+                  true ->
+                    []
+                end
+
               _ ->
                 Map.get(raw_params, field.name)
             end
@@ -197,6 +242,10 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
       end
     end
   end
+
+  defp array_to_text(value) when is_list(value), do: Enum.join(value, "\n")
+  defp array_to_text(value) when is_binary(value), do: value
+  defp array_to_text(_), do: ""
 
   #
   # Validation error output

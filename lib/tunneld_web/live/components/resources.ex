@@ -44,7 +44,9 @@ defmodule TunneldWeb.Live.Components.Resources do
               "type" => "schema",
               "data" => Tunneld.Schema.Resource.data(:add_private),
               "default_values" => %{
-                "ip" => "0.0.0.0"
+                "ip" => "0.0.0.0",
+                "port" => "",
+                "pool" => []
               },
               "action" => "add_private_share"
             })
@@ -63,7 +65,11 @@ defmodule TunneldWeb.Live.Components.Resources do
             Jason.encode!(%{
               "type" => "schema",
               "data" => Tunneld.Schema.Resource.data(:add_public),
-              "default_values" => %{},
+              "default_values" => %{
+                "ip" => "127.0.0.1",
+                "port" => "18000",
+                "pool" => []
+              },
               "action" => "add_share"
             })
           }
@@ -99,7 +105,6 @@ defmodule TunneldWeb.Live.Components.Resources do
                   <div class="grow">
                     <div class="text-xs font-semibold truncate"><%= resource.name %></div>
                   </div>
-                  <div class={["w-3 h-3 rounded-full", get_status_color(resource.status || false)]} />
                 </div>
 
                 <div class="flex items-center justify-between text-xs flex-shrink-0">
@@ -107,9 +112,12 @@ defmodule TunneldWeb.Live.Components.Resources do
                     <span class="px-2 py-0.5 rounded-full bg-white/10 text-gray-200 uppercase text-[10px] font-medium">
                       <%= kind %>
                     </span>
-                    <span class="px-2 py-0.5 rounded-full bg-white/10 text-gray-200 text-[10px] font-medium">
-                      <%= resource.ip %>:<%= resource.port %>
-                    </span>
+                    <%= if kind == "host" do %>
+                      <% pool_size = length(resource.pool || []) %>
+                      <span class="px-2 py-0.5 rounded-full bg-white/10 text-gray-200 text-[10px] font-medium">
+                        pool: <%= pool_size %>
+                      </span>
+                    <% end %>
                   </div>
                 </div>
               </div>
@@ -120,10 +128,6 @@ defmodule TunneldWeb.Live.Components.Resources do
     </div>
     """
   end
-
-  # Helper function to set a status indicator color based on resource status.
-  defp get_status_color(true), do: "bg-green"
-  defp get_status_color(_), do: "bg-red"
 
   defp kind_icon("access"), do: "hero-arrows-right-left"
   defp kind_icon("host"), do: "hero-server-stack"
