@@ -44,7 +44,7 @@ defmodule TunneldWeb.Live.Components.Resources do
               "type" => "schema",
               "data" => Tunneld.Schema.Resource.data(:add_private),
               "default_values" => %{
-                "ip" => "127.0.0.1",
+                "ip" => "0.0.0.0",
                 "port" => "",
                 "pool" => []
               },
