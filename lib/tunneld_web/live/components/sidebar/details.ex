@@ -114,6 +114,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(has_data: is_map(data) and map_size(data) > 0)
       |> assign(gateway: Application.get_env(:tunneld, :network)[:gateway])
       |> assign(data: data)
+      |> assign(health: Map.get(data || %{}, :health) || Map.get(data || %{}, "health") || %{})
 
     ~H"""
     <div class="bg-secondary p-2 h-full">
@@ -127,6 +128,42 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       </div>
 
       <div :if={@has_data} class="flex flex-row gap-1 justify-end my-2">
+        <% resource_schema =
+          Tunneld.Schema.Resource.data(:add_public)
+          |> Map.put("ui:order", ["id", "name", "description", "pool", "ip", "port"])
+          |> put_in(["properties", "id"], %{
+            "type" => "string",
+            "ui:widget" => "hidden",
+            "readOnly" => true
+          })
+          |> put_in(["properties", "name", "readOnly"], true) %>
+
+        <div
+          :if={@data.kind == "host"}
+          phx-click="modal_open"
+          phx-value-modal_title="Edit Resource"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "schema",
+              "data" => resource_schema,
+              "default_values" => %{
+                "id" => @data.id,
+                "name" => @data.name,
+                "description" => @data.description,
+                "pool" => @data.pool || [],
+                "ip" => @data.ip,
+                "port" => @data.port
+              },
+              "action" => "update_share"
+            })
+          }
+          phx-click-loading="opacity-50 cursor-wait"
+          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+        >
+          <.icon name="hero-pencil-square" class="h-5 w-5" />
+          <div class="truncate text-xs">Edit</div>
+        </div>
+
         <%!-- Actions: Remove Resource only --%>
         <div
           phx-click="modal_open"
@@ -165,10 +202,15 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               <span class="font-bold">Name:</span> <%= @data.name %>
             </div>
             <div class="text-sm truncate">
-              <span class="font-bold">IP:</span> <%= @data.ip %>
+              <span class="font-bold">Pool size:</span> <%= length(@data.pool || []) %>
             </div>
+            <% health = Map.get(@data, :health) || Map.get(@data, "health") || %{} %>
             <div class="text-sm truncate">
-              <span class="font-bold">Port:</span> <%= @data.port %>
+              <span class="font-bold">Pool health:</span>
+              <span class="ml-1 capitalize"><%= human_health(health[:status]) %></span>
+              <%= if is_number(health[:up]) and is_number(health[:total]) do %>
+                <span class="ml-1 text-xs text-gray-300">(<%= health[:up] %>/<%= health[:total] %> up)</span>
+              <% end %>
             </div>
           </div>
 
@@ -192,6 +234,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                 <% enabled? = get_in(tunneld, ["enabled", kind]) == true %>
                 <% unit = get_in(tunneld, ["units", kind, "unit"]) %>
                 <% unit_id = get_in(tunneld, ["units", kind, "id"]) %>
+                <% indicator_class = status_class(@data, kind) %>
 
                 <div class="bg-primary rounded-lg p-3">
                   <div class="flex items-center justify-between">
@@ -213,6 +256,11 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                     <div class="truncate">
                       <span class="font-semibold">Reserved:</span>
                       <span class="ml-1"><%= reserved || "—" %></span>
+                    </div>
+                    <div class="truncate flex items-center gap-2">
+                      <span class="font-semibold">Status:</span>
+                      <span class={["w-3 h-3 rounded-full inline-block", indicator_class]} />
+                      <span class="capitalize"><%= human_health_text(enabled?, @data) %></span>
                     </div>
                     <div class="truncate">
                       <span class="font-semibold">Systemd Unit:</span>
@@ -658,6 +706,35 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       </div>
     </div>
     """
+  end
+
+  defp status_class(resource, kind) do
+    enabled = get_in(resource.tunneld || %{}, ["enabled", kind]) == true
+    health = Map.get(resource, :health) || Map.get(resource, "health") || %{}
+
+    case {enabled, health[:status]} do
+      {false, _} -> "bg-gray-400"
+      {true, :all_up} -> "bg-green"
+      {true, :none} -> "bg-red"
+      {true, :partial} -> "bg-yellow-500"
+      {true, :mock} -> "bg-blue-400"
+      _ -> "bg-gray-500"
+    end
+  end
+
+  defp human_health(:all_up), do: "healthy"
+  defp human_health(:none), do: "down"
+  defp human_health(:partial), do: "degraded"
+  defp human_health(:mock), do: "mock"
+  defp human_health(:empty), do: "no backends"
+  defp human_health(:not_applicable), do: "n/a"
+  defp human_health(_), do: "unknown"
+
+  defp human_health_text(false, _resource), do: "disabled"
+
+  defp human_health_text(true, resource) do
+    health = Map.get(resource, :health) || Map.get(resource, "health") || %{}
+    human_health(health[:status])
   end
 
   #
