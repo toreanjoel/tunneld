@@ -61,7 +61,8 @@ defmodule TunneldWeb.Live.Dashboard do
       |> assign(
         sidebar: %{
           is_open: false,
-          view: nil
+          view: nil,
+          selection: nil
         }
       )
       |> assign(
@@ -107,7 +108,7 @@ defmodule TunneldWeb.Live.Dashboard do
 
   @spec sidebar(%{
           :allow_webauthn? => boolean(),
-          :sidebar => %{is_open: boolean(), view: atom()},
+          :sidebar => %{is_open: boolean(), view: atom(), selection: map() | nil},
           optional(any()) => any()
         }) ::
           Phoenix.LiveView.Rendered.t()
@@ -303,7 +304,8 @@ defmodule TunneldWeb.Live.Dashboard do
   def handle_event("show_details", %{"id" => id, "type" => type}, socket) do
     sidebar = %{
       is_open: true,
-      view: get_sidebar_details(type, id)
+      view: get_sidebar_details(type, id),
+      selection: sidebar_selection(type, id)
     }
 
     {:noreply, assign(socket, :sidebar, sidebar)}
@@ -333,7 +335,8 @@ defmodule TunneldWeb.Live.Dashboard do
   def handle_event("close_details", _, socket) do
     sidebar = %{
       is_open: false,
-      view: Map.get(socket.assigns.sidebar, :view)
+      view: Map.get(socket.assigns.sidebar, :view),
+      selection: nil
     }
 
     {:noreply, assign(socket, :sidebar, sidebar)}
@@ -421,6 +424,19 @@ defmodule TunneldWeb.Live.Dashboard do
       socket
       |> assign(:devices, devices)
       |> rebuild_network_graph()
+
+    {:noreply, socket}
+  end
+
+  def handle_info(
+        %{id: "resources", module: TunneldWeb.Live.Components.Resources, data: data} = message,
+        socket
+      ) do
+    send_update(message.module, id: message.id, data: message.data)
+
+    socket =
+      socket
+      |> maybe_refresh_sidebar_details(data)
 
     {:noreply, socket}
   end
@@ -550,7 +566,8 @@ defmodule TunneldWeb.Live.Dashboard do
   def handle_info(:close_details, socket) do
     sidebar = %{
       is_open: false,
-      view: Map.get(socket.assigns.sidebar, :view)
+      view: Map.get(socket.assigns.sidebar, :view),
+      selection: nil
     }
 
     {:noreply, assign(socket, :sidebar, sidebar)}
@@ -559,7 +576,8 @@ defmodule TunneldWeb.Live.Dashboard do
   def handle_info({:show_details, %{"id" => id, "type" => type}}, socket) do
     sidebar = %{
       is_open: true,
-      view: get_sidebar_details(type, id)
+      view: get_sidebar_details(type, id),
+      selection: sidebar_selection(type, id)
     }
 
     {:noreply, assign(socket, :sidebar, sidebar)}
@@ -594,6 +612,28 @@ defmodule TunneldWeb.Live.Dashboard do
       "authentication" ->
         :authentication
     end
+  end
+
+  defp sidebar_selection("resource", id) when is_binary(id), do: %{type: :resource, id: id}
+  defp sidebar_selection(_, _), do: nil
+
+  defp maybe_refresh_sidebar_details(socket, resources) do
+    sidebar = Map.get(socket.assigns, :sidebar, %{})
+    resources = List.wrap(resources)
+
+    with true <- Map.get(sidebar, :is_open, false),
+         :resource <- Map.get(sidebar, :view),
+         %{type: :resource, id: selected_id} <- Map.get(sidebar, :selection),
+         %{} = resource <- Enum.find(resources, &resource_match?(&1, selected_id)) do
+      send_update(SidebarDetails, id: "sidebar_details", data: resource)
+    end
+
+    socket
+  end
+
+  defp resource_match?(resource, id) do
+    res_id = Map.get(resource, :id) || Map.get(resource, "id")
+    res_id == id
   end
 
   #

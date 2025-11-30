@@ -176,19 +176,24 @@ defmodule Tunneld.Servers.Resources do
       if not Enum.empty?(resources) do
         resources
         |> Enum.each(fn s ->
-          name = s["name"]
-          ip = Map.get(s, "ip", @nginx_ip)
-          port = Map.get(s, "port", @nginx_port)
+          kind = s["kind"]
 
-          base = sanitize_base(name)
-          pub_token = make_token(base, "pub")
-          priv_token = make_token(base, "priv")
+          # we only enable resource we point to a local service
+          if kind === "host" do
+            name = s["name"]
+            ip = Map.get(s, "ip", @nginx_ip)
+            port = Map.get(s, "port", @nginx_port)
 
-          Zrok.reserve_public(pub_token, ip, port)
-          Zrok.reserve_private(priv_token, ip, port)
+            base = sanitize_base(name)
+            pub_token = make_token(base, "pub")
+            priv_token = make_token(base, "priv")
 
-          # Ensure nginx config is present on boot/resync
-          _ = ensure_nginx_config(s)
+            Zrok.reserve_public(pub_token, ip, port)
+            Zrok.reserve_private(priv_token, ip, port)
+
+            # Ensure nginx config is present on boot/resync
+            _ = ensure_nginx_config(s)
+          end
         end)
       end
     rescue
@@ -431,7 +436,11 @@ defmodule Tunneld.Servers.Resources do
                     pool = Map.get(s, "pool", [])
                     mock? = Application.get_env(:tunneld, :mock_data, false)
                     kind = s["kind"] || "host"
-                    health = if kind == "host", do: pool_health(pool, mock?), else: %{status: :not_applicable}
+
+                    health =
+                      if kind == "host",
+                        do: pool_health(pool, mock?),
+                        else: %{status: :not_applicable}
 
                     %{
                       id: s["id"],
