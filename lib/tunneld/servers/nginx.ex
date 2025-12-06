@@ -67,7 +67,7 @@ defmodule Tunneld.Servers.Nginx do
 
     server {
         listen #{listen_ip}:#{listen_port};
-        server_name #{public_name};
+        server_name #{public_name} ~^#{public_name}\..+$;
 
         location / {
             proxy_pass http://#{upstream_name};
@@ -80,7 +80,7 @@ defmodule Tunneld.Servers.Nginx do
 
     server {
         listen #{listen_ip}:#{listen_port};
-        server_name #{private_name};
+        server_name #{private_name} ~^#{private_name}\..+$;
 
         location / {
             proxy_pass http://#{upstream_name};
