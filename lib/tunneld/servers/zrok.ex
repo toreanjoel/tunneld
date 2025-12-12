@@ -264,7 +264,7 @@ defmodule Tunneld.Servers.Zrok do
   end
 
   def handle_call({:enable_access, id}, _from, state) do
-    case Map.fetch(state.units, id) do
+    case Map.fetch(state.units, "access-" <> id) do
       {:ok, %{unit: unit}} ->
         case do_enable(unit, state) do
           :ok ->
@@ -282,7 +282,7 @@ defmodule Tunneld.Servers.Zrok do
   end
 
   def handle_call({:disable_access, id}, _from, state) do
-    case Map.fetch(state.units, id) do
+    case Map.fetch(state.units, "access-" <> id) do
       {:ok, %{unit: unit}} ->
         case do_disable(unit, state) do
           :ok ->
