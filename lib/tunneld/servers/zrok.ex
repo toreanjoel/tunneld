@@ -264,7 +264,7 @@ defmodule Tunneld.Servers.Zrok do
   end
 
   def handle_call({:enable_access, id}, _from, state) do
-    case Map.fetch(state.units, "access-" <> id) do
+    case Map.fetch(state.units, id) do
       {:ok, %{unit: unit}} ->
         case do_enable(unit, state) do
           :ok ->
@@ -282,7 +282,7 @@ defmodule Tunneld.Servers.Zrok do
   end
 
   def handle_call({:disable_access, id}, _from, state) do
-    case Map.fetch(state.units, "access-" <> id) do
+    case Map.fetch(state.units, id) do
       {:ok, %{unit: unit}} ->
         case do_disable(unit, state) do
           :ok ->
@@ -612,16 +612,39 @@ defmodule Tunneld.Servers.Zrok do
         |> Enum.filter(&String.starts_with?(&1, @unit_prefix))
         |> Enum.filter(&String.ends_with?(&1, @unit_suffix))
         |> Enum.map(fn unit ->
-          id =
-            unit
-            |> String.replace_prefix(@unit_prefix, "")
-            |> String.replace_suffix(@unit_suffix, "")
+          id = discover_unit_id(dir, unit)
 
           %{id: id, unit: unit, active: unit_active?(unit, state)}
         end)
 
       _ ->
         []
+    end
+  end
+
+  defp discover_unit_id(dir, unit) do
+    base =
+      unit
+      |> String.replace_suffix(@unit_suffix, "")
+
+    if String.starts_with?(base, @access_prefix) do
+      # If a *share* is ever created with an id like "access-foo", its unit name
+      # becomes "zrok-access-foo.service" and would be ambiguous. Disambiguate
+      # by reading the unit content when possible.
+      case File.read(Path.join(dir, unit)) do
+        {:ok, content} ->
+          if String.contains?(content, "Description=Zrok Access") or
+               String.contains?(content, "zrok access private") do
+            String.replace_prefix(base, @access_prefix, "")
+          else
+            String.replace_prefix(base, @unit_prefix, "")
+          end
+
+        _ ->
+          String.replace_prefix(base, @access_prefix, "")
+      end
+    else
+      String.replace_prefix(base, @unit_prefix, "")
     end
   end
 
