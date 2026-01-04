@@ -15,39 +15,49 @@ defmodule Tunneld.Servers.Updater do
   end
 
   @doc """
+  Get the current update status from the state
+  """
+  def get_status() do
+    GenServer.call(__MODULE__, :get_status)
+  end
+
+  @doc """
   Init Updater
   """
   def init(_) do
     send(self(), :check_updates)
 
-    {:ok,
-     %{
-       init_call: true
-     }}
+    {:ok, %{is_latest: false, new_version: nil}}
   end
 
   # get the data and restart sync
   @impl false
   def handle_info(:check_updates, state) do
-    # check if the call is the first one
-    if not Map.get(state, :init_call) do
-      # Get the latest data from remote
-      {status, data} = fetch_latest()
+    {status, data} = fetch_latest()
 
+    new_state =
       if status == :ok do
-        # Do check with local version - fallback if needed
         c_v = Application.get_env(:tunneld, :version)
         r_m = Map.get(data, "version")
+        update_available = r_m && c_v < r_m
 
-        if c_v < r_m do
-          notify(true, r_m)
+        # Only broadcast if the status has changed
+        if update_available != state.is_latest or r_m != state.new_version do
+          notify(update_available, r_m)
         end
+
+        %{is_latest: update_available, new_version: r_m}
+      else
+        state
       end
-    end
 
     check_version()
-    # We make sure that we set the inital
-    {:noreply, Map.put(state, :init_call, false)}
+    {:noreply, new_state}
+  end
+
+  @impl true
+  def handle_call(:get_status, _from, state) do
+    {:reply, state, state}
   end
 
   # The job that will start interval sync
@@ -67,16 +77,14 @@ defmodule Tunneld.Servers.Updater do
   end
 
   # Send notification to the dashboard
-  defp notify(notify, new_version) do
-    if not is_nil(new_version) do
-      Phoenix.PubSub.broadcast(Tunneld.PubSub, "component:welcome", %{
-        id: "welcome",
-        module: TunneldWeb.Live.Components.Welcome,
-        data: %{
-          is_latest: notify,
-          new_version: new_version
-        }
-      })
-    end
+  defp notify(update_available, new_version) do
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "component:welcome", %{
+      id: "welcome",
+      module: TunneldWeb.Live.Components.Welcome,
+      data: %{
+        is_latest: update_available,
+        new_version: new_version
+      }
+    })
   end
 end

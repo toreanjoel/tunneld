@@ -12,7 +12,8 @@ defmodule TunneldWeb.Live.Components.Welcome do
   end
 
   def update(assigns, socket) do
-    {:ok, socket |> assign(data: Map.get(assigns, :data, %{}))}
+    data = Map.get(assigns, :data) || Tunneld.Servers.Updater.get_status()
+    {:ok, socket |> assign(data: data)}
   end
 
   @doc """
