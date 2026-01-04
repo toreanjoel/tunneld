@@ -12,7 +12,8 @@ defmodule Tunneld.Application do
     SystemResources,
     Wlan,
     Resources,
-    Blocklist
+    Blocklist,
+    Updater
   }
 
   @impl true
@@ -33,7 +34,8 @@ defmodule Tunneld.Application do
       {Resources, []},
       {Devices, []},
       {Auth, []},
-      {Blocklist, []}
+      {Blocklist, []},
+      {Updater, []}
     ]
 
     if not Application.get_env(:tunneld, :mock_data, false) do

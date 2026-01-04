@@ -20,7 +20,7 @@ defmodule TunneldWeb.Live.Login do
 
     uri_info = get_connect_info(socket, :uri)
     host = uri_info && URI.parse(uri_info) |> Map.get(:host)
-    gateway_domain = System.get_env("CF_DOMAIN") || "tunneld.lan"
+    gateway_domain = "Tunneld"
 
     has_webauthn? = Tunneld.Servers.Auth.has_webauthn?()
     connected_via_gateway_domain = host == gateway_domain
@@ -72,7 +72,7 @@ defmodule TunneldWeb.Live.Login do
           >
             <%= @info_content %>
           </span>
-          <h1 class="text-3xl font-bold my-4">tunneld.lan</h1>
+          <h1 class="text-3xl font-bold my-4">Tunneld</h1>
           <div class="text-xs text-gray-500"><%= Application.get_env(:tunneld, :metadata)[:device_id]  || System.get_env("DEVICE_ID") %></div>
         </div>
         <div class="text-sm text-gray-1">

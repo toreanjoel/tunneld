@@ -20,15 +20,19 @@ defmodule TunneldWeb.Live.Components.Welcome do
   """
   def render(assigns) do
     assigns = assigns |> assign(version: Map.get(assigns.data, :version, Application.get_env(:tunneld, :version)))
-
     ~H"""
     <div class="py-5">
       <div class="text-4xl font-medium bg-gradient-to-r from-slate-300 to-slate-600 bg-clip-text text-transparent">
-        tunneld.lan
+        Tunneld
       </div>
       <div class="text-xs text-gray-500"><%= Application.get_env(:tunneld, :metadata)[:device_id] || System.get_env("DEVICE_ID") %></div>
-      <div class="text-lg text-gray-2 font-light">
-        <%= @version %>
+      <div class="flex flex-row items-center gap-2">
+        <div class="text-lg text-gray-2 font-light">
+          <%= @version %>
+        </div>
+        <div :if={Map.get(@data, :is_latest, true) and not is_nil(Map.get(@data, :new_version))} class="bg-blue-800 bg-opacity-20 py-1 px-2 rounded-md text-xs text-blue-500">
+          <%= "Update Available: " <> Map.get(@data, :new_version) %>
+        </div>
       </div>
     </div>
     """

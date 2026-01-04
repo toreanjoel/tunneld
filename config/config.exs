@@ -59,11 +59,11 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
-# DEFAILT ADMIN DASHBOARD DETAILS
+# DEFAULT ADMIN DASHBOARD DETAILS
 config :tunneld, :auth,
   ttl: 900 # 15 minutes
 
-config :tunneld, version: "0.7.2"
+config :tunneld, version: "0.7.3"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
