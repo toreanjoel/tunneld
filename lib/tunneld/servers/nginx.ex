@@ -2,6 +2,9 @@ defmodule Tunneld.Servers.Nginx do
   @moduledoc false
   require Logger
   @service_name "nginx"
+  @public_port 18000
+  @private_port_base 20000
+  @private_port_range 10000
 
   @doc """
   Create or update the nginx config for a resource (shared for public/private).
@@ -42,15 +45,44 @@ defmodule Tunneld.Servers.Nginx do
 
   def remove_resource_config(_), do: {:error, :invalid_resource}
 
+  @doc """
+  Calculate a deterministic private port based on the Identifier (Name or ID).
+  """
+  def get_private_port(identifier) when is_binary(identifier) do
+    offset = :erlang.phash2(identifier, @private_port_range)
+    @private_port_base + offset
+  end
+
   defp render_config(resource) do
     id = resource["id"]
     listen_ip = Map.get(resource, "ip", "127.0.0.1")
-    listen_port = Map.get(resource, "port", "18000")
-    upstream_name = "tunneld_#{id}_pool"
-    pool = Map.get(resource, "pool", [])
+
+    # Determine names first
     reserved = get_in(resource, ["tunneld", "reserved"]) || %{}
     public_name = Map.get(reserved, "public", "#{id}-public")
     private_name = Map.get(reserved, "private", "#{id}-private")
+
+    public_port = @public_port
+    private_port = get_private_port(private_name)
+
+    upstream_name = "tunneld_#{id}_pool"
+    pool = Map.get(resource, "pool", [])
+
+    # Retrieve root domain from config if available (e.g. "example.com")
+    root_domain = Application.get_env(:tunneld, :root_domain)
+
+    # Logic to determine the Host header for private access:
+    spoofed_host =
+      cond do
+        String.contains?(public_name, ".") ->
+          public_name
+
+        is_binary(root_domain) and root_domain != "" ->
+          public_name <> "." <> String.trim_leading(root_domain, ".")
+
+        true ->
+          public_name
+      end
 
     servers =
       pool
@@ -64,7 +96,7 @@ defmodule Tunneld.Servers.Nginx do
     }
 
     server {
-        listen #{listen_ip}:#{listen_port};
+        listen #{listen_ip}:#{public_port};
         server_name #{public_name} ~^#{public_name}\..+$;
 
         location / {
@@ -77,12 +109,12 @@ defmodule Tunneld.Servers.Nginx do
     }
 
     server {
-        listen #{listen_ip}:#{listen_port};
-        server_name #{private_name} ~^#{private_name}\..+$;
+        listen #{listen_ip}:#{private_port};
+        server_name _ #{private_name};
 
         location / {
             proxy_pass http://#{upstream_name};
-            proxy_set_header Host $host;
+            proxy_set_header Host #{spoofed_host};
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
             proxy_set_header X-Forwarded-Proto $scheme;
@@ -91,6 +123,7 @@ defmodule Tunneld.Servers.Nginx do
     """
   end
 
+  # ... (The rest of your helper functions ensure_dirs, etc. remain unchanged) ...
   defp ensure_dirs(mock?) do
     with :ok <- ensure_dir(base_dir(mock?)),
          :ok <- ensure_dir(Path.join(base_dir(mock?), "sites-available")),
@@ -167,6 +200,6 @@ defmodule Tunneld.Servers.Nginx do
   defp ensure_pool(_), do: {:error, :invalid_pool}
 
   defp mock_mode?() do
-    Application.get_env(:tunneld, :mock_data, @env != :prod)
+    Application.get_env(:tunneld, :mock_data) in [true, "true"]
   end
 end

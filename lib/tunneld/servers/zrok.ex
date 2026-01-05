@@ -131,6 +131,7 @@ defmodule Tunneld.Servers.Zrok do
            "public",
            "--unique-name",
            name,
+           "--open",
            "--backend-mode",
            "proxy",
            "#{ip}:#{port}"
@@ -140,16 +141,21 @@ defmodule Tunneld.Servers.Zrok do
     end
   end
 
-  def handle_call({:reserve_private, %{name: name, ip: ip, port: port}}, _from, state) do
+  def handle_call({:reserve_private, %{name: name, ip: _ip, port: _port}}, _from, state) do
+    # --- FIX: Match the Nginx Hashing Logic ---
+    # We ignore the passed port and calculate the unique private port based on the Name.
+    # This ensures Zrok points to the exact port Nginx is listening on for this specific private share.
+    target_port = Tunneld.Servers.Nginx.get_private_port(name)
+    target = "127.0.0.1:#{target_port}"
+
     case run(zrok_bin(), [
            "reserve",
            "private",
            "--unique-name",
            name,
-           "--open",
            "--backend-mode",
            "proxy",
-           "#{ip}:#{port}"
+           target
          ]) do
       {_, 0} -> {:reply, :ok, state}
       err -> {:reply, {:error, err}, state}
