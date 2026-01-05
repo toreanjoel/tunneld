@@ -146,6 +146,7 @@ defmodule Tunneld.Servers.Zrok do
            "private",
            "--unique-name",
            name,
+           "--open",
            "--backend-mode",
            "proxy",
            "#{ip}:#{port}"
