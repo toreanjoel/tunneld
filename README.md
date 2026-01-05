@@ -7,7 +7,7 @@
 ![Zrok](https://img.shields.io/badge/zrok-enabled-blue)
 ![Platform](https://img.shields.io/badge/platform-debian-red)
 
-A wireless-first, zero-trust network manager built for portability, performance, and total control. Spend less time on infrastructure and more time building without giving up security.
+A wireless-first, zero-trust programable gateway built for portability, performance, and total control. Spend less time on infrastructure and more time building without giving up security.
 
 Tunneld acts as your network's intelligent gateway — managing devices, assigning IPs via DHCP, resolving DNS securely, sharing local compute, and exposing optional network services through Zrok Tunnels. Designed to be lightweight, modular, and resource-driven, Tunneld works both at home and on the move. The goal is to let you focus on building while Tunneld handles the network, keeping devices isolated and allowing you to expose resources publicly or privately over a secure network.
 
