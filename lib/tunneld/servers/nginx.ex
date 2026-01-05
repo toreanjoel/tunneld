@@ -1,8 +1,6 @@
 defmodule Tunneld.Servers.Nginx do
   @moduledoc false
   require Logger
-
-  @env Mix.env()
   @service_name "nginx"
 
   @doc """
