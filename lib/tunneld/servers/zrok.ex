@@ -31,7 +31,10 @@ defmodule Tunneld.Servers.Zrok do
         @linux_systemd_dir
       end
 
-    :ok = ensure_dir(sdir)
+    if not mock? do
+      :ok = ensure_dir(sdir)
+    end
+
     units = discover_units(sdir, mock?)
 
     state = %{

@@ -4,9 +4,19 @@ if System.get_env("PHX_SERVER") do
   config :tunneld, TunneldWeb.Endpoint, server: true
 end
 
-if System.get_env("MOCK_DATA") do
+mock_data? = System.get_env("MOCK_DATA") != nil
+
+if mock_data? do
   config :tunneld, mock_data: true
 end
+
+# Data paths (overrideable via ENV)
+default_root = if mock_data?, do: "data", else: "/var/lib/tunneld"
+config :tunneld, :fs,
+  root: System.get_env("TUNNELD_DATA", default_root),
+  auth: System.get_env("TUNNELD_AUTH_FILE", "auth.json"),
+  resources: System.get_env("TUNNELD_SHARES_FILE", "resources.json"),
+  sqm: System.get_env("TUNNELD_SQM_FILE", "sqm.json")
 
 # Only require these in PROD
 if config_env() == :prod do
@@ -46,12 +56,6 @@ if config_env() == :prod do
     check_origin: check_origins,
     secret_key_base: secret_key_base,
     server: true
-
-  # Prod data paths (overrideable via ENV)
-  config :tunneld, :fs,
-    root: System.get_env("TUNNELD_DATA", "/var/lib/tunneld"),
-    auth: System.get_env("TUNNELD_AUTH_FILE", "auth.json"),
-    resources: System.get_env("TUNNELD_SHARES_FILE", "resources.json")
 
   config :tunneld, :config_dir, path: System.get_env("TUNNELD_CONFIG", "/etc/tunneld")
   config :tunneld, :build_dir, path: System.get_env("TUNNELD_BUILD", "/opt/tunneld")

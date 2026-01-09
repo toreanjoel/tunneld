@@ -861,6 +861,12 @@ defmodule TunneldWeb.Live.Dashboard do
         %{"id" => id} = decode_if_needed(data)
         Tunneld.Servers.Services.get_service_logs(id)
 
+      #
+      # SQM Management
+      #
+      "set_sqm" ->
+        Tunneld.Servers.Sqm.set_sqm(decode_if_needed(data))
+
       _ ->
         Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
           type: :error,

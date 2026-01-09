@@ -16,10 +16,12 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     view = Map.get(assigns, :view, socket.assigns[:view] || :system_overview)
     web_authn = Map.get(assigns, :web_authn, socket.assigns[:web_authn] || false)
     data = Map.get(assigns, :data, %{})
+    sqm = Tunneld.Servers.Sqm.get_state()
 
     socket =
       socket
       |> assign(:view, view)
+      |> assign(:sqm, sqm)
       |> assign(:data, data)
       |> assign(:web_authn, web_authn)
 
@@ -43,7 +45,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     assigns = assign(assigns, :web_authn, Map.get(assigns, web_authn, false))
 
     ~H"""
-    <div class="bg-secondary p-2 h-full" id="auth" phx-hook="Auth">
+    <div class="bg-secondary p-4 h-full space-y-6" id="auth" phx-hook="Auth">
       <%!-- Sidebar header that will house metadat?  --%>
       <%= sidebar_header(assigns, %{
         header: "Authentication",
@@ -117,7 +119,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(health: Map.get(data || %{}, :health) || Map.get(data || %{}, "health") || %{})
 
     ~H"""
-    <div class="bg-secondary p-2 h-full">
+    <div class="bg-secondary p-4 h-full space-y-6">
       <div :if={@has_data}>
         <%= sidebar_header(assigns, %{
           header: @data.name,
@@ -297,7 +299,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(has_data: not Enum.empty?(data))
 
     ~H"""
-    <div class="bg-secondary p-2 h-full">
+    <div class="bg-secondary p-4 h-full space-y-6">
       <%!-- Sidebar header that will house metadat?  --%>
       <%= sidebar_header(assigns, %{
         header: "Overlay Network Settings",
@@ -418,7 +420,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(:link, Map.get(data, "homepage", ""))
 
     ~H"""
-    <div class="bg-secondary p-2 h-full">
+    <div class="bg-secondary p-4 h-full space-y-6">
       <%!-- Sidebar header that will house blocklist metadata --%>
       <%= sidebar_header(assigns, %{
         header: "Blocklist Details",
@@ -486,31 +488,87 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(count: data |> List.wrap() |> length())
 
     ~H"""
-    <div class="bg-secondary p-2 h-full">
-      <%!-- Sidebar header that will house metadat?  --%>
-      <%= sidebar_header(assigns, %{
-        header: "Wireless Network Access",
-        body: "Connect to wireless access points in order to get internet access to your gateway"
-      }) %>
+    <div class="bg-secondary p-4 h-full space-y-6">
+      <div class="relative">
+        <%= sidebar_header(assigns, %{
+          header: "Wireless Access",
+          body: "Connect to access points for internet connectivity and optimize traffic using the CAKE algorithm to reduce bufferbloat and latency."
+        }) %>
 
-      <pre
-        :if={@info["wpa_state"] !== "COMPLETED" and not Enum.empty?(@info)}
-        class="bg-gray-900 text-gray-100 text-xs p-3 rounded-md overflow-auto"
-      ><%= Jason.encode!(@info, pretty: true) %></pre>
-
-      <div class="flex flex-row gap-1 justify-end my-2">
-        <%!-- Actions to take --%>
-        <div
+      <div class="flex flex-row gap-1 mt-2 justify-end">
+        <button
           phx-click="trigger_action"
           phx-value-action="scan_for_wireless_networks"
           phx-value-data={Jason.encode!(%{})}
           phx-click-loading="opacity-50 cursor-wait"
           class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+          title="Scan for networks"
         >
           <.icon class="w-4 h-4" name="hero-arrow-path" />
           <div class="truncate text-xs text-gray-1">Refresh</div>
+        </button>
+      </div>
+      </div>
+      <div>
+        <div class="flex flex-cols gap-3">
+          <button
+            phx-click="set_sqm"
+            phx-target={@myself}
+            phx-value-mode="latency"
+            phx-value-up="5mbit"
+            phx-value-down="15mbit"
+            class={[
+              "grow flex flex-col items-center justify-center rounded-xl border-2 transition-all p-2 text-center",
+              if(@sqm["mode"] == "latency",
+                do: "bg-purple border-purple text-white shadow-lg shadow-purple/20",
+                else: "bg-primary border-transparent text-gray-1"
+              )
+            ]}
+          >
+            <span class="font-bold text-sm">Latency</span>
+            <span class="text-[10px] opacity-80 mt-1">15/5 mbit</span>
+          </button>
+
+          <button
+            phx-click="set_sqm"
+            phx-target={@myself}
+            phx-value-mode="balanced"
+            phx-value-up="20mbit"
+            phx-value-down="40mbit"
+            class={[
+              "grow flex flex-col items-center justify-center rounded-xl border-2 transition-all p-2 text-center",
+              if(@sqm["mode"] == "balanced",
+                do: "bg-purple border-purple text-white shadow-lg shadow-purple/20",
+                else: "bg-primary border-transparent text-gray-1"
+              )
+            ]}
+          >
+            <span class="font-bold text-sm">Balanced</span>
+            <span class="text-[10px] opacity-80 mt-1">40/20 mbit</span>
+          </button>
+
+          <button
+            phx-click="set_sqm"
+            phx-target={@myself}
+            phx-value-mode="off"
+            class={[
+              "grow flex flex-col items-center justify-center rounded-xl border-2 transition-all p-2 text-center",
+              if(@sqm["mode"] == "off",
+                do: "bg-red border-red text-white shadow-lg shadow-red/20",
+                else: "bg-primary border-transparent text-gray-1"
+              )
+            ]}
+          >
+            <span class="font-bold text-sm">Off</span>
+            <span class="text-[10px] opacity-80 mt-1">No shaping</span>
+          </button>
         </div>
       </div>
+
+      <pre
+        :if={@info["wpa_state"] !== "COMPLETED" and not Enum.empty?(@info)}
+        class="bg-gray-900 text-gray-100 text-xs p-3 rounded-md overflow-auto"
+      ><%= Jason.encode!(@info, pretty: true) %></pre>
 
       <div class={"flex flex-col #{if @count== 0, do: "items-center justify-center", else: ""}"}>
         <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">
@@ -589,42 +647,47 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     logs = Map.get(data, :logs, [])
     count = length(logs)
 
-    service = case service = Map.get(data, :service) do
-      :dnsmasq ->
-        %{
-          id: service,
-          name: service |> Atom.to_string() |> String.capitalize(),
-          description: "Lightweight DNS/DHCP daemon handling local name resolution and leases."
-        }
+    service =
+      case service = Map.get(data, :service) do
+        :dnsmasq ->
+          %{
+            id: service,
+            name: service |> Atom.to_string() |> String.capitalize(),
+            description: "Lightweight DNS/DHCP daemon handling local name resolution and leases."
+          }
 
-      :dhcpcd ->
-        %{
-          id: service,
-          name: service |> Atom.to_string() |> String.capitalize(),
-          description: "Client daemon that manages the upstream network lease and interface config"
-        }
+        :dhcpcd ->
+          %{
+            id: service,
+            name: service |> Atom.to_string() |> String.capitalize(),
+            description:
+              "Client daemon that manages the upstream network lease and interface config"
+          }
 
-      :"dnscrypt-proxy" ->
-        %{
-          id: service,
-          name: service |> Atom.to_string() |> String.capitalize(),
-          description: "Encrypts and filters DNS with DoH/DoT to block ads/trackers and prevent snooping."
-        }
+        :"dnscrypt-proxy" ->
+          %{
+            id: service,
+            name: service |> Atom.to_string() |> String.capitalize(),
+            description:
+              "Encrypts and filters DNS with DoH/DoT to block ads/trackers and prevent snooping."
+          }
 
-      :nginx ->
-        %{
-          id: service,
-          name: service |> Atom.to_string() |> String.capitalize(),
-          description: "Reverse proxy/load balancer that fronts your exposed resources and distributes traffic."
-        }
+        :nginx ->
+          %{
+            id: service,
+            name: service |> Atom.to_string() |> String.capitalize(),
+            description:
+              "Reverse proxy/load balancer that fronts your exposed resources and distributes traffic."
+          }
 
         # This is needed so when the component updates, we have some default value
-        _ -> %{
-          id: "-",
-          name: "-",
-          description: "-"
-        }
-    end
+        _ ->
+          %{
+            id: "-",
+            name: "-",
+            description: "-"
+          }
+      end
 
     assigns =
       assigns
@@ -633,7 +696,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(service: service)
 
     ~H"""
-    <div class="bg-secondary p-2 h-full">
+    <div class="bg-secondary p-4 h-full space-y-6">
       <%!-- Sidebar header that will house metadat?  --%>
       <%= sidebar_header(assigns, %{
         header: Map.get(@service, :name),
@@ -698,7 +761,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   @spec render(%{:view => :device, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :device} = assigns) do
     ~H"""
-    <div class="bg-secondary p-2 h-full">
+    <div class="bg-secondary p-4 h-full space-y-6">
       <div class="flex flex-col items-center justify-center">
         <h1 class="text-2xl font-light text-gray-2 my-4 text-center">
           No device Information
@@ -706,6 +769,18 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       </div>
     </div>
     """
+  end
+
+  def handle_event("set_sqm", %{"mode" => mode} = params, socket) do
+    # Prepare params for the server
+    sqm_params = %{
+      "mode" => mode,
+      "up_limit" => Map.get(params, "up", "25mbit"),
+      "down_limit" => Map.get(params, "down", "25mbit")
+    }
+
+    Tunneld.Servers.Sqm.set_sqm(sqm_params)
+    {:noreply, assign(socket, :sqm, Tunneld.Servers.Sqm.get_state())}
   end
 
   defp status_class(resource, kind) do
