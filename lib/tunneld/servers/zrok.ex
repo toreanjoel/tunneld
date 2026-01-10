@@ -452,8 +452,21 @@ defmodule Tunneld.Servers.Zrok do
     tun = resource["tunneld"] || resource[:tunneld] || %{}
     reserved_token = to_string(tun["reserved_token"] || tun[:reserved_token] || name)
 
+    auth = tun["auth"] || tun[:auth] || %{}
+    basic = auth["basic"] || auth[:basic] || %{}
+
+    auth_args =
+      if (basic["enabled"] == true or basic[:enabled] == true) &&
+           (basic["username"] || basic[:username]) && (basic["password"] || basic[:password]) do
+        username = basic["username"] || basic[:username]
+        password = basic["password"] || basic[:password]
+        ["--basic-auth", "#{username}:#{password}"]
+      else
+        []
+      end
+
     exec =
-      [zrok_bin(), "share", "reserved", reserved_token, "--headless"]
+      ([zrok_bin(), "share", "reserved", reserved_token, "--headless"] ++ auth_args)
       |> Enum.map(&to_string/1)
       |> Enum.join(" ")
 

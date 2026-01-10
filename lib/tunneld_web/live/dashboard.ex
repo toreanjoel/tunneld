@@ -97,6 +97,7 @@ defmodule TunneldWeb.Live.Dashboard do
         module={Modal}
         id="generic_modal"
         title={@modal.title}
+        description={@modal.description}
         body={@modal.body}
         actions={@modal.actions}
         client_id={@client_id}
@@ -127,7 +128,7 @@ defmodule TunneldWeb.Live.Dashboard do
       :if={@sidebar.is_open}
       class="fixed top-0 right-0 z-19 h-screen w-screen lg:w-[30%] lg:max-w-[600px] bg-secondary system-scroll shadow-lg transition-transform duration-300 ease-in-out"
     >
-      <button phx-click="close_details" class="absolute top-4 right-4">
+      <button phx-click="close_details" class="absolute top-4 right-5">
         <.icon class="w-5 h-5" name="hero-x-mark" />
       </button>
 
@@ -392,6 +393,7 @@ defmodule TunneldWeb.Live.Dashboard do
     modal_data = %{
       show: true,
       title: params["modal_title"] || nil,
+      description: params["modal_description"] || nil,
       body: Jason.decode!(params["modal_body"]) || %{},
       actions: actions,
       type: :default
@@ -405,7 +407,7 @@ defmodule TunneldWeb.Live.Dashboard do
   # Close the modal
   #
   def handle_event("modal_close", _params, socket) do
-    modal_data = %{show: false, title: nil, body: %{}, actions: nil, type: :default}
+    modal_data = %{show: false, title: nil, description: nil, body: %{}, actions: nil, type: :default}
 
     {:noreply, assign(socket, :modal, modal_data)}
   end
@@ -724,6 +726,7 @@ defmodule TunneldWeb.Live.Dashboard do
       "configure_disable_environment" -> "Disabling device..."
       "revoke_login_creds" -> "Resetting login..."
       "update_blocklist" -> "Updating blocklist..."
+      "configure_basic_auth" -> "Configuring Basic Auth..."
       _ -> "Working on request..."
     end
   end
@@ -810,6 +813,9 @@ defmodule TunneldWeb.Live.Dashboard do
 
       "update_share" ->
         Tunneld.Servers.Resources.update_share(decode_if_needed(data), :resource)
+
+      "configure_basic_auth" ->
+        Tunneld.Servers.Resources.configure_basic_auth(decode_if_needed(data))
 
       "add_private_share" ->
         Tunneld.Servers.Resources.add_access(decode_if_needed(data))

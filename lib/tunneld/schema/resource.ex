@@ -94,4 +94,34 @@ defmodule Tunneld.Schema.Resource do
       "required" => ["name", "port"]
     }
   end
+
+  @spec data(atom()) :: map()
+  def data(:basic_auth) do
+    %{
+      "title" => "Basic Authentication",
+      "description" => "Secure your public resource with a username and password.",
+      "type" => "object",
+      "ui:order" => ["username", "password", "resource_id"],
+      "properties" => %{
+        "username" => %{
+          "type" => "string",
+          "description" => "Username required to access the resource.",
+          "minLength" => 1
+        },
+        "password" => %{
+          "type" => "string",
+          "description" => "Password required to access the resource.",
+          "minLength" => 1,
+          "format" => "password"
+        },
+        "resource_id" => %{
+          "type" => "string",
+          "description" => "The associated resource id",
+          "readOnly" => true,
+          "ui:widget" => "hidden"
+        }
+      },
+      "required" => ["username", "password", "resource_id"]
+    }
+  end
 end

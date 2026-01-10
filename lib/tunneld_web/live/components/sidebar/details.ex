@@ -138,10 +138,12 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             "ui:widget" => "hidden",
             "readOnly" => true
           })
-          |> put_in(["properties", "name", "readOnly"], true) %>
+          |> put_in(["properties", "name", "readOnly"], true)
+
+           any_enabled? = Enum.any?(Map.values(get_in(@data.tunneld || %{}, ["enabled"]) || %{}), &(&1 == true)) %>
 
         <div
-          :if={@data.kind == "host"}
+          :if={@data.kind == "host" and not any_enabled?}
           phx-click="modal_open"
           phx-value-modal_title="Edit Resource"
           phx-value-modal_body={
@@ -161,6 +163,15 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           }
           phx-click-loading="opacity-50 cursor-wait"
           class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+        >
+          <.icon name="hero-pencil-square" class="h-5 w-5" />
+          <div class="truncate text-xs">Edit</div>
+        </div>
+
+        <div
+          :if={@data.kind == "host" and any_enabled?}
+          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-not-allowed rounded-md opacity-50"
+          title="Disable shares to edit"
         >
           <.icon name="hero-pencil-square" class="h-5 w-5" />
           <div class="truncate text-xs">Edit</div>
@@ -253,6 +264,38 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                       </div>
                     </label>
                   </div>
+
+                  <%= if kind == "public" do %>
+                    <% auth_config = get_in(tunneld, ["auth", "basic"]) || %{} %>
+                    <% has_auth? = Map.get(auth_config, "enabled", false) %>
+                    <div class="mt-2 border-t border-gray-700 pt-2">
+                       <div class="flex items-center justify-between">
+                         <span class="text-xs font-semibold">Basic Auth</span>
+                         <div class="flex gap-2 items-center">
+                           <%= if enabled? do %>
+                             <div class="text-xs text-gray-400 cursor-not-allowed" title="Disable share to configure">
+                               <%= if has_auth?, do: "Edit", else: "Configure" %>
+                             </div>
+                           <% else %>
+                             <div
+                               phx-click="modal_open"
+                               phx-value-modal_title="Configure Basic Auth"
+                               phx-value-modal_description="Basic auth for public resources, for APIs make sure to use basic auth header details to access"
+                               phx-value-modal_body={Jason.encode!(%{
+                                 "type" => "schema",
+                                 "data" => Tunneld.Schema.Resource.data(:basic_auth),
+                                 "default_values" => Map.put(auth_config, "resource_id", @data.id),
+                                 "action" => "configure_basic_auth"
+                               })}
+                               class="cursor-pointer text-xs underline text-blue-400 hover:text-blue-300"
+                             >
+                               <%= if has_auth?, do: "Edit", else: "Configure" %>
+                             </div>
+                           <% end %>
+                         </div>
+                       </div>
+                    </div>
+                  <% end %>
 
                   <div class="mt-2 grid grid-rows-1 md:grid-rows-3 gap-2 text-xs">
                     <div class="truncate">
@@ -494,6 +537,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           header: "Wireless Access",
           body: "Connect to access points for internet connectivity and optimize traffic using the CAKE algorithm to reduce bufferbloat and latency."
         }) %>
+      </div>
 
       <div class="flex flex-row gap-1 mt-2 justify-end">
         <button
@@ -508,7 +552,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <div class="truncate text-xs text-gray-1">Refresh</div>
         </button>
       </div>
-      </div>
+
       <div>
         <div class="flex flex-cols gap-3">
           <button

@@ -2,6 +2,7 @@ defmodule TunneldWeb.Live.Components.Modal do
   use TunneldWeb, :live_component
 
   attr :modal_title, :string, required: true
+  attr :modal_description, :string, required: false
   attr :modal_body, :any, required: true
   attr :modal_actions, :map, required: false
   attr :type, :atom, default: :default
@@ -33,7 +34,10 @@ defmodule TunneldWeb.Live.Components.Modal do
         <div phx-click="modal_close" class="absolute top-[0px] right-[0px] p-3 cursor-pointer">
           <.icon name="hero-x-mark-solid" class="h-5 w-5" />
         </div>
-        <h2 class="text-xl py-2"><%= @title %></h2>
+        <div class="py-2">
+          <h2 class="text-xl"><%= @title %></h2>
+          <h2 class="text-sm"><%= @description %></h2>
+        </div>
          <!-- Render the dynamic body -->
          <div class="text-sm"><%= render_body(assigns, @body) %></div>
          <!-- Modal Actions -->

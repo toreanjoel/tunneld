@@ -615,6 +615,93 @@ defmodule Tunneld.Servers.Resources do
     {:noreply, state}
   end
 
+  def handle_cast({:configure_basic_auth, params}, state) do
+    resource_id = params["resource_id"]
+    {_, raw} = read_file()
+    resources = if raw == "", do: [], else: raw
+
+    resource = Enum.find(resources, fn r -> r["id"] == resource_id end)
+
+    if resource do
+      # Prepare auth config
+      auth_config = %{
+        "enabled" => true,
+        "username" => params["username"],
+        "password" => params["password"]
+      }
+
+      updated_resource =
+        update_in(resource, ["tunneld", "auth"], fn auth ->
+          Map.put(auth || %{}, "basic", auth_config)
+        end)
+
+      # Regenerate the systemd files for the public share
+      tunneld = updated_resource["tunneld"] || %{}
+      units = tunneld["units"] || %{}
+
+      if public_unit = units["public"] do
+        Zrok.remove_share(public_unit["id"])
+      end
+
+      reserved = tunneld["reserved"] || %{}
+      pub_token = reserved["public"]
+
+      create_payload = %{
+        "id" => "#{updated_resource["id"]}pub",
+        "name" => updated_resource["name"],
+        "tunneld" => %{
+          "kind" => "reserved",
+          "reserved_token" => pub_token,
+          "headless" => true,
+          "auth" => %{"basic" => auth_config}
+        }
+      }
+
+      case Zrok.create_share_unit(create_payload) do
+        {:ok, %{id: new_pub_id, unit: new_pub_unit}} ->
+          updated_resource =
+            put_in(updated_resource, ["tunneld", "units", "public"], %{
+              "id" => new_pub_id,
+              "unit" => new_pub_unit
+            })
+
+          if get_in(resource, ["tunneld", "enabled", "public"]) do
+            Zrok.enable_share(new_pub_id)
+          end
+
+          updated_shares =
+            Enum.map(resources, fn r ->
+              if r["id"] == resource_id, do: updated_resource, else: r
+            end)
+
+          case File.write(path(), Jason.encode!(updated_shares)) do
+            :ok ->
+              Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+                type: :info,
+                message: "Basic Auth configured successfully"
+              })
+
+              broadcast_shares()
+              {:noreply, Map.put(state, :resources, updated_shares)}
+
+            {:error, err} ->
+              Logger.error("Failed to persist basic auth: #{inspect(err)}")
+              {:noreply, state}
+          end
+
+        {:error, err} ->
+          Logger.error("Failed to recreate share unit: #{inspect(err)}")
+          Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+            type: :error,
+            message: "Failed to configure Basic Auth"
+          })
+          {:noreply, state}
+      end
+    else
+      {:noreply, state}
+    end
+  end
+
   def handle_cast({:remove_share, id}, state) do
     {_, data} = read_file()
     resource = Enum.find(data, fn s -> s["id"] === id end)
@@ -885,6 +972,9 @@ defmodule Tunneld.Servers.Resources do
 
   def update_share(data, :resource),
     do: GenServer.cast(__MODULE__, {:update_share, :resource, data})
+
+  def configure_basic_auth(params),
+    do: GenServer.cast(__MODULE__, {:configure_basic_auth, params})
 
   def file_exists?(), do: File.exists?(path())
 
