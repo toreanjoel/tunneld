@@ -291,6 +291,27 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                              >
                                <%= if has_auth?, do: "Edit", else: "Configure" %>
                              </div>
+
+                             <%= if has_auth? do %>
+                               <div
+                                 phx-click="modal_open"
+                                 phx-value-modal_title="Disable Basic Auth?"
+                                 phx-value-modal_body={Jason.encode!(%{
+                                   "type" => "string",
+                                   "data" => "Are you sure you want to disable Basic Auth for this resource?"
+                                 })}
+                                 phx-value-modal_actions={Jason.encode!(%{
+                                   "title" => "Disable",
+                                   "payload" => %{
+                                     "type" => "disable_basic_auth",
+                                     "data" => %{"resource_id" => @data.id}
+                                   }
+                                 })}
+                                 class="cursor-pointer text-xs text-red hover:text-red-400 ml-2"
+                               >
+                                 Disable
+                               </div>
+                             <% end %>
                            <% end %>
                          </div>
                        </div>

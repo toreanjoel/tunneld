@@ -188,7 +188,11 @@ defmodule Tunneld.Servers.Resources do
             pub_token = make_token(base, "pub")
             priv_token = make_token(base, "priv")
 
-            Zrok.reserve_public(pub_token, ip, port)
+            tunneld = s["tunneld"] || %{}
+            auth = tunneld["auth"] || %{}
+            basic_auth = auth["basic"] || %{}
+
+            Zrok.reserve_public(pub_token, ip, port, basic_auth)
             Zrok.reserve_private(priv_token, ip, port)
 
             # Ensure nginx config is present on boot/resync
@@ -630,73 +634,21 @@ defmodule Tunneld.Servers.Resources do
         "password" => params["password"]
       }
 
-      updated_resource =
-        update_in(resource, ["tunneld", "auth"], fn auth ->
-          Map.put(auth || %{}, "basic", auth_config)
-        end)
+      reconfigure_share(resource, auth_config, resources, state)
+    else
+      {:noreply, state}
+    end
+  end
 
-      # Regenerate the systemd files for the public share
-      tunneld = updated_resource["tunneld"] || %{}
-      units = tunneld["units"] || %{}
+  def handle_cast({:disable_basic_auth, resource_id}, state) do
+    {_, raw} = read_file()
+    resources = if raw == "", do: [], else: raw
 
-      if public_unit = units["public"] do
-        Zrok.remove_share(public_unit["id"])
-      end
+    resource = Enum.find(resources, fn r -> r["id"] == resource_id end)
 
-      reserved = tunneld["reserved"] || %{}
-      pub_token = reserved["public"]
-
-      create_payload = %{
-        "id" => "#{updated_resource["id"]}pub",
-        "name" => updated_resource["name"],
-        "tunneld" => %{
-          "kind" => "reserved",
-          "reserved_token" => pub_token,
-          "headless" => true,
-          "auth" => %{"basic" => auth_config}
-        }
-      }
-
-      case Zrok.create_share_unit(create_payload) do
-        {:ok, %{id: new_pub_id, unit: new_pub_unit}} ->
-          updated_resource =
-            put_in(updated_resource, ["tunneld", "units", "public"], %{
-              "id" => new_pub_id,
-              "unit" => new_pub_unit
-            })
-
-          if get_in(resource, ["tunneld", "enabled", "public"]) do
-            Zrok.enable_share(new_pub_id)
-          end
-
-          updated_shares =
-            Enum.map(resources, fn r ->
-              if r["id"] == resource_id, do: updated_resource, else: r
-            end)
-
-          case File.write(path(), Jason.encode!(updated_shares)) do
-            :ok ->
-              Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-                type: :info,
-                message: "Basic Auth configured successfully"
-              })
-
-              broadcast_shares()
-              {:noreply, Map.put(state, :resources, updated_shares)}
-
-            {:error, err} ->
-              Logger.error("Failed to persist basic auth: #{inspect(err)}")
-              {:noreply, state}
-          end
-
-        {:error, err} ->
-          Logger.error("Failed to recreate share unit: #{inspect(err)}")
-          Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-            type: :error,
-            message: "Failed to configure Basic Auth"
-          })
-          {:noreply, state}
-      end
+    if resource do
+      auth_config = %{"enabled" => false}
+      reconfigure_share(resource, auth_config, resources, state)
     else
       {:noreply, state}
     end
@@ -786,6 +738,83 @@ defmodule Tunneld.Servers.Resources do
     resources
   end
 
+  defp reconfigure_share(resource, auth_config, resources, state) do
+    updated_resource =
+      update_in(resource, ["tunneld", "auth"], fn auth ->
+        Map.put(auth || %{}, "basic", auth_config)
+      end)
+
+    # Regenerate the systemd files for the public share
+    tunneld = updated_resource["tunneld"] || %{}
+    units = tunneld["units"] || %{}
+
+    if public_unit = units["public"] do
+      Zrok.remove_share(public_unit["id"])
+    end
+
+    # Release the reservation so we can update it with new auth details
+    reserved = tunneld["reserved"] || %{}
+    pub_token = reserved["public"]
+    Zrok.release_reserved(pub_token)
+
+    # Re-reserve with the new auth configuration
+    ip = updated_resource["ip"] || @nginx_ip
+    port = updated_resource["port"] || @nginx_port
+    Zrok.reserve_public(pub_token, ip, port, auth_config)
+
+    create_payload = %{
+      "id" => "#{updated_resource["id"]}pub",
+      "name" => updated_resource["name"],
+      "tunneld" => %{
+        "kind" => "reserved",
+        "reserved_token" => pub_token,
+        "headless" => true,
+        "auth" => %{"basic" => auth_config}
+      }
+    }
+
+    case Zrok.create_share_unit(create_payload) do
+      {:ok, %{id: new_pub_id, unit: new_pub_unit}} ->
+        updated_resource =
+          put_in(updated_resource, ["tunneld", "units", "public"], %{
+            "id" => new_pub_id,
+            "unit" => new_pub_unit
+          })
+
+        if get_in(resource, ["tunneld", "enabled", "public"]) do
+          Zrok.enable_share(new_pub_id)
+        end
+
+        updated_shares =
+          Enum.map(resources, fn r ->
+            if r["id"] == resource["id"], do: updated_resource, else: r
+          end)
+
+        case File.write(path(), Jason.encode!(updated_shares)) do
+          :ok ->
+            Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+              type: :info,
+              message: "Resource configuration updated"
+            })
+
+            broadcast_shares()
+            {:noreply, Map.put(state, :resources, updated_shares)}
+
+          {:error, err} ->
+            Logger.error("Failed to persist resource config: #{inspect(err)}")
+            {:noreply, state}
+        end
+
+      {:error, err} ->
+        Logger.error("Failed to recreate share unit: #{inspect(err)}")
+        Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+          type: :error,
+          message: "Failed to update resource configuration"
+        })
+        {:noreply, state}
+    end
+  end
+
   defp create_reserved_and_units(new_share) do
     name = new_share["name"]
     ip = Map.get(new_share, "ip", @nginx_ip)
@@ -795,7 +824,11 @@ defmodule Tunneld.Servers.Resources do
     pub_token = make_token(base, "pub")
     priv_token = make_token(base, "priv")
 
-    with :ok <- Zrok.reserve_public(pub_token, ip, port),
+    tunneld = new_share["tunneld"] || %{}
+    auth = tunneld["auth"] || %{}
+    basic_auth = auth["basic"] || %{}
+
+    with :ok <- Zrok.reserve_public(pub_token, ip, port, basic_auth),
          :ok <- Zrok.reserve_private(priv_token, ip, port),
          {:ok, %{id: pub_id, unit: pub_unit}} <-
            Zrok.create_share_unit(%{
@@ -975,6 +1008,9 @@ defmodule Tunneld.Servers.Resources do
 
   def configure_basic_auth(params),
     do: GenServer.cast(__MODULE__, {:configure_basic_auth, params})
+
+  def disable_basic_auth(resource_id),
+    do: GenServer.cast(__MODULE__, {:disable_basic_auth, resource_id})
 
   def file_exists?(), do: File.exists?(path())
 

@@ -128,17 +128,32 @@ defmodule Tunneld.Servers.Zrok do
     end
   end
 
-  def handle_call({:reserve_public, %{name: name, ip: ip, port: port}}, _from, state) do
-    case run(zrok_bin(), [
+  def handle_call({:reserve_public, %{name: name, ip: ip, port: port} = params}, _from, state) do
+    basic = params[:auth] || params["auth"] || %{}
+
+    auth_args =
+      if (basic["enabled"] == true or basic[:enabled] == true) &&
+           (basic["username"] || basic[:username]) && (basic["password"] || basic[:password]) do
+        username = basic["username"] || basic[:username]
+        password = basic["password"] || basic[:password]
+        ["--basic-auth", "#{username}:#{password}"]
+      else
+        []
+      end
+
+    cmd =
+      [
            "reserve",
            "public",
+           "#{ip}:#{port}",
            "--unique-name",
            name,
            "--open",
            "--backend-mode",
-           "proxy",
-           "#{ip}:#{port}"
-         ]) do
+           "proxy"
+         ] ++ auth_args
+
+    case run(zrok_bin(), cmd) do
       {_, 0} -> {:reply, :ok, state}
       err -> {:reply, {:error, err}, state}
     end
@@ -452,21 +467,8 @@ defmodule Tunneld.Servers.Zrok do
     tun = resource["tunneld"] || resource[:tunneld] || %{}
     reserved_token = to_string(tun["reserved_token"] || tun[:reserved_token] || name)
 
-    auth = tun["auth"] || tun[:auth] || %{}
-    basic = auth["basic"] || auth[:basic] || %{}
-
-    auth_args =
-      if (basic["enabled"] == true or basic[:enabled] == true) &&
-           (basic["username"] || basic[:username]) && (basic["password"] || basic[:password]) do
-        username = basic["username"] || basic[:username]
-        password = basic["password"] || basic[:password]
-        ["--basic-auth", "#{username}:#{password}"]
-      else
-        []
-      end
-
     exec =
-      ([zrok_bin(), "share", "reserved", reserved_token, "--headless"] ++ auth_args)
+      [zrok_bin(), "share", "reserved", reserved_token, "--headless"]
       |> Enum.map(&to_string/1)
       |> Enum.join(" ")
 
@@ -728,8 +730,8 @@ defmodule Tunneld.Servers.Zrok do
 
   def disable_env(), do: GenServer.call(__MODULE__, :disable_env, 60_000)
 
-  def reserve_public(name, ip, port),
-    do: GenServer.call(__MODULE__, {:reserve_public, %{name: name, ip: ip, port: port}}, 30_000)
+  def reserve_public(name, ip, port, auth \\ %{}),
+    do: GenServer.call(__MODULE__, {:reserve_public, %{name: name, ip: ip, port: port, auth: auth}}, 30_000)
 
   def reserve_private(name, ip, port),
     do: GenServer.call(__MODULE__, {:reserve_private, %{name: name, ip: ip, port: port}}, 30_000)

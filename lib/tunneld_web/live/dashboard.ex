@@ -727,6 +727,7 @@ defmodule TunneldWeb.Live.Dashboard do
       "revoke_login_creds" -> "Resetting login..."
       "update_blocklist" -> "Updating blocklist..."
       "configure_basic_auth" -> "Configuring Basic Auth..."
+      "disable_basic_auth" -> "Disabling Basic Auth..."
       _ -> "Working on request..."
     end
   end
@@ -816,6 +817,10 @@ defmodule TunneldWeb.Live.Dashboard do
 
       "configure_basic_auth" ->
         Tunneld.Servers.Resources.configure_basic_auth(decode_if_needed(data))
+
+      "disable_basic_auth" ->
+        %{"resource_id" => id} = decode_if_needed(data)
+        Tunneld.Servers.Resources.disable_basic_auth(id)
 
       "add_private_share" ->
         Tunneld.Servers.Resources.add_access(decode_if_needed(data))
