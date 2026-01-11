@@ -19,6 +19,8 @@ defmodule Tunneld.Application do
 
   @impl true
   def start(_type, _args) do
+    Tunneld.Template.ensure_template()
+
     children = [
       TunneldWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:tunneld, :dns_cluster_query) || :ignore},

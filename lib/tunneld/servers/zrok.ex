@@ -430,7 +430,7 @@ defmodule Tunneld.Servers.Zrok do
       |> Kernel.<>("%")
 
     exec =
-      [zrok_bin(), "access", "private", reserved, "-b", bind, "--headless"]
+      [zrok_bin(), "access", "private", reserved, "-b", bind, "--headless", "--template-path", Path.join(fs_root(), "error.gohtml")]
       |> Enum.map(&to_string/1)
       |> Enum.join(" ")
 
