@@ -97,14 +97,21 @@ defmodule Tunneld.Servers.Nginx do
 
     server {
         listen #{listen_ip}:#{public_port};
-        server_name #{public_name} ~^#{public_name}\..+$;
+        server_name #{public_name} ~^#{public_name}\\..+$;
 
         location / {
             proxy_pass http://#{upstream_name};
+
+            client_max_body_size 0;
+            proxy_request_buffering off;
+
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # Hardcoded to HTTPS for zrok/tunnel compatibility
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-Forwarded-Port 443;
         }
     }
 
@@ -114,16 +121,22 @@ defmodule Tunneld.Servers.Nginx do
 
         location / {
             proxy_pass http://#{upstream_name};
+
+            client_max_body_size 0;
+            proxy_request_buffering off;
+
             proxy_set_header Host #{spoofed_host};
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # Hardcoded to HTTPS for zrok/tunnel compatibility
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-Forwarded-Port 443;
         }
     }
     """
   end
 
-  # ... (The rest of your helper functions ensure_dirs, etc. remain unchanged) ...
   defp ensure_dirs(mock?) do
     with :ok <- ensure_dir(base_dir(mock?)),
          :ok <- ensure_dir(Path.join(base_dir(mock?), "sites-available")),
@@ -134,30 +147,22 @@ defmodule Tunneld.Servers.Nginx do
 
   defp ensure_symlink(source, destination) do
     case File.ln_s(source, destination) do
-      :ok ->
-        :ok
-
+      :ok -> :ok
       {:error, :eexist} ->
         case File.read_link(destination) do
-          {:ok, ^source} ->
-            :ok
-
+          {:ok, ^source} -> :ok
           {:ok, _other} ->
             _ = File.rm(destination)
             File.ln_s(source, destination)
-
           {:error, _} ->
             _ = File.rm(destination)
             File.ln_s(source, destination)
         end
-
-      {:error, reason} ->
-        {:error, reason}
+      {:error, reason} -> {:error, reason}
     end
   end
 
   defp reload_nginx(true), do: :ok
-
   defp reload_nginx(false) do
     case System.cmd("systemctl", ["reload", @service_name]) do
       {_, 0} -> :ok
