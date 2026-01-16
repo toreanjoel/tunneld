@@ -487,7 +487,7 @@ defmodule Tunneld.Servers.Zrok do
         "Type=simple",
         "User=root",
         "Environment=GOMEMLIMIT=80MiB",
-        "Environment=GOGC=70",
+        "Environment=GOGC=15",
         "Environment=GOMAXPROCS=1",
         "ExecStart=/bin/sh -c \"#{exec}\"",
         "Restart=always",
