@@ -189,7 +189,7 @@ defmodule TunneldWeb.Live.Dashboard do
             phx-value-id="_"
             class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1"
           >
-            <.icon name="hero-user" class="h-15 w-15" />
+            <.icon name="hero-cog-6-tooth" class="h-15 w-15" />
           </div>
         </div>
       </div>
