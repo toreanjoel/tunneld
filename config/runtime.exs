@@ -16,7 +16,13 @@ config :tunneld, :fs,
   root: System.get_env("TUNNELD_DATA", default_root),
   auth: System.get_env("TUNNELD_AUTH_FILE", "auth.json"),
   resources: System.get_env("TUNNELD_SHARES_FILE", "resources.json"),
-  sqm: System.get_env("TUNNELD_SQM_FILE", "sqm.json")
+  sqm: System.get_env("TUNNELD_SQM_FILE", "sqm.json"),
+  dns_file: System.get_env("TUNNELD_DNS_FILE", "/etc/dnsmasq.d/tunneld_resources.conf")
+
+config :tunneld, :certs,
+  cert_dir: System.get_env("TUNNELD_CERT_DIR", "/etc/nginx/certs"),
+  ca_dir: System.get_env("TUNNELD_CA_DIR", "/etc/tunneld/ca"),
+  ca_file: "rootCA.key"
 
 # Only require these in PROD
 if config_env() == :prod do
@@ -48,7 +54,7 @@ if config_env() == :prod do
 
   gateway_origin = System.get_env("GATEWAY", "")
   hostname = System.get_env("HOSTNAME", "")
-  check_origins = ["http://#{gateway_origin}", "http://localhost", "http://#{hostname}"]
+  check_origins = ["http://#{gateway_origin}", "http://localhost", "http://#{hostname}", "http://tunneld.local", "https://tunneld.local"]
 
   config :tunneld, TunneldWeb.Endpoint,
     url: [host: host, port: 80, scheme: "http"],
