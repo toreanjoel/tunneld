@@ -7,7 +7,7 @@ defmodule Tunneld.Servers.Nginx do
   @private_port_range 10000
 
   @doc """
-  Create or update the nginx config for a resource (shared for public/private).
+  Create or update the nginx config for a resource (shared for public/private)
   """
   def upsert_resource_config(%{"id" => id, "pool" => pool} = resource) when is_list(pool) do
     mock? = mock_mode?()
