@@ -39,7 +39,7 @@ defmodule Tunneld.Servers.Updater do
       if status == :ok do
         c_v = Application.get_env(:tunneld, :version)
         r_m = Map.get(data, "version")
-        update_available = r_m && Version.lt?(c_v, r_m)
+        update_available = r_m && Version.compare(c_v, r_m) == :lt
 
         # Only broadcast if the status has changed
         if update_available != state.is_latest or r_m != state.new_version do
