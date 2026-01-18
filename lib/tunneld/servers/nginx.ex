@@ -14,6 +14,10 @@ defmodule Tunneld.Servers.Nginx do
     available_path = available_path(id, mock?)
     enabled_path = enabled_path(id, mock?)
 
+    reserved = get_in(resource, ["tunneld", "reserved"]) || %{}
+    public_name = Map.get(reserved, "public", "#{id}-public")
+    Tunneld.CertManager.generate_cert(public_name)
+
     with :ok <- ensure_dirs(mock?),
          :ok <- ensure_pool(pool),
          :ok <- File.write(available_path, render_config(resource)),
@@ -68,8 +72,11 @@ defmodule Tunneld.Servers.Nginx do
     upstream_name = "tunneld_#{id}_pool"
     pool = Map.get(resource, "pool", [])
 
-    # Retrieve root domain from config if available (e.g. "example.com")
-    root_domain = Application.get_env(:tunneld, :root_domain)
+    root_domain =
+      case Tunneld.Servers.Zrok.get_root_domain() do
+        {:ok, domain} -> domain
+        _ -> nil
+      end
 
     # Logic to determine the Host header for private access:
     spoofed_host =
@@ -77,8 +84,8 @@ defmodule Tunneld.Servers.Nginx do
         String.contains?(public_name, ".") ->
           public_name
 
-        is_binary(root_domain) and root_domain != "" ->
-          public_name <> "." <> String.trim_leading(root_domain, ".")
+        root_domain ->
+          public_name <> "." <> root_domain
 
         true ->
           public_name
@@ -90,10 +97,44 @@ defmodule Tunneld.Servers.Nginx do
       |> Enum.reject(&(&1 == ""))
       |> Enum.map_join("\n", fn entry -> "    server #{entry};" end)
 
+    gateway_ip = Application.get_env(:tunneld, :network, []) |> Keyword.get(:gateway)
+    cert_dir = Application.get_env(:tunneld, :certs, []) |> Keyword.get(:cert_dir)
+    ssl_crt = Path.join(cert_dir, "#{public_name}.crt")
+    ssl_key = Path.join(cert_dir, "#{public_name}.key")
+
+    ssl_block = if root_domain do
+      """
+      server {
+          listen #{gateway_ip}:443 ssl;
+          server_name #{public_name}.#{root_domain};
+
+          ssl_certificate #{ssl_crt};
+          ssl_certificate_key #{ssl_key};
+
+          location / {
+              proxy_pass http://#{upstream_name};
+
+              client_max_body_size 0;
+              proxy_request_buffering off;
+
+              proxy_set_header Host $host;
+              proxy_set_header X-Real-IP $remote_addr;
+              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              proxy_set_header X-Forwarded-Proto https;
+              proxy_set_header X-Forwarded-Port 443;
+          }
+      }
+      """
+    else
+      ""
+    end
+
     """
     upstream #{upstream_name} {
     #{servers}
     }
+
+    #{ssl_block}
 
     server {
         listen #{listen_ip}:#{public_port};

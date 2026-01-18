@@ -103,6 +103,20 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <div class="truncate text-xs">WebAuthn</div>
         </div>
       </div>
+
+      <div class="mt-6 border-t border-gray-700 pt-4">
+        <p class="text-xs text-gray-400 mb-3">
+          Download and install the Root CA on your devices to enable trusted SSL access to services on your local subnet.
+        </p>
+        <a
+          href={~p"/download/ca"}
+          download
+          class="flex items-center justify-center gap-1 bg-blue-500 p-2 cursor-pointer rounded-md w-full"
+        >
+          <.icon name="hero-arrow-down-tray" class="h-5 w-5" />
+          <div class="truncate text-xs">Download Root CA</div>
+        </a>
+      </div>
     </div>
     """
   end

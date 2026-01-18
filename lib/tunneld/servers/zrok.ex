@@ -723,6 +723,22 @@ defmodule Tunneld.Servers.Zrok do
     do: GenServer.call(__MODULE__, {:set_api_endpoint, endpoint}, 30_000)
 
   def get_api_endpoint(), do: GenServer.call(__MODULE__, :get_api_endpoint, 15_000)
+
+  def get_root_domain do
+    case get_api_endpoint() do
+      url when is_binary(url) and url not in ["<unset>", "", nil] ->
+        case URI.parse(url).host do
+          nil -> {:error, :no_host}
+          host ->
+            domain = if String.starts_with?(host, "zrok."),
+              do: String.replace_prefix(host, "zrok.", ""),
+              else: host
+            {:ok, domain}
+        end
+      _ -> {:error, :unset}
+    end
+  end
+
   def unset_api_endpoint(), do: GenServer.call(__MODULE__, :unset_api_endpoint, 30_000)
 
   def enable_env(account_token),
