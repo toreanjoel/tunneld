@@ -4,7 +4,7 @@ defmodule Tunneld.Servers.Resources do
   """
   use GenServer
   require Logger
-  alias Tunneld.Servers.{Nginx, Zrok, Dnsmasq}
+  alias Tunneld.Servers.{Nginx, Zrok, Dnsmasq, Services}
 
   @interval 10_000
   @nginx_ip "127.0.0.1"
@@ -72,6 +72,7 @@ defmodule Tunneld.Servers.Resources do
 
           if pub = reserve_meta["reserved"]["public"] do
             Dnsmasq.add_entry(pub)
+            Services.restart_service(:dnsmasq)
           end
 
           broadcast_shares()
@@ -686,6 +687,7 @@ defmodule Tunneld.Servers.Resources do
               _ = Zrok.release_reserved(pub)
               _ = Zrok.release_reserved(priv)
               Dnsmasq.remove_entry(pub)
+              Services.restart_service(:dnsmasq)
               Tunneld.CertManager.delete_cert(pub)
 
             _ ->

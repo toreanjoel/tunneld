@@ -23,6 +23,7 @@ defmodule TunneldWeb.Router do
     pipe_through [:browser, :set_client_id]
 
     live "/", Live.Login
+    get "/download/ca", CAController, :download
     live "/dashboard", Live.Dashboard
   end
 
