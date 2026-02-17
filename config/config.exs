@@ -61,7 +61,7 @@ config :phoenix, :json_library, Jason
 
 # DEFAULT ADMIN DASHBOARD DETAILS
 config :tunneld, :auth,
-  ttl: 1800 # 30 minutes
+  ttl: 1800
 
 config :tunneld, version: "0.10.5"
 
