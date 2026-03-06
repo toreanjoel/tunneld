@@ -60,13 +60,21 @@ defmodule Tunneld.Servers.Devices do
   defp delete_lease_line(_mac, true), do: {:ok, :mock}
 
   defp delete_lease_line(mac, false) do
-    # sed -i '/{mac}/d' /var/lib/misc/dnsmasq.leases
-    {_, exit_code} =
-      System.cmd("sed", ["-i", "/#{mac}/d", @path])
+    case File.read(@path) do
+      {:ok, content} ->
+        filtered =
+          content
+          |> String.split("\n")
+          |> Enum.reject(&String.contains?(&1, mac))
+          |> Enum.join("\n")
 
-    case exit_code do
-      0 -> {:ok, :deleted}
-      code -> {:error, {:sed_failed, code}}
+        case File.write(@path, filtered) do
+          :ok -> {:ok, :deleted}
+          {:error, reason} -> {:error, {:write_failed, reason}}
+        end
+
+      {:error, reason} ->
+        {:error, {:read_failed, reason}}
     end
   end
 
@@ -119,9 +127,29 @@ defmodule Tunneld.Servers.Devices do
   end
 
   @doc """
-  Revoke a device's lease by MAC
+  Revoke a device's lease by MAC address.
+
+  Validates the MAC format before passing it to any system command to
+  prevent command injection via the `sed` call.
   """
   def revoke_lease(mac) when is_binary(mac) do
+    unless valid_mac?(mac) do
+      Phoenix.PubSub.broadcast(Tunneld.PubSub, @notifications_topic, %{
+        type: :error,
+        message: "Invalid MAC address format: #{mac}"
+      })
+
+      {:error, :invalid_mac}
+    else
+      do_revoke_lease(mac)
+    end
+  end
+
+  defp valid_mac?(mac) do
+    Regex.match?(~r/^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}$/, mac)
+  end
+
+  defp do_revoke_lease(mac) do
     mock? = Application.get_env(:tunneld, :mock_data, false)
 
     with {:ok, _} <- delete_lease_line(mac, mock?),

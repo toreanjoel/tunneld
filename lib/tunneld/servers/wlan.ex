@@ -21,7 +21,7 @@ defmodule Tunneld.Servers.Wlan do
     {:ok, %{}}
   end
 
-  # Disconenct from the current connected wireless network
+  # Disconnect from the current connected wireless network
   def handle_call(:disconnect, _from, state) do
     if Application.get_env(:tunneld, :mock_data, false) do
       {:reply, :ok, state}
@@ -34,7 +34,7 @@ defmodule Tunneld.Servers.Wlan do
         message: "Disconnected from network"
       })
 
-      Logger.info("Disconencted from network")
+      Logger.info("Disconnected from network")
 
       # send relevant events to the main dashboard
       check_connection()
@@ -87,14 +87,20 @@ defmodule Tunneld.Servers.Wlan do
     wlan_iface = network_conf[:wlan]
     country = network_conf[:country] || ""
 
+    # Sanitize inputs to prevent WPA config injection.
+    # Escape backslashes and double quotes which could break out of the value fields.
+    safe_ssid = sanitize_wpa_value(ssid)
+    safe_password = sanitize_wpa_value(password)
+    safe_country = sanitize_wpa_value(country)
+
     new_config = """
-    country=#{country}
+    country=#{safe_country}
     ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
     update_config=1
 
     network={
-        ssid="#{ssid}"
-        psk="#{password}"
+        ssid="#{safe_ssid}"
+        psk="#{safe_password}"
         auth_alg=OPEN
         key_mgmt=WPA-PSK
     }
@@ -246,6 +252,17 @@ defmodule Tunneld.Servers.Wlan do
       end
     end
   end
+
+  # Escape characters that could break out of a double-quoted WPA config value.
+  defp sanitize_wpa_value(value) when is_binary(value) do
+    value
+    |> String.replace("\\", "\\\\")
+    |> String.replace("\"", "\\\"")
+    |> String.replace("\n", "")
+    |> String.replace("\r", "")
+  end
+
+  defp sanitize_wpa_value(_), do: ""
 
   # Parses raw wpa_cli status output into a map
   def parse_wpa_status(raw) do

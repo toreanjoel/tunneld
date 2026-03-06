@@ -76,28 +76,37 @@ defmodule Tunneld.Servers.Services do
     end
   end
 
-  # Restart a service - can be broken to be more modular
+  # Restart a service — only allows services in the @services allowlist
   def handle_cast({:restart_service, service, :no_notify}, state) do
-    service_name = service |> to_string
+    if service in @services do
+      service_name = to_string(service)
 
-    Task.start(fn ->
-      System.cmd("systemctl", ["restart", service_name])
-    end)
+      Task.start(fn ->
+        System.cmd("systemctl", ["restart", service_name])
+      end)
+    end
 
     {:noreply, state}
   end
 
   def handle_cast({:restart_service, service}, state) do
-    service_name = service |> to_string
+    if service in @services do
+      service_name = to_string(service)
 
-    Task.start(fn ->
-      System.cmd("systemctl", ["restart", service_name])
-    end)
+      Task.start(fn ->
+        System.cmd("systemctl", ["restart", service_name])
+      end)
 
-    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-      type: :info,
-      message: "Restarting service: #{service_name}"
-    })
+      Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+        type: :info,
+        message: "Restarting service: #{service_name}"
+      })
+    else
+      Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+        type: :error,
+        message: "Unknown service: #{inspect(service)}"
+      })
+    end
 
     {:noreply, state}
   end

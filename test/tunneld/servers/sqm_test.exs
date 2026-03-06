@@ -3,6 +3,12 @@ defmodule Tunneld.Servers.SqmTest do
 
   alias Tunneld.Servers.Sqm
 
+  setup do
+    # Restart the Sqm GenServer if a prior test killed it
+    unless GenServer.whereis(Sqm), do: Sqm.start_link([])
+    :ok
+  end
+
   describe "get_state/0" do
     test "returns current SQM state with expected keys" do
       state = Sqm.get_state()

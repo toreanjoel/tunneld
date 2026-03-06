@@ -983,6 +983,33 @@ defmodule Tunneld.Servers.Resources do
     pool
     |> Enum.map(&String.trim/1)
     |> Enum.reject(&(&1 == ""))
+    |> Enum.filter(&valid_pool_entry?/1)
+  end
+
+  # Validates that a pool entry matches IP:port format to prevent
+  # injection into nginx upstream configs.
+  defp valid_pool_entry?(entry) do
+    case String.split(entry, ":", parts: 2) do
+      [ip, port] ->
+        valid_ip?(ip) and valid_port?(port)
+
+      _ ->
+        false
+    end
+  end
+
+  defp valid_ip?(ip) do
+    case :inet.parse_address(String.to_charlist(ip)) do
+      {:ok, _} -> true
+      _ -> false
+    end
+  end
+
+  defp valid_port?(port_str) do
+    case Integer.parse(port_str) do
+      {port, ""} -> port > 0 and port <= 65535
+      _ -> false
+    end
   end
 
   def read_file() do
