@@ -1060,7 +1060,7 @@ defmodule Tunneld.Servers.Resources do
   def file_exists?(), do: File.exists?(path())
 
   @doc "Returns the full path to the resources JSON file."
-  def path(), do: Path.join(config_fs(:root), config_fs(:resources))
+  def path(), do: Path.join(Tunneld.Config.fs(:root), Tunneld.Config.fs(:resources))
 
   defp pool_health(pool, true) when is_list(pool) do
     %{status: :mock, total: length(pool), up: nil}
@@ -1116,11 +1116,4 @@ defmodule Tunneld.Servers.Resources do
     end
   end
 
-  defp config_fs(key) do
-    case Application.get_env(:tunneld, :fs) do
-      kw when is_list(kw) -> Keyword.get(kw, key)
-      map when is_map(map) -> Map.get(map, key) || Map.get(map, to_string(key))
-      _ -> nil
-    end
-  end
 end

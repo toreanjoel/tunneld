@@ -216,17 +216,9 @@ defmodule Tunneld.Servers.Sqm do
   Get the path to the SQM configuration file.
   """
   def path() do
-    root = config_fs(:root)
-    sqm = config_fs(:sqm)
+    root = Tunneld.Config.fs(:root)
+    sqm = Tunneld.Config.fs(:sqm)
     if root && sqm, do: Path.join(root, sqm), else: nil
-  end
-
-  defp config_fs(key) do
-    case Application.get_env(:tunneld, :fs) do
-      kw when is_list(kw) -> Keyword.get(kw, key)
-      map when is_map(map) -> Map.get(map, key) || Map.get(map, to_string(key))
-      _ -> nil
-    end
   end
 
   defp get_net_config(key) do

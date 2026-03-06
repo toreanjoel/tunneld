@@ -256,14 +256,7 @@ defmodule Tunneld.Servers.Nginx do
     end
   end
 
-  defp fs_root() do
-    case Application.get_env(:tunneld, :fs) do
-      nil -> "/var/lib/tunneld"
-      kw when is_list(kw) -> Keyword.get(kw, :root, "/var/lib/tunneld")
-      map when is_map(map) -> Map.get(map, :root) || Map.get(map, "root") || "/var/lib/tunneld"
-      bin when is_binary(bin) -> bin
-    end
-  end
+  defp fs_root(), do: Tunneld.Config.fs_root()
 
   defp ensure_pool(pool) when is_list(pool) and length(pool) > 0, do: :ok
   defp ensure_pool(_), do: {:error, :invalid_pool}

@@ -108,14 +108,5 @@ defmodule Tunneld.Servers.Auth do
   def file_exists?(), do: path() |> File.exists?()
 
   # Path helper
-  def path(), do: Path.join(config_fs(:root), config_fs(:auth))
-
-  # Config helper
-  defp config_fs(key) do
-    case Application.get_env(:tunneld, :fs) do
-      kw when is_list(kw) -> Keyword.get(kw, key)
-      map when is_map(map) -> Map.get(map, key) || Map.get(map, to_string(key))
-      _ -> nil
-    end
-  end
+  def path(), do: Path.join(Tunneld.Config.fs(:root), Tunneld.Config.fs(:auth))
 end

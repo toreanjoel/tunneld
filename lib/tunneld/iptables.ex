@@ -1,4 +1,4 @@
-defmodule Iptables do
+defmodule Tunneld.Iptables do
   @moduledoc """
   Configures iptables firewall rules for the Tunneld gateway.
 

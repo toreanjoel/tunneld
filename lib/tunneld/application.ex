@@ -48,7 +48,7 @@ defmodule Tunneld.Application do
     ]
 
     if not Application.get_env(:tunneld, :mock_data, false) do
-      Iptables.reset()
+      Tunneld.Iptables.reset()
     end
 
     opts = [strategy: :one_for_one, name: Tunneld.Supervisor]

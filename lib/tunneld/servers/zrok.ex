@@ -722,14 +722,7 @@ defmodule Tunneld.Servers.Zrok do
     end
   end
 
-  defp fs_root() do
-    case Application.get_env(:tunneld, :fs) do
-      nil -> "/var/lib/tunneld"
-      kw when is_list(kw) -> Keyword.get(kw, :root, "/var/lib/tunneld")
-      map when is_map(map) -> Map.get(map, :root) || Map.get(map, "root") || "/var/lib/tunneld"
-      bin when is_binary(bin) -> bin
-    end
-  end
+  defp fs_root(), do: Tunneld.Config.fs_root()
 
   defp notify(type, message) do
     Phoenix.PubSub.broadcast(@pubsub, @topic_notif, %{type: type, message: message})
