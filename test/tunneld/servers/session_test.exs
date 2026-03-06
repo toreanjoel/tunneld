@@ -4,12 +4,8 @@ defmodule Tunneld.Servers.SessionTest do
   alias Tunneld.Servers.Session
 
   setup do
-    # Stop the existing Session GenServer and restart it with clean state
-    if Process.whereis(Session) do
-      GenServer.stop(Session)
-    end
-
-    {:ok, _pid} = Session.start_link([])
+    # Ensure the Session GenServer is running (may have been killed by another test)
+    unless GenServer.whereis(Session), do: Session.start_link([])
     :ok
   end
 

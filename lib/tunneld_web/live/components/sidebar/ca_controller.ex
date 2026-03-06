@@ -1,4 +1,10 @@
 defmodule TunneldWeb.CAController do
+  @moduledoc """
+  Controller for downloading the Tunneld root CA certificate.
+
+  Serves the PEM-encoded root CA file so that clients on the network
+  can install it to trust locally-generated TLS certificates.
+  """
   use TunneldWeb, :controller
 
   def download(conn, _params) do

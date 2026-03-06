@@ -1,4 +1,10 @@
 defmodule TunneldWeb.Live.Components.Modal do
+  @moduledoc """
+  Reusable modal dialog component for the dashboard.
+
+  Renders different content types (default overlay, JSON schema forms)
+  and dispatches form actions back to the parent LiveView via PubSub.
+  """
   use TunneldWeb, :live_component
 
   attr :modal_title, :string, required: true
