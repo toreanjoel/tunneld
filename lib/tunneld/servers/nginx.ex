@@ -1,5 +1,19 @@
 defmodule Tunneld.Servers.Nginx do
-  @moduledoc false
+  @moduledoc """
+  Generates and manages per-resource nginx reverse proxy configurations.
+
+  Each resource gets an nginx config file with:
+  - An upstream block pointing to the resource's backend pool (IP:port entries)
+  - A public server block (port 18000) matched by the Zrok public share name
+  - A private server block (deterministic port via `phash2`) for Zrok private shares
+  - An optional SSL server block (port 443) for local DNS hairpin access
+
+  Config files follow the sites-available/sites-enabled symlink pattern.
+  In mock mode, files are written under the local data directory instead of `/etc/nginx/`.
+
+  This is a plain module (not a GenServer) — all functions are called synchronously
+  by the Resources server.
+  """
   require Logger
   @service_name "nginx"
   @public_port 18000

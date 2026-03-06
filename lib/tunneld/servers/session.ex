@@ -1,6 +1,16 @@
 defmodule Tunneld.Servers.Session do
   @moduledoc """
-  Auth session management (IP-keyed).
+  In-memory, IP-keyed authentication session store.
+
+  Each session is a map entry keyed by the client's IP address with an
+  `expires_at` Unix timestamp. Sessions are created on successful login,
+  renewed on activity, and automatically evicted when expired.
+
+  A periodic cleanup sweeps stale entries every `@interval` milliseconds
+  to prevent unbounded state growth.
+
+  All public functions are synchronous (`GenServer.call`) to guarantee
+  the caller receives the latest session state.
   """
   use GenServer
   require Logger
@@ -12,15 +22,21 @@ defmodule Tunneld.Servers.Session do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 
-  # Create/refresh a session for id (IP). Overwrites or creates with fresh TTL.
+  @doc """
+  Create or refresh a session for the given IP. Returns `{:ok, "Session Created"}`.
+  """
   @spec create(String.t()) :: {:ok, String.t()}
   def create(id), do: GenServer.call(__MODULE__, {:create, id})
 
-  # Get a session; will evict & return error if expired/missing.
+  @doc """
+  Retrieve a session by IP. Evicts and returns `{:error, reason}` if expired or missing.
+  """
   @spec get(String.t()) :: {:ok, map()} | {:error, String.t()}
   def get(id), do: GenServer.call(__MODULE__, {:get, id})
 
-  # Convenience: is this session currently valid (exists & not expired)?
+  @doc """
+  Returns `true` if the session exists and has not expired.
+  """
   @spec valid?(String.t()) :: boolean()
   def valid?(id) do
     case get(id) do
@@ -29,10 +45,15 @@ defmodule Tunneld.Servers.Session do
     end
   end
 
-  # Renew a valid session's expiry (no-op if missing).
+  @doc """
+  Reset the TTL on an existing session. Returns `:ok` or `{:error, reason}` if missing/expired.
+  """
   @spec renew(String.t()) :: :ok | {:error, String.t()}
   def renew(id), do: GenServer.call(__MODULE__, {:renew, id})
 
+  @doc """
+  Delete a session by IP. Returns `{:ok, "Session deleted"}` or `{:error, reason}`.
+  """
   @spec delete(String.t()) :: {:ok, String.t()} | {:error, String.t()}
   def delete(id), do: GenServer.call(__MODULE__, {:delete, id})
 

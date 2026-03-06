@@ -1,6 +1,22 @@
 defmodule Tunneld.Servers.Resources do
   @moduledoc """
-  Manage the resources (to a running application hosted on some device on the network)
+  Central resource registry — manages "resources" (references to applications
+  hosted on devices within the Tunneld network).
+
+  A resource represents a service that Tunneld can proxy and optionally expose
+  via Zrok tunnels. Each resource has:
+  - A **pool** of backend `IP:port` entries (load-balanced by nginx)
+  - A **public** Zrok share (internet-accessible via the Zrok network)
+  - A **private** Zrok share (accessible only to other Zrok-enabled devices)
+  - Optional **basic auth** on the public share
+
+  Resources are persisted to `resources.json` and synced to nginx configs,
+  dnsmasq DNS entries, and Zrok reservations/systemd units.
+
+  This module also manages "access" entries — connections to remote Zrok shares
+  that bind to a local port for consumption.
+
+  State is periodically broadcast to the dashboard via PubSub.
   """
   use GenServer
   require Logger
@@ -992,37 +1008,58 @@ defmodule Tunneld.Servers.Resources do
     end
   end
 
+  @doc "Broadcast a single resource's details to the sidebar component."
   def get_resource(id), do: GenServer.cast(__MODULE__, {:get_resource, id})
 
+  @doc "Enable or disable a Zrok share unit by its systemd unit ID."
   def toggle_share(unit_id, enable),
     do: GenServer.cast(__MODULE__, {:toggle_share, unit_id, enable})
 
+  @doc "Add a new host resource with Zrok reservations, nginx config, and DNS entry."
   def add_share(resource), do: GenServer.call(__MODULE__, {:add_share, resource}, 25_000)
+
+  @doc "Re-register all existing host resources with Zrok on startup."
   def try_init_local_shares(), do: GenServer.cast(__MODULE__, :init_local_shares)
+
+  @doc "Disable all active Zrok shares (used before shutdown/restart)."
   def try_hibernate_shares(), do: GenServer.cast(__MODULE__, :hibernate_shares)
+
+  @doc "Remove a host resource and clean up its Zrok reservations, nginx config, and DNS entry."
   def remove_share(id), do: GenServer.cast(__MODULE__, {:remove_share, id})
 
+  @doc "Add a new access entry (bind a remote Zrok share to a local port)."
   def add_access(access), do: GenServer.call(__MODULE__, {:add_access, access}, 25_000)
 
+  @doc "Enable or disable a Zrok access unit by its systemd unit ID."
   def toggle_access(unit_id, enable),
     do: GenServer.cast(__MODULE__, {:toggle_access, unit_id, enable})
 
+  @doc "Remove an access entry and its Zrok access unit."
   def remove_access(id), do: GenServer.cast(__MODULE__, {:remove_access, id})
 
+  @doc """
+  Update a resource. The second argument determines what is updated:
+  - `:tunneld` — update the Zrok tunnel metadata
+  - `:resource` — update resource fields (description, pool) and regenerate nginx config
+  """
   def update_share(data, :tunneld),
     do: GenServer.cast(__MODULE__, {:update_share, :tunneld, data})
 
   def update_share(data, :resource),
     do: GenServer.cast(__MODULE__, {:update_share, :resource, data})
 
+  @doc "Configure HTTP basic auth on a resource's public Zrok share."
   def configure_basic_auth(params),
     do: GenServer.cast(__MODULE__, {:configure_basic_auth, params})
 
+  @doc "Disable HTTP basic auth on a resource's public Zrok share."
   def disable_basic_auth(resource_id),
     do: GenServer.cast(__MODULE__, {:disable_basic_auth, resource_id})
 
+  @doc "Returns `true` if the resources JSON file exists on disk."
   def file_exists?(), do: File.exists?(path())
 
+  @doc "Returns the full path to the resources JSON file."
   def path(), do: Path.join(config_fs(:root), config_fs(:resources))
 
   defp pool_health(pool, true) when is_list(pool) do

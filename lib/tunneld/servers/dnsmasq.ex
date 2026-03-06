@@ -1,5 +1,17 @@
 defmodule Tunneld.Servers.Dnsmasq do
-  @moduledoc false
+  @moduledoc """
+  Manages custom dnsmasq DNS entries for local resource resolution.
+
+  When a resource is created with a public Zrok share name, a DNS `address=` line
+  is appended to the dnsmasq config file (e.g., `/etc/dnsmasq.d/tunneld_resources.conf`)
+  so that `<share_name>.<root_domain>` resolves to the gateway IP on the local network.
+
+  This enables DNS hairpinning — devices on the Tunneld network can reach Zrok-shared
+  resources by their public domain name without leaving the local network.
+
+  This is a plain module (not a GenServer). The Resources server calls `add_entry/1`
+  and `remove_entry/1` and then restarts dnsmasq via the Services server.
+  """
   require Logger
 
   def add_entry(subdomain) do

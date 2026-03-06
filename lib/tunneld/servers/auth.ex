@@ -1,6 +1,14 @@
 defmodule Tunneld.Servers.Auth do
   @moduledoc """
-  Init and manage auth for the clients
+  Manages the on-disk authentication file (`auth.json`).
+
+  The auth file stores a single admin credential set (username + bcrypt hash)
+  and an optional WebAuthn credential for biometric login. All reads and writes
+  go through this module to keep the file format consistent.
+
+  This GenServer currently holds no state — it exists as a named process so
+  the supervision tree can track it, but all operations read/write directly
+  to disk.
   """
   use GenServer
   require Logger
@@ -9,15 +17,13 @@ defmodule Tunneld.Servers.Auth do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 
-  @doc """
-  Init and check auth files
-  """
+  @doc false
   def init(_) do
     {:ok, %{}}
   end
 
   @doc """
-  Read the auth file
+  Read and decode the auth JSON file. Returns `{:ok, map}` or `{:error, reason}`.
   """
   def read_file() do
     case path() |> File.read() do
@@ -36,7 +42,8 @@ defmodule Tunneld.Servers.Auth do
   end
 
   @doc """
-  Create the auth file
+  Create the auth file with the given username and plaintext password.
+  The password is bcrypt-hashed before writing.
   """
   def create_file(u, p) do
     case path()
@@ -52,7 +59,7 @@ defmodule Tunneld.Servers.Auth do
   end
 
   @doc """
-  Save the WebAuthn credential into the auth file
+  Merge a WebAuthn credential map into the existing auth file under the `"webauthn"` key.
   """
   def save_webauthn(credential_data) do
     case read_file() do
@@ -69,7 +76,7 @@ defmodule Tunneld.Servers.Auth do
   end
 
   @doc """
-  Clear the WebAuthn credential from the auth file
+  Remove the `"webauthn"` key from the auth file, disabling biometric login.
   """
   def clear_webauthn() do
     case read_file() do
@@ -83,7 +90,7 @@ defmodule Tunneld.Servers.Auth do
   end
 
   @doc """
-  Check if the user has setup webauthn
+  Returns `true` if a WebAuthn credential is stored in the auth file.
   """
   def has_webauthn?() do
     case read_file() do
@@ -96,7 +103,7 @@ defmodule Tunneld.Servers.Auth do
   end
 
   @doc """
-  Check if the auth file exists
+  Returns `true` if the auth JSON file exists on disk.
   """
   def file_exists?(), do: path() |> File.exists?()
 

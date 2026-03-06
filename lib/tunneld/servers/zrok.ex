@@ -1,5 +1,21 @@
 defmodule Tunneld.Servers.Zrok do
-  @moduledoc false
+  @moduledoc """
+  Manages the Zrok/OpenZiti overlay network integration.
+
+  Handles the full lifecycle of Zrok tunnel shares and access points:
+
+  - **Configuration**: Setting/unsetting the Zrok API endpoint (control plane URL)
+  - **Environment**: Enabling/disabling the device on a Zrok account
+  - **Reservations**: Creating named public and private share reservations
+  - **Shares**: Creating, enabling, disabling, and removing systemd service units
+    that run `zrok share reserved` for each resource
+  - **Access**: Creating, enabling, disabling, and removing systemd service units
+    that run `zrok access private` for consuming remote shares
+
+  In production, this module manages real systemd unit files under `/etc/systemd/system/`.
+  In mock mode (`MOCK_DATA=true`), unit files are written to the local data directory
+  and `.enabled` marker files simulate systemd enable/disable.
+  """
   use GenServer
   require Logger
 
