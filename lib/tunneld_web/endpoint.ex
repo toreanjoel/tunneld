@@ -1,4 +1,8 @@
 defmodule TunneldWeb.Endpoint do
+  @moduledoc """
+  Phoenix HTTP endpoint for the Tunneld dashboard. Uses the Bandit adapter.
+  Serves static assets, LiveView websockets, and the browser session.
+  """
   use Phoenix.Endpoint, otp_app: :tunneld
 
   # The session will be stored in the cookie and signed,

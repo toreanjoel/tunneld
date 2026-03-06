@@ -1,6 +1,13 @@
 defmodule Tunneld.Servers.Devices do
   @moduledoc """
-  Manage devices connected to the network
+  Polls the dnsmasq DHCP lease file to track devices connected to the Tunneld network.
+
+  Every `@interval` milliseconds, reads `/var/lib/misc/dnsmasq.leases` (or mock data),
+  parses each lease line into a device map (MAC, IP, hostname, expiry), and broadcasts
+  the device list to the dashboard via PubSub.
+
+  Also supports revoking a device's DHCP lease by MAC address, which removes the
+  lease line and restarts dnsmasq to force the device off the network.
   """
   use GenServer
   require Logger

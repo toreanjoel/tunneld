@@ -1,6 +1,10 @@
 defmodule Tunneld.Servers.Services do
   @moduledoc """
-  Manage running services
+  Monitors and manages the core system services (dnsmasq, dhcpcd, dnscrypt-proxy, nginx).
+
+  Polls each service's systemd status every `@interval` milliseconds and broadcasts
+  the results to the dashboard. Automatically attempts to start any service that is
+  not active. Also provides log retrieval via `journalctl` and service restart capability.
   """
   use GenServer
   require Logger

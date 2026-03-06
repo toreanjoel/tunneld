@@ -1,6 +1,10 @@
 defmodule Tunneld.Servers.SystemResources do
   @moduledoc """
-  Periodically gathers system resource usage data and broadcasts it to the Resources component.
+  Periodically gathers system resource usage (CPU, memory, disk) and broadcasts
+  to the SystemResources dashboard component.
+
+  Uses Erlang's `:cpu_sup` and `:memsup` (via the `:os_mon` application) for
+  CPU and memory metrics, and `df` for disk usage. Polls every `@interval` milliseconds.
   """
   use GenServer
   require Logger

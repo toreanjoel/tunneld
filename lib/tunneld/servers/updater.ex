@@ -1,6 +1,11 @@
 defmodule Tunneld.Servers.Updater do
   @moduledoc """
-  Manage updates for the system
+  Periodically checks for new Tunneld releases by fetching version metadata
+  from the installer repository on GitHub.
+
+  Compares the remote version against `Application.get_env(:tunneld, :version)`
+  and broadcasts update availability to the Welcome dashboard component.
+  Checks every `@interval` milliseconds (default: 5 minutes).
   """
   use GenServer
   require Logger

@@ -1,10 +1,9 @@
 defmodule Tunneld do
   @moduledoc """
-  Tunneld keeps the contexts that define your domain
-  and business logic.
+  Root module for the Tunneld application.
 
-  Contexts are also responsible for managing your data, regardless
-  if it comes from the database, an external API or others.
+  Contains the `Tunneld.Template` submodule which ensures the Zrok error
+  page template (`error.gohtml`) exists in the data directory on startup.
   """
 
   defmodule Template do

@@ -1,6 +1,14 @@
 defmodule Tunneld.Servers.Sqm do
   @moduledoc """
-  Manages Smart Queue Management (SQM) using the CAKE algorithm.
+  Manages Smart Queue Management (SQM) using the CAKE qdisc algorithm.
+
+  SQM shapes network traffic to reduce bufferbloat and improve latency
+  under load. This module applies `tc` (traffic control) rules to the
+  WiFi and Ethernet interfaces, configures CPU steering for packet
+  distribution, and disables hardware offloading for accurate shaping.
+
+  Settings are persisted to `sqm.json` and re-applied on startup.
+  Supports preset modes ("latency", "balanced") and custom bandwidth limits.
   """
   use GenServer
   require Logger

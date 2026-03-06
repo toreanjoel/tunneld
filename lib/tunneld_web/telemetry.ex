@@ -1,4 +1,8 @@
 defmodule TunneldWeb.Telemetry do
+  @moduledoc """
+  Telemetry metrics supervisor. Defines Phoenix and VM metrics for
+  the LiveDashboard (available at `/dev/dashboard` in development).
+  """
   use Supervisor
   import Telemetry.Metrics
 

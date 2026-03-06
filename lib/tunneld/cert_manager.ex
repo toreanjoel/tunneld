@@ -1,4 +1,15 @@
 defmodule Tunneld.CertManager do
+  @moduledoc """
+  Manages SSL certificates for local DNS hairpin access to Tunneld resources.
+
+  Generates certificates signed by the Tunneld root CA for each resource's
+  public share name (e.g., `<share>.example.com`). These certificates allow
+  devices on the local network to access resources via HTTPS using the same
+  domain name used externally.
+
+  Periodically checks all existing certificates and renews any that expire
+  within 24 hours. Uses OpenSSL CLI for all certificate operations.
+  """
   use GenServer
   require Logger
 

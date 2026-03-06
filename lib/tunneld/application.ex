@@ -1,5 +1,9 @@
 defmodule Tunneld.Application do
-  @moduledoc false
+  @moduledoc """
+  OTP Application entry point. Starts the supervision tree with all
+  GenServers, PubSub, and the Phoenix endpoint. In production, also
+  resets iptables firewall rules on startup.
+  """
 
   use Application
 

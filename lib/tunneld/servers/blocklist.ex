@@ -1,5 +1,14 @@
 defmodule Tunneld.Servers.Blocklist do
-  @moduledoc false
+  @moduledoc """
+  Manages the DNS sinkhole blocklist (ad/tracker/malware domain blocking).
+
+  Reads metadata (title, version, entry count, last modified) from the header
+  comments of the dnsmasq-format blocklist file. Supports triggering an update
+  via an external shell script that re-downloads the blocklist.
+
+  This GenServer holds no persistent state — metadata is loaded on demand
+  and broadcast to the sidebar details component.
+  """
   use GenServer
   require Logger
 

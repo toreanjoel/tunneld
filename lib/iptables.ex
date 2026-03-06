@@ -1,7 +1,15 @@
 defmodule Iptables do
   @moduledoc """
-  Module that will contain helper functions to interact with the firewall rules.
-  This ensures all devices are blocked by default except for access to Tunneld.
+  Configures iptables firewall rules for the Tunneld gateway.
+
+  On startup (production only), flushes all existing rules and sets up:
+  - IP forwarding between ethernet and WiFi interfaces
+  - NAT masquerading for internet access via WiFi and VPN (Mullvad)
+  - DNS redirection: all port-53 traffic is redirected to port 5336
+    (where dnscrypt-proxy listens) to enforce encrypted DNS
+  - Gateway access rules allowing devices to reach the Tunneld host
+
+  This module is called once at application start and is not a GenServer.
   """
 
   @doc """
