@@ -159,11 +159,12 @@ defmodule TunneldWeb.Live.Login do
   def handle_info(%{can_signup: can_signup}, socket) do
     if can_signup do
       send(self(), %{loading: false})
-      # Here we need to return the socket with the login state
-      # here we put a flash to let the user know it was successful
-      socket = socket |> put_flash(:info, "User successfully created!") |> assign(:type, :login)
+      # Create session and redirect to setup wizard
+      Session.create(socket.assigns.client_id)
 
-      {:noreply, socket}
+      {:noreply,
+       socket
+       |> push_navigate(to: Routes.live_path(socket, TunneldWeb.Live.Setup))}
     else
       socket = socket |> put_flash(:error, "Make sure the passwords match")
       # We clear the flash after 3 seconds
