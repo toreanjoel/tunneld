@@ -83,14 +83,66 @@ The installation script handles dependencies including `dnsmasq`, `dhcpcd`, `ngi
 curl -sSf https://raw.githubusercontent.com/toreanjoel/tunneld-installer/main/install.sh | sudo bash
 ```
 
+## Project Structure
+
+```
+lib/
+  tunneld/
+    application.ex          # OTP supervision tree
+    config.ex               # Shared config helpers
+    iptables.ex             # iptables firewall rule management
+    cert_manager.ex         # SSL certificate lifecycle (root CA + per-resource)
+    servers/
+      session.ex            # In-memory IP-keyed auth sessions
+      auth.ex               # Login credentials (bcrypt + WebAuthn)
+      resources.ex           # Resource registry (CRUD, Zrok shares, nginx, DNS)
+      resources/health.ex   # Pool backend health checking (TCP probes)
+      devices.ex            # DHCP lease monitoring and revocation
+      services.ex           # systemd service monitoring (dnsmasq, dhcpcd, etc.)
+      wlan.ex               # Wi-Fi interface management (wpa_supplicant)
+      nginx.ex              # Nginx reverse proxy config generation
+      dnsmasq.ex            # DNS hairpin entry management
+      zrok.ex               # Zrok CLI orchestration and systemd units
+      blocklist.ex          # DNS sinkhole blocklist management
+      sqm.ex                # Smart Queue Management (tc/CAKE)
+      updater.ex            # OTA update checking
+      system_resources.ex   # CPU, memory, disk monitoring
+    schema/                 # Ecto-less embedded schemas for form validation
+  tunneld_web/
+    live/
+      dashboard.ex          # Main dashboard LiveView
+      dashboard/
+        network_graph.ex    # Isometric network topology builder
+      login.ex              # Login LiveView
+      components/           # LiveView components (devices, resources, services, etc.)
+```
+
 ## Development
 
 To run Tunneld locally for development (mocking hardware interactions):
 
-1.  Install dependencies: `mix deps.get`
-2.  Start the server: `MOCK_DATA=true mix phx.server`
+1. Install Elixir 1.18+ and Erlang/OTP 27+
+2. Install dependencies: `mix deps.get`
+3. Install JS/CSS tooling: `mix assets.setup`
+4. Start the server: `MOCK_DATA=true mix phx.server`
 
 Now you can visit `localhost:4000` from your browser.
+
+The `MOCK_DATA=true` flag enables mock mode — all system commands (systemctl, wpa_cli, iw, tc, etc.) are stubbed with fake data so you can develop on any OS without hardware.
+
+### Running Tests
+
+```bash
+MOCK_DATA=true mix test
+```
+
+Tests are designed to run against the mock data layer. No hardware, root access, or running services are required.
+
+### Compilation Checks
+
+```bash
+MOCK_DATA=true mix compile --warnings-as-errors
+```
 
 ## API Access
 
@@ -115,3 +167,7 @@ Tunneld is built for users who:
 - Network-level ad blocking.
 - Secure DNS encryption.
 - Access to APIs and tools over a trusted application-level encrypted network.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on setting up your dev environment, running tests, and submitting changes.

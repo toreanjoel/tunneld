@@ -867,7 +867,8 @@ defmodule TunneldWeb.Live.Dashboard do
 
       "restart_service" ->
         %{"id" => id} = decode_if_needed(data)
-        id |> String.to_atom() |> Tunneld.Servers.Services.restart_service()
+        service = Tunneld.Servers.Services.find_service(id)
+        if service, do: Tunneld.Servers.Services.restart_service(service)
 
       "refresh_service_logs" ->
         %{"id" => id} = decode_if_needed(data)

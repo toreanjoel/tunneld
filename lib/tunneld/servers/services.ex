@@ -154,6 +154,12 @@ defmodule Tunneld.Servers.Services do
   end
 
   # Public API
+
+  @doc "Find a service atom by string name, returns nil if not in the allowlist."
+  def find_service(name) when is_binary(name) do
+    Enum.find(@services, fn s -> to_string(s) == name end)
+  end
+
   def get_service_logs(service), do: GenServer.call(__MODULE__, {:get_service_logs, service})
   def restart_service(service), do: GenServer.cast(__MODULE__, {:restart_service, service})
 
