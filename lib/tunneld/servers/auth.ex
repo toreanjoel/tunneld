@@ -26,18 +26,9 @@ defmodule Tunneld.Servers.Auth do
   Read and decode the auth JSON file. Returns `{:ok, map}` or `{:error, reason}`.
   """
   def read_file() do
-    case path() |> File.read() do
-      {:ok, data} ->
-        case Jason.decode(data) do
-          {:ok, data} ->
-            {:ok, data}
-
-          {:error, err} ->
-            {:error, "Failed to decode auth file: #{inspect(err)}"}
-        end
-
-      {:error, reason} ->
-        {:error, "There was a problem reading the file: #{inspect(reason)}"}
+    case Tunneld.Persistence.read_json(path()) do
+      {:ok, data} -> {:ok, data}
+      {:error, reason} -> {:error, "Failed to read auth file: #{inspect(reason)}"}
     end
   end
 
@@ -46,15 +37,11 @@ defmodule Tunneld.Servers.Auth do
   The password is bcrypt-hashed before writing.
   """
   def create_file(u, p) do
-    case path()
-         |> File.write(
-           Jason.encode!(%{"user" => u, "pass" => Bcrypt.hash_pwd_salt(p), "hide_login" => false})
-         ) do
-      :ok ->
-        {:ok, "Auth file created"}
+    data = %{"user" => u, "pass" => Bcrypt.hash_pwd_salt(p), "hide_login" => false}
 
-      {:error, reason} ->
-        {:error, "Failed to create auth file: #{inspect(reason)}"}
+    case Tunneld.Persistence.write_json(path(), data) do
+      :ok -> {:ok, "Auth file created"}
+      {:error, reason} -> {:error, "Failed to create auth file: #{inspect(reason)}"}
     end
   end
 
@@ -64,11 +51,8 @@ defmodule Tunneld.Servers.Auth do
   def save_webauthn(credential_data) do
     case read_file() do
       {:ok, data} ->
-        updated =
-          data
-          |> Map.put("webauthn", credential_data)
-
-        File.write(path(), Jason.encode!(updated))
+        updated = Map.put(data, "webauthn", credential_data)
+        Tunneld.Persistence.write_json(path(), updated)
 
       error ->
         error
@@ -82,7 +66,7 @@ defmodule Tunneld.Servers.Auth do
     case read_file() do
       {:ok, data} ->
         updated = Map.drop(data, ["webauthn"])
-        File.write(path(), Jason.encode!(updated))
+        Tunneld.Persistence.write_json(path(), updated)
 
       error ->
         error

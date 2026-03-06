@@ -16,7 +16,7 @@ defmodule TunneldWeb.Live.Dashboard do
   alias TunneldWeb.Live.Components.Resources
   alias TunneldWeb.Live.Components.Devices
   alias TunneldWeb.Live.Components.Modal
-  alias TunneldWeb.Live.Dashboard.NetworkGraph
+  alias TunneldWeb.Live.Dashboard.{Actions, NetworkGraph}
 
   # auth check if this page needs to be behind auth
   on_mount TunneldWeb.Hooks.CheckAuth
@@ -655,7 +655,7 @@ defmodule TunneldWeb.Live.Dashboard do
     Task.start(fn ->
       result =
         try do
-          {:ok, perform_action(action, data, parent)}
+          {:ok, Actions.perform(action, data, parent)}
         rescue
           e -> {:error, e}
         catch
@@ -733,161 +733,6 @@ defmodule TunneldWeb.Live.Dashboard do
     end
   end
 
-  defp perform_action(action, data, parent) do
-    case action do
-      #
-      # Device management
-      #
-      "revoke_release_ip" ->
-        %{"mac" => mac} = decode_if_needed(data)
-
-        if not is_nil(mac) do
-          Tunneld.Servers.Devices.revoke_lease(mac)
-        end
-
-      #
-      # Wireless networking
-      #
-      "connect_to_wireless_network" ->
-        decoded = decode_if_needed(data)
-        Tunneld.Servers.Wlan.connect_with_pass(decoded["ssid"], decoded["password"])
-
-      "disconnect_from_wireless_network" ->
-        Tunneld.Servers.Wlan.disconnect()
-        Process.send_after(parent, :delayed_scan, 3000)
-
-      "scan_for_wireless_networks" ->
-        send(parent, :scan_for_wireless_networks)
-
-      #
-      # WebAuthn configure
-      #
-      "configure_web_authn" ->
-        send(parent, :configure_web_authn)
-
-      #
-      # The setup to configure control plane domain
-      #
-      "configure_disable_control_plane" ->
-        Tunneld.Servers.Zrok.unset_api_endpoint()
-        Tunneld.Servers.Resources.try_hibernate_shares()
-
-      #
-      # The setup to configure control plane domain
-      #
-      "configure_enable_control_plane" ->
-        decoded = decode_if_needed(data)
-        Tunneld.Servers.Zrok.set_api_endpoint(decoded["url"])
-
-      #
-      # Configure device - enable
-      #
-      "configure_enable_environment" ->
-        decoded = decode_if_needed(data)
-        Tunneld.Servers.Zrok.enable_env(decoded["account_token"])
-        Tunneld.Servers.Resources.try_init_local_shares()
-
-      #
-      # Configure device - disable
-      #
-      "configure_disable_environment" ->
-        Tunneld.Servers.Zrok.disable_env()
-        Tunneld.Servers.Resources.try_hibernate_shares()
-
-      #
-      # Revoke Login Credentials
-      #
-      "revoke_login_creds" ->
-        File.rm(Tunneld.Servers.Auth.path())
-        send(parent, :revoke_login_creds)
-
-      #
-      # Blocklist
-      #
-      "update_blocklist" ->
-        Tunneld.Servers.Blocklist.update()
-
-      #
-      # Resources
-      #
-      "add_share" ->
-        Tunneld.Servers.Resources.add_share(decode_if_needed(data))
-
-      "update_share" ->
-        Tunneld.Servers.Resources.update_share(decode_if_needed(data), :resource)
-
-      "configure_basic_auth" ->
-        Tunneld.Servers.Resources.configure_basic_auth(decode_if_needed(data))
-
-      "disable_basic_auth" ->
-        %{"resource_id" => id} = decode_if_needed(data)
-        Tunneld.Servers.Resources.disable_basic_auth(id)
-
-      "add_private_share" ->
-        Tunneld.Servers.Resources.add_access(decode_if_needed(data))
-
-      "toggle_share_access" ->
-        payload =
-          data
-          |> decode_if_needed()
-          |> Map.get("payload")
-          |> decode_if_needed()
-
-        %{"id" => id, "enable" => enable, "kind" => kind} = payload
-
-        case kind do
-          "host" ->
-            Tunneld.Servers.Resources.toggle_share(id, enable)
-
-          "access" ->
-            Tunneld.Servers.Resources.toggle_access(id, enable)
-
-          _ ->
-            raise "Kind not found, make sure resource is setup with correct kind"
-        end
-
-      "remove_share" ->
-        %{"id" => id, "kind" => kind} = decode_if_needed(data)
-
-        case kind do
-          "host" ->
-            Tunneld.Servers.Resources.remove_share(id)
-
-          "access" ->
-            Tunneld.Servers.Resources.remove_access(id)
-
-          _ ->
-            raise "Kind not found, make sure resource is setup with correct kind"
-        end
-
-        send(parent, :close_details)
-
-      "tunneld_settings" ->
-        Tunneld.Servers.Resources.update_share(decode_if_needed(data), :tunneld)
-
-      "restart_service" ->
-        %{"id" => id} = decode_if_needed(data)
-        service = Tunneld.Servers.Services.find_service(id)
-        if service, do: Tunneld.Servers.Services.restart_service(service)
-
-      "refresh_service_logs" ->
-        %{"id" => id} = decode_if_needed(data)
-        Tunneld.Servers.Services.get_service_logs(id)
-
-      #
-      # SQM Management
-      #
-      "set_sqm" ->
-        Tunneld.Servers.Sqm.set_sqm(decode_if_needed(data))
-
-      _ ->
-        Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-          type: :error,
-          message: "Action doesnt exist and cant be handled"
-        })
-    end
-  end
-
   defp rebuild_network_graph(socket) do
     internet? = get_in(socket.assigns, [:status, :internet]) || false
     devices = Map.get(socket.assigns, :devices, [])
@@ -895,14 +740,4 @@ defmodule TunneldWeb.Live.Dashboard do
     assign(socket, :network_graph, NetworkGraph.build(internet?, devices))
   end
 
-  defp decode_if_needed(%{} = data), do: data
-
-  defp decode_if_needed(data) when is_binary(data) do
-    case Jason.decode(data) do
-      {:ok, decoded} -> decoded
-      _ -> %{}
-    end
-  end
-
-  defp decode_if_needed(_), do: %{}
 end

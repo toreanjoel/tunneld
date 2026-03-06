@@ -190,19 +190,15 @@ defmodule Tunneld.Servers.Sqm do
   # --- Persistence Helpers ---
 
   defp read_file do
-    path = path()
-    if is_binary(path) and File.exists?(path) do
-      with {:ok, body} <- File.read(path),
-           {:ok, json} <- Jason.decode(body),
-           do: {:ok, json}
-    else
-      {:error, :not_found}
+    case path() do
+      path when is_binary(path) -> Tunneld.Persistence.read_json(path)
+      _ -> {:error, :not_found}
     end
   end
 
   defp write_file(data) do
     case path() do
-      path when is_binary(path) -> File.write(path, Jason.encode!(data))
+      path when is_binary(path) -> Tunneld.Persistence.write_json(path, data)
       _ -> {:error, :no_path_configured}
     end
   end

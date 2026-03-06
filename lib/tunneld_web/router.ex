@@ -22,6 +22,11 @@ defmodule TunneldWeb.Router do
     plug TunneldWeb.Plugs.CheckProtocol
   end
 
+  scope "/api", TunneldWeb do
+    pipe_through :api
+    get "/health", HealthController, :index
+  end
+
   # These are the open routes
   scope "/", TunneldWeb do
     pipe_through [:browser, :check_protocol, :set_client_id]

@@ -81,7 +81,7 @@ defmodule Tunneld.Servers.Resources do
              configured_share <- Map.merge(new_share, %{"tunneld" => reserve_meta}),
              :ok <- Nginx.upsert_resource_config(configured_share),
              u_nodes <- resources ++ [configured_share],
-             :ok <- File.write(path(), Jason.encode!(u_nodes)) do
+             :ok <- Tunneld.Persistence.write_json(path(), u_nodes) do
           Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
             type: :info,
             message: "resource added successfully"
@@ -156,7 +156,7 @@ defmodule Tunneld.Servers.Resources do
           }
 
           updated0 = resources ++ [access_entry]
-          :ok = File.write(path(), Jason.encode!(updated0))
+          :ok = Tunneld.Persistence.write_json(path(), updated0)
 
           broadcast_shares()
 
@@ -264,7 +264,7 @@ defmodule Tunneld.Servers.Resources do
         |> put_in(["tunneld", "enabled", "access"], false)
       end)
 
-    case File.write(path(), Jason.encode!(updated_shares)) do
+    case Tunneld.Persistence.write_json(path(), updated_shares) do
       :ok ->
         broadcast_shares()
         {:noreply, Map.put(state, :resources, updated_shares)}
@@ -336,7 +336,7 @@ defmodule Tunneld.Servers.Resources do
                 end
               end)
 
-            case File.write(path(), Jason.encode!(updated_shares)) do
+            case Tunneld.Persistence.write_json(path(), updated_shares) do
               :ok ->
                 broadcast_shares()
                 {:noreply, Map.put(state, :resources, updated_shares)}
@@ -379,7 +379,7 @@ defmodule Tunneld.Servers.Resources do
     updated_nodes = Enum.reject(data, fn s -> s["id"] === id and s["kind"] == "access" end)
 
     update_state =
-      case File.write(path(), Jason.encode!(updated_nodes)) do
+      case Tunneld.Persistence.write_json(path(), updated_nodes) do
         :ok ->
           Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
             type: :info,
@@ -452,7 +452,7 @@ defmodule Tunneld.Servers.Resources do
                 end
               end)
 
-            case File.write(path(), Jason.encode!(updated_shares)) do
+            case Tunneld.Persistence.write_json(path(), updated_shares) do
               :ok ->
                 broadcast_shares()
 
@@ -554,7 +554,7 @@ defmodule Tunneld.Servers.Resources do
             end
           end)
 
-        case File.write(path(), Jason.encode!(updated_shares)) do
+        case Tunneld.Persistence.write_json(path(), updated_shares) do
           :ok ->
             _ = ensure_nginx_config(updated_resource)
 
@@ -616,7 +616,7 @@ defmodule Tunneld.Servers.Resources do
               resources
           end
 
-        case File.write(path(), Jason.encode!(updated_shares)) do
+        case Tunneld.Persistence.write_json(path(), updated_shares) do
           :ok ->
             Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
               type: :info,
@@ -717,7 +717,7 @@ defmodule Tunneld.Servers.Resources do
     updated_nodes = Enum.reject(data, fn resource -> resource["id"] === id end)
 
     update_state =
-      case File.write(path(), Jason.encode!(updated_nodes)) do
+      case Tunneld.Persistence.write_json(path(), updated_nodes) do
         :ok ->
           Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
             type: :info,
@@ -816,7 +816,7 @@ defmodule Tunneld.Servers.Resources do
             if r["id"] == resource["id"], do: updated_resource, else: r
           end)
 
-        case File.write(path(), Jason.encode!(updated_shares)) do
+        case Tunneld.Persistence.write_json(path(), updated_shares) do
           :ok ->
             Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
               type: :info,
@@ -965,7 +965,7 @@ defmodule Tunneld.Servers.Resources do
   end
 
   def create_file() do
-    case File.write(path(), Jason.encode!([])) do
+    case Tunneld.Persistence.write_json(path(), []) do
       :ok -> {:ok, "Resources file created"}
       {:error, reason} -> {:error, "Failed to create Resources file: #{inspect(reason)}"}
     end
@@ -1014,15 +1014,9 @@ defmodule Tunneld.Servers.Resources do
   end
 
   def read_file() do
-    case path() |> File.read() do
-      {:ok, data} ->
-        case Jason.decode(data) do
-          {:ok, data} -> {:ok, data}
-          {:error, err} -> {:error, "Failed to decode resource file: #{inspect(err)}"}
-        end
-
-      {:error, reason} ->
-        {:error, "There was a problem reading the file: #{inspect(reason)}"}
+    case Tunneld.Persistence.read_json(path()) do
+      {:ok, data} -> {:ok, data}
+      {:error, reason} -> {:error, "Failed to read resource file: #{inspect(reason)}"}
     end
   end
 
