@@ -7,81 +7,72 @@
 ![Zrok](https://img.shields.io/badge/zrok-enabled-blue)
 ![Platform](https://img.shields.io/badge/platform-debian-red)
 
-A wireless-first, zero-trust programable gateway built for portability, performance, and total control. Spend less time on infrastructure and more time building without giving up security.
+A wireless-first software-defined gateway for ARM single-board computers. Tunneld bridges Wi-Fi and Ethernet to create a private subnet, manages devices via DHCP, resolves DNS securely, reverse-proxies local services with auto-SSL, and optionally exposes them through Zrok overlay tunnels.
 
-Tunneld acts as your network's intelligent gateway — managing devices, assigning IPs via DHCP, resolving DNS securely, sharing local compute, and exposing optional network services through Zrok Tunnels. Designed to be lightweight, modular, and resource-driven, Tunneld works both at home and on the move. The goal is to let you focus on building while Tunneld handles the network, keeping devices isolated and allowing you to expose resources publicly or privately over a secure network.
+Designed to be lightweight and portable — run it at home as a smarter router, or take it anywhere as a self-contained network appliance.
 
 > **Prerequisites**
 >
-> Before you begin, ensure you have the following:
-> - **Zrok Access**: A self-hosted Zrok control plane or an account with Zrok.
-> - **Hardware**: An ARM-based Single Board Computer (SBC) equipped with both **wireless** and **ethernet** interfaces.
-> - **Operating System**: A Debian-based OS.
-> - **Connectivity Note**: The device currently only supports upstream internet access via the **Wi-Fi interface**.
+> - **Hardware**: An ARM64 SBC with both wireless and ethernet interfaces (Raspberry Pi, NanoPi, etc.)
+> - **Operating System**: Debian-based OS
+> - **Zrok** (optional): A self-hosted Zrok control plane or account for overlay networking
 
 ## Features
 
-### Zero Trust Network Access
-Tunneld treats every device as untrusted by default. Access to the internet is explicitly granted — no open gateway, no assumptions. Devices are approved manually.
+### Wireless-First Gateway
+Connects upstream via Wi-Fi and serves a private subnet over Ethernet. Devices plug in and receive IPs, DNS, and internet access — no existing router UI needed. Everything is controlled through the Tunneld dashboard.
 
-### Wireless-First Design
-Built to operate by wirelessly connecting to an upstream internet source, Tunneld runs independently from your router or ISP equipment. Devices connect directly to Tunneld's downstream interface and receive configuration, access control, and internet routing. Everything can be controlled through the Tunneld dashboard.
+### Smart Queue Management (SQM)
+Implements the CAKE algorithm to eliminate bufferbloat and reduce latency. Choose between latency-optimized, balanced, or no shaping — applied in real-time via `tc`.
 
-### Intelligent DHCP, DNS, and DNScrypt
-- Acts as the **DHCP server** for your network.
-- Uses `dnsmasq` for fast, cache-aware DNS resolution.
-- Integrates `dnscrypt-proxy` to enforce DNS-over-HTTPS (DoH), blocking ads, tracking domains, and fingerprinting.
-- Ensures all DNS queries are filtered and resolved securely using providers like Mullvad DoH.
+### Local PKI & Auto-SSL
+Generates a Root CA on first run. Every resource gets a TLS certificate signed by your CA, served through nginx. Install the Root CA on your devices for trusted HTTPS across your subnet.
 
-### Local and Remote Resource Monitoring
-Tunneld monitors active services (e.g., dnsmasq, DoH proxy) and connected devices. It also allows you to setup resources that define an intent to share a service existing on a machine within your Tunneld network.
+### Secure DNS
+All DNS queries are intercepted and routed through `dnscrypt-proxy` with DNS-over-HTTPS. Includes a DNS sinkhole (via dnsmasq blocklists) for ad and tracker blocking at the network level.
 
-### Zrok Tunnel Integration
-Expose your local Tunneld UI or custom services to the internet via secure Zrok Tunnels. Great for accessing your dashboard while away from home, self-hosting applications running on any device on the network, or connecting peer Tunneld instances together.
+### Resource Management & Health Monitoring
+Define resources that point to services running on your subnet. Each resource has a pool of backends that are health-checked via TCP probes. Nginx load-balances across healthy backends with auto-generated configs.
 
-### Compute Sharing
-Tunneld acts as a gateway. Once nodes are set up to be monitored, you can share compute resources between Tunneld devices through APIs, allowing trusted parties to access local services (e.g., AI APIs) through their Tunneld Host.
+### Overlay Networking (Zrok/OpenZiti)
+Expose resources publicly or privately through Zrok tunnels without port forwarding. Share services across Tunneld instances — bind remote shares locally and add them to your nginx pool for distributed load balancing.
 
-### Deployment Modes
-Run Tunneld in:
-- **Static mode**: At home, replacing your router's weak UI — manage every device, filter content, and control network flow.
-- **Portable mode**: Take it with you. Manage resource access, deploy temporary networks, or integrate Tunneld with mobile data.
+### Distributed Service Pooling
+Combine local and remote backends in a single resource pool. Nginx distributes traffic across all entries — whether they're on your subnet or bound from a peer's Tunneld instance over the overlay.
 
-## Core Architecture
+### First-Run Setup Wizard
+Guided onboarding flow after initial account creation: connect to Wi-Fi, optionally configure the overlay network control plane and enable the device as an environment.
 
-| Component        | Description                                                                 |
-|------------------|-----------------------------------------------------------------------------|
-| `dnsmasq`        | DHCP and DNS resolution with caching and ad blocking.                       |
-| `dnscrypt-proxy` | Enforces DNS-over-HTTPS (DoH) with secure resolvers.                        |
-| `Elixir + Phoenix` | Manages the UI, session-based device approval, discovery, and services.     |
-| `iptables`       | Controls packet forwarding and filtering.                                   |
-| `Zrok/OpenZiti`  | The tunnel provider orchestrated through the tool.                          |
-| `Nginx`          | Reverse proxy to manage access to the dashboard and resources.              |
+## Architecture
 
-## Dashboard Features
+| Component | Role |
+|-----------|------|
+| `dnsmasq` | DHCP server + DNS resolver with caching and blocklist filtering |
+| `dnscrypt-proxy` | DNS-over-HTTPS enforcement with secure resolvers |
+| `nginx` | Reverse proxy with per-resource SSL and upstream load balancing |
+| `iptables` | NAT, packet forwarding, and DNS interception |
+| `Zrok/OpenZiti` | Overlay tunnel orchestration (reserve, share, access) |
+| `Elixir/Phoenix` | Application server, LiveView dashboard, GenServer process management |
 
-- View service status and restart components if needed.
-- Dynamic refresh with a minimal, efficient design.
-- Create Resources (references with intent to share and monitor self-hosted applications).
-- Expose Services to the internet using Zrok tunnels.
-- Enable sharing and connect to other Tunneld devices to access shared resources.
-- Updates for the built-in Open Source DNS sinkhole.
-- Load balance resource instances across local or distributed instances with trusted parties.
+### Diagrams
+
+Detailed architecture diagrams with Mermaid (rendered on GitHub):
+
+- [Network Topology](docs/network-topology.md) — How Tunneld bridges Wi-Fi upstream and Ethernet downstream
+- [Resource Lifecycle](docs/resource-lifecycle.md) — Creating resources, enabling public/private shares, binding remote access
+- [Distributed Load Balancing](docs/distributed-load-balancing.md) — Combining local and remote backends in nginx pools
+- [Nginx & SSL](docs/nginx-ssl.md) — Certificate chain, config generation, and hairpin DNS
+- [Supervision Tree](docs/supervision-tree.md) — OTP process map, polling intervals, and PubSub topics
 
 ## Installation
 
-Tunneld is designed for Debian-based SBCs (Single Board Computers) such as:
-- Raspberry Pi
-- NanoPi
-- Custom Debian-based setups
-
-The installation script handles dependencies including `dnsmasq`, `dhcpcd`, `nginx`, `iptables`, `dnscrypt-proxy`, and `zrok`.
-
-### Install Script
+Tunneld is designed for Debian-based SBCs such as Raspberry Pi, NanoPi, or any custom ARM64 setup.
 
 ```bash
 curl -sSf https://raw.githubusercontent.com/toreanjoel/tunneld-installer/main/install.sh | sudo bash
 ```
+
+The installer handles all dependencies: `dnsmasq`, `dhcpcd`, `nginx`, `iptables`, `dnscrypt-proxy`, and `zrok`.
 
 ## Project Structure
 
@@ -90,12 +81,13 @@ lib/
   tunneld/
     application.ex          # OTP supervision tree
     config.ex               # Shared config helpers
+    persistence.ex          # Atomic JSON file persistence with backup recovery
     iptables.ex             # iptables firewall rule management
     cert_manager.ex         # SSL certificate lifecycle (root CA + per-resource)
     servers/
       session.ex            # In-memory IP-keyed auth sessions
       auth.ex               # Login credentials (bcrypt + WebAuthn)
-      resources.ex           # Resource registry (CRUD, Zrok shares, nginx, DNS)
+      resources.ex          # Resource registry (CRUD, Zrok shares, nginx, DNS)
       resources/health.ex   # Pool backend health checking (TCP probes)
       devices.ex            # DHCP lease monitoring and revocation
       services.ex           # systemd service monitoring (dnsmasq, dhcpcd, etc.)
@@ -107,28 +99,28 @@ lib/
       sqm.ex                # Smart Queue Management (tc/CAKE)
       updater.ex            # OTA update checking
       system_resources.ex   # CPU, memory, disk monitoring
-    schema/                 # Ecto-less embedded schemas for form validation
+    schema/                 # JSON Schema validation (login, signup, resource, wlan, zrok)
   tunneld_web/
     live/
       dashboard.ex          # Main dashboard LiveView
-      dashboard/
-        network_graph.ex    # Isometric network topology builder
-      login.ex              # Login LiveView
-      components/           # LiveView components (devices, resources, services, etc.)
+      dashboard/actions.ex  # Action dispatcher
+      setup.ex              # First-run setup wizard
+      login.ex              # Login/signup with WebAuthn support
+      components/           # LiveView components (devices, resources, services, sidebar, etc.)
 ```
 
 ## Development
 
-To run Tunneld locally for development (mocking hardware interactions):
+Run Tunneld locally with mocked hardware interactions:
 
 1. Install Elixir 1.18+ and Erlang/OTP 27+
 2. Install dependencies: `mix deps.get`
 3. Install JS/CSS tooling: `mix assets.setup`
 4. Start the server: `MOCK_DATA=true mix phx.server`
 
-Now you can visit `localhost:4000` from your browser.
+Visit `localhost:4000` in your browser.
 
-The `MOCK_DATA=true` flag enables mock mode — all system commands (systemctl, wpa_cli, iw, tc, etc.) are stubbed with fake data so you can develop on any OS without hardware.
+The `MOCK_DATA=true` flag stubs all system commands (systemctl, wpa_cli, iw, tc, etc.) with fake data so you can develop on any OS without hardware.
 
 ### Running Tests
 
@@ -136,38 +128,21 @@ The `MOCK_DATA=true` flag enables mock mode — all system commands (systemctl, 
 MOCK_DATA=true mix test
 ```
 
-Tests are designed to run against the mock data layer. No hardware, root access, or running services are required.
-
-### Compilation Checks
+### Version Management
 
 ```bash
-MOCK_DATA=true mix compile --warnings-as-errors
+mix version          # show current version
+mix version patch    # bump patch (0.10.5 -> 0.10.6)
+mix version minor    # bump minor (0.10.5 -> 0.11.0)
+mix version major    # bump major (0.10.5 -> 1.0.0)
 ```
 
-## API Access
-
-Tunneld exposes endpoints for:
-- Getting current Tunneld instance overview details (Internal health and monitoring).
-- Resource registration and schema-based contract sharing over the private network.
-
-This allows custom nodes (AI inference, file servers, etc.) to announce themselves and expose UIs or APIs back to Tunneld.
-
-## Philosophy
-
-Tunneld is built for users who:
-- Want **control without overhead** when exposing services, resources, and compute without firewall punching.
-- Need a plug-and-play installation to self-host on a Debian-based OS.
-- Want to focus on building instead of infrastructure (being your own private cloud).
-- Wish to share resources with trusted individuals in a distributed manner.
-
-## Use Cases
-
-- Connect a router in bridge mode to expand the Tunneld device network wirelessly.
-- Distributed compute and application sharing across households or friends (hosting blogs, websites, etc.).
-- Network-level ad blocking.
-- Secure DNS encryption.
-- Access to APIs and tools over a trusted application-level encrypted network.
+Updates both `mix.exs` and `config/config.exs`.
 
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on setting up your dev environment, running tests, and submitting changes.
+
+## License
+
+[Apache 2.0](LICENSE)
