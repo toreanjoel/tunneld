@@ -86,7 +86,10 @@ defmodule Tunneld.Servers.Devices do
       if Application.get_env(:tunneld, :mock_data, false) do
         Tunneld.Servers.FakeData.Devices.get_data()
       else
-        System.cmd("cat", [@path])
+        case File.read(@path) do
+          {:ok, content} -> {content, 0}
+          {:error, _} -> {"", 1}
+        end
       end
 
     clean_data = String.trim(data)

@@ -25,10 +25,10 @@ defmodule Tunneld.Servers.Services do
   Get the system logs for the services that we can render
   """
   def handle_call({:get_service_logs, service}, _from, state) do
-    service_atom = service |> String.to_atom()
+    service_atom = Enum.find(@services, fn s -> to_string(s) == service end)
 
     try do
-      if service_atom in @services do
+      if service_atom do
         data =
           case System.cmd("journalctl", [
                  "-u",

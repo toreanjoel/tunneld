@@ -5,8 +5,6 @@ defmodule Tunneld.Servers.Updater do
   use GenServer
   require Logger
 
-  @pubsub Tunneld.PubSub
-  @topic_notif "notifications"
   @interval 300_000
   @metadata_url "https://raw.githubusercontent.com/toreanjoel/tunneld-installer/refs/heads/main/releases/metadata.json"
 
@@ -24,6 +22,7 @@ defmodule Tunneld.Servers.Updater do
   @doc """
   Init Updater
   """
+  @impl true
   def init(_) do
     send(self(), :check_updates)
 
@@ -31,7 +30,7 @@ defmodule Tunneld.Servers.Updater do
   end
 
   # get the data and restart sync
-  @impl false
+  @impl true
   def handle_info(:check_updates, state) do
     {status, data} = fetch_latest()
 

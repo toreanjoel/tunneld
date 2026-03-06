@@ -39,7 +39,8 @@ defmodule Tunneld.Application do
       {Auth, []},
       {Blocklist, []},
       {Updater, []},
-      {Sqm, []}
+      {Sqm, []},
+      {Tunneld.CertManager, []}
     ]
 
     if not Application.get_env(:tunneld, :mock_data, false) do
