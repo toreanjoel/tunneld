@@ -5,10 +5,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   use TunneldWeb, :live_component
 
   def mount(socket) do
-    if connected?(socket) do
-      Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:details")
-    end
-
     {:ok, socket}
   end
 
@@ -559,11 +555,13 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   def render(%{view: :wlan} = assigns) do
     data = Map.get(assigns, :data)
 
+    networks = Map.get(data, :networks, [])
+
     assigns =
       assigns
-      |> assign(networks: Map.get(data, :networks, []))
+      |> assign(networks: networks)
       |> assign(info: Map.get(data, :info, %{}))
-      |> assign(count: data |> List.wrap() |> length())
+      |> assign(count: length(networks))
 
     ~H"""
     <div class="bg-secondary p-4 h-full space-y-6">

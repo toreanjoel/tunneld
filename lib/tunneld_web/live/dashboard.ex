@@ -16,7 +16,7 @@ defmodule TunneldWeb.Live.Dashboard do
   alias TunneldWeb.Live.Components.Resources
   alias TunneldWeb.Live.Components.Devices
   alias TunneldWeb.Live.Components.Modal
-  alias TunneldWeb.Live.Dashboard.{Actions, NetworkGraph}
+  alias TunneldWeb.Live.Dashboard.Actions
 
   # auth check if this page needs to be behind auth
   on_mount TunneldWeb.Hooks.CheckAuth
@@ -26,6 +26,21 @@ defmodule TunneldWeb.Live.Dashboard do
   Initialize the dashboard with sidebar set to false.
   """
   def mount(_params, %{"client_id" => client_id} = _session, socket) do
+    # Redirect to setup wizard if not yet onboarded
+    needs_setup =
+      case Tunneld.Servers.Auth.read_file() do
+        {:ok, auth} -> not Map.get(auth, "onboarded", false)
+        _ -> false
+      end
+
+    if needs_setup do
+      {:ok, push_navigate(socket, to: Routes.live_path(socket, TunneldWeb.Live.Setup))}
+    else
+      mount_dashboard(client_id, socket)
+    end
+  end
+
+  defp mount_dashboard(client_id, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "notifications")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "show_details")
@@ -72,8 +87,6 @@ defmodule TunneldWeb.Live.Dashboard do
         }
       )
       |> assign(:devices, devices)
-      |> assign(:view_tab, :list)
-      |> assign(:network_graph, NetworkGraph.build(internet_status, devices))
       |> assign(:pending_actions, %{})
 
     {:ok, socket}
@@ -212,73 +225,14 @@ defmodule TunneldWeb.Live.Dashboard do
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
 
-        <%!-- IMPORTANT SECTION WHERE CHANGES WILL TAKE PLACE  --%>
+        <%!-- Resources and Devices --%>
         <div class="mt-6">
-          <div class="flex flex-row items-center gap-2 mb-4">
-            <div class="flex flex-row gap-2">
-              <button
-                phx-click="set_view_tab"
-                phx-value-tab="list"
-                class={
-                  "px-4 py-2 rounded-md text-sm font-semibold border " <>
-                    if @view_tab == :list do
-                      "bg-secondary border-secondary text-white"
-                    else
-                      "bg-primary border-secondary text-gray-1"
-                    end
-                }
-              >
-                Resource List
-              </button>
-              <button
-                phx-click="set_view_tab"
-                phx-value-tab="map"
-                class={
-                  "px-4 py-2 rounded-md text-sm font-semibold border " <>
-                    if @view_tab == :map do
-                      "bg-secondary border-secondary text-white"
-                    else
-                      "bg-primary border-secondary text-gray-1"
-                    end
-                }
-              >
-                Network Map
-              </button>
-            </div>
-            <div class="flex-1" />
-            <%!-- <button
-              :if={@view_tab == :map}
-              id="download-network-map" phx-hook="DownloadNetworkMap"
-              class="ml-auto px-4 py-2 rounded-md text-sm font-semibold border bg-primary border-secondary text-gray-1 hover:text-white hover:border-white transition"
-            >
-              Download map
-            </button> --%>
+          <div class="min-h-[200px]">
+            <.live_component id="resources" module={Resources} />
           </div>
 
-          <div class={"#{if @view_tab == :map, do: "hidden"}"}>
-            <div class="min-h-[200px]">
-              <.live_component id="resources" module={Resources} />
-            </div>
-
-            <div class="min-h-[200px]">
-              <.live_component id="devices" module={Devices} />
-            </div>
-          </div>
-
-          <div class={"#{if @view_tab == :list, do: "hidden"}"}>
-            <div>
-              <div
-                id="network-map"
-                class="network-board"
-                phx-hook="NetworkMap"
-                data-graph={Jason.encode!(@network_graph)}
-              >
-                <div class="loader" id="loader">
-                  <span>Loading…</span>
-                </div>
-                <canvas id="iso"></canvas>
-              </div>
-            </div>
+          <div class="min-h-[200px]">
+            <.live_component id="devices" module={Devices} />
           </div>
         </div>
       </div>
@@ -311,17 +265,6 @@ defmodule TunneldWeb.Live.Dashboard do
     }
 
     {:noreply, assign(socket, :sidebar, sidebar)}
-  end
-
-  def handle_event("set_view_tab", %{"tab" => tab}, socket) do
-    view_tab = if tab == "map", do: :map, else: :list
-
-    socket =
-      socket
-      |> assign(:view_tab, view_tab)
-      |> rebuild_network_graph()
-
-    {:noreply, socket}
   end
 
   #
@@ -423,12 +366,7 @@ defmodule TunneldWeb.Live.Dashboard do
 
     devices = Map.get(data, :devices, [])
 
-    socket =
-      socket
-      |> assign(:devices, devices)
-      |> rebuild_network_graph()
-
-    {:noreply, socket}
+    {:noreply, assign(socket, :devices, devices)}
   end
 
   def handle_info(
@@ -458,12 +396,7 @@ defmodule TunneldWeb.Live.Dashboard do
   def handle_info(%{type: :internet, status: status}, socket) do
     socket =
       socket
-      |> assign(
-        status: %{
-          internet: status
-        }
-      )
-      |> rebuild_network_graph()
+      |> assign(status: %{internet: status})
 
     {:noreply, socket}
   end
@@ -731,13 +664,6 @@ defmodule TunneldWeb.Live.Dashboard do
       "disable_basic_auth" -> "Disabling Basic Auth..."
       _ -> "Working on request..."
     end
-  end
-
-  defp rebuild_network_graph(socket) do
-    internet? = get_in(socket.assigns, [:status, :internet]) || false
-    devices = Map.get(socket.assigns, :devices, [])
-
-    assign(socket, :network_graph, NetworkGraph.build(internet?, devices))
   end
 
 end
