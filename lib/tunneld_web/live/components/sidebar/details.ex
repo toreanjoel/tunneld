@@ -873,14 +873,28 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       <div class="flex flex-row gap-1 justify-end my-2">
         <div
           :if={@ai_configured}
-          phx-click="trigger_action"
-          phx-value-action="clear_ai_config"
-          phx-value-data={Jason.encode!(%{})}
+          phx-click="modal_open"
+          phx-value-modal_title="Disconnect AI Provider?"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "string",
+              "data" => "This will remove your AI provider configuration and disable the chat assistant. You can reconfigure it at any time."
+            })
+          }
+          phx-value-modal_actions={
+            Jason.encode!(%{
+              "title" => "Disconnect",
+              "payload" => %{
+                "type" => "clear_ai_config",
+                "data" => %{}
+              }
+            })
+          }
           phx-click-loading="opacity-50 cursor-wait"
           class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
         >
           <.icon name="hero-no-symbol" class="h-5 w-5" />
-          <div class="truncate text-xs">Remove Config</div>
+          <div class="truncate text-xs">Disconnect</div>
         </div>
       </div>
 

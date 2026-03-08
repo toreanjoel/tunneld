@@ -582,7 +582,21 @@ defmodule TunneldWeb.Live.Dashboard do
   # Close the sidebar programatically without user interaction
   #
   def handle_info(:ai_config_changed, socket) do
-    {:noreply, assign(socket, :ai_configured, Tunneld.Servers.Ai.configured?())}
+    configured = Tunneld.Servers.Ai.configured?()
+
+    socket =
+      socket
+      |> assign(:ai_configured, configured)
+
+    socket =
+      if not configured and socket.assigns.view_mode == :chat do
+        Tunneld.Servers.Chat.clear_history()
+        assign(socket, :view_mode, :dashboard)
+      else
+        socket
+      end
+
+    {:noreply, socket}
   end
 
   def handle_info(:close_details, socket) do
@@ -751,6 +765,8 @@ defmodule TunneldWeb.Live.Dashboard do
       "update_blocklist" -> "Updating blocklist..."
       "configure_basic_auth" -> "Configuring Basic Auth..."
       "disable_basic_auth" -> "Disabling Basic Auth..."
+      "clear_ai_config" -> "Disconnecting AI..."
+      "save_ai_config" -> "Saving AI config..."
       _ -> "Working on request..."
     end
   end

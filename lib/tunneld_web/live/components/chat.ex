@@ -84,14 +84,24 @@ defmodule TunneldWeb.Live.Components.Chat do
           </form>
         </div>
 
-        <button
-          phx-click="clear_chat"
-          phx-target={@myself}
-          class="flex items-center gap-1 bg-secondary px-3 py-1.5 rounded-md text-xs text-gray-1 hover:opacity-80"
-        >
-          <.icon name="hero-plus" class="w-3 h-3" />
-          New Chat
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            phx-click="show_details"
+            phx-value-type="ai_settings"
+            phx-value-id="_"
+            class="flex items-center justify-center bg-secondary p-1.5 rounded-md text-gray-1 hover:opacity-80"
+          >
+            <.icon name="hero-cog-6-tooth" class="w-4 h-4" />
+          </button>
+          <button
+            phx-click="clear_chat"
+            phx-target={@myself}
+            class="flex items-center gap-1 bg-secondary px-3 py-1.5 rounded-md text-xs text-gray-1 hover:opacity-80"
+          >
+            <.icon name="hero-plus" class="w-3 h-3" />
+            New Chat
+          </button>
+        </div>
       </div>
 
       <div
