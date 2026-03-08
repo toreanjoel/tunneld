@@ -835,6 +835,100 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     """
   end
 
+  @spec render(%{:view => :ai_settings, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{view: :ai_settings} = assigns) do
+    config =
+      case Tunneld.Servers.Ai.read_config() do
+        {:ok, c} -> c
+        _ -> %{}
+      end
+
+    configured = Tunneld.Servers.Ai.configured?()
+
+    models =
+      if configured do
+        case Tunneld.Ai.Client.list_models(Map.put(config, "mock", false)) do
+          {:ok, m} -> m
+          _ -> []
+        end
+      else
+        []
+      end
+
+    schema = Tunneld.Schema.Ai.data(%{models: models})
+
+    assigns =
+      assigns
+      |> assign(:ai_config, config)
+      |> assign(:ai_configured, configured)
+      |> assign(:ai_schema, schema)
+
+    ~H"""
+    <div class="bg-secondary p-4 h-full space-y-6">
+      <%= sidebar_header(assigns, %{
+        header: "AI Assistant",
+        body: "Configure an AI provider to enable the chat assistant. A local provider like Ollama is recommended for privacy."
+      }) %>
+
+      <div class="flex flex-row gap-1 justify-end my-2">
+        <div
+          :if={@ai_configured}
+          phx-click="trigger_action"
+          phx-value-action="clear_ai_config"
+          phx-value-data={Jason.encode!(%{})}
+          phx-click-loading="opacity-50 cursor-wait"
+          class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
+        >
+          <.icon name="hero-no-symbol" class="h-5 w-5" />
+          <div class="truncate text-xs">Remove Config</div>
+        </div>
+      </div>
+
+      <div class="bg-primary rounded-lg p-3 space-y-3">
+        <div class="text-xs text-gray-1 mb-2">
+          <span class="font-semibold">Status:</span>
+          <span class={"ml-1 #{if @ai_configured, do: "text-green", else: "text-gray-2"}"}>
+            <%= if @ai_configured, do: "Connected", else: "Not configured" %>
+          </span>
+        </div>
+
+        <div :if={@ai_configured} class="text-xs text-gray-1">
+          <div class="truncate">
+            <span class="font-semibold">URL:</span>
+            <span class="ml-1"><%= @ai_config["base_url"] || "—" %></span>
+          </div>
+          <div class="truncate mt-1">
+            <span class="font-semibold">Model:</span>
+            <span class="ml-1"><%= @ai_config["model"] || "—" %></span>
+          </div>
+        </div>
+      </div>
+
+      <div
+        phx-click="modal_open"
+        phx-value-modal_title="Configure AI Assistant"
+        phx-value-modal_body={
+          Jason.encode!(%{
+            "type" => "schema",
+            "data" => @ai_schema,
+            "default_values" => %{
+              "base_url" => @ai_config["base_url"] || "http://localhost:11434/v1",
+              "api_key" => @ai_config["api_key"] || "",
+              "model" => @ai_config["model"] || ""
+            },
+            "action" => "save_ai_config"
+          })
+        }
+        phx-click-loading="opacity-50 cursor-wait"
+        class="flex items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
+      >
+        <.icon name="hero-cog-6-tooth" class="h-5 w-5" />
+        <div class="truncate text-xs"><%= if @ai_configured, do: "Update Config", else: "Configure" %></div>
+      </div>
+    </div>
+    """
+  end
+
   @spec render(%{:view => :device, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :device} = assigns) do
     ~H"""

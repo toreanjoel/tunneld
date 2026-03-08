@@ -16,6 +16,7 @@ defmodule TunneldWeb.Live.Dashboard do
   alias TunneldWeb.Live.Components.Resources
   alias TunneldWeb.Live.Components.Devices
   alias TunneldWeb.Live.Components.Modal
+  alias TunneldWeb.Live.Components.Chat
   alias TunneldWeb.Live.Dashboard.Actions
 
   # auth check if this page needs to be behind auth
@@ -88,6 +89,10 @@ defmodule TunneldWeb.Live.Dashboard do
       )
       |> assign(:devices, devices)
       |> assign(:pending_actions, %{})
+      |> assign(:view_mode, :dashboard)
+      |> assign(:ai_configured, Tunneld.Servers.Ai.configured?())
+      |> assign(:chat_artifacts, %{})
+      |> assign(:chat_update, nil)
 
     {:ok, socket}
   end
@@ -98,8 +103,29 @@ defmodule TunneldWeb.Live.Dashboard do
   def render(assigns) do
     ~H"""
     <div class="relative flex flex-row flex-1 h-screen text-white bg-primary">
-      <!-- Flexible middle column -->
-      <%= main(assigns) %>
+      <%= if @view_mode == :chat do %>
+        <div class="flex-1 flex flex-col">
+          <div class="flex items-center p-3 gap-2">
+            <button
+              phx-click="show_dashboard"
+              class="flex items-center gap-1 bg-secondary px-3 py-1.5 rounded-md text-xs text-gray-1 hover:opacity-80"
+            >
+              <.icon name="hero-arrow-left" class="w-3 h-3" />
+              Dashboard
+            </button>
+          </div>
+          <.live_component
+            module={Chat}
+            id="chat"
+            parent_pid={self()}
+            chat_update={@chat_update}
+          />
+        </div>
+      <% else %>
+        <!-- Flexible middle column -->
+        <%= main(assigns) %>
+      <% end %>
+
       <%= if @sidebar.is_open do %>
         <div class="fixed inset-0 bg-black bg-opacity-50 z-2" phx-click="close_details" />
       <% end %>
@@ -196,6 +222,27 @@ defmodule TunneldWeb.Live.Dashboard do
             Internet Access
           </div>
 
+          <%!-- AI Assistant --%>
+          <div
+            :if={@ai_configured}
+            phx-click="show_chat"
+            class="flex items-center justify-center gap-2 bg-purple px-3 py-2 cursor-pointer rounded-md text-white hover:opacity-80 transition-all"
+          >
+            <.icon name="hero-sparkles-solid" class="h-4 w-4" />
+            <span class="text-xs font-medium">AI</span>
+          </div>
+
+          <div
+            :if={not @ai_configured}
+            phx-click="show_details"
+            phx-value-type="ai_settings"
+            phx-value-id="_"
+            class="flex items-center justify-center gap-2 bg-secondary px-3 py-2 cursor-pointer rounded-md text-gray-1 hover:opacity-80 transition-all"
+          >
+            <.icon name="hero-sparkles" class="h-4 w-4" />
+            <span class="text-xs font-medium">AI</span>
+          </div>
+
           <%!-- Auth Settings  --%>
           <div
             phx-click="show_details"
@@ -257,6 +304,14 @@ defmodule TunneldWeb.Live.Dashboard do
   @doc """
   Render Sidebar content
   """
+  def handle_event("show_chat", _params, socket) do
+    {:noreply, assign(socket, :view_mode, :chat)}
+  end
+
+  def handle_event("show_dashboard", _params, socket) do
+    {:noreply, assign(socket, :view_mode, :dashboard)}
+  end
+
   def handle_event("show_details", %{"id" => id, "type" => type}, socket) do
     sidebar = %{
       is_open: true,
@@ -361,6 +416,33 @@ defmodule TunneldWeb.Live.Dashboard do
   @doc """
   This will have the parent dashboard view be responsible for sending update messages to components
   """
+  def handle_info({:chat_response, {:ok, _new_messages, artifacts}}, socket) do
+    history = Tunneld.Servers.Chat.get_history()
+
+    artifact_map =
+      Enum.reduce(artifacts, %{}, fn a, acc ->
+        Map.put(acc, a.tool_call_id, a)
+      end)
+
+    send_update(Chat,
+      id: "chat",
+      chat_update: %{messages: history, artifacts: artifact_map}
+    )
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:chat_response, _error}, socket) do
+    history = Tunneld.Servers.Chat.get_history()
+
+    send_update(Chat,
+      id: "chat",
+      chat_update: %{messages: history, artifacts: %{}}
+    )
+
+    {:noreply, socket}
+  end
+
   def handle_info(%{id: "devices", module: TunneldWeb.Live.Components.Devices, data: data} = message, socket) do
     send_update(message.module, id: message.id, data: message.data)
 
@@ -499,6 +581,10 @@ defmodule TunneldWeb.Live.Dashboard do
   #
   # Close the sidebar programatically without user interaction
   #
+  def handle_info(:ai_config_changed, socket) do
+    {:noreply, assign(socket, :ai_configured, Tunneld.Servers.Ai.configured?())}
+  end
+
   def handle_info(:close_details, socket) do
     sidebar = %{
       is_open: false,
@@ -547,6 +633,9 @@ defmodule TunneldWeb.Live.Dashboard do
 
       "authentication" ->
         :authentication
+
+      "ai_settings" ->
+        :ai_settings
     end
   end
 

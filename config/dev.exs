@@ -68,7 +68,8 @@ config :phoenix, :plug_init_mode, :runtime
 config :tunneld, :fs,
   root: Path.expand("../data/", __DIR__),
   auth: "auth.json",
-  resources: "resources.json"
+  resources: "resources.json",
+  ai: "ai.json"
 
 config :phoenix_live_view,
   # Include HEEx debug annotations as HTML comments in rendered markup

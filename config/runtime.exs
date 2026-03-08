@@ -17,6 +17,7 @@ config :tunneld, :fs,
   auth: System.get_env("TUNNELD_AUTH_FILE", "auth.json"),
   resources: System.get_env("TUNNELD_SHARES_FILE", "resources.json"),
   sqm: System.get_env("TUNNELD_SQM_FILE", "sqm.json"),
+  ai: System.get_env("TUNNELD_AI_FILE", "ai.json"),
   dns_file: System.get_env("TUNNELD_DNS_FILE", "/etc/dnsmasq.d/tunneld_resources.conf")
 
 config :tunneld, :certs,

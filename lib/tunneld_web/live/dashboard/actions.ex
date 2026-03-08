@@ -125,6 +125,15 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       "set_sqm" ->
         Sqm.set_sqm(data)
 
+      # AI Config
+      "save_ai_config" ->
+        Tunneld.Servers.Ai.save_config(data)
+        send(parent, :ai_config_changed)
+
+      "clear_ai_config" ->
+        Tunneld.Servers.Ai.clear_config()
+        send(parent, :ai_config_changed)
+
       _ ->
         Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
           type: :error,
