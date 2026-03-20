@@ -30,66 +30,68 @@ defmodule TunneldWeb.Live.Components.Resources do
       |> assign(resources: assigns.data)
 
     ~H"""
-    <div class="p-5">
-      <div class="mb-5 flex flex-row">
+    <div class="p-3 md:p-5">
+      <div class="mb-4 md:mb-5 flex flex-row items-center gap-2">
         <div class="flex-1">
-          <div class="text-xl text-gray-1 font-medium">Resources</div>
+          <div class="text-lg md:text-xl text-gray-1 font-medium">Resources</div>
           <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
         </div>
-        <div
-          phx-click="modal_open"
-          phx-value-modal_title="Add Private Resource"
-          phx-value-modal_body={
-            Jason.encode!(%{
-              "type" => "schema",
-              "data" => Tunneld.Schema.Resource.data(:add_private),
-              "default_values" => %{
-                "ip" => "0.0.0.0",
-                "port" => "",
-                "pool" => []
-              },
-              "action" => "add_private_share"
-            })
-          }
-          phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
-        >
-          <.icon class="w-6 h-6" name="hero-cpu-chip" />
-          <div class="truncate text-xs">Bind Private</div>
-        </div>
+        <div class="flex flex-row gap-1">
+          <div
+            phx-click="modal_open"
+            phx-value-modal_title="Add Private Resource"
+            phx-value-modal_body={
+              Jason.encode!(%{
+                "type" => "schema",
+                "data" => Tunneld.Schema.Resource.data(:add_private),
+                "default_values" => %{
+                  "ip" => "0.0.0.0",
+                  "port" => "",
+                  "pool" => []
+                },
+                "action" => "add_private_share"
+              })
+            }
+            phx-click-loading="opacity-50 cursor-wait"
+            class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
+          >
+            <.icon class="w-5 h-5 sm:w-6 sm:h-6" name="hero-cpu-chip" />
+            <div class="hidden sm:block truncate text-xs">Bind Private</div>
+          </div>
 
-        <div
-          phx-click="modal_open"
-          phx-value-modal_title="Add Resource"
-          phx-value-modal_body={
-            Jason.encode!(%{
-              "type" => "schema",
-              "data" => Tunneld.Schema.Resource.data(:add_public),
-              "default_values" => %{
-                "ip" => "127.0.0.1",
-                "port" => "18000",
-                "pool" => []
-              },
-              "action" => "add_share"
-            })
-          }
-          phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
-        >
-          <.icon class="w-6 h-6" name="hero-cpu-chip" />
-          <div class="truncate text-xs">Add Resource</div>
+          <div
+            phx-click="modal_open"
+            phx-value-modal_title="Add Resource"
+            phx-value-modal_body={
+              Jason.encode!(%{
+                "type" => "schema",
+                "data" => Tunneld.Schema.Resource.data(:add_public),
+                "default_values" => %{
+                  "ip" => "127.0.0.1",
+                  "port" => "18000",
+                  "pool" => []
+                },
+                "action" => "add_share"
+              })
+            }
+            phx-click-loading="opacity-50 cursor-wait"
+            class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
+          >
+            <.icon class="w-5 h-5 sm:w-6 sm:h-6" name="hero-cpu-chip" />
+            <div class="hidden sm:block truncate text-xs">Add Resource</div>
+          </div>
         </div>
       </div>
 
       <div>
         <div
           :if={Enum.empty?(@resources)}
-          class="w-[100px] md:w-[60px] h-[100px] md:h-[60px] bg-secondary flex items-center justify-center rounded-md opacity-10"
+          class="w-[60px] h-[60px] bg-secondary flex items-center justify-center rounded-md opacity-10"
         >
           <.icon class="w-8 h-8 text-white" name="hero-cpu-chip" />
         </div>
 
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           <%= if !Enum.empty?(@resources) do %>
             <%= for resource <- @resources do %>
               <% kind = resource.kind || "host" %>

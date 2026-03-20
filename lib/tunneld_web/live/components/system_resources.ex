@@ -59,17 +59,16 @@ defmodule TunneldWeb.Live.Components.SystemResources do
       |> assign(circumference: 2 * :math.pi() * @radius)
 
     ~H"""
-    <div class="p-5">
-      <div class="mb-5 flex flex-col">
-        <div class="text-xl text-gray-1 font-medium">System Resources</div>
+    <div class="p-3 md:p-5">
+      <div class="mb-4 md:mb-5 flex flex-col">
+        <div class="text-lg md:text-xl text-gray-1 font-medium">System Resources</div>
         <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
       </div>
 
       <div class="flex items-center justify-center">
-        <div class="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-2">
+        <div class="grid grid-cols-3 gap-2">
           <%= for {resource, percent} <- @resources do %>
-            <!-- On small screens: full width; on md and above, limit width -->
-            <div class="bg-primary relative w-full md:max-w-[200px] rounded-lg">
+            <div class="bg-primary relative w-full max-w-[200px] rounded-lg">
               <svg class="w-full h-full" viewBox="0 0 170 170">
                 <!-- Background circle -->
                 <circle
@@ -95,9 +94,9 @@ defmodule TunneldWeb.Live.Components.SystemResources do
                 />
               </svg>
               <!-- Percentage and label -->
-              <div class="absolute inset-0 flex flex-col items-center justify-center text-2xl md:text-lg text-white">
+              <div class="absolute inset-0 flex flex-col items-center justify-center text-sm sm:text-lg md:text-xl text-white">
                 <%= "#{percent}%" %>
-                <div class="text-xs"><%= String.upcase(to_string(resource)) %></div>
+                <div class="text-[10px] sm:text-xs"><%= String.upcase(to_string(resource)) %></div>
               </div>
             </div>
           <% end %>

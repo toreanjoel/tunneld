@@ -31,10 +31,10 @@ defmodule TunneldWeb.Live.Components.Services do
     # We need to make sure we have the details of the block list here already in case
 
     ~H"""
-    <div class="p-5">
-      <div class="mb-5 flex flex-row">
+    <div class="p-3 md:p-5">
+      <div class="mb-4 md:mb-5 flex flex-row">
         <div class="flex-1">
-          <div class="text-xl text-gray-1 font-medium">Services</div>
+          <div class="text-lg md:text-xl text-gray-1 font-medium">Services</div>
           <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
         </div>
         <div>
@@ -44,19 +44,19 @@ defmodule TunneldWeb.Live.Components.Services do
             phx-value-id="blacklist"
             class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
           >
-            <.icon class="w-6 h-6" name="hero-shield-check" />
-            <div class="truncate text-xs">Blocklist Details</div>
+            <.icon class="w-5 h-5 sm:w-6 sm:h-6" name="hero-shield-check" />
+            <div class="hidden sm:block truncate text-xs">Blocklist Details</div>
           </div>
         </div>
       </div>
 
-      <div :if={@loading} class="grid grid-cols-2 xl:grid-cols-3 gap-2">
+      <div :if={@loading} class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
         <div class="flex flex-row gap-3 py-2 px-3 items-center rounded-md bg-secondary opacity-20">
           <div class="text-sm truncate text-gray-1">Checking Services</div>
         </div>
       </div>
 
-      <div :if={!@loading} class="grid grid-cols-2 xl:grid-cols-3 gap-2">
+      <div :if={!@loading} class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-2">
         <%= for {service, service_status} <- @status do %>
           <div
             phx-click="show_details"

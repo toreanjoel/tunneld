@@ -191,25 +191,26 @@ defmodule TunneldWeb.Live.Dashboard do
   """
   def main(assigns) do
     ~H"""
-    <div class="flex-1 flex flex-col p-5 system-scroll">
+    <div class="flex-1 flex flex-col p-3 md:p-5 system-scroll">
       <%!-- Hooks to mount on startup --%>
       <div id="clipboard-hook" phx-hook="CopyToClipboard"></div>
 
-      <div class="flex flex-row h-[30px]">
-        <!-- Fixed width left column -->
+      <div class="flex flex-row items-center gap-2">
+        <!-- Logout -->
         <%= nav(assigns) %>
 
         <div class="flex-1" />
 
-        <div class="flex flex-row gap-1">
+        <div class="flex flex-row flex-wrap justify-end gap-1">
           <%!-- Private Network Access --%>
           <div
             phx-click="show_details"
             phx-value-type="zrok"
             phx-value-id="_"
-            class="bg-purple flex flex-row gap-3 py-2 px-3 items-center rounded-md cursor-pointer"
+            class="bg-purple flex flex-row gap-2 py-2 px-2 md:px-3 items-center rounded-md cursor-pointer text-white text-xs font-medium hover:opacity-80 transition-all"
           >
-            Configure Network
+            <.icon name="hero-signal" class="h-4 w-4" />
+            <span class="hidden sm:inline">Configure Network</span>
           </div>
 
           <%!-- Internet Access --%>
@@ -217,19 +218,20 @@ defmodule TunneldWeb.Live.Dashboard do
             phx-click="show_details"
             phx-value-type="wlan"
             phx-value-id="_"
-            class={"#{if @status.internet, do: "bg-green", else: "bg-red"} flex flex-row gap-3 py-2 px-3 items-center rounded-md cursor-pointer"}
+            class={"#{if @status.internet, do: "bg-green", else: "bg-red"} flex flex-row gap-2 py-2 px-2 md:px-3 items-center rounded-md cursor-pointer text-white text-xs font-medium hover:opacity-80 transition-all"}
           >
-            Internet Access
+            <.icon name="hero-wifi" class="h-4 w-4" />
+            <span class="hidden sm:inline">Internet Access</span>
           </div>
 
           <%!-- AI Assistant --%>
           <div
             :if={@ai_configured}
             phx-click="show_chat"
-            class="flex items-center justify-center gap-2 bg-purple px-3 py-2 cursor-pointer rounded-md text-white hover:opacity-80 transition-all"
+            class="flex items-center justify-center gap-2 bg-purple px-2 md:px-3 py-2 cursor-pointer rounded-md text-white text-xs font-medium hover:opacity-80 transition-all"
           >
             <.icon name="hero-sparkles-solid" class="h-4 w-4" />
-            <span class="text-xs font-medium">AI</span>
+            <span class="hidden sm:inline">AI</span>
           </div>
 
           <div
@@ -237,10 +239,10 @@ defmodule TunneldWeb.Live.Dashboard do
             phx-click="show_details"
             phx-value-type="ai_settings"
             phx-value-id="_"
-            class="flex items-center justify-center gap-2 bg-secondary px-3 py-2 cursor-pointer rounded-md text-gray-1 hover:opacity-80 transition-all"
+            class="flex items-center justify-center gap-2 bg-secondary px-2 md:px-3 py-2 cursor-pointer rounded-md text-gray-1 text-xs font-medium hover:opacity-80 transition-all"
           >
             <.icon name="hero-sparkles" class="h-4 w-4" />
-            <span class="text-xs font-medium">AI</span>
+            <span class="hidden sm:inline">AI</span>
           </div>
 
           <%!-- Auth Settings  --%>
@@ -248,21 +250,21 @@ defmodule TunneldWeb.Live.Dashboard do
             phx-click="show_details"
             phx-value-type="authentication"
             phx-value-id="_"
-            class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1"
+            class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1 hover:opacity-80 transition-all"
           >
-            <.icon name="hero-cog-6-tooth" class="h-15 w-15" />
+            <.icon name="hero-cog-6-tooth" class="h-4 w-4" />
           </div>
         </div>
       </div>
 
-      <div class="flex flex-col mx-auto max-w-[1280px] w-[980px]">
+      <div class="flex flex-col mx-auto max-w-[1280px] w-full">
         <%!-- Welcome section --%>
         <div>
           <.live_component id="welcome" module={Welcome} />
         </div>
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
-        <%!-- Resources, Resources and Services  --%>
+        <%!-- System Resources and Services --%>
         <div class="flex flex-col md:flex-row w-full gap-6">
           <div class="flex-1"><.live_component id="system_resources" module={SystemResources} /></div>
           <div class="flex-1">
@@ -273,12 +275,12 @@ defmodule TunneldWeb.Live.Dashboard do
         <div class="border-t-2 border-dashed border-secondary" />
 
         <%!-- Resources and Devices --%>
-        <div class="mt-6">
-          <div class="min-h-[200px]">
+        <div class="mt-4 md:mt-6">
+          <div class="min-h-[150px] md:min-h-[200px]">
             <.live_component id="resources" module={Resources} />
           </div>
 
-          <div class="min-h-[200px]">
+          <div class="min-h-[150px] md:min-h-[200px]">
             <.live_component id="devices" module={Devices} />
           </div>
         </div>

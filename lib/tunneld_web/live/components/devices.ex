@@ -35,10 +35,10 @@ defmodule TunneldWeb.Live.Components.Devices do
   """
   def render(assigns) do
     ~H"""
-    <div class="p-5">
-      <div class="mb-5 flex flex-row">
+    <div class="p-3 md:p-5">
+      <div class="mb-4 md:mb-5 flex flex-row">
         <div class="flex-1">
-          <div class="text-xl text-gray-1 font-medium">Devices</div>
+          <div class="text-lg md:text-xl text-gray-1 font-medium">Devices</div>
           <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
         </div>
         <div class="grid grid-cols-1 gap-1">
@@ -47,7 +47,7 @@ defmodule TunneldWeb.Live.Components.Devices do
       </div>
 
       <%!-- Loading indicator --%>
-      <div :if={@loading} class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div :if={@loading} class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         <div class="p-4 flex flex-col bg-secondary rounded-lg w-full h-[130px] opacity-10">
           <div class="grow">
             <.icon class="w-10 h-10 text-white" name="hero-computer-desktop" />
@@ -58,7 +58,7 @@ defmodule TunneldWeb.Live.Components.Devices do
       </div>
 
       <%!-- Content after loading --%>
-      <div :if={!@loading} class="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div :if={!@loading} class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         <%= for device <- Map.get(@data, :devices, []) do %>
           <div
             class="p-4 flex flex-col bg-secondary rounded-lg w-full h-[130px] hover:bg-secondary"
