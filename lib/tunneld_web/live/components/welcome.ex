@@ -13,7 +13,8 @@ defmodule TunneldWeb.Live.Components.Welcome do
 
   def update(assigns, socket) do
     data = Map.get(assigns, :data) || Tunneld.Servers.Updater.get_status()
-    {:ok, socket |> assign(data: data)}
+    ai_configured = Tunneld.Servers.Ai.configured?()
+    {:ok, socket |> assign(data: data) |> assign(:ai_configured, ai_configured)}
   end
 
   @doc """
@@ -33,6 +34,15 @@ defmodule TunneldWeb.Live.Components.Welcome do
         </div>
         <div :if={Map.get(@data, :is_latest, true) and not is_nil(Map.get(@data, :new_version))} class="bg-blue-800 bg-opacity-20 py-1 px-2 rounded-md text-xs text-blue-500">
           <%= "Update Available: " <> Map.get(@data, :new_version) %>
+        </div>
+        <div
+          :if={not @ai_configured}
+          phx-click="show_details"
+          phx-value-type="ai_settings"
+          phx-value-id="_"
+          class="bg-purple bg-opacity-20 py-1 px-2 rounded-md text-xs text-purple cursor-pointer hover:opacity-80 transition-all"
+        >
+          Connect AI Assistant
         </div>
       </div>
     </div>

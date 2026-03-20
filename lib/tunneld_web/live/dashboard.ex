@@ -89,10 +89,10 @@ defmodule TunneldWeb.Live.Dashboard do
       )
       |> assign(:devices, devices)
       |> assign(:pending_actions, %{})
-      |> assign(:view_mode, :dashboard)
       |> assign(:ai_configured, Tunneld.Servers.Ai.configured?())
       |> assign(:chat_artifacts, %{})
       |> assign(:chat_update, nil)
+      |> assign(:settings_menu_open, false)
 
     {:ok, socket}
   end
@@ -103,34 +103,23 @@ defmodule TunneldWeb.Live.Dashboard do
   def render(assigns) do
     ~H"""
     <div class="relative flex flex-row flex-1 h-screen text-white bg-primary">
-      <%= if @view_mode == :chat do %>
-        <div class="flex-1 flex flex-col">
-          <div class="flex items-center p-3 gap-2">
-            <button
-              phx-click="show_dashboard"
-              class="flex items-center gap-1 bg-secondary px-3 py-1.5 rounded-md text-xs text-gray-1 hover:opacity-80"
-            >
-              <.icon name="hero-arrow-left" class="w-3 h-3" />
-              Dashboard
-            </button>
-          </div>
-          <.live_component
-            module={Chat}
-            id="chat"
-            parent_pid={self()}
-            chat_update={@chat_update}
-          />
-        </div>
-      <% else %>
-        <!-- Flexible middle column -->
-        <%= main(assigns) %>
-      <% end %>
+      <!-- Flexible middle column -->
+      <%= main(assigns) %>
 
       <%= if @sidebar.is_open do %>
         <div class="fixed inset-0 bg-black bg-opacity-50 z-2" phx-click="close_details" />
       <% end %>
       <!-- Sidebar for more details -->
       <%= if not is_nil(@sidebar.view), do: sidebar(assigns) %>
+
+      <%!-- Floating AI button --%>
+      <div
+        :if={@ai_configured and not @sidebar.is_open}
+        phx-click="show_chat"
+        class="fixed bottom-5 right-5 z-1 flex items-center justify-center w-12 h-12 bg-purple rounded-full cursor-pointer shadow-lg hover:opacity-80 transition-all"
+      >
+        <.icon name="hero-sparkles-solid" class="h-5 w-5 text-white" />
+      </div>
 
       <.live_component
         :if={@modal.show && @modal.type === :default}
@@ -166,20 +155,29 @@ defmodule TunneldWeb.Live.Dashboard do
     ~H"""
     <div
       :if={@sidebar.is_open}
-      class="fixed top-0 right-0 z-19 h-screen w-screen lg:w-[30%] lg:max-w-[600px] bg-secondary system-scroll shadow-lg transition-transform duration-300 ease-in-out"
+      class="fixed top-0 right-0 z-19 h-screen w-screen lg:w-[35%] lg:max-w-[700px] bg-secondary system-scroll shadow-lg transition-transform duration-300 ease-in-out"
     >
-      <button phx-click="close_details" class="absolute top-4 right-5">
+      <button :if={@sidebar.view != :chat} phx-click="close_details" class="absolute top-4 right-5 z-10">
         <.icon class="w-5 h-5" name="hero-x-mark" />
       </button>
 
       <div class="h-full">
-        <.live_component
-          id="sidebar_details"
-          module={SidebarDetails}
-          view={@sidebar.view}
-          uri_info={@uri_info}
-          web_authn={@allow_webauthn?}
-        />
+        <%= if @sidebar.view == :chat do %>
+          <.live_component
+            module={Chat}
+            id="chat"
+            parent_pid={self()}
+            chat_update={@chat_update}
+          />
+        <% else %>
+          <.live_component
+            id="sidebar_details"
+            module={SidebarDetails}
+            view={@sidebar.view}
+            uri_info={@uri_info}
+            web_authn={@allow_webauthn?}
+          />
+        <% end %>
       </div>
     </div>
     """
@@ -224,35 +222,37 @@ defmodule TunneldWeb.Live.Dashboard do
             <span class="hidden sm:inline">Internet Access</span>
           </div>
 
-          <%!-- AI Assistant --%>
-          <div
-            :if={@ai_configured}
-            phx-click="show_chat"
-            class="flex items-center justify-center gap-2 bg-purple px-2 md:px-3 py-2 cursor-pointer rounded-md text-white text-xs font-medium hover:opacity-80 transition-all"
-          >
-            <.icon name="hero-sparkles-solid" class="h-4 w-4" />
-            <span class="hidden sm:inline">AI</span>
-          </div>
+          <%!-- Settings Menu --%>
+          <div class="relative">
+            <div
+              phx-click="toggle_settings_menu"
+              class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1 hover:opacity-80 transition-all"
+            >
+              <.icon name="hero-cog-6-tooth" class="h-4 w-4" />
+            </div>
 
-          <div
-            :if={not @ai_configured}
-            phx-click="show_details"
-            phx-value-type="ai_settings"
-            phx-value-id="_"
-            class="flex items-center justify-center gap-2 bg-secondary px-2 md:px-3 py-2 cursor-pointer rounded-md text-gray-1 text-xs font-medium hover:opacity-80 transition-all"
-          >
-            <.icon name="hero-sparkles" class="h-4 w-4" />
-            <span class="hidden sm:inline">AI</span>
-          </div>
-
-          <%!-- Auth Settings  --%>
-          <div
-            phx-click="show_details"
-            phx-value-type="authentication"
-            phx-value-id="_"
-            class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1 hover:opacity-80 transition-all"
-          >
-            <.icon name="hero-cog-6-tooth" class="h-4 w-4" />
+            <div
+              :if={@settings_menu_open}
+              phx-click-away="close_settings_menu"
+              class="absolute right-0 top-full mt-1 w-48 bg-secondary rounded-md shadow-lg z-10 py-1 border border-gray-700"
+            >
+              <div
+                phx-click="open_settings"
+                phx-value-type="ai_settings"
+                class="flex items-center gap-2 px-3 py-2 text-xs text-gray-1 hover:bg-primary cursor-pointer transition-all"
+              >
+                <.icon name="hero-sparkles" class="h-4 w-4" />
+                AI Assistant
+              </div>
+              <div
+                phx-click="open_settings"
+                phx-value-type="authentication"
+                class="flex items-center gap-2 px-3 py-2 text-xs text-gray-1 hover:bg-primary cursor-pointer transition-all"
+              >
+                <.icon name="hero-lock-closed" class="h-4 w-4" />
+                Authentication
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -307,11 +307,31 @@ defmodule TunneldWeb.Live.Dashboard do
   Render Sidebar content
   """
   def handle_event("show_chat", _params, socket) do
-    {:noreply, assign(socket, :view_mode, :chat)}
+    sidebar = %{
+      is_open: true,
+      view: :chat,
+      selection: nil
+    }
+
+    {:noreply, socket |> assign(:sidebar, sidebar) |> assign(:settings_menu_open, false)}
   end
 
-  def handle_event("show_dashboard", _params, socket) do
-    {:noreply, assign(socket, :view_mode, :dashboard)}
+  def handle_event("toggle_settings_menu", _params, socket) do
+    {:noreply, assign(socket, :settings_menu_open, !socket.assigns.settings_menu_open)}
+  end
+
+  def handle_event("close_settings_menu", _params, socket) do
+    {:noreply, assign(socket, :settings_menu_open, false)}
+  end
+
+  def handle_event("open_settings", %{"type" => type}, socket) do
+    sidebar = %{
+      is_open: true,
+      view: get_sidebar_details(type, "_"),
+      selection: sidebar_selection(type, "_")
+    }
+
+    {:noreply, socket |> assign(:sidebar, sidebar) |> assign(:settings_menu_open, false)}
   end
 
   def handle_event("show_details", %{"id" => id, "type" => type}, socket) do
@@ -586,14 +606,20 @@ defmodule TunneldWeb.Live.Dashboard do
   def handle_info(:ai_config_changed, socket) do
     configured = Tunneld.Servers.Ai.configured?()
 
-    socket =
-      socket
-      |> assign(:ai_configured, configured)
+    socket = assign(socket, :ai_configured, configured)
+
+    # Update the Welcome component's AI status
+    send_update(Welcome, id: "welcome", data: Tunneld.Servers.Updater.get_status())
 
     socket =
-      if not configured and socket.assigns.view_mode == :chat do
+      if not configured and socket.assigns.sidebar.view == :chat do
         Tunneld.Servers.Chat.clear_history()
-        assign(socket, :view_mode, :dashboard)
+
+        assign(socket, :sidebar, %{
+          is_open: false,
+          view: nil,
+          selection: nil
+        })
       else
         socket
       end

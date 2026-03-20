@@ -101,6 +101,12 @@ defmodule TunneldWeb.Live.Components.Chat do
             <.icon name="hero-plus" class="w-3 h-3" />
             New Chat
           </button>
+          <button
+            phx-click="close_details"
+            class="flex items-center justify-center p-1.5 text-gray-1 hover:opacity-80"
+          >
+            <.icon name="hero-x-mark" class="w-5 h-5" />
+          </button>
         </div>
       </div>
 
