@@ -81,10 +81,13 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         <%!-- Not allowed if the scheme is not HTTPS and we dont have a domain --%>
         <div
           :if={!@web_authn}
-          class="flex grow items-center justify-center gap-1 bg-gray-2 p-2 rounded-md w-1/2"
+          class="flex grow flex-col items-center justify-center gap-1 bg-gray-2 p-2 rounded-md w-1/2"
         >
-          <.icon name="hero-finger-print" class="h-5 w-5" />
-          <div class="truncate text-xs">WebAuthn (disabled)</div>
+          <div class="flex items-center gap-1">
+            <.icon name="hero-finger-print" class="h-5 w-5" />
+            <div class="truncate text-xs">WebAuthn</div>
+          </div>
+          <div class="text-[10px] text-gray-400">Available over HTTPS</div>
         </div>
         <%!-- We have the option to generate --%>
         <div

@@ -252,6 +252,14 @@ defmodule TunneldWeb.Live.Dashboard do
                 <.icon name="hero-lock-closed" class="h-4 w-4" />
                 Authentication
               </div>
+              <div class="border-t border-gray-700 my-1" />
+              <div
+                phx-click="restart_device"
+                class="flex items-center gap-2 px-3 py-2 text-xs text-red hover:bg-primary cursor-pointer transition-all"
+              >
+                <.icon name="hero-arrow-path" class="h-4 w-4" />
+                Restart Device
+              </div>
             </div>
           </div>
         </div>
@@ -314,6 +322,28 @@ defmodule TunneldWeb.Live.Dashboard do
     }
 
     {:noreply, socket |> assign(:sidebar, sidebar) |> assign(:settings_menu_open, false)}
+  end
+
+  def handle_event("restart_device", _params, socket) do
+    modal_data = %{
+      show: true,
+      title: "Restart Device?",
+      description: "This will restart the gateway service. The dashboard will be temporarily unavailable.",
+      body: %{
+        "type" => "string",
+        "data" => "All active connections will be interrupted. The device will come back online automatically."
+      },
+      actions: %{
+        "title" => "Restart",
+        "payload" => %{
+          "type" => "restart_device",
+          "data" => %{}
+        }
+      },
+      type: :default
+    }
+
+    {:noreply, socket |> assign(:modal, modal_data) |> assign(:settings_menu_open, false)}
   end
 
   def handle_event("toggle_settings_menu", _params, socket) do
@@ -795,6 +825,7 @@ defmodule TunneldWeb.Live.Dashboard do
       "disable_basic_auth" -> "Disabling Basic Auth..."
       "clear_ai_config" -> "Disconnecting AI..."
       "save_ai_config" -> "Saving AI config..."
+      "restart_device" -> "Restarting device..."
       _ -> "Working on request..."
     end
   end

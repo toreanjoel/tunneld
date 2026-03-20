@@ -134,6 +134,15 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
         Tunneld.Servers.Ai.clear_config()
         send(parent, :ai_config_changed)
 
+      # Device restart
+      "restart_device" ->
+        if Application.get_env(:tunneld, :mock_data) do
+          require Logger
+          Logger.info("Mock mode: would restart tunneld service")
+        else
+          System.cmd("sudo", ["systemctl", "restart", "tunneld"])
+        end
+
       _ ->
         Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
           type: :error,
