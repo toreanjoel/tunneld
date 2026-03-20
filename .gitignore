@@ -43,3 +43,4 @@ npm-debug.log
 # other
 .DS_Store
 .claude/
+docs-site/
