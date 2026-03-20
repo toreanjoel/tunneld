@@ -34,6 +34,8 @@ defmodule TunneldWeb.Router do
     live "/", Live.Login
     live "/setup", Live.Setup
     get "/download/ca", CAController, :download
+    get "/download/backup", BackupController, :export
+    post "/restore/backup", BackupController, :import
     live "/dashboard", Live.Dashboard
   end
 
