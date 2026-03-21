@@ -19,6 +19,8 @@ jobs:
 
     name: Build and test
     runs-on: ubuntu-latest
+    env:
+      MOCK_DATA: "true"
 
     steps:
     - uses: actions/checkout@v4
@@ -36,4 +38,4 @@ jobs:
     - name: Install dependencies
       run: mix deps.get
     - name: Run tests
-      run: MOCK_DATA=true mix test
+      run: mix test
