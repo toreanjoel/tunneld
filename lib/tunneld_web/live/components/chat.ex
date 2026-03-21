@@ -31,6 +31,7 @@ defmodule TunneldWeb.Live.Components.Chat do
       socket
       |> assign(:id, assigns.id)
       |> assign(:parent_pid, Map.get(assigns, :parent_pid, socket.assigns[:parent_pid]))
+      |> assign(:ai_configured, Map.get(assigns, :ai_configured, socket.assigns[:ai_configured] || false))
 
     socket =
       case assigns do
@@ -69,7 +70,7 @@ defmodule TunneldWeb.Live.Components.Chat do
         <div class="flex items-center gap-3">
           <h1 class="text-lg font-medium">AI Assistant</h1>
           <form
-            :if={length(@models) > 1}
+            :if={@ai_configured and length(@models) > 1}
             phx-change="select_model"
             phx-target={@myself}
           >
@@ -86,6 +87,7 @@ defmodule TunneldWeb.Live.Components.Chat do
 
         <div class="flex items-center gap-2">
           <button
+            :if={@ai_configured}
             phx-click="show_details"
             phx-value-type="ai_settings"
             phx-value-id="_"
@@ -94,6 +96,7 @@ defmodule TunneldWeb.Live.Components.Chat do
             <.icon name="hero-cog-6-tooth" class="w-4 h-4" />
           </button>
           <button
+            :if={@ai_configured}
             phx-click="clear_chat"
             phx-target={@myself}
             class="flex items-center gap-1 bg-secondary px-3 py-1.5 rounded-md text-xs text-gray-1 hover:opacity-80"
@@ -116,7 +119,25 @@ defmodule TunneldWeb.Live.Components.Chat do
         phx-hook="ChatScroll"
       >
         <div
-          :if={Enum.empty?(@messages)}
+          :if={not @ai_configured}
+          class="flex flex-col items-center justify-center h-full text-gray-2"
+        >
+          <.icon name="hero-sparkles" class="w-12 h-12 mb-4 opacity-30" />
+          <p class="text-sm">No AI provider connected</p>
+          <p class="text-xs mt-1 mb-4 opacity-60">Connect a provider to start chatting</p>
+          <button
+            phx-click="show_details"
+            phx-value-type="ai_settings"
+            phx-value-id="_"
+            class="flex items-center gap-2 bg-purple px-4 py-2 rounded-lg text-sm text-white hover:opacity-80 transition-all"
+          >
+            <.icon name="hero-cog-6-tooth" class="w-4 h-4" />
+            Setup AI Provider
+          </button>
+        </div>
+
+        <div
+          :if={@ai_configured and Enum.empty?(@messages)}
           class="flex flex-col items-center justify-center h-full text-gray-2"
         >
           <.icon name="hero-chat-bubble-left-right" class="w-12 h-12 mb-4 opacity-30" />
@@ -192,7 +213,7 @@ defmodule TunneldWeb.Live.Components.Chat do
         <% end %>
       </div>
 
-      <div class="flex-shrink-0 p-4 border-t border-secondary">
+      <div :if={@ai_configured} class="flex-shrink-0 p-4 border-t border-secondary">
         <form
           phx-submit="send_message"
           phx-target={@myself}

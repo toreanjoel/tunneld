@@ -21,12 +21,12 @@ mix assets.setup
 ### Running Locally
 
 ```bash
-MOCK_DATA=true mix phx.server
+PORT=4000 MOCK_DATA=true mix phx.server
 ```
 
-The `MOCK_DATA=true` flag stubs all hardware/OS interactions (systemctl, wpa_cli, iptables, etc.) with fake data. This lets you develop and test on any machine — no SBC, no root access required.
+The `MOCK_DATA=true` flag stubs all hardware/OS interactions (systemctl, wpa_cli, iptables, etc.) with fake data. This lets you develop and test on any machine - no SBC, no root access required.
 
-Visit `http://localhost:4000` to see the dashboard.
+Visit `http://localhost:4000` to see the dashboard. The default port is 80 (used in production), but that requires root - set `PORT=4000` (or any unprivileged port) for local development.
 
 ### Running Tests
 

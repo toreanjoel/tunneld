@@ -35,14 +35,24 @@ defmodule TunneldWeb.Live.Components.Welcome do
         <div :if={Map.get(@data, :is_latest, true) and not is_nil(Map.get(@data, :new_version))} class="bg-blue-800 bg-opacity-20 py-1 px-2 rounded-md text-xs text-blue-500">
           <%= "Update Available: " <> Map.get(@data, :new_version) %>
         </div>
+        <div class="flex-1"></div>
+        <div
+          :if={@ai_configured}
+          phx-click="show_chat"
+          class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
+        >
+          <.icon name="hero-sparkles-solid" class="w-5 h-5 sm:w-6 sm:h-6" />
+          <div class="hidden sm:block truncate text-xs">AI Assistant</div>
+        </div>
         <div
           :if={not @ai_configured}
           phx-click="show_details"
           phx-value-type="ai_settings"
           phx-value-id="_"
-          class="bg-purple bg-opacity-20 py-1 px-2 rounded-md text-xs text-purple cursor-pointer hover:opacity-80 transition-all"
+          class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
         >
-          Connect AI Assistant
+          <.icon name="hero-sparkles" class="w-5 h-5 sm:w-6 sm:h-6" />
+          <div class="hidden sm:block truncate text-xs">Connect AI</div>
         </div>
       </div>
     </div>

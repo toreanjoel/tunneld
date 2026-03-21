@@ -54,6 +54,7 @@ defmodule TunneldWeb.Live.Dashboard do
     # Check the scheme and domain to make sure it is possible to show
     uri_info = get_connect_info(socket, :uri)
     devices = DevicesServer.fetch_devices()
+
     internet_status =
       try do
         Tunneld.Servers.Wlan.connected?()
@@ -112,15 +113,6 @@ defmodule TunneldWeb.Live.Dashboard do
       <!-- Sidebar for more details -->
       <%= if not is_nil(@sidebar.view), do: sidebar(assigns) %>
 
-      <%!-- Floating AI button --%>
-      <div
-        :if={@ai_configured and not @sidebar.is_open}
-        phx-click="show_chat"
-        class="fixed bottom-5 right-5 z-1 flex items-center justify-center w-12 h-12 bg-purple rounded-full cursor-pointer shadow-lg hover:opacity-80 transition-all"
-      >
-        <.icon name="hero-sparkles-solid" class="h-5 w-5 text-white" />
-      </div>
-
       <.live_component
         :if={@modal.show && @modal.type === :default}
         module={Modal}
@@ -157,18 +149,17 @@ defmodule TunneldWeb.Live.Dashboard do
       :if={@sidebar.is_open}
       class="fixed top-0 right-0 z-19 h-screen w-screen lg:w-[35%] lg:max-w-[700px] bg-secondary system-scroll shadow-lg transition-transform duration-300 ease-in-out"
     >
-      <button :if={@sidebar.view != :chat} phx-click="close_details" class="absolute top-4 right-5 z-10">
+      <button
+        :if={@sidebar.view != :chat}
+        phx-click="close_details"
+        class="absolute top-4 right-5 z-10"
+      >
         <.icon class="w-5 h-5" name="hero-x-mark" />
       </button>
 
       <div class="h-full">
         <%= if @sidebar.view == :chat do %>
-          <.live_component
-            module={Chat}
-            id="chat"
-            parent_pid={self()}
-            chat_update={@chat_update}
-          />
+          <.live_component module={Chat} id="chat" parent_pid={self()} chat_update={@chat_update} ai_configured={@ai_configured} />
         <% else %>
           <.live_component
             id="sidebar_details"
@@ -241,24 +232,21 @@ defmodule TunneldWeb.Live.Dashboard do
                 phx-value-type="ai_settings"
                 class="flex items-center gap-2 px-3 py-2 text-xs text-gray-1 hover:bg-primary cursor-pointer transition-all"
               >
-                <.icon name="hero-sparkles" class="h-4 w-4" />
-                AI Assistant
+                <.icon name="hero-sparkles" class="h-4 w-4" /> AI Assistant
               </div>
               <div
                 phx-click="open_settings"
                 phx-value-type="authentication"
                 class="flex items-center gap-2 px-3 py-2 text-xs text-gray-1 hover:bg-primary cursor-pointer transition-all"
               >
-                <.icon name="hero-lock-closed" class="h-4 w-4" />
-                Authentication
+                <.icon name="hero-lock-closed" class="h-4 w-4" /> Authentication
               </div>
               <div class="border-t border-gray-700 my-1" />
               <div
                 phx-click="restart_device"
                 class="flex items-center gap-2 px-3 py-2 text-xs text-red hover:bg-primary cursor-pointer transition-all"
               >
-                <.icon name="hero-arrow-path" class="h-4 w-4" />
-                Restart Device
+                <.icon name="hero-arrow-path" class="h-4 w-4" /> Restart Device
               </div>
             </div>
           </div>
@@ -328,10 +316,12 @@ defmodule TunneldWeb.Live.Dashboard do
     modal_data = %{
       show: true,
       title: "Restart Device?",
-      description: "This will restart the gateway service. The dashboard will be temporarily unavailable.",
+      description:
+        "This will restart the gateway service. The dashboard will be temporarily unavailable.",
       body: %{
         "type" => "string",
-        "data" => "All active connections will be interrupted. The device will come back online automatically."
+        "data" =>
+          "All active connections will be interrupted. The device will come back online automatically."
       },
       actions: %{
         "title" => "Restart",
@@ -458,7 +448,14 @@ defmodule TunneldWeb.Live.Dashboard do
   # Close the modal
   #
   def handle_event("modal_close", _params, socket) do
-    modal_data = %{show: false, title: nil, description: nil, body: %{}, actions: nil, type: :default}
+    modal_data = %{
+      show: false,
+      title: nil,
+      description: nil,
+      body: %{},
+      actions: nil,
+      type: :default
+    }
 
     {:noreply, assign(socket, :modal, modal_data)}
   end
@@ -495,7 +492,10 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, socket}
   end
 
-  def handle_info(%{id: "devices", module: TunneldWeb.Live.Components.Devices, data: data} = message, socket) do
+  def handle_info(
+        %{id: "devices", module: TunneldWeb.Live.Components.Devices, data: data} = message,
+        socket
+      ) do
     send_update(message.module, id: message.id, data: message.data)
 
     devices = Map.get(data, :devices, [])
@@ -553,6 +553,7 @@ defmodule TunneldWeb.Live.Dashboard do
   def handle_info(%{action: action, data: data}, socket) do
     {:noreply, start_action(action, data, socket)}
   end
+
   #
   # Handle the completion of an async action
   #
@@ -642,16 +643,25 @@ defmodule TunneldWeb.Live.Dashboard do
     send_update(Welcome, id: "welcome", data: Tunneld.Servers.Updater.get_status())
 
     socket =
-      if not configured and socket.assigns.sidebar.view == :chat do
-        Tunneld.Servers.Chat.clear_history()
+      cond do
+        not configured and socket.assigns.sidebar.view == :chat ->
+          Tunneld.Servers.Chat.clear_history()
 
-        assign(socket, :sidebar, %{
-          is_open: false,
-          view: nil,
-          selection: nil
-        })
-      else
-        socket
+          assign(socket, :sidebar, %{
+            is_open: false,
+            view: nil,
+            selection: nil
+          })
+
+        socket.assigns.sidebar.view == :ai_settings ->
+          # Force sidebar re-render so it reflects the updated config
+          assign(socket, :sidebar, %{
+            socket.assigns.sidebar
+            | selection: %{updated_at: System.monotonic_time()}
+          })
+
+        true ->
+          socket
       end
 
     {:noreply, socket}
@@ -829,5 +839,4 @@ defmodule TunneldWeb.Live.Dashboard do
       _ -> "Working on request..."
     end
   end
-
 end
