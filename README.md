@@ -54,7 +54,7 @@ Guided onboarding flow after initial account creation: connect to Wi-Fi, optiona
 | `dnscrypt-proxy` | DNS-over-HTTPS enforcement with secure resolvers |
 | `nginx` | Reverse proxy with per-resource SSL and upstream load balancing |
 | `iptables` | NAT, packet forwarding, and DNS interception |
-| `Zrok/OpenZiti` | Overlay tunnel orchestration (reserve, share, access) |
+| `Zrok v2/OpenZiti` | Overlay tunnel orchestration (namespace names, share, access) |
 | `Elixir/Phoenix` | Application server, LiveView dashboard, GenServer process management |
 
 ### Diagrams
@@ -75,7 +75,7 @@ Tunneld is designed for Debian-based SBCs such as Raspberry Pi, NanoPi, or any c
 curl -sSf https://raw.githubusercontent.com/toreanjoel/tunneld-installer/main/install.sh | sudo bash
 ```
 
-The installer handles all dependencies: `dnsmasq`, `dhcpcd`, `nginx`, `iptables`, `dnscrypt-proxy`, and `zrok`.
+The installer handles all dependencies: `dnsmasq`, `dhcpcd`, `nginx`, `iptables`, `dnscrypt-proxy`, and `zrok2`.
 
 ## Project Structure
 
@@ -97,7 +97,7 @@ lib/
       wlan.ex               # Wi-Fi interface management (wpa_supplicant)
       nginx.ex              # Nginx reverse proxy config generation
       dnsmasq.ex            # DNS hairpin entry management
-      zrok.ex               # Zrok CLI orchestration and systemd units
+      zrok.ex               # Zrok v2 CLI orchestration (names, shares, access units)
       blocklist.ex          # DNS sinkhole blocklist management
       sqm.ex                # Smart Queue Management (tc/CAKE)
       updater.ex            # OTA update checking

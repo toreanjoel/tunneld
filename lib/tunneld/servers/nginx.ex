@@ -28,7 +28,7 @@ defmodule Tunneld.Servers.Nginx do
     available_path = available_path(id, mock?)
     enabled_path = enabled_path(id, mock?)
 
-    reserved = get_in(resource, ["tunneld", "reserved"]) || %{}
+    reserved = get_in(resource, ["tunneld", "share_names"]) || %{}
     public_name = Map.get(reserved, "public", "#{id}-public")
     Tunneld.CertManager.generate_cert(public_name)
 
@@ -76,7 +76,7 @@ defmodule Tunneld.Servers.Nginx do
     listen_ip = Map.get(resource, "ip", "127.0.0.1")
 
     # Determine names first
-    reserved = get_in(resource, ["tunneld", "reserved"]) || %{}
+    reserved = get_in(resource, ["tunneld", "share_names"]) || %{}
     public_name = Map.get(reserved, "public", "#{id}-public")
     private_name = Map.get(reserved, "private", "#{id}-private")
 

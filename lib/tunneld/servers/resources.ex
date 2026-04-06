@@ -87,7 +87,7 @@ defmodule Tunneld.Servers.Resources do
             message: "resource added successfully"
           })
 
-          if pub = reserve_meta["reserved"]["public"] do
+          if pub = reserve_meta["share_names"]["public"] do
             Dnsmasq.add_entry(pub)
             Services.restart_service(:dnsmasq)
           end
@@ -149,7 +149,7 @@ defmodule Tunneld.Servers.Resources do
             "bind" => bind,
             "description" => access["description"] || "",
             "tunneld" => %{
-              "reserved" => %{"private" => name},
+              "share_names" => %{"private" => name},
               "units" => %{"access" => %{"id" => acc_id, "unit" => acc_unit}},
               "enabled" => %{"access" => false}
             }
@@ -203,20 +203,14 @@ defmodule Tunneld.Servers.Resources do
           # we only enable resource we point to a local service
           if kind === "host" do
             name = s["name"]
-            ip = Map.get(s, "ip", @nginx_ip)
-            port = Map.get(s, "port", @nginx_port)
 
             base = sanitize_base(name)
-            pub_token = make_token(base, "pub")
-            priv_token = make_token(base, "priv")
+            pub_name = make_token(base, "pub")
+            priv_name = make_token(base, "priv")
 
-            tunneld = s["tunneld"] || %{}
-            auth = tunneld["auth"] || %{}
-            basic_auth = auth["basic"] || %{}
-
-            Zrok.reserve_public(pub_token, ip, port, basic_auth)
-            Zrok.reserve_private(priv_token, ip, port)
-            Dnsmasq.add_entry(pub_token)
+            Zrok.create_public_name(pub_name)
+            Zrok.create_private_name(priv_name)
+            Dnsmasq.add_entry(pub_name)
 
             # Ensure nginx config is present on boot/resync
             _ = ensure_nginx_config(s)
@@ -699,10 +693,11 @@ defmodule Tunneld.Servers.Resources do
           end
 
         _ =
-          case tunneld["reserved"] do
-            %{"public" => pub, "private" => priv} ->
-              _ = Zrok.release_reserved(pub)
-              _ = Zrok.release_reserved(priv)
+          case tunneld["share_names"] do
+            %{"public" => pub, "private" => _priv} ->
+              # In zrok v2, only public names need explicit deletion.
+              # Private share tokens are ephemeral (managed by --share-token on the share command).
+              _ = Zrok.delete_name(pub)
               Dnsmasq.remove_entry(pub)
               Services.restart_service(:dnsmasq)
               Tunneld.CertManager.delete_cert(pub)
@@ -778,23 +773,22 @@ defmodule Tunneld.Servers.Resources do
       Zrok.remove_share(public_unit["id"])
     end
 
-    # Release the reservation so we can update it with new auth details
-    reserved = tunneld["reserved"] || %{}
-    pub_token = reserved["public"]
-    Zrok.release_reserved(pub_token)
+    # In zrok v2, the name persists — we just recreate the unit with new auth args.
+    # No need to delete and recreate the name itself.
+    share_names = tunneld["share_names"] || %{}
+    pub_name = share_names["public"]
 
-    # Re-reserve with the new auth configuration
     ip = updated_resource["ip"] || @nginx_ip
     port = updated_resource["port"] || @nginx_port
-    Zrok.reserve_public(pub_token, ip, port, auth_config)
+    target = "#{ip}:#{port}"
 
     create_payload = %{
       "id" => "#{updated_resource["id"]}pub",
       "name" => updated_resource["name"],
       "tunneld" => %{
-        "kind" => "reserved",
-        "reserved_token" => pub_token,
-        "headless" => true,
+        "share_type" => "public",
+        "share_name" => pub_name,
+        "target" => target,
         "auth" => %{"basic" => auth_config}
       }
     }
@@ -845,25 +839,27 @@ defmodule Tunneld.Servers.Resources do
     name = new_share["name"]
     ip = Map.get(new_share, "ip", @nginx_ip)
     port = Map.get(new_share, "port", @nginx_port)
+    target = "#{ip}:#{port}"
 
     base = sanitize_base(name)
-    pub_token = make_token(base, "pub")
-    priv_token = make_token(base, "priv")
+    pub_name = make_token(base, "pub")
+    priv_name = make_token(base, "priv")
 
     tunneld = new_share["tunneld"] || %{}
     auth = tunneld["auth"] || %{}
     basic_auth = auth["basic"] || %{}
 
-    with :ok <- Zrok.reserve_public(pub_token, ip, port, basic_auth),
-         :ok <- Zrok.reserve_private(priv_token, ip, port),
+    with :ok <- Zrok.create_public_name(pub_name),
+         :ok <- Zrok.create_private_name(priv_name),
          {:ok, %{id: pub_id, unit: pub_unit}} <-
            Zrok.create_share_unit(%{
              "id" => "#{new_share["id"]}pub",
              "name" => name,
              "tunneld" => %{
-               "kind" => "reserved",
-               "reserved_token" => pub_token,
-               "headless" => true
+               "share_type" => "public",
+               "share_name" => pub_name,
+               "target" => target,
+               "auth" => %{"basic" => basic_auth}
              }
            }),
          {:ok, %{id: priv_id, unit: priv_unit}} <-
@@ -871,19 +867,20 @@ defmodule Tunneld.Servers.Resources do
              "id" => "#{new_share["id"]}priv",
              "name" => name,
              "tunneld" => %{
-               "kind" => "reserved",
-               "reserved_token" => priv_token,
-               "headless" => true
+               "share_type" => "private",
+               "share_name" => priv_name,
+               "target" => target
              }
            }) do
       {:ok,
        %{
-         "reserved" => %{"public" => pub_token, "private" => priv_token},
+         "share_names" => %{"public" => pub_name, "private" => priv_name},
          "units" => %{
            "public" => %{"id" => pub_id, "unit" => pub_unit},
            "private" => %{"id" => priv_id, "unit" => priv_unit}
          },
-         "enabled" => %{"public" => false, "private" => false}
+         "enabled" => %{"public" => false, "private" => false},
+         "auth" => %{"basic" => basic_auth}
        }}
     else
       {:error, reason} -> {:error, reason}

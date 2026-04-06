@@ -254,8 +254,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               <%= for kind <- available_kinds do %>
                 <% reserved =
                   case kind do
-                    "access" -> get_in(tunneld, ["reserved", "private"])
-                    _ -> get_in(tunneld, ["reserved", kind])
+                    "access" -> get_in(tunneld, ["share_names", "private"])
+                    _ -> get_in(tunneld, ["share_names", kind])
                   end %>
                 <% enabled? = get_in(tunneld, ["enabled", kind]) == true %>
                 <% unit = get_in(tunneld, ["units", kind, "unit"]) %>

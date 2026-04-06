@@ -1,16 +1,16 @@
 defmodule Tunneld.Servers.Zrok do
   @moduledoc """
-  Manages the Zrok/OpenZiti overlay network integration.
+  Manages the Zrok v2 / OpenZiti overlay network integration.
 
   Handles the full lifecycle of Zrok tunnel shares and access points:
 
   - **Configuration**: Setting/unsetting the Zrok API endpoint (control plane URL)
   - **Environment**: Enabling/disabling the device on a Zrok account
-  - **Reservations**: Creating named public and private share reservations
+  - **Names**: Creating and deleting reserved public names (`zrok2 create name`)
   - **Shares**: Creating, enabling, disabling, and removing systemd service units
-    that run `zrok share reserved` for each resource
+    that run `zrok2 share public/private` for each resource
   - **Access**: Creating, enabling, disabling, and removing systemd service units
-    that run `zrok access private` for consuming remote shares
+    that run `zrok2 access private` for consuming remote shares
 
   In production, this module manages real systemd unit files under `/etc/systemd/system/`.
   In mock mode (`MOCK_DATA=true`), unit files are written to the local data directory
@@ -42,7 +42,7 @@ defmodule Tunneld.Servers.Zrok do
 
     sdir =
       if mock? do
-        Path.join([fs_root(), "zrok", "units"])
+        Path.join([fs_root(), "zrok2", "units"])
       else
         @linux_systemd_dir
       end
@@ -144,60 +144,38 @@ defmodule Tunneld.Servers.Zrok do
     end
   end
 
-  def handle_call({:reserve_public, %{name: name, ip: ip, port: port} = params}, _from, state) do
-    basic = params[:auth] || params["auth"] || %{}
+  def handle_call({:create_public_name, %{name: name}}, _from, state) do
+    # In zrok v2, creating a reserved name is separate from sharing.
+    # `zrok2 create name -n public <name>` creates the name.
+    # The actual sharing (with --backend-mode, --basic-auth, etc.) happens
+    # in the systemd unit via `zrok2 share public <target> -n public:<name>`.
+    case run(zrok_bin(), ["create", "name", "-n", "public", name]) do
+      {_, 0} ->
+        {:reply, :ok, state}
 
-    auth_args =
-      if (basic["enabled"] == true or basic[:enabled] == true) &&
-           (basic["username"] || basic[:username]) && (basic["password"] || basic[:password]) do
-        username = basic["username"] || basic[:username]
-        password = basic["password"] || basic[:password]
-        ["--basic-auth", "#{username}:#{password}"]
-      else
-        []
-      end
-
-    cmd =
-      [
-           "reserve",
-           "public",
-           "#{ip}:#{port}",
-           "--unique-name",
-           name,
-           "--open",
-           "--backend-mode",
-           "proxy"
-         ] ++ auth_args
-
-    case run(zrok_bin(), cmd) do
-      {_, 0} -> {:reply, :ok, state}
-      err -> {:reply, {:error, err}, state}
+      {out, _code} ->
+        # Idempotent: if the name already exists, treat as success
+        if String.contains?(out, "already exists") do
+          {:reply, :ok, state}
+        else
+          {:reply, {:error, {out, 1}}, state}
+        end
     end
   end
 
-  def handle_call({:reserve_private, %{name: name, ip: _ip, port: _port}}, _from, state) do
-    # --- FIX: Match the Nginx Hashing Logic ---
-    # We ignore the passed port and calculate the unique private port based on the Name.
-    # This ensures Zrok points to the exact port Nginx is listening on for this specific private share.
-    target_port = Tunneld.Servers.Nginx.get_private_port(name)
-    target = "127.0.0.1:#{target_port}"
-
-    case run(zrok_bin(), [
-           "reserve",
-           "private",
-           "--unique-name",
-           name,
-           "--backend-mode",
-           "proxy",
-           target
-         ]) do
-      {_, 0} -> {:reply, :ok, state}
-      err -> {:reply, {:error, err}, state}
-    end
+  def handle_call({:create_private_name, %{name: _name}}, _from, state) do
+    # In zrok v2, private shares use --share-token on the share command itself.
+    # There is no separate "create name" step for private shares — the token
+    # is specified when starting `zrok2 share private <target> --share-token <name>`.
+    # This handler is kept as a no-op so the resources.ex flow stays consistent.
+    {:reply, :ok, state}
   end
 
-  def handle_call({:release_reserved, name}, _from, state) do
-    case run(zrok_bin(), ["release", name]) do
+  def handle_call({:delete_name, name}, _from, state) do
+    # In zrok v2, `zrok2 delete name <name>` replaces `zrok release <name>`.
+    # Note: delete will fail if the name has an active share — the systemd unit
+    # must be stopped first.
+    case run(zrok_bin(), ["delete", "name", name]) do
       {_, 0} -> {:reply, :ok, state}
       err -> {:reply, {:error, err}, state}
     end
@@ -426,7 +404,7 @@ defmodule Tunneld.Servers.Zrok do
   end
 
   defp zrok_bin() do
-    System.find_executable("zrok") || "zrok"
+    System.find_executable("zrok2") || "zrok2"
   end
 
   defp build_access_unit(access, _state) do
@@ -446,7 +424,7 @@ defmodule Tunneld.Servers.Zrok do
       |> Kernel.<>("%")
 
     exec =
-      [zrok_bin(), "access", "private", reserved, "-b", bind, "--headless", "--template-path", Path.join(fs_root(), "error.gohtml")]
+      [zrok_bin(), "access", "private", reserved, "-b", bind, "--headless"]
       |> Enum.map(&to_string/1)
       |> Enum.join(" ")
 
@@ -481,10 +459,40 @@ defmodule Tunneld.Servers.Zrok do
     id = normalize_id(resource["id"] || resource[:id])
     name = resource["name"] || resource[:name] || id
     tun = resource["tunneld"] || resource[:tunneld] || %{}
-    reserved_token = to_string(tun["reserved_token"] || tun[:reserved_token] || name)
+
+    share_type = to_string(tun["share_type"] || tun[:share_type] || "public")
+    share_name = to_string(tun["share_name"] || tun[:share_name] || name)
+    target = to_string(tun["target"] || tun[:target] || "127.0.0.1:18000")
+
+    # Build auth args for public shares
+    auth = tun["auth"] || tun[:auth] || %{}
+    basic = auth["basic"] || auth[:basic] || %{}
+
+    auth_args =
+      if share_type == "public" &&
+           (basic["enabled"] == true or basic[:enabled] == true) &&
+           (basic["username"] || basic[:username]) && (basic["password"] || basic[:password]) do
+        username = basic["username"] || basic[:username]
+        password = basic["password"] || basic[:password]
+        ["--basic-auth", "#{username}:#{password}"]
+      else
+        []
+      end
+
+    # In zrok v2:
+    #   Public:  zrok2 share public <target> -n public:<name> --headless --backend-mode proxy
+    #   Private: zrok2 share private <target> --share-token <name> --headless --backend-mode proxy
+    exec_args =
+      case share_type do
+        "public" ->
+          ["share", "public", target, "-n", "public:#{share_name}", "--headless", "--backend-mode", "proxy"] ++ auth_args
+
+        "private" ->
+          ["share", "private", target, "--share-token", share_name, "--headless", "--backend-mode", "proxy"]
+      end
 
     exec =
-      [zrok_bin(), "share", "reserved", reserved_token, "--headless"]
+      ([zrok_bin()] ++ exec_args)
       |> Enum.map(&to_string/1)
       |> Enum.join(" ")
 
@@ -755,13 +763,13 @@ defmodule Tunneld.Servers.Zrok do
 
   def disable_env(), do: GenServer.call(__MODULE__, :disable_env, 60_000)
 
-  def reserve_public(name, ip, port, auth \\ %{}),
-    do: GenServer.call(__MODULE__, {:reserve_public, %{name: name, ip: ip, port: port, auth: auth}}, 30_000)
+  def create_public_name(name),
+    do: GenServer.call(__MODULE__, {:create_public_name, %{name: name}}, 30_000)
 
-  def reserve_private(name, ip, port),
-    do: GenServer.call(__MODULE__, {:reserve_private, %{name: name, ip: ip, port: port}}, 30_000)
+  def create_private_name(name),
+    do: GenServer.call(__MODULE__, {:create_private_name, %{name: name}}, 30_000)
 
-  def release_reserved(name), do: GenServer.call(__MODULE__, {:release_reserved, name}, 30_000)
+  def delete_name(name), do: GenServer.call(__MODULE__, {:delete_name, name}, 30_000)
 
   def create_share_unit(share_map),
     do: GenServer.call(__MODULE__, {:create_share_unit, share_map}, 30_000)

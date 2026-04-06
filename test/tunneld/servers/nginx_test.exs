@@ -59,7 +59,7 @@ defmodule Tunneld.Servers.NginxTest do
         "port" => "18000",
         "pool" => ["192.168.1.10:8080"],
         "tunneld" => %{
-          "reserved" => %{
+          "share_names" => %{
             "public" => "testapppub",
             "private" => "testapppriv"
           }
@@ -99,7 +99,7 @@ defmodule Tunneld.Servers.NginxTest do
         "port" => "18000",
         "pool" => ["10.0.0.5:3000"],
         "tunneld" => %{
-          "reserved" => %{"public" => "rmapppub", "private" => "rmapppriv"}
+          "share_names" => %{"public" => "rmapppub", "private" => "rmapppriv"}
         }
       }
 

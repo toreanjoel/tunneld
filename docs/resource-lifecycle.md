@@ -31,12 +31,12 @@ sequenceDiagram
     participant Sys as systemd
 
     User->>Res: Toggle public share ON
-    Res->>Zrok: Reserve public endpoint (name, ip:port)
-    Zrok->>Zrok: zrok reserve public
-    Zrok->>Sys: Create systemd unit file
+    Res->>Zrok: Create public name
+    Zrok->>Zrok: zrok2 create name -n public NAME
+    Zrok->>Sys: Create systemd unit (zrok2 share public target -n public:NAME)
     Zrok->>Sys: Enable + start unit
-    Zrok-->>Res: Reserved name returned
-    Res->>Res: Store reserved name + unit info
+    Zrok-->>Res: Share name + unit info returned
+    Res->>Res: Store share name + unit info
     Res-->>User: Share enabled (accessible via name.share.zrok.io)
 ```
 
@@ -50,13 +50,12 @@ sequenceDiagram
     participant Sys as systemd
 
     User->>Res: Toggle private share ON
-    Res->>Zrok: Reserve private endpoint (name, ip:port)
-    Zrok->>Zrok: zrok reserve private
-    Zrok->>Sys: Create systemd unit file
+    Res->>Zrok: Create private share unit
+    Zrok->>Sys: Create systemd unit (zrok2 share private target --share-token NAME)
     Zrok->>Sys: Enable + start unit
-    Zrok-->>Res: Reserved name returned
-    Res->>Res: Store reserved name + unit info
-    Res-->>User: Share enabled (accessible via zrok access)
+    Zrok-->>Res: Share name + unit info returned
+    Res->>Res: Store share name + unit info
+    Res-->>User: Share enabled (accessible via zrok2 access)
 ```
 
 ## Binding to a Remote Share (Access)
@@ -71,7 +70,7 @@ sequenceDiagram
 
     User->>Res: Add private resource (remote share name)
     Res->>Zrok: Bind access to share (allocates local port)
-    Zrok->>Zrok: zrok access private (systemd unit)
+    Zrok->>Zrok: zrok2 access private (systemd unit)
     Zrok-->>Res: Local bind port returned
     Res->>Nginx: Generate proxy config (local port -> resource)
     Res->>DNS: Add hairpin DNS entry

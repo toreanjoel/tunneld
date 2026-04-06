@@ -57,11 +57,11 @@ sequenceDiagram
     participant B as Tunneld B (Peer)
 
     Note over A: Has myapp running on local device
-    A->>Z: Reserve private share for myapp
-    Z-->>A: Share name: myapp-share
+    A->>Z: zrok2 share private --share-token myapp-share
+    Z-->>A: Share token: myapp-share
 
     Note over B: Wants to access myapp
-    B->>Z: Bind access to myapp-share
+    B->>Z: zrok2 access private myapp-share
     Z-->>B: Local port 29182
 
     Note over B: Add to pool alongside local backends
