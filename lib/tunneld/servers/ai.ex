@@ -26,8 +26,15 @@ defmodule Tunneld.Servers.Ai do
   """
   def read_config do
     case Tunneld.Persistence.read_json(path()) do
-      {:ok, data} -> {:ok, data}
-      {:error, reason} -> {:error, "Failed to read AI config: #{inspect(reason)}"}
+      {:ok, data} ->
+        {:ok, data}
+
+      {:error, _reason} ->
+        if Application.get_env(:tunneld, :mock_data, false) do
+          {:ok, Tunneld.Servers.FakeData.Ai.get_config()}
+        else
+          {:error, "AI not configured"}
+        end
     end
   end
 
@@ -72,9 +79,13 @@ defmodule Tunneld.Servers.Ai do
   Returns `true` if the AI config file exists and has a non-empty `base_url`.
   """
   def configured? do
-    case read_config() do
-      {:ok, %{"base_url" => url}} when is_binary(url) -> String.trim(url) != ""
-      _ -> false
+    if Application.get_env(:tunneld, :mock_data, false) do
+      true
+    else
+      case read_config() do
+        {:ok, %{"base_url" => url}} when is_binary(url) -> String.trim(url) != ""
+        _ -> false
+      end
     end
   end
 

@@ -248,9 +248,10 @@ defmodule Tunneld.Servers.Chat do
   end
 
   defp get_completion(messages) do
-    case Ai.read_config() do
+    mock? = Application.get_env(:tunneld, :mock_data, false)
+
+    case get_ai_config(mock?) do
       {:ok, config} ->
-        config = Map.put_new(config, "mock", false)
         system_message = %{"role" => "system", "content" => SystemPrompt.build()}
         full_messages = [system_message | messages]
 
@@ -268,6 +269,20 @@ defmodule Tunneld.Servers.Chat do
 
       {:error, reason} ->
         {:error, reason}
+    end
+  end
+
+  defp get_ai_config(true = _mock?) do
+    case Ai.read_config() do
+      {:ok, config} -> {:ok, Map.put(config, "mock", true)}
+      {:error, _} -> {:ok, Map.put(Tunneld.Servers.FakeData.Ai.get_config(), "mock", true)}
+    end
+  end
+
+  defp get_ai_config(false) do
+    case Ai.read_config() do
+      {:ok, config} -> {:ok, Map.put_new(config, "mock", false)}
+      {:error, reason} -> {:error, reason}
     end
   end
 

@@ -8,10 +8,13 @@ defmodule Tunneld.Servers.AiTest do
     File.mkdir_p!(tmp_dir)
 
     original_fs = Application.get_env(:tunneld, :fs)
+    original_mock = Application.get_env(:tunneld, :mock_data)
     Application.put_env(:tunneld, :fs, root: tmp_dir, auth: "auth.json", ai: "ai.json")
+    Application.put_env(:tunneld, :mock_data, false)
 
     on_exit(fn ->
       Application.put_env(:tunneld, :fs, original_fs)
+      Application.put_env(:tunneld, :mock_data, original_mock)
       File.rm_rf!(tmp_dir)
     end)
 
