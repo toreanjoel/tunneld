@@ -86,6 +86,9 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       "disable_basic_auth" ->
         Resources.disable_basic_auth(data["resource_id"])
 
+      "get_private_token" ->
+        Resources.get_private_token(data["resource_id"])
+
       "add_private_share" ->
         Resources.add_access(data)
 

@@ -145,17 +145,19 @@ defmodule Tunneld.Servers.Zrok do
   end
 
   def handle_call({:create_public_name, %{name: name}}, _from, state) do
-    # In zrok v2, creating a reserved name is separate from sharing.
-    # `zrok2 create name -n public <name>` creates the name.
-    # The actual sharing (with --backend-mode, --basic-auth, etc.) happens
-    # in the systemd unit via `zrok2 share public <target> -n public:<name>`.
+    # Clean up any stale active share using this name before creating/verifying
+    # the name reservation. A crashed share process leaves the session active on
+    # the controller, causing subsequent `zrok2 share public -n public:NAME` to
+    # fail with 409 shareConflict.
+    cleanup_active_share_for_name(name)
+
     case run(zrok_bin(), ["create", "name", "-n", "public", name]) do
       {_, 0} ->
         {:reply, :ok, state}
 
       {out, _code} ->
-        # Idempotent: if the name already exists, treat as success
-        if String.contains?(out, "already exists") do
+        # Idempotent: zrok2 returns HTTP 409 when the name already exists
+        if String.contains?(out, "409") or String.contains?(out, "already exists") do
           {:reply, :ok, state}
         else
           {:reply, {:error, {out, 1}}, state}
@@ -164,21 +166,45 @@ defmodule Tunneld.Servers.Zrok do
   end
 
   def handle_call({:create_private_name, %{name: _name}}, _from, state) do
-    # In zrok v2, private shares use --share-token on the share command itself.
-    # There is no separate "create name" step for private shares — the token
-    # is specified when starting `zrok2 share private <target> --share-token <name>`.
-    # This handler is kept as a no-op so the resources.ex flow stays consistent.
+    # No-op: private shares are ephemeral — zrok2 assigns a token at startup.
     {:reply, :ok, state}
   end
 
+  def handle_call({:get_share_token, _unit_name}, _from, %{mock?: true} = state) do
+    {:reply, {:ok, nil}, state}
+  end
+
+  def handle_call({:get_share_token, unit_name}, _from, state) do
+    # Read the unit's journal to extract the private share token
+    case run("journalctl", ["-u", unit_name, "--no-pager", "-n", "50", "--output", "cat"]) do
+      {out, 0} ->
+        token =
+          case Regex.run(~r/zrok2 access private ([a-z0-9]+)/, out) do
+            [_, t] -> t
+            _ -> nil
+          end
+
+        {:reply, {:ok, token}, state}
+
+      _ ->
+        {:reply, {:ok, nil}, state}
+    end
+  end
+
   def handle_call({:delete_name, name}, _from, state) do
-    # In zrok v2, `zrok2 delete name <name>` replaces `zrok release <name>`.
-    # Note: delete will fail if the name has an active share — the systemd unit
-    # must be stopped first.
+    # Must clean up any active share first — zrok2 refuses to delete a name
+    # that has a live share session attached to it.
+    cleanup_active_share_for_name(name)
+
     case run(zrok_bin(), ["delete", "name", name]) do
       {_, 0} -> {:reply, :ok, state}
       err -> {:reply, {:error, err}, state}
     end
+  end
+
+  def handle_call({:cleanup_share_by_name, name}, _from, state) do
+    cleanup_active_share_for_name(name)
+    {:reply, :ok, state}
   end
 
   def handle_call({:create_share_unit, share_map}, _from, state) do
@@ -488,11 +514,14 @@ defmodule Tunneld.Servers.Zrok do
           ["share", "public", target, "-n", "public:#{share_name}", "--headless", "--backend-mode", "proxy"] ++ auth_args
 
         "private" ->
-          ["share", "private", target, "--share-token", share_name, "--headless", "--backend-mode", "proxy"]
+          ["share", "private", target, "--headless", "--backend-mode", "proxy"]
       end
 
+    # Use the resolved absolute path so systemd (which has no login PATH) can find the binary
+    bin = System.find_executable("zrok2") || "/usr/local/bin/zrok2"
+
     exec =
-      ([zrok_bin()] ++ exec_args)
+      ([bin] ++ exec_args)
       |> Enum.map(&to_string/1)
       |> Enum.join(" ")
 
@@ -510,10 +539,11 @@ defmodule Tunneld.Servers.Zrok do
         "[Service]",
         "Type=simple",
         "User=root",
+        "Environment=HOME=/root",
         "Environment=GOMEMLIMIT=80MiB",
         "Environment=GOGC=15",
         "Environment=GOMAXPROCS=1",
-        "ExecStart=/bin/sh -c \"#{exec}\"",
+        "ExecStart=/bin/sh -lc \"#{exec}\"",
         "Restart=always",
         "RestartSec=3s",
         "MemoryHigh=80M",
@@ -599,7 +629,7 @@ defmodule Tunneld.Servers.Zrok do
 
   defp do_enable(unit, _state) do
     with :ok <- systemctl(["enable", unit]),
-         :ok <- systemctl(["start", unit]) do
+         :ok <- systemctl(["start", "--no-block", unit]) do
       :ok
     else
       {:error, r} -> {:error, r}
@@ -722,6 +752,55 @@ defmodule Tunneld.Servers.Zrok do
     end
   end
 
+  # Queries `zrok2 overview` to find any active share session using the given
+  # public name, then deletes it. This handles two cases:
+  #   1. A crashed share process that left a stale session on the controller
+  #   2. Pre-deletion cleanup (zrok2 refuses to delete a name with an active share)
+  # Runs best-effort — failures are logged but not propagated.
+  defp cleanup_active_share_for_name(name) do
+    case run(zrok_bin(), ["overview", "--json"]) do
+      {json, 0} ->
+        case Jason.decode(json) do
+          {:ok, overview} ->
+            # Get share tokens from the names section
+            # Names have: "name", "shareToken", "namespaceName", etc.
+            name_tokens =
+              (overview["names"] || [])
+              |> Enum.filter(fn n -> n["name"] == name end)
+              |> Enum.map(fn n -> n["shareToken"] end)
+              |> Enum.reject(&is_nil/1)
+
+            # Get share tokens from environment shares by checking frontendEndpoints
+            # Shares have: "shareToken", "frontendEndpoints" (list), "shareMode", etc.
+            env_tokens =
+              (overview["environments"] || [])
+              |> Enum.flat_map(fn env -> env["shares"] || [] end)
+              |> Enum.filter(fn s ->
+                endpoints = s["frontendEndpoints"] || []
+
+                Enum.any?(endpoints, fn ep ->
+                  String.contains?(ep, name)
+                end)
+              end)
+              |> Enum.map(fn s -> s["shareToken"] end)
+              |> Enum.reject(&is_nil/1)
+
+            tokens = Enum.uniq(name_tokens ++ env_tokens)
+
+            Enum.each(tokens, fn token ->
+              Logger.info("Cleaning up share for '#{name}' (token: #{token})")
+              run(zrok_bin(), ["delete", "share", token])
+            end)
+
+          _ ->
+            :ok
+        end
+
+      _ ->
+        :ok
+    end
+  end
+
   defp ensure_dir(dir) do
     case File.mkdir_p(dir) do
       :ok -> :ok
@@ -770,6 +849,12 @@ defmodule Tunneld.Servers.Zrok do
     do: GenServer.call(__MODULE__, {:create_private_name, %{name: name}}, 30_000)
 
   def delete_name(name), do: GenServer.call(__MODULE__, {:delete_name, name}, 30_000)
+
+  def get_share_token(unit_name),
+    do: GenServer.call(__MODULE__, {:get_share_token, unit_name}, 15_000)
+
+  def cleanup_share_by_name(name),
+    do: GenServer.call(__MODULE__, {:cleanup_share_by_name, name}, 30_000)
 
   def create_share_unit(share_map),
     do: GenServer.call(__MODULE__, {:create_share_unit, share_map}, 30_000)

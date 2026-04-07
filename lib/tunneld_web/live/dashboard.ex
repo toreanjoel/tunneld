@@ -833,6 +833,7 @@ defmodule TunneldWeb.Live.Dashboard do
       "update_blocklist" -> "Updating blocklist..."
       "configure_basic_auth" -> "Configuring Basic Auth..."
       "disable_basic_auth" -> "Disabling Basic Auth..."
+      "get_private_token" -> "Fetching private token..."
       "clear_ai_config" -> "Disconnecting AI..."
       "save_ai_config" -> "Saving AI config..."
       "restart_device" -> "Restarting device..."

@@ -331,11 +331,37 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                     </div>
                   <% end %>
 
+                  <%= if kind == "private" and enabled? do %>
+                    <% # Check if we have a real token (not the placeholder name like "adminapriv")
+                      has_token? = is_binary(reserved) and reserved != "" and not String.ends_with?(reserved, "priv") %>
+                    <div class="mt-2 border-t border-gray-700 pt-2">
+                      <div class="flex items-center justify-between">
+                        <span class="text-xs font-semibold">Private Token</span>
+                        <div
+                          phx-click="trigger_action"
+                          phx-value-action="get_private_token"
+                          phx-value-data={Jason.encode!(%{"resource_id" => @data.id})}
+                          class="cursor-pointer text-xs underline text-blue-400 hover:text-blue-300"
+                        >
+                          <%= if has_token?, do: "Refresh", else: "Get Token" %>
+                        </div>
+                      </div>
+                      <%= if has_token? do %>
+                        <div class="mt-1 bg-gray-800 rounded px-2 py-1">
+                          <code class="text-xs text-green-400 break-all"><%= reserved %></code>
+                        </div>
+                        <p class="text-[10px] text-gray-400 mt-1">Use this token to access this resource from another device</p>
+                      <% end %>
+                    </div>
+                  <% end %>
+
                   <div class="mt-2 grid grid-rows-1 md:grid-rows-3 gap-2 text-xs">
+                    <%= if kind != "private" do %>
                     <div class="truncate">
                       <span class="font-semibold">Reserved:</span>
                       <span class="ml-1"><%= reserved || "—" %></span>
                     </div>
+                    <% end %>
                     <div class="truncate flex items-center gap-2">
                       <span class="font-semibold">Status:</span>
                       <span class={["w-3 h-3 rounded-full inline-block", indicator_class]} />

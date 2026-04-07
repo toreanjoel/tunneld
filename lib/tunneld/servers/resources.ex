@@ -186,6 +186,65 @@ defmodule Tunneld.Servers.Resources do
     end
   end
 
+  def handle_call({:get_private_token, resource_id}, _from, state) do
+    {_, data} = read_file()
+    resources = if data == "", do: [], else: data
+    resource = Enum.find(resources, fn r -> r["id"] == resource_id end)
+
+    priv_unit = get_in(resource || %{}, ["tunneld", "units", "private", "unit"])
+
+    token =
+      if priv_unit do
+        case Zrok.get_share_token(priv_unit) do
+          {:ok, t} when is_binary(t) -> t
+          _ -> nil
+        end
+      end
+
+    if token do
+      updated =
+        Enum.map(resources, fn r ->
+          if r["id"] == resource_id do
+            put_in(r, ["tunneld", "share_names", "private"], token)
+          else
+            r
+          end
+        end)
+
+      _ = Tunneld.Persistence.write_json(path(), updated)
+      broadcast_shares()
+
+      Phoenix.PubSub.broadcast(Tunneld.PubSub, @broadcast_topic, %{
+        id: @component_desktop_id,
+        module: @component_module,
+        data:
+          updated
+          |> Enum.find(&(&1["id"] == resource_id))
+          |> then(fn s ->
+            pool = Map.get(s, "pool", [])
+            mock? = Application.get_env(:tunneld, :mock_data, false)
+
+            %{
+              id: s["id"],
+              name: s["name"],
+              ip: s["ip"],
+              description: s["description"],
+              port: s["port"],
+              status: Map.get(s, "status", false),
+              pool: pool,
+              health: Health.pool_health(pool, mock?),
+              tunneld: s["tunneld"],
+              kind: s["kind"]
+            }
+          end)
+      })
+
+      {:reply, {:ok, token}, Map.put(state, :resources, updated)}
+    else
+      {:reply, {:error, :not_found}, state}
+    end
+  end
+
   def handle_cast(:init_local_shares, state) do
     resources =
       case read_file() do
@@ -317,7 +376,12 @@ defmodule Tunneld.Servers.Resources do
         {:noreply, state}
 
       _ ->
-        result = if enable?, do: Zrok.enable_access(unit_id), else: Zrok.disable_access(unit_id)
+        result =
+          try do
+            if enable?, do: Zrok.enable_access(unit_id), else: Zrok.disable_access(unit_id)
+          catch
+            :exit, {:timeout, _} -> {:error, :timeout}
+          end
 
         case result do
           :ok ->
@@ -429,10 +493,14 @@ defmodule Tunneld.Servers.Resources do
 
       {resource, kind} ->
         result =
-          if enable? do
-            Tunneld.Servers.Zrok.enable_share(unit_id)
-          else
-            Tunneld.Servers.Zrok.disable_share(unit_id)
+          try do
+            if enable? do
+              Tunneld.Servers.Zrok.enable_share(unit_id)
+            else
+              Tunneld.Servers.Zrok.disable_share(unit_id)
+            end
+          catch
+            :exit, {:timeout, _} -> {:error, :timeout}
           end
 
         case result do
@@ -694,10 +762,14 @@ defmodule Tunneld.Servers.Resources do
 
         _ =
           case tunneld["share_names"] do
-            %{"public" => pub, "private" => _priv} ->
-              # In zrok v2, only public names need explicit deletion.
-              # Private share tokens are ephemeral (managed by --share-token on the share command).
+            %{"public" => pub, "private" => priv} ->
+              # Clean up both public and private shares from the controller
               _ = Zrok.delete_name(pub)
+              # Delete private share session if we have the token
+              if is_binary(priv) and priv != "" do
+                Zrok.cleanup_share_by_name(priv)
+              end
+
               Dnsmasq.remove_entry(pub)
               Services.restart_service(:dnsmasq)
               Tunneld.CertManager.delete_cert(pub)
@@ -1055,6 +1127,10 @@ defmodule Tunneld.Servers.Resources do
 
   @doc "Remove an access entry and its Zrok access unit."
   def remove_access(id), do: GenServer.cast(__MODULE__, {:remove_access, id})
+
+  @doc "Fetch the private share token from the journal and persist it."
+  def get_private_token(resource_id),
+    do: GenServer.call(__MODULE__, {:get_private_token, resource_id}, 15_000)
 
   @doc """
   Update a resource. The second argument determines what is updated:
