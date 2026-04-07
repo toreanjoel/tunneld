@@ -252,29 +252,33 @@ defmodule Tunneld.Servers.Resources do
         _ -> []
       end
 
-    # We try and add all the resources we had locally
+    # Re-register all host resources: public names, DNS, and nginx configs
     try do
       if not Enum.empty?(resources) do
-        resources
-        |> Enum.each(fn s ->
-          kind = s["kind"]
+        hosts = Enum.filter(resources, fn s -> s["kind"] === "host" end)
 
-          # we only enable resource we point to a local service
-          if kind === "host" do
-            name = s["name"]
+        Enum.each(hosts, fn s ->
+          name = s["name"]
 
-            base = sanitize_base(name)
-            pub_name = make_token(base, "pub")
-            priv_name = make_token(base, "priv")
+          base = sanitize_base(name)
+          pub_name = make_token(base, "pub")
+          priv_name = make_token(base, "priv")
 
-            Zrok.create_public_name(pub_name)
-            Zrok.create_private_name(priv_name)
-            Dnsmasq.add_entry(pub_name)
+          # Delete and recreate the name to rebind it to the current environment.
+          # After disconnect/reconnect the zrok environment ID changes, so names
+          # from the old environment need to be released and re-registered.
+          Zrok.delete_name(pub_name)
+          Zrok.create_public_name(pub_name)
+          Zrok.create_private_name(priv_name)
+          Dnsmasq.add_entry(pub_name)
 
-            # Ensure nginx config is present on boot/resync
-            _ = ensure_nginx_config(s)
-          end
+          # Ensure nginx config is present on boot/resync
+          _ = ensure_nginx_config(s)
         end)
+
+        if not Enum.empty?(hosts) do
+          Services.restart_service(:dnsmasq)
+        end
       end
     rescue
       _e ->

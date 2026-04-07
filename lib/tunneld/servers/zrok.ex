@@ -224,6 +224,11 @@ defmodule Tunneld.Servers.Zrok do
   def handle_call({:enable_share, id}, _from, state) do
     case Map.fetch(state.units, id) do
       {:ok, %{unit: unit}} ->
+        # Clean up any stale share session on the controller before starting,
+        # otherwise zrok2 returns 409 shareConflict
+        unit_path = Path.join(state.systemd_dir, unit)
+        cleanup_stale_share_from_unit(unit_path)
+
         case do_enable(unit, state) do
           :ok ->
             notify(:info, "Resource enabled: #{id}")
@@ -798,6 +803,23 @@ defmodule Tunneld.Servers.Zrok do
 
       _ ->
         :ok
+    end
+  end
+
+  # Reads a unit file and cleans up any stale share on the controller
+  # that would cause a 409 shareConflict on start.
+  defp cleanup_stale_share_from_unit(unit_path) do
+    with {:ok, content} <- File.read(unit_path) do
+      # Public shares: extract name from "-n public:<name>"
+      case Regex.run(~r/-n\s+public:(\S+)/, content) do
+        [_, name] ->
+          cleanup_active_share_for_name(name)
+
+        _ ->
+          :ok
+      end
+    else
+      _ -> :ok
     end
   end
 
