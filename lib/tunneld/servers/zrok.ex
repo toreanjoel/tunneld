@@ -664,10 +664,28 @@ defmodule Tunneld.Servers.Zrok do
   end
 
   defp run(cmd, args) do
-    try do
-      System.cmd(cmd, args, stderr_to_stdout: true, into: "", timeout: 30_000)
-    rescue
-      e -> {:error, e}
+    caller = self()
+    ref = make_ref()
+
+    pid =
+      spawn(fn ->
+        try do
+          result = System.cmd(cmd, args, stderr_to_stdout: true, into: "")
+          send(caller, {ref, {:ok, result}})
+        rescue
+          e -> send(caller, {ref, {:error, e}})
+        catch
+          _, reason -> send(caller, {ref, {:error, reason}})
+        end
+      end)
+
+    receive do
+      {^ref, {:ok, result}} -> result
+      {^ref, {:error, e}} -> {:error, e}
+    after
+      30_000 ->
+        Process.exit(pid, :kill)
+        {"", 1}
     end
   end
 

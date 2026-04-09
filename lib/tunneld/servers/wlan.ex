@@ -285,11 +285,35 @@ defmodule Tunneld.Servers.Wlan do
     |> Enum.into(%{})
   end
 
-  # Wrapper around System.cmd with a 15-second timeout to prevent
+  # Wrapper around System.cmd with a timeout to prevent
   # GenServer hangs when system commands stall.
+  # Uses spawn instead of Task.async for safe error isolation.
   defp run_cmd(cmd, args, opts \\ []) do
-    default_opts = [stderr_to_stdout: true, timeout: 15_000]
-    System.cmd(cmd, args, Keyword.merge(default_opts, opts))
+    timeout = Keyword.get(opts, :timeout, 15_000)
+    cmd_opts = opts |> Keyword.delete(:timeout) |> Keyword.put_new(:stderr_to_stdout, true)
+    caller = self()
+    ref = make_ref()
+
+    pid =
+      spawn(fn ->
+        try do
+          result = System.cmd(cmd, args, cmd_opts)
+          send(caller, {ref, {:ok, result}})
+        rescue
+          e -> send(caller, {ref, {:error, e}})
+        catch
+          _, reason -> send(caller, {ref, {:error, reason}})
+        end
+      end)
+
+    receive do
+      {^ref, {:ok, result}} -> result
+      {^ref, {:error, _}} -> {"", 1}
+    after
+      timeout ->
+        Process.exit(pid, :kill)
+        {"", 1}
+    end
   end
 
   @impl true
