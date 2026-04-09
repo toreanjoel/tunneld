@@ -63,7 +63,7 @@ config :phoenix, :json_library, Jason
 config :tunneld, :auth,
   ttl: 1800
 
-config :tunneld, version: "0.13.5"
+config :tunneld, version: "0.13.6"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

@@ -15,7 +15,6 @@ defmodule TunneldWeb.Live.Dashboard do
   alias TunneldWeb.Live.Components.Services
   alias TunneldWeb.Live.Components.Resources
   alias TunneldWeb.Live.Components.Devices
-  alias TunneldWeb.Live.Components.Modal
   alias TunneldWeb.Live.Components.Chat
   alias TunneldWeb.Live.Dashboard.Actions
   alias TunneldWeb.Live.Dashboard.Modal
@@ -103,7 +102,7 @@ defmodule TunneldWeb.Live.Dashboard do
 
       <.live_component
         :if={@modal.show && @modal.type === :default}
-        module={Modal}
+        module={TunneldWeb.Live.Components.Modal}
         id="generic_modal"
         title={@modal.title}
         description={@modal.description}
