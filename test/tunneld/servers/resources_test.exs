@@ -39,19 +39,19 @@ defmodule Tunneld.Servers.ResourcesTest do
 
     test "created file contains empty JSON array", %{tmp_dir: _} do
       Resources.create_file()
-      {:ok, data} = Resources.read_file()
+      data = Resources.read_file()
       assert data == []
     end
   end
 
   describe "read_file/0" do
-    test "returns error when file does not exist", %{tmp_dir: _} do
-      assert {:error, _} = Resources.read_file()
+    test "returns empty list when file does not exist", %{tmp_dir: _} do
+      assert Resources.read_file() == []
     end
 
     test "reads valid JSON array", %{tmp_dir: _} do
       Resources.create_file()
-      {:ok, data} = Resources.read_file()
+      data = Resources.read_file()
       assert is_list(data)
     end
 
@@ -68,7 +68,7 @@ defmodule Tunneld.Servers.ResourcesTest do
       }
 
       File.write!(Resources.path(), Jason.encode!([resource]))
-      {:ok, data} = Resources.read_file()
+      data = Resources.read_file()
       assert length(data) == 1
       assert hd(data)["name"] == "testapp"
     end

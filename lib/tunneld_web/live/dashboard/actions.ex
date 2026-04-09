@@ -19,6 +19,8 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
     Sqm
   }
 
+  @mock Application.compile_env(:tunneld, :mock_data, false)
+
   @doc """
   Execute a named action with the given data.
 
@@ -139,7 +141,7 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
 
       # Device restart
       "restart_device" ->
-        if Application.get_env(:tunneld, :mock_data) do
+        if @mock do
           require Logger
           Logger.info("Mock mode: would restart tunneld service")
         else

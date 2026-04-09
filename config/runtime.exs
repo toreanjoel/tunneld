@@ -10,20 +10,23 @@ if mock_data? do
   config :tunneld, mock_data: true
 end
 
-# Data paths (overrideable via ENV)
-default_root = if mock_data?, do: "data", else: "/var/lib/tunneld"
-config :tunneld, :fs,
-  root: System.get_env("TUNNELD_DATA", default_root),
-  auth: System.get_env("TUNNELD_AUTH_FILE", "auth.json"),
-  resources: System.get_env("TUNNELD_SHARES_FILE", "resources.json"),
-  sqm: System.get_env("TUNNELD_SQM_FILE", "sqm.json"),
-  ai: System.get_env("TUNNELD_AI_FILE", "ai.json"),
-  dns_file: System.get_env("TUNNELD_DNS_FILE", "/etc/dnsmasq.d/tunneld_resources.conf")
+# Data paths (overrideable via ENV) — skip in test, config/test.exs handles it
+unless config_env() == :test do
+  default_root = if mock_data?, do: "data", else: "/var/lib/tunneld"
 
-config :tunneld, :certs,
-  cert_dir: System.get_env("TUNNELD_CERT_DIR", "/etc/nginx/certs"),
-  ca_dir: System.get_env("TUNNELD_CA_DIR", "/etc/tunneld/ca"),
-  ca_file: "rootCA.key"
+  config :tunneld, :fs,
+    root: System.get_env("TUNNELD_DATA", default_root),
+    auth: System.get_env("TUNNELD_AUTH_FILE", "auth.json"),
+    resources: System.get_env("TUNNELD_SHARES_FILE", "resources.json"),
+    sqm: System.get_env("TUNNELD_SQM_FILE", "sqm.json"),
+    ai: System.get_env("TUNNELD_AI_FILE", "ai.json"),
+    dns_file: System.get_env("TUNNELD_DNS_FILE", "/etc/dnsmasq.d/tunneld_resources.conf")
+
+  config :tunneld, :certs,
+    cert_dir: System.get_env("TUNNELD_CERT_DIR", "/etc/nginx/certs"),
+    ca_dir: System.get_env("TUNNELD_CA_DIR", "/etc/tunneld/ca"),
+    ca_file: "rootCA.key"
+end
 
 # Only require these in PROD
 if config_env() == :prod do

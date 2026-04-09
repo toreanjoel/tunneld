@@ -17,6 +17,7 @@ defmodule Tunneld.Servers.Blocklist do
 
   @system_blacklist "/blacklists/dnsmasq-system.blacklist"
   @update_script "/update_blacklist.sh"
+  defp mock?, do: Application.get_env(:tunneld, :mock_data, false)
 
   @broadcast_topic "component:details"
   @component_desktop_id "sidebar_details"
@@ -73,7 +74,7 @@ defmodule Tunneld.Servers.Blocklist do
   end
 
   defp update_blocklist do
-    if Application.get_env(:tunneld, :mock_data, false) do
+    if mock?() do
       :ok
     else
       try do
@@ -99,7 +100,7 @@ defmodule Tunneld.Servers.Blocklist do
   end
 
   defp load_blocklist_meta(opts \\ []) do
-    mock? = Application.get_env(:tunneld, :mock_data, false)
+    mock? = mock?()
     updated? = Keyword.get(opts, :updated, false)
 
     try do

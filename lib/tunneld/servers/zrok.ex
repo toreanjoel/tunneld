@@ -665,7 +665,7 @@ defmodule Tunneld.Servers.Zrok do
 
   defp run(cmd, args) do
     try do
-      System.cmd(cmd, args, stderr_to_stdout: true, into: "")
+      System.cmd(cmd, args, stderr_to_stdout: true, into: "", timeout: 30_000)
     rescue
       e -> {:error, e}
     end
@@ -893,4 +893,17 @@ defmodule Tunneld.Servers.Zrok do
   def enable_access(id), do: GenServer.call(__MODULE__, {:enable_access, id}, 30_000)
   def disable_access(id), do: GenServer.call(__MODULE__, {:disable_access, id}, 30_000)
   def remove_access(id), do: GenServer.call(__MODULE__, {:remove_access, id}, 30_000)
+
+  @impl true
+  def terminate(_reason, state) do
+    unless state[:mock?] do
+      Logger.info("Zrok shutting down, disabling all active units")
+
+      Enum.each(state.units || %{}, fn {_id, %{unit: unit}} ->
+        _ = do_disable(unit, state)
+      end)
+    end
+
+    :ok
+  end
 end

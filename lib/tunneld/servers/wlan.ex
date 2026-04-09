@@ -8,12 +8,14 @@ defmodule Tunneld.Servers.Wlan do
   # Define the Wi-Fi interface used for internet
   @wpa_config "/etc/wpa_supplicant/wpa_supplicant.conf"
   @conn_interval_checker 15_000
+  defp mock?, do: Application.get_env(:tunneld, :mock_data, false)
 
   @doc "Starts the GenServer"
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 
+  @impl true
   def init(_) do
     # We make sure the WP Supplicant is running
     init_wp_supplicant()
@@ -22,12 +24,13 @@ defmodule Tunneld.Servers.Wlan do
   end
 
   # Disconnect from the current connected wireless network
+  @impl true
   def handle_call(:disconnect, _from, state) do
-    if Application.get_env(:tunneld, :mock_data, false) do
+    if mock?() do
       {:reply, :ok, state}
     else
       # Disconnect from current network
-      System.cmd("wpa_cli", ["-i", Application.get_env(:tunneld, :network)[:wlan], "disconnect"])
+      run_cmd("wpa_cli", ["-i", Application.get_env(:tunneld, :network)[:wlan], "disconnect"])
 
       Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
         type: :info,
@@ -43,15 +46,16 @@ defmodule Tunneld.Servers.Wlan do
   end
 
   # Scans for networks
+  @impl true
   def handle_cast(:scan, state) do
-    if Application.get_env(:tunneld, :mock_data, false) do
+    if mock?() do
       {:noreply, Tunneld.Servers.FakeData.Wlan.get_data()}
     else
       Logger.info("Scanning for Wi-Fi networks...")
 
       # scan for networks
-      System.cmd("wpa_cli", ["scan"])
-      {output, _} = System.cmd("wpa_cli", ["scan_results"])
+      run_cmd("wpa_cli", ["scan"])
+      {output, _} = run_cmd("wpa_cli", ["scan_results"])
 
       networks =
         output
@@ -61,8 +65,8 @@ defmodule Tunneld.Servers.Wlan do
         |> Enum.filter(fn i -> i.security !== "/" end)
 
       # attempt to get current network details
-      System.cmd("wpa_cli", ["status"])
-      {status_output, _} = System.cmd("wpa_cli", ["status"])
+      run_cmd("wpa_cli", ["status"])
+      {status_output, _} = run_cmd("wpa_cli", ["status"])
 
       # Broadcast to the live view (or parent) so it can update the Devices component.
       # Use an id that matches the one used in your live_component render.
@@ -80,6 +84,7 @@ defmodule Tunneld.Servers.Wlan do
   end
 
   # Connects to a Wi-Fi network and overwrites config
+  @impl true
   def handle_cast({:connect, ssid, password}, state) do
     Logger.info("Connecting to Wi-Fi: #{ssid}...")
 
@@ -110,8 +115,8 @@ defmodule Tunneld.Servers.Wlan do
 
     init_wp_supplicant()
 
-    System.cmd("wpa_cli", ["-i", wlan_iface, "reconnect"])
-    System.cmd("dhcpcd", [wlan_iface])
+    run_cmd("wpa_cli", ["-i", wlan_iface, "reconnect"])
+    run_cmd("dhcpcd", [wlan_iface])
 
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
       type: :info,
@@ -124,6 +129,7 @@ defmodule Tunneld.Servers.Wlan do
   end
 
   # check the connection status of the current interface
+  @impl true
   def handle_info(:check_connection, state) do
     check_connection()
     Process.send_after(self(), :check_connection, @conn_interval_checker)
@@ -147,12 +153,12 @@ defmodule Tunneld.Servers.Wlan do
 
   @doc "Returns true if the WLAN interface reports an active connection."
   def connected? do
-    if Application.get_env(:tunneld, :mock_data, false) do
+    if mock?() do
       true
     else
       iface = Application.get_env(:tunneld, :network)[:wlan]
 
-      case System.cmd("iw", ["dev", iface, "link"]) do
+      case run_cmd("iw", ["dev", iface, "link"]) do
         {output, _} -> String.trim(output) != "Not connected."
         _ -> false
       end
@@ -182,11 +188,11 @@ defmodule Tunneld.Servers.Wlan do
 
   # Get the current connection status
   defp check_connection do
-    if Application.get_env(:tunneld, :mock_data, false) do
+    if mock?() do
       :local_development_mode
     else
       {output, _} =
-        System.cmd("iw", ["dev", Application.get_env(:tunneld, :network)[:wlan], "link"])
+        run_cmd("iw", ["dev", Application.get_env(:tunneld, :network)[:wlan], "link"])
 
       is_connected =
         case output |> String.trim() do
@@ -205,19 +211,19 @@ defmodule Tunneld.Servers.Wlan do
 
   # we reinit the wp supplicant on startup initially
   def init_wp_supplicant() do
-    if Application.get_env(:tunneld, :mock_data, false) do
+    if mock?() do
       :local_development_mode
     else
       Logger.info("Restarting wpa_supplicant...")
 
       # Kill existing wpa_supplicant
-      System.cmd("pkill", ["-f", "wpa_supplicant"])
+      run_cmd("pkill", ["-f", "wpa_supplicant"])
       # Wait 2 seconds for the process to fully terminate
       Process.sleep(2000)
 
       # Restart wpa_supplicant
       {_, exit_code} =
-        System.cmd("wpa_supplicant", [
+        run_cmd("wpa_supplicant", [
           "-B",
           "-i",
           Application.get_env(:tunneld, :network)[:wlan],
@@ -237,7 +243,7 @@ defmodule Tunneld.Servers.Wlan do
 
   # Ensures wpa_cli is available before proceeding
   defp wait_for_wpa_cli_ready(attempts \\ 5) do
-    {output, exit_code} = System.cmd("wpa_cli", ["status"])
+    {output, exit_code} = run_cmd("wpa_cli", ["status"])
 
     if exit_code == 0 and String.contains?(output, "wpa_state") do
       Logger.info("wpa_cli is ready")
@@ -277,5 +283,22 @@ defmodule Tunneld.Servers.Wlan do
     end)
     |> Enum.reject(&is_nil/1)
     |> Enum.into(%{})
+  end
+
+  # Wrapper around System.cmd with a 15-second timeout to prevent
+  # GenServer hangs when system commands stall.
+  defp run_cmd(cmd, args, opts \\ []) do
+    default_opts = [stderr_to_stdout: true, timeout: 15_000]
+    System.cmd(cmd, args, Keyword.merge(default_opts, opts))
+  end
+
+  @impl true
+  def terminate(_reason, _state) do
+    unless mock?() do
+      Logger.info("Wlan shutting down, stopping wpa_supplicant")
+      run_cmd("pkill", ["-f", "wpa_supplicant"])
+    end
+
+    :ok
   end
 end

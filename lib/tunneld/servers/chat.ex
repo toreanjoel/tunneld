@@ -13,6 +13,8 @@ defmodule Tunneld.Servers.Chat do
   alias Tunneld.Ai.{Client, Executor, SystemPrompt, Tools}
   alias Tunneld.Servers.Ai
 
+  defp mock?, do: Application.get_env(:tunneld, :mock_data, false)
+
   @cleanup_interval 86_400_000
 
   def start_link(_) do
@@ -248,7 +250,7 @@ defmodule Tunneld.Servers.Chat do
   end
 
   defp get_completion(messages) do
-    mock? = Application.get_env(:tunneld, :mock_data, false)
+    mock? = mock?()
 
     case get_ai_config(mock?) do
       {:ok, config} ->

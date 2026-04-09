@@ -20,6 +20,8 @@ defmodule Tunneld.Servers.Nginx do
   @private_port_base 20000
   @private_port_range 10000
 
+  defp mock_mode?, do: Application.get_env(:tunneld, :mock_data, false) in [true, "true"]
+
   @doc """
   Create or update the nginx config for a resource (shared for public/private)
   """
@@ -260,8 +262,4 @@ defmodule Tunneld.Servers.Nginx do
 
   defp ensure_pool(pool) when is_list(pool) and length(pool) > 0, do: :ok
   defp ensure_pool(_), do: {:error, :invalid_pool}
-
-  defp mock_mode?() do
-    Application.get_env(:tunneld, :mock_data) in [true, "true"]
-  end
 end

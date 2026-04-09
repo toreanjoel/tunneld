@@ -12,6 +12,8 @@ defmodule Tunneld.Servers.Ai do
   """
   use GenServer
 
+  defp mock?, do: Application.get_env(:tunneld, :mock_data, false)
+
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
@@ -30,7 +32,7 @@ defmodule Tunneld.Servers.Ai do
         {:ok, data}
 
       {:error, _reason} ->
-        if Application.get_env(:tunneld, :mock_data, false) do
+        if mock?() do
           {:ok, Tunneld.Servers.FakeData.Ai.get_config()}
         else
           {:error, "AI not configured"}
@@ -79,7 +81,7 @@ defmodule Tunneld.Servers.Ai do
   Returns `true` if the AI config file exists and has a non-empty `base_url`.
   """
   def configured? do
-    if Application.get_env(:tunneld, :mock_data, false) do
+    if mock?() do
       true
     else
       case read_config() do

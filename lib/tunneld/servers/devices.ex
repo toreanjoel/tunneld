@@ -15,6 +15,7 @@ defmodule Tunneld.Servers.Devices do
   @interval 10_000
   @path "/var/lib/misc/dnsmasq.leases"
   @notifications_topic "notifications"
+  defp mock?, do: Application.get_env(:tunneld, :mock_data, false)
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -98,7 +99,7 @@ defmodule Tunneld.Servers.Devices do
   """
   def fetch_devices() do
     {data, _} =
-      if Application.get_env(:tunneld, :mock_data, false) do
+      if mock?() do
         Tunneld.Servers.FakeData.Devices.get_data()
       else
         case File.read(@path) do
@@ -150,10 +151,8 @@ defmodule Tunneld.Servers.Devices do
   end
 
   defp do_revoke_lease(mac) do
-    mock? = Application.get_env(:tunneld, :mock_data, false)
-
-    with {:ok, _} <- delete_lease_line(mac, mock?),
-         :ok <- restart_dnsmasq(mock?) do
+    with {:ok, _} <- delete_lease_line(mac, mock?()),
+         :ok <- restart_dnsmasq(mock?()) do
       Phoenix.PubSub.broadcast(Tunneld.PubSub, @notifications_topic, %{
         type: :info,
         message: "Lease for #{mac} revoked. Device will drop off shortly once sync updates."

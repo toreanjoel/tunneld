@@ -22,10 +22,12 @@ defmodule Tunneld.Servers.Resources do
   require Logger
   alias Tunneld.Servers.{Nginx, Zrok, Dnsmasq, Services}
   alias Tunneld.Servers.Resources.Health
+  alias Tunneld.PubSub.Messages
 
   @interval 10_000
   @nginx_ip "127.0.0.1"
   @nginx_port "18000"
+  defp mock?, do: Application.get_env(:tunneld, :mock_data, false)
 
   @broadcast_topic_main "component:resources"
   @broadcast_topic "component:details"
@@ -46,11 +48,7 @@ defmodule Tunneld.Servers.Resources do
   end
 
   def handle_call({:add_share, resource}, _from, state) do
-    resources =
-      case read_file() do
-        {:ok, list} when is_list(list) -> list
-        _ -> []
-      end
+    resources = read_file()
 
     exists = Enum.find(resources, fn item -> item["name"] === resource["name"] end)
 
@@ -82,10 +80,7 @@ defmodule Tunneld.Servers.Resources do
              :ok <- Nginx.upsert_resource_config(configured_share),
              u_nodes <- resources ++ [configured_share],
              :ok <- Tunneld.Persistence.write_json(path(), u_nodes) do
-          Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-            type: :info,
-            message: "resource added successfully"
-          })
+          Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", Messages.notification(:info, "resource added successfully"))
 
           if pub = reserve_meta["share_names"]["public"] do
             Dnsmasq.add_entry(pub)
@@ -116,11 +111,7 @@ defmodule Tunneld.Servers.Resources do
   end
 
   def handle_call({:add_access, access}, _from, state) do
-    resources =
-      case read_file() do
-        {:ok, list} when is_list(list) -> list
-        _ -> []
-      end
+    resources = read_file()
 
     new_id = DateTime.utc_now() |> DateTime.to_unix() |> to_string()
     id = new_id <> "acc"
@@ -187,8 +178,7 @@ defmodule Tunneld.Servers.Resources do
   end
 
   def handle_call({:get_private_token, resource_id}, _from, state) do
-    {_, data} = read_file()
-    resources = if data == "", do: [], else: data
+    resources = read_file()
     resource = Enum.find(resources, fn r -> r["id"] == resource_id end)
 
     priv_unit = get_in(resource || %{}, ["tunneld", "units", "private", "unit"])
@@ -222,7 +212,6 @@ defmodule Tunneld.Servers.Resources do
           |> Enum.find(&(&1["id"] == resource_id))
           |> then(fn s ->
             pool = Map.get(s, "pool", [])
-            mock? = Application.get_env(:tunneld, :mock_data, false)
 
             %{
               id: s["id"],
@@ -232,7 +221,7 @@ defmodule Tunneld.Servers.Resources do
               port: s["port"],
               status: Map.get(s, "status", false),
               pool: pool,
-              health: Health.pool_health(pool, mock?),
+              health: Health.pool_health(pool, mock?()),
               tunneld: s["tunneld"],
               kind: s["kind"]
             }
@@ -246,11 +235,7 @@ defmodule Tunneld.Servers.Resources do
   end
 
   def handle_cast(:init_local_shares, state) do
-    resources =
-      case read_file() do
-        {:ok, list} when is_list(list) -> list
-        _ -> []
-      end
+    resources = read_file()
 
     # Re-register all host resources: public names, DNS, and nginx configs
     try do
@@ -290,11 +275,7 @@ defmodule Tunneld.Servers.Resources do
   end
 
   def handle_cast(:hibernate_shares, state) do
-    resources =
-      case read_file() do
-        {:ok, list} when is_list(list) -> list
-        _ -> []
-      end
+    resources = read_file()
 
     updated_shares =
       Enum.map(resources, fn s ->
@@ -321,13 +302,9 @@ defmodule Tunneld.Servers.Resources do
         |> put_in(["tunneld", "enabled", "access"], false)
       end)
 
-    case Tunneld.Persistence.write_json(path(), updated_shares) do
-      :ok ->
-        broadcast_shares()
-        {:noreply, Map.put(state, :resources, updated_shares)}
-
-      {:error, _err} ->
-        {:noreply, state}
+    case persist_and_broadcast(updated_shares, "Shares hibernated", "Failed to hibernate shares") do
+      {:ok, _} -> {:noreply, Map.put(state, :resources, updated_shares)}
+      {:error, _} -> {:noreply, state}
     end
   end
 
@@ -336,7 +313,7 @@ defmodule Tunneld.Servers.Resources do
 
     if !Enum.empty?(resources) do
       resource =
-        Enum.filter(resources, fn resource -> resource.id === id or resource["id"] === id end)
+        Enum.filter(resources, fn r -> r.id === id or r["id"] === id end)
         |> Enum.at(0)
 
       Phoenix.PubSub.broadcast(Tunneld.PubSub, @broadcast_topic, %{
@@ -358,8 +335,7 @@ defmodule Tunneld.Servers.Resources do
         _ -> false
       end
 
-    {_status, data} = read_file()
-    resources = if data == "", do: [], else: data
+    resources = read_file()
 
     {entry, _kind} =
       Enum.reduce_while(resources, {nil, nil}, fn s, _acc ->
@@ -398,18 +374,9 @@ defmodule Tunneld.Servers.Resources do
                 end
               end)
 
-            case Tunneld.Persistence.write_json(path(), updated_shares) do
-              :ok ->
-                broadcast_shares()
-                {:noreply, Map.put(state, :resources, updated_shares)}
-
-              {:error, err} ->
-                Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-                  type: :error,
-                  message: "Failed to persist access state: #{inspect(err)}"
-                })
-
-                {:noreply, state}
+            case persist_and_broadcast(updated_shares, "Access #{if enable?, do: "enabled", else: "disabled"}", "Failed to persist access state") do
+              {:ok, _} -> {:noreply, Map.put(state, :resources, updated_shares)}
+              {:error, _} -> {:noreply, state}
             end
 
           {:error, err} ->
@@ -425,8 +392,8 @@ defmodule Tunneld.Servers.Resources do
   end
 
   def handle_cast({:remove_access, id}, state) do
-    {_, data} = read_file()
-    resource = Enum.find(data, fn s -> s["id"] === id and s["kind"] == "access" end)
+    resources = read_file()
+    resource = Enum.find(resources, fn s -> s["id"] === id and s["kind"] == "access" end)
 
     _ =
       if resource do
@@ -438,26 +405,12 @@ defmodule Tunneld.Servers.Resources do
         end
       end
 
-    updated_nodes = Enum.reject(data, fn s -> s["id"] === id and s["kind"] == "access" end)
+    updated_nodes = Enum.reject(resources, fn s -> s["id"] === id and s["kind"] == "access" end)
 
     update_state =
-      case Tunneld.Persistence.write_json(path(), updated_nodes) do
-        :ok ->
-          Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-            type: :info,
-            message: "access removed successfully"
-          })
-
-          broadcast_shares()
-          Map.put(state, :resources, updated_nodes)
-
-        {:error, err} ->
-          Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-            type: :error,
-            message: "Failed to remove access: #{inspect(err)}"
-          })
-
-          state
+      case persist_and_broadcast(updated_nodes, "access removed successfully", "Failed to remove access") do
+        {:ok, _} -> Map.put(state, :resources, updated_nodes)
+        {:error, _} -> state
       end
 
     {:noreply, update_state}
@@ -472,8 +425,7 @@ defmodule Tunneld.Servers.Resources do
         _ -> false
       end
 
-    {_status, data} = read_file()
-    resources = if data == "", do: [], else: data
+    resources = read_file()
 
     {resource, kind} =
       Enum.reduce_while(resources, {nil, nil}, fn s, _acc ->
@@ -527,12 +479,11 @@ defmodule Tunneld.Servers.Resources do
                   |> Enum.find(&(&1["id"] == resource["id"]))
                   |> then(fn s ->
                     pool = Map.get(s, "pool", [])
-                    mock? = Application.get_env(:tunneld, :mock_data, false)
                     kind = s["kind"] || "host"
 
                     health =
                       if kind == "host",
-                        do: Health.pool_health(pool, mock?),
+                        do: Health.pool_health(pool, mock?()),
                         else: %{status: :not_applicable}
 
                     %{
@@ -579,8 +530,7 @@ defmodule Tunneld.Servers.Resources do
   end
 
   def handle_cast({:update_share, :resource, data}, state) do
-    {_, raw} = read_file()
-    resources = if raw == "", do: [], else: raw
+    resources = read_file()
 
     resource = Enum.find(resources, fn r -> r["id"] == data["id"] end)
 
@@ -620,16 +570,9 @@ defmodule Tunneld.Servers.Resources do
             end
           end)
 
-        case Tunneld.Persistence.write_json(path(), updated_shares) do
-          :ok ->
+        case persist_and_broadcast(updated_shares, "Resource updated successfully", "Failed to update resource") do
+          {:ok, _} ->
             _ = ensure_nginx_config(updated_resource)
-
-            Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-              type: :info,
-              message: "Resource updated successfully"
-            })
-
-            broadcast_shares()
 
             Phoenix.PubSub.broadcast(
               Tunneld.PubSub,
@@ -639,12 +582,7 @@ defmodule Tunneld.Servers.Resources do
 
             {:noreply, Map.put(state, :resources, updated_shares)}
 
-          {:error, err} ->
-            Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-              type: :error,
-              message: "Failed to update resource: #{inspect(err)}"
-            })
-
+          {:error, _} ->
             {:noreply, state}
         end
     end
@@ -653,27 +591,23 @@ defmodule Tunneld.Servers.Resources do
   end
 
   def handle_cast({:update_share, type, data}, state) do
-    resources = fetch_shares()
+    resources = read_file()
 
     cond do
       Enum.empty?(resources) ->
         {:noreply, state}
 
       true ->
-        resource =
-          Enum.filter(resources, fn resource ->
-            resource.id === data["id"] or resource["id"] === data["id"]
-          end)
-          |> Enum.at(0)
+        resource = Enum.find(resources, fn r -> r["id"] == data["id"] end)
 
         updated_shares =
           case type do
             :tunneld ->
-              Enum.map(resources, fn a ->
-                if a.id === resource.id do
-                  Map.put(a, :tunneld, data)
+              Enum.map(resources, fn r ->
+                if r["id"] == resource["id"] do
+                  Map.put(r, "tunneld", data)
                 else
-                  a
+                  r
                 end
               end)
 
@@ -682,26 +616,16 @@ defmodule Tunneld.Servers.Resources do
               resources
           end
 
-        case Tunneld.Persistence.write_json(path(), updated_shares) do
-          :ok ->
-            Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-              type: :info,
-              message: "Resource updated successfully"
-            })
-
-            broadcast_shares()
-
+        case persist_and_broadcast(updated_shares, "Resource updated successfully", "Failed to update resource") do
+          {:ok, _} ->
             Phoenix.PubSub.broadcast(
               Tunneld.PubSub,
               "show_details",
               {:show_details, %{"id" => data["id"], "type" => "resource"}}
             )
 
-          {:error, err} ->
-            Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-              type: :error,
-              message: "Failed to update resource: #{inspect(err)}"
-            })
+          {:error, _} ->
+            :ok
         end
     end
 
@@ -710,8 +634,7 @@ defmodule Tunneld.Servers.Resources do
 
   def handle_cast({:configure_basic_auth, params}, state) do
     resource_id = params["resource_id"]
-    {_, raw} = read_file()
-    resources = if raw == "", do: [], else: raw
+    resources = read_file()
 
     resource = Enum.find(resources, fn r -> r["id"] == resource_id end)
 
@@ -730,8 +653,7 @@ defmodule Tunneld.Servers.Resources do
   end
 
   def handle_cast({:disable_basic_auth, resource_id}, state) do
-    {_, raw} = read_file()
-    resources = if raw == "", do: [], else: raw
+    resources = read_file()
 
     resource = Enum.find(resources, fn r -> r["id"] == resource_id end)
 
@@ -744,8 +666,8 @@ defmodule Tunneld.Servers.Resources do
   end
 
   def handle_cast({:remove_share, id}, state) do
-    {_, data} = read_file()
-    resource = Enum.find(data, fn s -> s["id"] === id end)
+    resources = read_file()
+    resource = Enum.find(resources, fn s -> s["id"] === id end)
 
     _ =
       if resource do
@@ -785,18 +707,11 @@ defmodule Tunneld.Servers.Resources do
         _ = Nginx.remove_resource_config(id)
       end
 
-    updated_nodes = Enum.reject(data, fn resource -> resource["id"] === id end)
+    updated_nodes = Enum.reject(resources, fn resource -> resource["id"] === id end)
 
     update_state =
-      case Tunneld.Persistence.write_json(path(), updated_nodes) do
-        :ok ->
-          Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-            type: :info,
-            message: "resource removed successfully"
-          })
-
-          broadcast_shares()
-
+      case persist_and_broadcast(updated_nodes, "resource removed successfully", "Failed to remove resource") do
+        {:ok, _} ->
           Phoenix.PubSub.broadcast(Tunneld.PubSub, @broadcast_topic, %{
             id: @component_desktop_id,
             module: @component_module,
@@ -805,12 +720,7 @@ defmodule Tunneld.Servers.Resources do
 
           Map.put(state, :resources, updated_nodes)
 
-        {:error, err} ->
-          Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-            type: :error,
-            message: "Failed to remove resource: #{inspect(err)}"
-          })
-
+        {:error, _} ->
           state
       end
 
@@ -833,6 +743,29 @@ defmodule Tunneld.Servers.Resources do
     })
 
     resources
+  end
+
+  # Persists updated resources, broadcasts, and returns {:ok, updated} or {:error, reason}.
+  # Broadcasts a notification on error.
+  defp persist_and_broadcast(updated_resources, success_msg, error_msg) do
+    case Tunneld.Persistence.write_json(path(), updated_resources) do
+      :ok ->
+        Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+          type: :info,
+          message: success_msg
+        })
+
+        broadcast_shares()
+        {:ok, updated_resources}
+
+      {:error, err} ->
+        Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+          type: :error,
+          message: "#{error_msg}: #{inspect(err)}"
+        })
+
+        {:error, err}
+    end
   end
 
   defp reconfigure_share(resource, auth_config, resources, state) do
@@ -996,9 +929,7 @@ defmodule Tunneld.Servers.Resources do
   end
 
   def fetch_shares() do
-    mock? = Application.get_env(:tunneld, :mock_data, false)
-    {_status, data} = read_file()
-    resources = if data == "", do: [], else: data
+    resources = read_file()
 
     Enum.map(resources, fn s ->
       kind = s["kind"] || "host"
@@ -1012,7 +943,7 @@ defmodule Tunneld.Servers.Resources do
 
       health =
         case kind do
-          "host" -> Health.pool_health(pool, mock?)
+          "host" -> Health.pool_health(pool, mock?())
           _ -> %{status: :not_applicable}
         end
 
@@ -1086,10 +1017,12 @@ defmodule Tunneld.Servers.Resources do
     end
   end
 
+  @doc "Read resources from disk. Returns a list (empty on missing/corrupt file)."
   def read_file() do
     case Tunneld.Persistence.read_json(path()) do
-      {:ok, data} -> {:ok, data}
-      {:error, reason} -> {:error, "Failed to read resource file: #{inspect(reason)}"}
+      {:ok, data} when is_list(data) -> data
+      {:ok, _} -> []
+      {:error, _reason} -> []
     end
   end
 
