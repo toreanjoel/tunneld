@@ -16,7 +16,8 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
     Services,
     Blocklist,
     Auth,
-    Sqm
+    Sqm,
+    Dns
   }
 
   @mock Application.compile_env(:tunneld, :mock_data, false)
@@ -129,6 +130,10 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       # SQM
       "set_sqm" ->
         Sqm.set_sqm(data)
+
+      # DNS Provider
+      "set_dns_provider" ->
+        Dns.set_provider(data["provider"])
 
       # AI Config
       "save_ai_config" ->

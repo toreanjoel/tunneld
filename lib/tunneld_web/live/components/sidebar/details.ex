@@ -985,6 +985,80 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     """
   end
 
+  @spec render(%{:view => :dns_settings, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{view: :dns_settings} = assigns) do
+    dns_state = Tunneld.Servers.Dns.get_state()
+    providers = Tunneld.Servers.Dns.providers()
+    current_provider = dns_state["provider"]
+    status = dns_state["status"]
+    applying? = status == :applying
+
+    assigns =
+      assigns
+      |> assign(:dns_state, dns_state)
+      |> assign(:providers, providers)
+      |> assign(:current_provider, current_provider)
+      |> assign(:applying, applying?)
+      |> assign(:status, status)
+
+    ~H"""
+    <div class="bg-secondary p-4 h-full space-y-6">
+      <%= sidebar_header(assigns, %{
+        header: "DNS Provider",
+        body: "Select the encrypted DNS resolver for your gateway. Changing providers will briefly pause DNS resolution while the service restarts."
+      }) %>
+
+      <div class="bg-primary rounded-lg p-3 space-y-3">
+        <div class="text-xs text-gray-1 mb-2">
+          <span class="font-semibold">Current:</span>
+          <span class={"ml-1 #{if @applying, do: "text-yellow-500", else: "text-green"}"}>
+            <%= if @applying do %>
+              Applying...
+            <% else %>
+              <%= Tunneld.Servers.Dns.label_for(@current_provider) %>
+            <% end %>
+          </span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <%= for {id, label} <- @providers do %>
+          <button
+            phx-click="modal_open"
+            phx-value-modal_title={"Change DNS Provider to #{label}?"}
+            phx-value-modal_body={Jason.encode!(%{
+              "type" => "string",
+              "data" => "Your internet will briefly pause while the DNS service restarts. This usually takes a few seconds."
+            })}
+            phx-value-modal_actions={Jason.encode!(%{
+              "title" => "Change Provider",
+              "payload" => %{
+                "type" => "set_dns_provider",
+                "data" => %{"provider" => id}
+              }
+            })}
+            disabled={@applying or id == @current_provider}
+            class={[
+              "flex flex-col items-center justify-center rounded-xl border-2 transition-all p-2 text-center",
+              if(id == @current_provider,
+                do: "bg-purple border-purple text-white shadow-lg shadow-purple/20",
+                else: "bg-primary border-transparent text-gray-1 hover:border-purple/40"
+              ),
+              if(@applying or id == @current_provider, do: "opacity-50 cursor-not-allowed", else: "cursor-pointer")
+            ]}
+          >
+            <span class="font-bold text-sm"><%= label %></span>
+          </button>
+        <% end %>
+      </div>
+
+      <div :if={@status == :failed} class="bg-red bg-opacity-20 p-3 rounded-md">
+        <p class="text-red text-sm">Provider change failed. The previous config has been restored.</p>
+      </div>
+    </div>
+    """
+  end
+
   def handle_event("set_sqm", %{"mode" => mode} = params, socket) do
     # Prepare params for the server
     sqm_params = %{

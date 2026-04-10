@@ -20,7 +20,8 @@ defmodule Tunneld.Application do
     Resources,
     Blocklist,
     Updater,
-    Sqm
+    Sqm,
+    Dns
   }
 
   @impl true
@@ -46,6 +47,7 @@ defmodule Tunneld.Application do
       {Blocklist, []},
       {Updater, []},
       {Sqm, []},
+      {Dns, []},
       {Tunneld.CertManager, []},
       {Ai, []},
       {Chat, []}

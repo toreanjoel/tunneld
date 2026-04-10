@@ -8,7 +8,8 @@ config :tunneld, :fs,
   resources: "resources.json",
   sqm: "sqm.json",
   ai: "ai.json",
-  dns_file: Path.expand("../data/", __DIR__) <> "/dnsmasq_test.conf"
+  dns_file: Path.expand("../data/", __DIR__) <> "/dnsmasq_test.conf",
+  dnscrypt_toml: Path.expand("../data/dnscrypt-proxy.toml", __DIR__)
 
 config :tunneld, :certs,
   cert_dir: Path.expand("../data/", __DIR__) <> "/certs",

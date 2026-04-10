@@ -50,6 +50,7 @@ defmodule TunneldWeb.Live.Dashboard do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "status:internet")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:details")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:devices")
+      Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:dns")
     end
 
     # Check the scheme and domain to make sure it is possible to show
@@ -78,6 +79,7 @@ defmodule TunneldWeb.Live.Dashboard do
       |> assign(:devices, devices)
       |> assign(:pending_actions, %{})
       |> assign(:ai_configured, Tunneld.Servers.Ai.configured?())
+      |> assign(:dns_state, Tunneld.Servers.Dns.get_state())
       |> assign(:chat_artifacts, %{})
       |> assign(:chat_update, nil)
       |> assign(:settings_menu_open, false)
@@ -227,6 +229,13 @@ defmodule TunneldWeb.Live.Dashboard do
                 class="flex items-center gap-2 px-3 py-2 text-xs text-gray-1 hover:bg-primary cursor-pointer transition-all"
               >
                 <.icon name="hero-lock-closed" class="h-4 w-4" /> Authentication
+              </div>
+              <div
+                phx-click="open_settings"
+                phx-value-type="dns_settings"
+                class="flex items-center gap-2 px-3 py-2 text-xs text-gray-1 hover:bg-primary cursor-pointer transition-all"
+              >
+                <.icon name="hero-globe-alt" class="h-4 w-4" /> DNS Provider
               </div>
               <div class="border-t border-gray-700 my-1" />
               <div
@@ -625,6 +634,24 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, assign(socket, :sidebar, Sidebar.close(socket.assigns.sidebar))}
   end
 
+  #
+  # Handle DNS provider changes from PubSub
+  #
+  def handle_info(%{status: :updated, state: dns_state}, socket) do
+    socket =
+      socket
+      |> assign(:dns_state, dns_state)
+      |> then(fn s ->
+        if s.assigns.sidebar.view == :dns_settings do
+          assign(s, :sidebar, %{s.assigns.sidebar | selection: %{updated_at: System.monotonic_time()}})
+        else
+          s
+        end
+      end)
+
+    {:noreply, socket}
+  end
+
   def handle_info({:show_details, %{"id" => id, "type" => type}}, socket) do
     sidebar = Sidebar.open(get_sidebar_details(type, id), sidebar_selection(type, id))
 
@@ -662,6 +689,9 @@ defmodule TunneldWeb.Live.Dashboard do
 
       "ai_settings" ->
         :ai_settings
+
+      "dns_settings" ->
+        :dns_settings
     end
   end
 
@@ -772,6 +802,7 @@ defmodule TunneldWeb.Live.Dashboard do
       "get_private_token" -> "Fetching private token..."
       "clear_ai_config" -> "Disconnecting AI..."
       "save_ai_config" -> "Saving AI config..."
+      "set_dns_provider" -> "Changing DNS provider..."
       "restart_device" -> "Restarting device..."
       _ -> "Working on request..."
     end
