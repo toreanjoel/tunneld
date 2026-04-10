@@ -13,7 +13,7 @@ config :tunneld, :fs,
 config :tunneld, :certs,
   cert_dir: Path.expand("../data/", __DIR__) <> "/certs",
   ca_dir: Path.expand("../data/", __DIR__) <> "/ca",
-  ca_file: "rootCA.key"
+  ca_file: "rootCA.pem"
 
 config :tunneld, :network,
   gateway: "192.168.1.1",

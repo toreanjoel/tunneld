@@ -25,7 +25,7 @@ unless config_env() == :test do
   config :tunneld, :certs,
     cert_dir: System.get_env("TUNNELD_CERT_DIR", "/etc/nginx/certs"),
     ca_dir: System.get_env("TUNNELD_CA_DIR", "/etc/tunneld/ca"),
-    ca_file: "rootCA.key"
+    ca_file: "rootCA.pem"
 end
 
 # Only require these in PROD

@@ -19,7 +19,7 @@ defmodule TunneldWeb.CAController do
       if File.exists?(ca_path) do
         conn
         |> put_resp_content_type("application/x-x509-ca-cert")
-        |> put_resp_header("content-disposition", "attachment; filename=\"#{ca_file}\"")
+        |> put_resp_header("content-disposition", "attachment; filename=\"tunneld-root-ca.pem\"")
         |> send_file(200, ca_path)
       else
         conn |> put_status(404) |> text("Certificate file not found.")
