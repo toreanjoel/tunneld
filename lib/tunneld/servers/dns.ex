@@ -19,8 +19,8 @@ defmodule Tunneld.Servers.Dns do
   @providers [
     {"mullvad-doh", "Mullvad DoH"},
     {"cloudflare", "Cloudflare"},
-    {"quad9-dnscrypt", "Quad9 (Security)"},
-    {"quad9-unfiltered", "Quad9 (Unfiltered)"},
+    {"quad9-dnscrypt-ip4-filter-pri", "Quad9 (Security)"},
+    {"quad9-dnscrypt-ip4-nofilter-pri", "Quad9 (Unfiltered)"},
     {"adguard-dns", "AdGuard DNS"},
     {"cleanbrowsing-family", "CleanBrowsing (Family)"}
   ]
@@ -106,6 +106,7 @@ defmodule Tunneld.Servers.Dns do
 
           {:error, reason} ->
             new_state = %{"provider" => current, "status" => :failed}
+            broadcast(new_state)
             broadcast_error("DNS provider change failed: #{reason}")
             {:reply, {:error, reason}, new_state}
         end
@@ -134,13 +135,12 @@ defmodule Tunneld.Servers.Dns do
     path = toml_path()
     bak_path = path <> ".bak"
 
-    with {:ok, original} <- File.read(bak_path),
-         :ok <- write_toml(path, original) do
+    if File.exists?(bak_path) do
+      File.cp!(bak_path, path)
       restart_service()
       Logger.info("DNS provider rolled back to previous config")
     else
-      error ->
-        Logger.error("DNS rollback also failed: #{inspect(error)}")
+      Logger.error("DNS rollback failed: no backup file found")
     end
   end
 
@@ -179,10 +179,20 @@ defmodule Tunneld.Servers.Dns do
 
     case File.read(path) do
       {:ok, content} ->
-        case Regex.run(~r/server_names\s*=\s*\['([^']+)'\]/, content) do
-          [_, provider] -> provider
-          _ -> @default_provider
-        end
+        content
+        |> String.split("\n")
+        |> Enum.find(fn line ->
+          trimmed = String.trim_leading(line)
+          String.starts_with?(trimmed, "server_names =")
+        end)
+        |> then(fn
+          nil -> @default_provider
+          line ->
+            case Regex.run(~r/server_names\s*=\s*\['([^']+)'\]/, line) do
+              [_, provider] -> provider
+              _ -> @default_provider
+            end
+        end)
 
       {:error, _} ->
         @default_provider
@@ -190,7 +200,22 @@ defmodule Tunneld.Servers.Dns do
   end
 
   defp update_server_names(content, provider) do
-    Regex.replace(~r/#?\s*server_names\s*=\s*\[.*?\]/, content, "server_names = ['#{provider}']")
+    # Replace only the active (non-commented) server_names line.
+    # Line-by-line approach avoids regex matching across lines or
+    # hitting commented-out server_names entries that would create
+    # duplicate keys in TOML.
+    content
+    |> String.split("\n")
+    |> Enum.map(fn line ->
+      trimmed = String.trim_leading(line)
+
+      if String.starts_with?(trimmed, "server_names =") do
+        "server_names = ['#{provider}']"
+      else
+        line
+      end
+    end)
+    |> Enum.join("\n")
   end
 
   defp write_toml(path, content) do

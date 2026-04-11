@@ -641,11 +641,14 @@ defmodule TunneldWeb.Live.Dashboard do
     socket =
       socket
       |> assign(:dns_state, dns_state)
-      |> then(fn s ->
-        if s.assigns.sidebar.view == :dns_settings do
-          assign(s, :sidebar, %{s.assigns.sidebar | selection: %{updated_at: System.monotonic_time()}})
+      |> then(fn socket ->
+        if socket.assigns.sidebar.view == :dns_settings do
+          assign(socket, :sidebar, %{
+            socket.assigns.sidebar
+            | selection: %{updated_at: System.monotonic_time()}
+          })
         else
-          s
+          socket
         end
       end)
 
@@ -803,6 +806,7 @@ defmodule TunneldWeb.Live.Dashboard do
       "clear_ai_config" -> "Disconnecting AI..."
       "save_ai_config" -> "Saving AI config..."
       "set_dns_provider" -> "Changing DNS provider..."
+      "toggle_local_ssl" -> "Updating Local SSL..."
       "restart_device" -> "Restarting device..."
       _ -> "Working on request..."
     end

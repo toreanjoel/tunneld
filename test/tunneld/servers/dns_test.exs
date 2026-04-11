@@ -47,7 +47,7 @@ defmodule Tunneld.Servers.DnsTest do
     test "returns label for known provider" do
       assert Dns.label_for("mullvad-doh") == "Mullvad DoH"
       assert Dns.label_for("cloudflare") == "Cloudflare"
-      assert Dns.label_for("quad9-dnscrypt") == "Quad9 (Security)"
+      assert Dns.label_for("quad9-dnscrypt-ip4-filter-pri") == "Quad9 (Security)"
     end
 
     test "returns id for unknown provider" do
@@ -86,8 +86,8 @@ defmodule Tunneld.Servers.DnsTest do
       assert {:ok, "cloudflare"} = Dns.set_provider("cloudflare")
       assert Dns.get_state()["provider"] == "cloudflare"
 
-      assert {:ok, "quad9-dnscrypt"} = Dns.set_provider("quad9-dnscrypt")
-      assert Dns.get_state()["provider"] == "quad9-dnscrypt"
+      assert {:ok, "quad9-dnscrypt-ip4-filter-pri"} = Dns.set_provider("quad9-dnscrypt-ip4-filter-pri")
+      assert Dns.get_state()["provider"] == "quad9-dnscrypt-ip4-filter-pri"
 
       # Restore
       Dns.set_provider("mullvad-doh")
@@ -99,6 +99,32 @@ defmodule Tunneld.Servers.DnsTest do
       path = Dns.toml_path()
       assert is_binary(path)
       assert String.ends_with?(path, "dnscrypt-proxy.toml")
+    end
+  end
+
+  describe "TOML round-trip via set_provider" do
+    test "provider change writes and reads back correctly" do
+      # Start from a known state
+      Dns.set_provider("mullvad-doh")
+
+      # Change to cloudflare
+      assert {:ok, "cloudflare"} = Dns.set_provider("cloudflare")
+
+      # Read it back via get_state (which reads from GenServer state, which
+      # was updated from the TOML file in mock mode)
+      assert Dns.get_state()["provider"] == "cloudflare"
+
+      # Change back
+      Dns.set_provider("mullvad-doh")
+    end
+
+    test "switching providers multiple times maintains file integrity" do
+      Dns.set_provider("mullvad-doh")
+
+      for provider <- ["cloudflare", "quad9-dnscrypt-ip4-filter-pri", "adguard-dns", "mullvad-doh"] do
+        assert {:ok, ^provider} = Dns.set_provider(provider)
+        assert Dns.get_state()["provider"] == provider
+      end
     end
   end
 end

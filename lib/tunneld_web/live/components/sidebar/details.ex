@@ -240,6 +240,29 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             </div>
           </div>
 
+          <%= if @data.kind == "host" do %>
+            <div class="mt-3 border-t border-gray-700 pt-3">
+              <div class="flex items-center justify-between">
+                <div>
+                  <span class="text-sm font-semibold">Local SSL</span>
+                  <p class="text-[10px] text-gray-400 mt-0.5">
+                    DNS hairpin and HTTPS for local devices
+                  </p>
+                </div>
+                <label
+                  phx-click="trigger_action"
+                  phx-value-action="toggle_local_ssl"
+                  phx-value-data={Jason.encode!(%{"resource_id" => @data.id, "enabled" => "#{!@data.local_ssl}"})}
+                  class="relative inline-flex items-center cursor-pointer"
+                >
+                  <input type="checkbox" class="sr-only peer" checked={@data.local_ssl} />
+                  <div class="w-9 h-5 bg-light_purple rounded-full peer-checked:bg-purple relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-light_purple after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4">
+                  </div>
+                </label>
+              </div>
+            </div>
+          <% end %>
+
           <% tunneld = @data.tunneld || %{} %>
           <div :if={!Enum.empty?(tunneld)} class="mt-3">
             <div class="py-2">

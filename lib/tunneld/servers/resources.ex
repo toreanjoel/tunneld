@@ -61,6 +61,7 @@ defmodule Tunneld.Servers.Resources do
           |> Map.put("ip", @nginx_ip)
           |> Map.put("port", @nginx_port)
           |> Map.put("pool", pool)
+          |> Map.put("local_ssl", Map.get(resource, "local_ssl", false))
           |> Map.merge(%{
             "id" => DateTime.utc_now() |> DateTime.to_unix() |> to_string,
             "kind" => "host",
@@ -83,8 +84,10 @@ defmodule Tunneld.Servers.Resources do
           Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", Messages.notification(:info, "resource added successfully"))
 
           if pub = reserve_meta["share_names"]["public"] do
-            Dnsmasq.add_entry(pub)
-            Services.restart_service(:dnsmasq)
+            if configured_share["local_ssl"] do
+              Dnsmasq.add_entry(pub)
+              Services.restart_service(:dnsmasq)
+            end
           end
 
           broadcast_shares()
@@ -255,7 +258,15 @@ defmodule Tunneld.Servers.Resources do
           Zrok.delete_name(pub_name)
           Zrok.create_public_name(pub_name)
           Zrok.create_private_name(priv_name)
-          Dnsmasq.add_entry(pub_name)
+
+          # Only add hairpin DNS when local_ssl is enabled
+          local_ssl = Map.get(s, "local_ssl", true)
+
+          if local_ssl do
+            Dnsmasq.add_entry(pub_name)
+          else
+            Dnsmasq.remove_entry(pub_name)
+          end
 
           # Ensure nginx config is present on boot/resync
           _ = ensure_nginx_config(s)
@@ -496,7 +507,8 @@ defmodule Tunneld.Servers.Resources do
                       pool: pool,
                       health: health,
                       tunneld: s["tunneld"],
-                      kind: s["kind"]
+                      kind: s["kind"],
+                      local_ssl: Map.get(s, "local_ssl", true)
                     }
                   end)
 
@@ -524,6 +536,83 @@ defmodule Tunneld.Servers.Resources do
                 "Failed to #{if enable?, do: "enable", else: "disable"} resource: #{inspect(err)}"
             })
 
+            {:noreply, state}
+        end
+    end
+  end
+
+  def handle_cast({:toggle_local_ssl, resource_id, enabled}, state) do
+    resources = read_file()
+    resource = Enum.find(resources, fn r -> r["id"] == resource_id end)
+
+    case resource do
+      nil ->
+        Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+          type: :error,
+          message: "Resource not found"
+        })
+
+        {:noreply, state}
+
+      resource ->
+        enabled? = enabled in [true, "true", "on"]
+        updated_resource = Map.put(resource, "local_ssl", enabled?)
+
+        pub_name = get_in(resource, ["tunneld", "share_names", "public"])
+
+        if enabled? do
+          if pub_name, do: Dnsmasq.add_entry(pub_name)
+          if pub_name, do: Tunneld.CertManager.generate_cert(pub_name)
+        else
+          if pub_name, do: Dnsmasq.remove_entry(pub_name)
+        end
+
+        Services.restart_service(:dnsmasq)
+        _ = ensure_nginx_config(updated_resource)
+        Nginx.reload()
+
+        updated_shares =
+          Enum.map(resources, fn r ->
+            if r["id"] == resource_id, do: updated_resource, else: r
+          end)
+
+        case persist_and_broadcast(updated_shares, "Local SSL #{if enabled?, do: "enabled", else: "disabled"}", "Failed to update Local SSL") do
+          {:ok, _} ->
+            updated_atom_share =
+              updated_resource
+              |> then(fn s ->
+                pool = Map.get(s, "pool", [])
+                kind = s["kind"] || "host"
+
+                health =
+                  if kind == "host",
+                    do: Health.pool_health(pool, mock?()),
+                    else: %{status: :not_applicable}
+
+                %{
+                  id: s["id"],
+                  name: s["name"],
+                  ip: s["ip"],
+                  description: s["description"],
+                  port: s["port"],
+                  status: Map.get(s, "status", false),
+                  pool: pool,
+                  health: health,
+                  tunneld: s["tunneld"],
+                  kind: kind,
+                  local_ssl: s["local_ssl"]
+                }
+              end)
+
+            Phoenix.PubSub.broadcast(Tunneld.PubSub, @broadcast_topic, %{
+              id: @component_desktop_id,
+              module: @component_module,
+              data: updated_atom_share
+            })
+
+            {:noreply, Map.put(state, :resources, updated_shares)}
+
+          {:error, _} ->
             {:noreply, state}
         end
     end
@@ -963,7 +1052,8 @@ defmodule Tunneld.Servers.Resources do
         status: status_bool,
         health: health,
         tunneld: s["tunneld"],
-        kind: kind
+        kind: kind,
+        local_ssl: Map.get(s, "local_ssl", true)
       }
     end)
   end
@@ -1042,6 +1132,10 @@ defmodule Tunneld.Servers.Resources do
   @doc "Enable or disable a Zrok share unit by its systemd unit ID."
   def toggle_share(unit_id, enable),
     do: GenServer.cast(__MODULE__, {:toggle_share, unit_id, enable})
+
+  @doc "Toggle local SSL (DNS hairpin + HTTPS) for a host resource."
+  def toggle_local_ssl(resource_id, enabled),
+    do: GenServer.cast(__MODULE__, {:toggle_local_ssl, resource_id, enabled})
 
   @doc "Add a new host resource with Zrok reservations, nginx config, and DNS entry."
   def add_share(resource), do: GenServer.call(__MODULE__, {:add_share, resource}, 25_000)

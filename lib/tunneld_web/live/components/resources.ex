@@ -69,7 +69,8 @@ defmodule TunneldWeb.Live.Components.Resources do
                 "default_values" => %{
                   "ip" => "127.0.0.1",
                   "port" => "18000",
-                  "pool" => []
+                  "pool" => [],
+                  "local_ssl" => false
                 },
                 "action" => "add_share"
               })

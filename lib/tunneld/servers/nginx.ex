@@ -32,7 +32,9 @@ defmodule Tunneld.Servers.Nginx do
 
     reserved = get_in(resource, ["tunneld", "share_names"]) || %{}
     public_name = Map.get(reserved, "public", "#{id}-public")
-    Tunneld.CertManager.generate_cert(public_name)
+    local_ssl = Map.get(resource, "local_ssl", true)
+
+    if local_ssl, do: Tunneld.CertManager.generate_cert(public_name)
 
     with :ok <- ensure_dirs(mock?),
          :ok <- ensure_pool(pool),
@@ -76,6 +78,7 @@ defmodule Tunneld.Servers.Nginx do
   defp render_config(resource) do
     id = resource["id"]
     listen_ip = Map.get(resource, "ip", "127.0.0.1")
+    local_ssl = Map.get(resource, "local_ssl", true)
 
     # Determine names first
     reserved = get_in(resource, ["tunneld", "share_names"]) || %{}
@@ -118,7 +121,7 @@ defmodule Tunneld.Servers.Nginx do
     ssl_crt = Path.join(cert_dir, "#{public_name}.crt")
     ssl_key = Path.join(cert_dir, "#{public_name}.key")
 
-    ssl_block = if root_domain do
+    ssl_block = if root_domain && local_ssl do
       """
       server {
           listen #{gateway_ip}:443 ssl;
@@ -227,6 +230,9 @@ defmodule Tunneld.Servers.Nginx do
       {:error, reason} -> {:error, reason}
     end
   end
+
+  @doc "Reload nginx configuration. No-op in mock mode."
+  def reload, do: reload_nginx(mock_mode?())
 
   defp reload_nginx(true), do: :ok
   defp reload_nginx(false) do

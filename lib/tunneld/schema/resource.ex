@@ -13,7 +13,7 @@ defmodule Tunneld.Schema.Resource do
       "description" =>
         "Register a LAN device and port for this resource. (Internal, shown on the dashboard.)",
       "type" => "object",
-      "ui:order" => ["name", "description", "pool", "ip", "port"],
+      "ui:order" => ["name", "description", "pool", "local_ssl", "ip", "port"],
       "properties" => %{
         "name" => %{
           "type" => "string",
@@ -41,6 +41,14 @@ defmodule Tunneld.Schema.Resource do
             "pattern" => "^[^\\s:]+:[0-9]{1,5}$"
           },
           "minItems" => 1
+        },
+        "local_ssl" => %{
+          "type" => "boolean",
+          "description" =>
+            "Enable local DNS and HTTPS for devices on this network. Requires the Tunneld Root CA to be installed on client devices.",
+          "ui:help" =>
+            "Turn OFF if clients on the local network cannot trust the Root CA (e.g., API tools, mobile apps).",
+          "default" => false
         },
         "ip" => %{
           "type" => "string",

@@ -119,6 +119,10 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       "tunneld_settings" ->
         Resources.update_share(data, :tunneld)
 
+      # Local SSL toggle
+      "toggle_local_ssl" ->
+        Resources.toggle_local_ssl(data["resource_id"], data["enabled"])
+
       # Services
       "restart_service" ->
         service = Services.find_service(data["id"])
