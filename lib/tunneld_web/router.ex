@@ -18,10 +18,6 @@ defmodule TunneldWeb.Router do
     plug TunneldWeb.Plugs.SetClientId
   end
 
-  pipeline :check_protocol do
-    plug TunneldWeb.Plugs.CheckProtocol
-  end
-
   scope "/api", TunneldWeb do
     pipe_through :api
     get "/health", HealthController, :index
@@ -29,13 +25,11 @@ defmodule TunneldWeb.Router do
 
   # These are the open routes
   scope "/", TunneldWeb do
-    pipe_through [:browser, :check_protocol, :set_client_id]
+    pipe_through [:browser, :set_client_id]
 
     live "/", Live.Login
     live "/setup", Live.Setup
     get "/download/ca", CAController, :download
-    get "/download/backup", BackupController, :export
-    post "/restore/backup", BackupController, :import
     live "/dashboard", Live.Dashboard
   end
 

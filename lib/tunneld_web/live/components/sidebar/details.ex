@@ -468,7 +468,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           phx-value-modal_body={
             Jason.encode!(%{
               "type" => "schema",
-              "data" => Tunneld.Schema.Zrok.data(:endpoint),
+              "data" => Tunneld.Schema.data(:zrok, :endpoint),
               "default_values" => %{
                 url: @endpoint
               },
@@ -517,7 +517,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           phx-value-modal_body={
             Jason.encode!(%{
               "type" => "schema",
-              "data" => Tunneld.Schema.Zrok.data(:conf_device),
+              "data" => Tunneld.Schema.data(:zrok, :conf_device),
               "default_values" => %{},
               "action" => "configure_enable_environment"
             })
@@ -749,7 +749,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                   phx-value-modal_body={
                     Jason.encode!(%{
                       "type" => "schema",
-                      "data" => Tunneld.Schema.Wlan.data(%{title: ssid}),
+                      "data" => Tunneld.Schema.data(:wlan, %{title: ssid}),
                       "default_values" => %{
                         ssid: [ssid]
                       },
@@ -882,114 +882,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             </div>
           <% end %>
         </div>
-      </div>
-    </div>
-    """
-  end
-
-  @spec render(%{:view => :ai_settings, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
-  def render(%{view: :ai_settings} = assigns) do
-    config =
-      case Tunneld.Servers.Ai.read_config() do
-        {:ok, c} -> c
-        _ -> %{}
-      end
-
-    configured = Tunneld.Servers.Ai.configured?()
-
-    models =
-      if configured do
-        case Tunneld.Ai.Client.list_models(Map.put(config, "mock", false)) do
-          {:ok, m} -> m
-          _ -> []
-        end
-      else
-        []
-      end
-
-    schema = Tunneld.Schema.Ai.data(%{models: models})
-
-    assigns =
-      assigns
-      |> assign(:ai_config, config)
-      |> assign(:ai_configured, configured)
-      |> assign(:ai_schema, schema)
-
-    ~H"""
-    <div class="bg-secondary p-4 h-full space-y-6">
-      <%= sidebar_header(assigns, %{
-        header: "AI Assistant",
-        body: "Configure an AI provider to enable the chat assistant. A local provider like Ollama is recommended for privacy."
-      }) %>
-
-      <div class="flex flex-row gap-1 justify-end my-2">
-        <div
-          :if={@ai_configured}
-          phx-click="modal_open"
-          phx-value-modal_title="Disconnect AI Provider?"
-          phx-value-modal_body={
-            Jason.encode!(%{
-              "type" => "string",
-              "data" => "This will remove your AI provider configuration and disable the chat assistant. You can reconfigure it at any time."
-            })
-          }
-          phx-value-modal_actions={
-            Jason.encode!(%{
-              "title" => "Disconnect",
-              "payload" => %{
-                "type" => "clear_ai_config",
-                "data" => %{}
-              }
-            })
-          }
-          phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
-        >
-          <.icon name="hero-no-symbol" class="h-5 w-5" />
-          <div class="truncate text-xs">Disconnect</div>
-        </div>
-      </div>
-
-      <div class="bg-primary rounded-lg p-3 space-y-3">
-        <div class="text-xs text-gray-1 mb-2">
-          <span class="font-semibold">Status:</span>
-          <span class={"ml-1 #{if @ai_configured, do: "text-green", else: "text-gray-2"}"}>
-            <%= if @ai_configured, do: "Connected", else: "Not configured" %>
-          </span>
-        </div>
-
-        <div :if={@ai_configured} class="text-xs text-gray-1">
-          <div class="truncate">
-            <span class="font-semibold">URL:</span>
-            <span class="ml-1"><%= @ai_config["base_url"] || "—" %></span>
-          </div>
-          <div class="truncate mt-1">
-            <span class="font-semibold">Model:</span>
-            <span class="ml-1"><%= @ai_config["model"] || "—" %></span>
-          </div>
-        </div>
-      </div>
-
-      <div
-        phx-click="modal_open"
-        phx-value-modal_title="Configure AI Assistant"
-        phx-value-modal_body={
-          Jason.encode!(%{
-            "type" => "schema",
-            "data" => @ai_schema,
-            "default_values" => %{
-              "base_url" => @ai_config["base_url"] || "http://localhost:11434/v1",
-              "api_key" => @ai_config["api_key"] || "",
-              "model" => @ai_config["model"] || ""
-            },
-            "action" => "save_ai_config"
-          })
-        }
-        phx-click-loading="opacity-50 cursor-wait"
-        class="flex items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
-      >
-        <.icon name="hero-cog-6-tooth" class="h-5 w-5" />
-        <div class="truncate text-xs"><%= if @ai_configured, do: "Update Config", else: "Configure" %></div>
       </div>
     </div>
     """

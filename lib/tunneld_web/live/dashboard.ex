@@ -15,10 +15,22 @@ defmodule TunneldWeb.Live.Dashboard do
   alias TunneldWeb.Live.Components.Services
   alias TunneldWeb.Live.Components.Resources
   alias TunneldWeb.Live.Components.Devices
-  alias TunneldWeb.Live.Components.Chat
   alias TunneldWeb.Live.Dashboard.Actions
-  alias TunneldWeb.Live.Dashboard.Modal
-  alias TunneldWeb.Live.Dashboard.Sidebar
+
+  @modal_default %{
+    show: false,
+    title: nil,
+    description: nil,
+    body: %{},
+    actions: nil,
+    type: :default
+  }
+
+  @sidebar_default %{
+    is_open: false,
+    view: nil,
+    selection: nil
+  }
 
   # auth check if this page needs to be behind auth
   on_mount TunneldWeb.Hooks.CheckAuth
@@ -69,8 +81,8 @@ defmodule TunneldWeb.Live.Dashboard do
       |> assign(:client_id, client_id)
       |> assign(:uri_info, uri_info)
       |> assign(:allow_webauthn?, false)
-      |> assign(modal: Modal.default())
-      |> assign(sidebar: Sidebar.default())
+      |> assign(modal: @modal_default)
+      |> assign(sidebar: @sidebar_default)
       |> assign(
         status: %{
           internet: internet_status
@@ -78,10 +90,7 @@ defmodule TunneldWeb.Live.Dashboard do
       )
       |> assign(:devices, devices)
       |> assign(:pending_actions, %{})
-      |> assign(:ai_configured, Tunneld.Servers.Ai.configured?())
       |> assign(:dns_state, Tunneld.Servers.Dns.get_state())
-      |> assign(:chat_artifacts, %{})
-      |> assign(:chat_update, nil)
       |> assign(:settings_menu_open, false)
 
     {:ok, socket}
@@ -139,7 +148,6 @@ defmodule TunneldWeb.Live.Dashboard do
       class="fixed top-0 right-0 z-19 h-screen w-screen lg:w-[35%] lg:max-w-[700px] bg-secondary system-scroll shadow-lg transition-transform duration-300 ease-in-out"
     >
       <button
-        :if={@sidebar.view != :chat}
         phx-click="close_details"
         class="absolute top-4 right-5 z-10"
       >
@@ -147,17 +155,13 @@ defmodule TunneldWeb.Live.Dashboard do
       </button>
 
       <div class="h-full">
-        <%= if @sidebar.view == :chat do %>
-          <.live_component module={Chat} id="chat" parent_pid={self()} chat_update={@chat_update} ai_configured={@ai_configured} />
-        <% else %>
-          <.live_component
-            id="sidebar_details"
-            module={SidebarDetails}
-            view={@sidebar.view}
-            uri_info={@uri_info}
-            web_authn={@allow_webauthn?}
-          />
-        <% end %>
+        <.live_component
+          id="sidebar_details"
+          module={SidebarDetails}
+          view={@sidebar.view}
+          uri_info={@uri_info}
+          web_authn={@allow_webauthn?}
+        />
       </div>
     </div>
     """
@@ -216,13 +220,6 @@ defmodule TunneldWeb.Live.Dashboard do
               phx-click-away="close_settings_menu"
               class="absolute right-0 top-full mt-1 w-48 bg-secondary rounded-md shadow-lg z-10 py-1 border border-gray-700"
             >
-              <div
-                phx-click="open_settings"
-                phx-value-type="ai_settings"
-                class="flex items-center gap-2 px-3 py-2 text-xs text-gray-1 hover:bg-primary cursor-pointer transition-all"
-              >
-                <.icon name="hero-sparkles" class="h-4 w-4" /> AI Assistant
-              </div>
               <div
                 phx-click="open_settings"
                 phx-value-type="authentication"
@@ -298,14 +295,8 @@ defmodule TunneldWeb.Live.Dashboard do
   @doc """
   Render Sidebar content
   """
-  def handle_event("show_chat", _params, socket) do
-    sidebar = Sidebar.open(:chat)
-
-    {:noreply, socket |> assign(:sidebar, sidebar) |> assign(:settings_menu_open, false)}
-  end
-
   def handle_event("restart_device", _params, socket) do
-    modal_data = Modal.open(%{
+    modal_data = modal_open(%{
       title: "Restart Device?",
       description: "This will restart the gateway service. The dashboard will be temporarily unavailable.",
       body: %{
@@ -333,13 +324,13 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   def handle_event("open_settings", %{"type" => type}, socket) do
-    sidebar = Sidebar.open(get_sidebar_details(type, "_"), sidebar_selection(type, "_"))
+    sidebar = sidebar_open(get_sidebar_details(type, "_"), sidebar_selection(type, "_"))
 
     {:noreply, socket |> assign(:sidebar, sidebar) |> assign(:settings_menu_open, false)}
   end
 
   def handle_event("show_details", %{"id" => id, "type" => type}, socket) do
-    sidebar = Sidebar.open(get_sidebar_details(type, id), sidebar_selection(type, id))
+    sidebar = sidebar_open(get_sidebar_details(type, id), sidebar_selection(type, id))
 
     {:noreply, assign(socket, :sidebar, sidebar)}
   end
@@ -355,7 +346,7 @@ defmodule TunneldWeb.Live.Dashboard do
   # Close the details bar (relevant when we are in mobile mode)
   #
   def handle_event("close_details", _, socket) do
-    sidebar = Sidebar.close(socket.assigns.sidebar)
+    sidebar = sidebar_close(socket.assigns.sidebar)
 
     {:noreply, assign(socket, :sidebar, sidebar)}
   end
@@ -424,7 +415,7 @@ defmodule TunneldWeb.Live.Dashboard do
   # Close the modal
   #
   def handle_event("modal_close", _params, socket) do
-    {:noreply, assign(socket, :modal, Modal.close())}
+    {:noreply, assign(socket, :modal, @modal_default)}
   end
 
   @spec handle_info(%{id: String.t(), module: atom(), data: map()}, Phoenix.LiveView.Socket.t()) ::
@@ -432,33 +423,6 @@ defmodule TunneldWeb.Live.Dashboard do
   @doc """
   This will have the parent dashboard view be responsible for sending update messages to components
   """
-  def handle_info({:chat_response, {:ok, _new_messages, artifacts}}, socket) do
-    history = Tunneld.Servers.Chat.get_history()
-
-    artifact_map =
-      Enum.reduce(artifacts, %{}, fn a, acc ->
-        Map.put(acc, a.tool_call_id, a)
-      end)
-
-    send_update(Chat,
-      id: "chat",
-      chat_update: %{messages: history, artifacts: artifact_map}
-    )
-
-    {:noreply, socket}
-  end
-
-  def handle_info({:chat_response, _error}, socket) do
-    history = Tunneld.Servers.Chat.get_history()
-
-    send_update(Chat,
-      id: "chat",
-      chat_update: %{messages: history, artifacts: %{}}
-    )
-
-    {:noreply, socket}
-  end
-
   def handle_info(
         %{id: "devices", module: TunneldWeb.Live.Components.Devices, data: data} = message,
         socket
@@ -598,40 +562,8 @@ defmodule TunneldWeb.Live.Dashboard do
      put_flash(socket, :info, "Auth reset. Next login will require a new password to be setup")}
   end
 
-  #
-  # Close the sidebar programatically without user interaction
-  #
-  def handle_info(:ai_config_changed, socket) do
-    configured = Tunneld.Servers.Ai.configured?()
-
-    socket = assign(socket, :ai_configured, configured)
-
-    # Update the Welcome component's AI status
-    send_update(Welcome, id: "welcome", data: Tunneld.Servers.Updater.get_status())
-
-    socket =
-      cond do
-        not configured and socket.assigns.sidebar.view == :chat ->
-          Tunneld.Servers.Chat.clear_history()
-
-          assign(socket, :sidebar, Sidebar.close_all())
-
-        socket.assigns.sidebar.view == :ai_settings ->
-          # Force sidebar re-render so it reflects the updated config
-          assign(socket, :sidebar, %{
-            socket.assigns.sidebar
-            | selection: %{updated_at: System.monotonic_time()}
-          })
-
-        true ->
-          socket
-      end
-
-    {:noreply, socket}
-  end
-
   def handle_info(:close_details, socket) do
-    {:noreply, assign(socket, :sidebar, Sidebar.close(socket.assigns.sidebar))}
+    {:noreply, assign(socket, :sidebar, sidebar_close(socket.assigns.sidebar))}
   end
 
   #
@@ -656,7 +588,7 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   def handle_info({:show_details, %{"id" => id, "type" => type}}, socket) do
-    sidebar = Sidebar.open(get_sidebar_details(type, id), sidebar_selection(type, id))
+    sidebar = sidebar_open(get_sidebar_details(type, id), sidebar_selection(type, id))
 
     {:noreply, assign(socket, :sidebar, sidebar)}
   end
@@ -689,9 +621,6 @@ defmodule TunneldWeb.Live.Dashboard do
 
       "authentication" ->
         :authentication
-
-      "ai_settings" ->
-        :ai_settings
 
       "dns_settings" ->
         :dns_settings
@@ -764,10 +693,10 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   defp reset_modal(socket) do
-    assign(socket, :modal, Modal.close())
+    assign(socket, :modal, @modal_default)
   end
 
-  defp modal_is_schema?(socket), do: Modal.schema_form?(socket.assigns)
+  defp modal_is_schema?(socket), do: modal_schema_form?(socket.assigns)
 
   defp maybe_keep_modal_open(socket, %{keep_modal_open: true}) do
     modal = Map.get(socket.assigns, :modal, %{}) |> Map.put(:show, true)
@@ -803,12 +732,34 @@ defmodule TunneldWeb.Live.Dashboard do
       "configure_basic_auth" -> "Configuring Basic Auth..."
       "disable_basic_auth" -> "Disabling Basic Auth..."
       "get_private_token" -> "Fetching private token..."
-      "clear_ai_config" -> "Disconnecting AI..."
-      "save_ai_config" -> "Saving AI config..."
       "set_dns_provider" -> "Changing DNS provider..."
       "toggle_local_ssl" -> "Updating Local SSL..."
       "restart_device" -> "Restarting device..."
       _ -> "Working on request..."
     end
+  end
+
+  # --- Modal & Sidebar state helpers ---
+
+  defp modal_open(fields) when is_map(fields) do
+    Map.merge(@modal_default, Map.put(fields, :show, true))
+  end
+
+  defp modal_schema_form?(socket_assigns) do
+    socket_assigns
+    |> Map.get(:modal, %{})
+    |> Map.get(:body, %{})
+    |> case do
+      %{"type" => "schema"} -> true
+      _ -> false
+    end
+  end
+
+  defp sidebar_open(view, selection) when is_atom(view) do
+    %{is_open: true, view: view, selection: selection}
+  end
+
+  defp sidebar_close(sidebar) when is_map(sidebar) do
+    %{is_open: false, view: Map.get(sidebar, :view), selection: nil}
   end
 end

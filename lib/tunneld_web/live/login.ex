@@ -19,15 +19,7 @@ defmodule TunneldWeb.Live.Login do
     end
 
     uri_info = get_connect_info(socket, :uri)
-    host = uri_info && URI.parse(uri_info) |> Map.get(:host)
-    gateway_domain = "Tunneld"
-
-    has_webauthn? = Tunneld.Servers.Auth.has_webauthn?()
-    connected_via_gateway_domain = host == gateway_domain
-
-    # Fix: Don't crash if any value is nil
-    show_form = not has_webauthn? or not connected_via_gateway_domain
-    show_webauthn = has_webauthn? and connected_via_gateway_domain
+    _host = uri_info && URI.parse(uri_info) |> Map.get(:host)
 
     type =
       if Tunneld.Servers.Auth.file_exists?() do
@@ -42,8 +34,6 @@ defmodule TunneldWeb.Live.Login do
       |> assign(:client_id, client_id)
       |> assign(:type, type)
       |> assign(:info_content, "👋 Hello")
-      |> assign(:show_form, show_form)
-      |> assign(:show_webauthn, show_webauthn)
 
     {:ok, socket}
   end
@@ -83,41 +73,31 @@ defmodule TunneldWeb.Live.Login do
       </div>
 
       <div class="lg:w-2/5 w-full flex flex-col items-center justify-center p-8">
-        <div :if={@show_form and @type === :login} class="w-full max-w-sm">
+        <div :if={@type === :login} class="w-full max-w-sm">
           <h1 class="text-3xl text-white font-bold mb-4 text-center">Login</h1>
           <!-- Login Form -->
           <.live_component
             id={DateTime.utc_now()}
             module={TunneldWeb.Live.Components.JsonSchemaRenderer}
-            schema={Tunneld.Schema.Login.data()}
+            schema={Tunneld.Schema.data(:login)}
             loading={@loading}
             action="login"
             client_id={@client_id}
           />
         </div>
-        <div :if={@show_form and @type === :signup} class="w-full max-w-sm">
+        <div :if={@type === :signup} class="w-full max-w-sm">
           <h1 class="text-3xl text-white font-bold mb-4 text-center">Register</h1>
           <!-- signup Form -->
           <.live_component
             id={DateTime.utc_now()}
             module={TunneldWeb.Live.Components.JsonSchemaRenderer}
-            schema={Tunneld.Schema.Signup.data()}
+            schema={Tunneld.Schema.data(:signup)}
             loading={@loading}
             action="signup"
             client_id={@client_id}
           />
         </div>
         <div class="py-2" />
-        <%!-- We need to only show the option for this auth if the resource for the gateway is exposed? --%>
-        <div :if={@show_webauthn} class="mt-4 text-center flex flex-col text-gray-500 gap-2">
-          <h1 class="text-lg text-white font-bold mb-4 text-center">Login (WebAuthn)</h1>
-          <button phx-click="trigger_webauthn_login">
-            <.icon name="hero-finger-print" class="h-14 w-14" />
-          </button>
-          <div class="text-sm text-gray-1">
-            Authorized device access
-          </div>
-        </div>
       </div>
     </div>
     """
@@ -205,67 +185,6 @@ defmodule TunneldWeb.Live.Login do
   #
   def handle_info(%{loading: loading}, socket) do
     {:noreply, socket |> assign(loading: loading)}
-  end
-
-  #
-  # trigger the login challenge to compare against the current auth file
-  #
-  def handle_event("trigger_webauthn_login", _params, socket) do
-    with {:ok, auth} <- Tunneld.Servers.Auth.read_file(),
-         %{"webauthn" => webauthn} <- auth do
-      challenge = :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
-
-      # Save challenge temporarily for comparison (or add it to session)
-      socket = assign(socket, :webauthn_challenge, challenge)
-
-      public_key_options = %{
-        challenge: challenge,
-        timeout: 60_000,
-        allowCredentials: [
-          %{
-            id: webauthn["rawId"],
-            type: "public-key",
-            transports: ["usb", "nfc", "ble", "internal"]
-          }
-        ],
-        userVerification: "preferred"
-      }
-
-      socket =
-        socket
-        |> assign(:webauthn_challenge, challenge)
-        |> push_event("start_webauthn_login", %{publicKeyOptions: public_key_options})
-
-      {:noreply, socket}
-    else
-      _ ->
-        {:noreply, put_flash(socket, :error, "No WebAuthn credential available")}
-    end
-  end
-
-  #
-  # Log in and setup session for the user
-  #
-  def handle_event("webauthn_login_complete", %{"id" => id}, socket) do
-    with {:ok, auth} <- Tunneld.Servers.Auth.read_file(),
-         %{"webauthn" => webauthn} <- auth,
-         true <- id == webauthn["id"] do
-      Session.create(socket.assigns.client_id)
-
-      {:noreply,
-       socket
-       |> push_navigate(to: Routes.live_path(socket, TunneldWeb.Live.Dashboard))}
-    else
-      _ ->
-        {:noreply, put_flash(socket, :error, "WebAuthn login failed")}
-    end
-  end
-
-  #
-  # Error completing the WebAuthn registration
-  #
-  def handle_event("webauthn_login_error", %{"error" => err}, socket) do
-    {:noreply, socket |> put_flash(:error, err)}
   end
 
   #

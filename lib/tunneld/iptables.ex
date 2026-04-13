@@ -4,7 +4,7 @@ defmodule Tunneld.Iptables do
 
   On startup (production only), flushes all existing rules and sets up:
   - IP forwarding between ethernet and WiFi interfaces
-  - NAT masquerading for internet access via WiFi and VPN (Mullvad)
+  - NAT masquerading for internet access via WiFi and VPN
   - DNS redirection: all port-53 traffic is redirected to port 5336
     (where dnscrypt-proxy listens) to enforce encrypted DNS
   - Gateway access rules allowing devices to reach the Tunneld host
@@ -31,7 +31,7 @@ defmodule Tunneld.Iptables do
   def get_env(:gateway), do: Application.get_env(:tunneld, :network)[:gateway]
   def get_env(:wlan), do: Application.get_env(:tunneld, :network)[:wlan]
   def get_env(:eth), do: Application.get_env(:tunneld, :network)[:eth]
-  def get_env(:mullvad), do: Application.get_env(:tunneld, :network)[:mullvad]
+  def get_env(:vpn), do: Application.get_env(:tunneld, :network)[:mullvad]
 
   @doc """
   Flush all iptables rules.
@@ -120,7 +120,7 @@ defmodule Tunneld.Iptables do
       "-A",
       "POSTROUTING",
       "-o",
-      get_env(:mullvad),
+      get_env(:vpn),
       "-j",
       "MASQUERADE"
     ])
@@ -201,7 +201,7 @@ defmodule Tunneld.Iptables do
       "-i",
       get_env(:eth),
       "-o",
-      get_env(:mullvad),
+      get_env(:vpn),
       "-m",
       "state",
       "--state",
@@ -214,7 +214,7 @@ defmodule Tunneld.Iptables do
       "-A",
       "FORWARD",
       "-i",
-      get_env(:mullvad),
+      get_env(:vpn),
       "-o",
       get_env(:eth),
       "-m",

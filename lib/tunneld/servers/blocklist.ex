@@ -106,7 +106,7 @@ defmodule Tunneld.Servers.Blocklist do
     try do
       meta =
         if mock? do
-          data = Tunneld.Servers.FakeData.Blocklist.get_data()
+          data = Tunneld.Servers.FakeData.blocklist()
 
           if updated? do
             Map.put(data, "title", "UPDATED")

@@ -100,7 +100,7 @@ defmodule Tunneld.Servers.Devices do
   def fetch_devices() do
     {data, _} =
       if mock?() do
-        Tunneld.Servers.FakeData.Devices.get_data()
+        Tunneld.Servers.FakeData.devices()
       else
         case File.read(@path) do
           {:ok, content} -> {content, 0}

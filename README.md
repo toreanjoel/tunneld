@@ -40,11 +40,8 @@ Expose resources publicly or privately through Zrok tunnels without port forward
 ### Distributed Service Pooling
 Combine local and remote backends in a single resource pool. Nginx distributes traffic across all entries — whether they're on your subnet or bound from a peer's Tunneld instance over the overlay.
 
-### AI Assistant
-Chat with an AI assistant to manage your gateway. Supports any OpenAI-compatible API (Ollama recommended for privacy). The assistant can read status, manage resources, and perform actions through natural language. Accessible via a floating button on the dashboard when configured.
-
 ### First-Run Setup Wizard
-Guided onboarding flow after initial account creation: connect to Wi-Fi, optionally configure the overlay network control plane, and optionally connect an AI provider.
+Guided onboarding flow after initial account creation: connect to Wi-Fi, optionally configure the overlay network control plane.
 
 ## Architecture
 
@@ -90,8 +87,7 @@ lib/
     servers/
       session.ex            # In-memory IP-keyed auth sessions
       auth.ex               # Login credentials (bcrypt + WebAuthn)
-      resources.ex          # Resource registry (CRUD, Zrok shares, nginx, DNS)
-      resources/health.ex   # Pool backend health checking (TCP probes)
+      resources.ex          # Resource registry (CRUD, Zrok shares, nginx, DNS, health)
       devices.ex            # DHCP lease monitoring and revocation
       services.ex           # systemd service monitoring (dnsmasq, dhcpcd, etc.)
       wlan.ex               # Wi-Fi interface management (wpa_supplicant)
@@ -102,13 +98,6 @@ lib/
       sqm.ex                # Smart Queue Management (tc/CAKE)
       updater.ex            # OTA update checking
       system_resources.ex   # CPU, memory, disk monitoring
-      ai.ex                 # AI provider config management
-      chat.ex               # Chat session state and tool-use loop
-    ai/
-      client.ex             # OpenAI-compatible API client
-      tools.ex              # Tool definitions for AI actions
-      executor.ex           # Bridges tool calls to dashboard actions
-      system_prompt.ex      # AI system prompt generation
     schema/                 # JSON Schema validation (login, signup, resource, wlan, zrok)
   tunneld_web/
     live/
@@ -116,7 +105,7 @@ lib/
       dashboard/actions.ex  # Action dispatcher
       setup.ex              # First-run setup wizard
       login.ex              # Login/signup with WebAuthn support
-      components/           # LiveView components (devices, resources, services, sidebar, chat, etc.)
+      components/           # LiveView components (devices, resources, services, sidebar, etc.)
 ```
 
 ## Development

@@ -21,8 +21,6 @@ defmodule Tunneld.Servers.Resources do
   use GenServer
   require Logger
   alias Tunneld.Servers.{Nginx, Zrok, Dnsmasq, Services}
-  alias Tunneld.Servers.Resources.Health
-  alias Tunneld.PubSub.Messages
 
   @interval 10_000
   @nginx_ip "127.0.0.1"
@@ -81,7 +79,7 @@ defmodule Tunneld.Servers.Resources do
              :ok <- Nginx.upsert_resource_config(configured_share),
              u_nodes <- resources ++ [configured_share],
              :ok <- Tunneld.Persistence.write_json(path(), u_nodes) do
-          Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", Messages.notification(:info, "resource added successfully"))
+          Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{type: :info, message: "resource added successfully"})
 
           if pub = reserve_meta["share_names"]["public"] do
             if configured_share["local_ssl"] do
@@ -224,7 +222,7 @@ defmodule Tunneld.Servers.Resources do
               port: s["port"],
               status: Map.get(s, "status", false),
               pool: pool,
-              health: Health.pool_health(pool, mock?()),
+              health: pool_health(pool, mock?()),
               tunneld: s["tunneld"],
               kind: s["kind"]
             }
@@ -494,7 +492,7 @@ defmodule Tunneld.Servers.Resources do
 
                     health =
                       if kind == "host",
-                        do: Health.pool_health(pool, mock?()),
+                        do: pool_health(pool, mock?()),
                         else: %{status: :not_applicable}
 
                     %{
@@ -586,7 +584,7 @@ defmodule Tunneld.Servers.Resources do
 
                 health =
                   if kind == "host",
-                    do: Health.pool_health(pool, mock?()),
+                    do: pool_health(pool, mock?()),
                     else: %{status: :not_applicable}
 
                 %{
@@ -1032,7 +1030,7 @@ defmodule Tunneld.Servers.Resources do
 
       health =
         case kind do
-          "host" -> Health.pool_health(pool, mock?())
+          "host" -> pool_health(pool, mock?())
           _ -> %{status: :not_applicable}
         end
 
@@ -1188,4 +1186,60 @@ defmodule Tunneld.Servers.Resources do
   @doc "Returns the full path to the resources JSON file."
   def path(), do: Path.join(Tunneld.Config.fs(:root), Tunneld.Config.fs(:resources))
 
+  # --- Pool health checking ---
+
+  @doc "Check the health of a pool of backend servers."
+  def pool_health(pool, true) when is_list(pool) do
+    %{status: :mock, total: length(pool), up: nil}
+  end
+
+  def pool_health(pool, false) when is_list(pool) do
+    totals =
+      pool
+      |> Enum.map(&String.trim/1)
+      |> Enum.reject(&(&1 == ""))
+      |> Enum.reduce(%{total: 0, up: 0}, fn entry, acc ->
+        case String.split(entry, ":", parts: 2) do
+          [ip, port_str] ->
+            total = acc.total + 1
+
+            up =
+              case Integer.parse(port_str) do
+                {port, _} ->
+                  if backend_up?(ip, port), do: acc.up + 1, else: acc.up
+
+                _ ->
+                  acc.up
+              end
+
+            %{acc | total: total, up: up}
+
+          _ ->
+            acc
+        end
+      end)
+
+    status =
+      cond do
+        totals.total == 0 -> :empty
+        totals.up == 0 -> :none
+        totals.up == totals.total -> :all_up
+        true -> :partial
+      end
+
+    Map.put(totals, :status, status)
+  end
+
+  def pool_health(_, _), do: %{status: :empty, total: 0, up: 0}
+
+  defp backend_up?(ip, port) do
+    case :gen_tcp.connect(String.to_charlist(ip), port, [:binary, active: false], 1500) do
+      {:ok, socket} ->
+        :gen_tcp.close(socket)
+        true
+
+      _ ->
+        false
+    end
+  end
 end

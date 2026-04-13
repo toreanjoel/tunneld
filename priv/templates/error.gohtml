@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tunneld - {{.Title}}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link
+href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap"
+rel="stylesheet">
+<style>
+:root {
+--acc-primary: #00e676;
+--bg-color: #050505;
+--mono-font: 'JetBrains Mono', monospace;
+--sans-font: 'Inter', sans-serif;
+}
+
+* {
+margin: 0;
+padding: 0;
+box-sizing: border-box;
+}
+
+body {
+background-color: var(--bg-color);
+color: #fff;
+font-family: var(--sans-font);
+overflow-x: hidden;
+line-height: 1.6;
+}
+
+.bg-grid {
+position: fixed;
+top: 0;
+left: 0;
+width: 100vw;
+height: 100vh;
+z-index: -1;
+pointer-events: none;
+}
+
+.bg-grid::before {
+content: "";
+position: absolute;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background-image:
+  linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+  linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+background-size: 50px 50px;
+}
+
+.bg-grid::after {
+content: "";
+position: absolute;
+top: 0;
+left: 0;
+width: 100%;
+height: 100%;
+background-image:
+  linear-gradient(var(--acc-primary) 1px, transparent 1px),
+  linear-gradient(90deg, var(--acc-primary) 1px, transparent 1px);
+background-size: 50px 50px;
+opacity: 0.15;
+mask-image: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), black 0%, transparent 20%);
+-webkit-mask-image: radial-gradient(circle at var(--mouse-x, 50%) var(--mouse-y, 50%), black 0%, transparent 20%);
+}
+
+
+.error-wrapper {
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+min-height: 100vh;
+padding: 8rem 2rem;
+position: relative;
+z-index: 1;
+}
+
+.logo {
+font-family: var(--mono-font);
+font-weight: 700;
+font-size: 1.5rem;
+letter-spacing: 2px;
+}
+
+.error-card {
+background: #050505;
+border: 1px solid #222;
+padding: 3rem;
+max-width: 600px;
+width: 100%;
+text-align: center;
+position: relative;
+overflow: hidden;
+transition: transform 0.1s ease-out;
+}
+
+.error-card::before {
+content: '';
+position: absolute;
+top: 0;
+left: 0;
+width: 100%;
+height: 2px;
+background: var(--acc-primary);
+}
+
+.status-code {
+font-family: var(--mono-font);
+font-size: 1.5rem;
+font-weight: 700;
+color: var(--acc-primary);
+margin-bottom: 0.5rem;
+letter-spacing: -2px;
+}
+
+.status-text {
+font-family: var(--mono-font);
+text-transform: uppercase;
+color: #fff;
+margin-bottom: 2rem;
+opacity: 0.8;
+}
+
+.error-details {
+background: #090909;
+padding: 10px;
+font-family: var(--mono-font);
+font-size: 0.85rem;
+color: #666;
+margin-bottom: 2rem;
+}
+
+.error-details strong {
+color: var(--acc-primary);
+}
+
+.retry-link {
+display: inline-block;
+margin-top: 1rem;
+font-family: var(--mono-font);
+font-size: 0.8rem;
+color: #666;
+text-decoration: none;
+border-bottom: 1px solid transparent;
+transition: all 0.2s ease;
+}
+
+.retry-link:hover {
+color: var(--acc-primary);
+border-bottom-color: var(--acc-primary);
+}
+</style>
+</head>
+
+<body>
+<div class="bg-grid"></div>
+<div class="error-wrapper">
+<div class="logo" style="margin-bottom: 3rem;">TUNNELD_</div>
+<div class="error-card">
+<div class="status-code">{{.Title}}</div>
+<div class="status-text">{{.Banner}}</div>
+
+{{if .Message}}
+<div class="error-details">
+  {{.Message}}
+</div>
+{{end}}
+
+{{if .Error}}
+<div class="error-details">
+  <strong>// SYSTEM_ERROR:</strong><br>
+  {{.Error}}
+</div>
+{{end}}
+
+<a href="javascript:window.location.reload()" class="retry-link">_RETRY_CONNECTION</a>
+</div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('mousemove', (e) => {
+  document.documentElement.style.setProperty('--mouse-x', e.clientX + 'px');
+  document.documentElement.style.setProperty('--mouse-y', e.clientY + 'px');
+});
+
+const card = document.querySelector('.error-card');
+if (card) {
+  card.addEventListener('mousemove', (e) => {
+    const rect = card.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const xRotation = ((y - rect.height / 2) / rect.height) * -5;
+    const yRotation = ((x - rect.width / 2) / rect.width) * 5;
+    card.style.transform = `perspective(1000px) rotateX(${xRotation}deg) rotateY(${yRotation}deg)`;
+  });
+  card.addEventListener('mouseleave', () => {
+    card.style.transform = 'perspective(1000px) rotateX(0) rotateY(0)';
+  });
+}
+});
+</script>
+</body>
+
+</html>

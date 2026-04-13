@@ -49,7 +49,7 @@ defmodule Tunneld.Servers.Wlan do
   @impl true
   def handle_cast(:scan, state) do
     if mock?() do
-      {:noreply, Tunneld.Servers.FakeData.Wlan.get_data()}
+      {:noreply, Tunneld.Servers.FakeData.wlan()}
     else
       Logger.info("Scanning for Wi-Fi networks...")
 

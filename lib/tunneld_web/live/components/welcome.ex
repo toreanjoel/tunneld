@@ -14,12 +14,11 @@ defmodule TunneldWeb.Live.Components.Welcome do
 
   def update(assigns, socket) do
     data = Map.get(assigns, :data) || Tunneld.Servers.Updater.get_status()
-    ai_configured = Tunneld.Servers.Ai.configured?()
-    {:ok, socket |> assign(data: data) |> assign(:ai_configured, ai_configured)}
+    {:ok, socket |> assign(data: data)}
   end
 
   @doc """
-  Show the message and subtext that could be used as subtext information (Disabled AI Overview)
+  Show the message and subtext that could be used as subtext information
   """
   def render(assigns) do
     assigns =
@@ -43,25 +42,6 @@ defmodule TunneldWeb.Live.Components.Welcome do
           class="bg-blue-800 bg-opacity-20 py-1 px-2 rounded-md text-xs text-blue-500"
         >
           <%= "Update Available: " <> Map.get(@data, :new_version) %>
-        </div>
-        <div class="flex-1"></div>
-        <div
-          :if={@ai_configured}
-          phx-click="show_chat"
-          class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
-        >
-          <.icon name="hero-sparkles-solid" class="w-5 h-5 sm:w-6 sm:h-6" />
-          <div class="hidden sm:block truncate text-xs">AI Assistant</div>
-        </div>
-        <div
-          :if={not @ai_configured}
-          phx-click="show_details"
-          phx-value-type="ai_settings"
-          phx-value-id="_"
-          class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
-        >
-          <.icon name="hero-sparkles" class="w-5 h-5 sm:w-6 sm:h-6" />
-          <div class="hidden sm:block truncate text-xs">Connect AI</div>
         </div>
       </div>
     </div>

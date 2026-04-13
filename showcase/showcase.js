@@ -22,7 +22,7 @@ The app is running in MOCK_DATA mode with fake but realistic data.
 
 ## Routes
 - / — Login page (username + password form)
-- /setup — First-run setup wizard (WiFi → Zrok → AI, 3 steps)
+- /setup — First-run setup wizard (WiFi → Zrok, 2 steps)
 - /dashboard — Main dashboard (requires login)
 
 ## Login
@@ -34,10 +34,10 @@ The app is running in MOCK_DATA mode with fake but realistic data.
 Top bar has 3 buttons:
 - "Configure Network" (opens Zrok/overlay sidebar)
 - "Internet Access" (opens WiFi sidebar)
-- Settings gear icon (dropdown: AI Assistant, Authentication, Restart Device)
+- Settings gear icon (dropdown: Authentication, Restart Device)
 
 Main content sections (top to bottom):
-1. Welcome banner — version info, "Update Now" button, floating AI chat button (bottom-right)
+1. Welcome banner — version info, "Update Now" button
 2. System Resources — CPU, Memory, Storage gauge charts
 3. Services — dnsmasq, dhcpcd, dnscrypt-proxy, nginx (status dots green/red)
 4. Resources — public/private tunneled services cards with toggle switches
@@ -50,8 +50,6 @@ Opened by clicking dashboard buttons. Types:
 - "resource" — Individual resource details
 - "service" — Service logs, restart button
 - "authentication" — Reset login, WebAuthn setup, download Root CA
-- "ai_settings" — AI provider config (base_url, api_key, model dropdown)
-- "chat" — AI chat interface with message history, tool approval
 
 Close sidebar: click the X button or the overlay backdrop.
 
@@ -72,7 +70,6 @@ Close sidebar: click the X button or the overlay backdrop.
 - Devices: cards in #devices section
 - Resources: cards in #resources section
 - System resources: gauges in #system_resources section
-- Chat: floating button bottom-right, or sidebar chat view
 - Welcome: #welcome section
 
 ## Visual Style

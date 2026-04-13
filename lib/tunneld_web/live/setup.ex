@@ -9,8 +9,7 @@ defmodule TunneldWeb.Live.Setup do
   use TunneldWeb, :live_view
   require Logger
 
-  alias Tunneld.Servers.{Ai, Auth, Wlan, Zrok}
-  alias Tunneld.Ai.Client
+  alias Tunneld.Servers.{Auth, Wlan, Zrok}
   alias TunneldWeb.Router.Helpers, as: Routes
 
   on_mount TunneldWeb.Hooks.CheckAuth
@@ -38,12 +37,6 @@ defmodule TunneldWeb.Live.Setup do
         |> assign(:zrok_configured, false)
         |> assign(:env_loading, false)
         |> assign(:env_enabled, false)
-        |> assign(:ai_url, "http://localhost:11434/v1")
-        |> assign(:ai_key, "")
-        |> assign(:ai_models, [])
-        |> assign(:ai_model, "")
-        |> assign(:ai_testing, false)
-        |> assign(:ai_tested, false)
 
       # Kick off initial scan
       if connected?(socket), do: start_scan()
@@ -70,8 +63,6 @@ defmodule TunneldWeb.Live.Setup do
             <div class={step_dot(:wifi, @step)} />
             <div class="w-8 h-px bg-gray-600" />
             <div class={step_dot(:zrok, @step)} />
-            <div class="w-8 h-px bg-gray-600" />
-            <div class={step_dot(:ai, @step)} />
           </div>
 
           <!-- Step content -->
@@ -210,10 +201,10 @@ defmodule TunneldWeb.Live.Setup do
 
       <div :if={@zrok_configured and @env_enabled} class="flex gap-3 pt-4">
         <button
-          phx-click="next_step"
+          phx-click="finish_setup"
           class="w-full p-3 rounded-lg bg-purple text-sm font-medium hover:bg-opacity-80 transition"
         >
-          Next
+          Finish
         </button>
       </div>
 
@@ -255,10 +246,10 @@ defmodule TunneldWeb.Live.Setup do
           Back
         </button>
         <button
-          phx-click="next_step"
+          phx-click="finish_setup"
           class="flex-1 p-3 rounded-lg bg-purple text-sm font-medium hover:bg-opacity-80 transition"
         >
-          Next
+          Finish
         </button>
       </div>
 
@@ -302,112 +293,8 @@ defmodule TunneldWeb.Live.Setup do
           Back
         </button>
         <button
-          phx-click="next_step"
-          class="flex-1 p-3 rounded-lg bg-purple text-sm font-medium hover:bg-opacity-80 transition"
-        >
-          Next
-        </button>
-      </div>
-    </div>
-    """
-  end
-
-  # AI step
-  defp render_step(%{step: :ai} = assigns) do
-    ~H"""
-    <div class="space-y-4">
-      <div class="bg-secondary rounded-lg p-4">
-        <div class="text-sm">
-          Configure an AI assistant to help manage your gateway through chat.
-          A local provider like <span class="font-semibold text-purple">Ollama</span> is recommended
-          for privacy — your data stays on the device.
-        </div>
-      </div>
-
-      <form phx-submit="save_ai_config" phx-change="update_ai_form" class="space-y-3">
-        <div>
-          <label class="text-xs text-gray-1 mb-1 block">Provider URL</label>
-          <input
-            type="url"
-            name="base_url"
-            value={@ai_url}
-            placeholder="http://localhost:11434/v1"
-            class="w-full bg-secondary border border-gray-600 rounded-lg p-3 text-sm text-white placeholder-gray-500 focus:border-purple focus:outline-none"
-          />
-          <p class="text-xs text-gray-2 mt-1">Recommended: Ollama at http://localhost:11434/v1</p>
-        </div>
-
-        <div>
-          <label class="text-xs text-gray-1 mb-1 block">API Key (optional for local providers)</label>
-          <input
-            type="password"
-            name="api_key"
-            value={@ai_key}
-            placeholder="Not required for Ollama"
-            autocomplete="off"
-            class="w-full bg-secondary border border-gray-600 rounded-lg p-3 text-sm text-white placeholder-gray-500 focus:border-purple focus:outline-none"
-          />
-        </div>
-
-        <div class="flex gap-2">
-          <button
-            type="button"
-            phx-click="test_ai_connection"
-            disabled={@ai_testing}
-            class={"flex-1 p-3 rounded-lg text-sm transition flex items-center justify-center gap-2 #{if @ai_testing, do: "bg-secondary text-gray-1 cursor-wait", else: "bg-secondary hover:bg-gray-700 cursor-pointer"}"}
-          >
-            <svg :if={@ai_testing} class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
-              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-            </svg>
-            <%= if @ai_testing, do: "Testing...", else: "Test Connection" %>
-          </button>
-        </div>
-
-        <div :if={@ai_tested and !Enum.empty?(@ai_models)} class="bg-green bg-opacity-10 border border-green border-opacity-30 rounded-lg p-3">
-          <div class="flex items-center gap-2 mb-2">
-            <div class="w-2 h-2 rounded-full bg-green" />
-            <span class="text-sm font-medium">Connected — <%= length(@ai_models) %> model(s) found</span>
-          </div>
-          <div>
-            <label class="text-xs text-gray-1 mb-1 block">Select Model</label>
-            <select
-              name="model"
-              class="w-full bg-primary border border-gray-600 rounded-lg p-3 text-sm text-white focus:border-purple focus:outline-none"
-            >
-              <%= for model <- @ai_models do %>
-                <option value={model} selected={model == @ai_model}><%= model %></option>
-              <% end %>
-            </select>
-          </div>
-        </div>
-
-        <div :if={@ai_tested and Enum.empty?(@ai_models)} class="bg-red bg-opacity-10 border border-red border-opacity-30 rounded-lg p-3">
-          <div class="flex items-center gap-2">
-            <div class="w-2 h-2 rounded-full bg-red" />
-            <span class="text-sm">Could not connect. Check the URL and try again.</span>
-          </div>
-        </div>
-
-        <button
-          :if={@ai_tested and !Enum.empty?(@ai_models)}
-          type="submit"
-          class="w-full p-3 rounded-lg bg-purple text-sm font-medium hover:bg-opacity-80 transition"
-        >
-          Save & Finish
-        </button>
-      </form>
-
-      <div class="flex gap-3 pt-4">
-        <button
-          phx-click="prev_step"
-          class="flex-1 p-3 rounded-lg bg-secondary text-sm hover:bg-gray-700 transition"
-        >
-          Back
-        </button>
-        <button
           phx-click="finish_setup"
-          class="flex-1 p-3 rounded-lg bg-green text-sm font-medium hover:bg-opacity-80 transition"
+          class="flex-1 p-3 rounded-lg bg-purple text-sm font-medium hover:bg-opacity-80 transition"
         >
           Skip & Finish
         </button>
@@ -454,8 +341,7 @@ defmodule TunneldWeb.Live.Setup do
     next =
       case socket.assigns.step do
         :wifi -> :zrok
-        :zrok -> :ai
-        :ai -> :ai
+        :zrok -> :zrok
       end
 
     {:noreply, assign(socket, :step, next)}
@@ -466,7 +352,6 @@ defmodule TunneldWeb.Live.Setup do
       case socket.assigns.step do
         :wifi -> :wifi
         :zrok -> :wifi
-        :ai -> :zrok
       end
 
     {:noreply, assign(socket, :step, prev)}
@@ -488,46 +373,6 @@ defmodule TunneldWeb.Live.Setup do
 
   def handle_event("enable_environment", _, socket) do
     {:noreply, put_flash(socket, :error, "Please enter an account token")}
-  end
-
-  def handle_event("update_ai_form", params, socket) do
-    socket =
-      socket
-      |> assign(:ai_url, Map.get(params, "base_url", socket.assigns.ai_url))
-      |> assign(:ai_key, Map.get(params, "api_key", socket.assigns.ai_key))
-      |> assign(:ai_model, Map.get(params, "model", socket.assigns.ai_model))
-
-    {:noreply, socket}
-  end
-
-  def handle_event("test_ai_connection", _, socket) do
-    socket = assign(socket, :ai_testing, true)
-    config = %{"base_url" => socket.assigns.ai_url, "api_key" => socket.assigns.ai_key, "mock" => false}
-    parent = self()
-
-    Task.start(fn ->
-      result = Client.list_models(config)
-      send(parent, {:ai_models_result, result})
-    end)
-
-    {:noreply, socket}
-  end
-
-  def handle_event("save_ai_config", params, socket) do
-    config = %{
-      "base_url" => Map.get(params, "base_url", socket.assigns.ai_url),
-      "api_key" => Map.get(params, "api_key", socket.assigns.ai_key),
-      "model" => Map.get(params, "model", socket.assigns.ai_model)
-    }
-
-    case Ai.save_config(config) do
-      {:ok, _} ->
-        mark_onboarded()
-        {:noreply, push_navigate(socket, to: Routes.live_path(socket, TunneldWeb.Live.Dashboard))}
-
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Failed to save: #{reason}")}
-    end
   end
 
   def handle_event("finish_setup", _, socket) do
@@ -572,29 +417,6 @@ defmodule TunneldWeb.Live.Setup do
     {:noreply, assign(socket, internet: internet, connecting: false, scanning: true)}
   end
 
-  def handle_info({:ai_models_result, {:ok, models}}, socket) do
-    model = List.first(models, "")
-
-    socket =
-      socket
-      |> assign(:ai_models, models)
-      |> assign(:ai_model, model)
-      |> assign(:ai_testing, false)
-      |> assign(:ai_tested, true)
-
-    {:noreply, socket}
-  end
-
-  def handle_info({:ai_models_result, {:error, _}}, socket) do
-    socket =
-      socket
-      |> assign(:ai_models, [])
-      |> assign(:ai_testing, false)
-      |> assign(:ai_tested, true)
-
-    {:noreply, socket}
-  end
-
   def handle_info(_msg, socket), do: {:noreply, socket}
 
   # -- Helpers --
@@ -630,7 +452,6 @@ defmodule TunneldWeb.Live.Setup do
 
   defp step_description(:wifi), do: "Connect to a Wi-Fi network for internet access"
   defp step_description(:zrok), do: "Configure your overlay network (optional)"
-  defp step_description(:ai), do: "Set up an AI assistant (optional)"
 
   defp step_dot(step, current) do
     base = "w-3 h-3 rounded-full transition"
@@ -644,5 +465,4 @@ defmodule TunneldWeb.Live.Setup do
 
   defp step_index(:wifi), do: 0
   defp step_index(:zrok), do: 1
-  defp step_index(:ai), do: 2
 end

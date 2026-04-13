@@ -139,15 +139,6 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       "set_dns_provider" ->
         Dns.set_provider(data["provider"])
 
-      # AI Config
-      "save_ai_config" ->
-        Tunneld.Servers.Ai.save_config(data)
-        send(parent, :ai_config_changed)
-
-      "clear_ai_config" ->
-        Tunneld.Servers.Ai.clear_config()
-        send(parent, :ai_config_changed)
-
       # Device restart
       "restart_device" ->
         if @mock do

@@ -8,9 +8,7 @@ defmodule Tunneld.Application do
   use Application
 
   alias Tunneld.Servers.{
-    Ai,
     Auth,
-    Chat,
     Session,
     Zrok,
     Services,
@@ -48,9 +46,7 @@ defmodule Tunneld.Application do
       {Updater, []},
       {Sqm, []},
       {Dns, []},
-      {Tunneld.CertManager, []},
-      {Ai, []},
-      {Chat, []}
+      {Tunneld.CertManager, []}
     ]
 
     if not Application.get_env(:tunneld, :mock_data, false) do
