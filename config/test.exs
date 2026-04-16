@@ -7,6 +7,7 @@ config :tunneld, :fs,
   auth: "auth.json",
   resources: "resources.json",
   sqm: "sqm.json",
+  wireguard: "wireguard.json",
   dns_file: Path.expand("../data/", __DIR__) <> "/dnsmasq_test.conf",
   dnscrypt_toml: Path.expand("../data/dnscrypt-proxy.toml", __DIR__)
 

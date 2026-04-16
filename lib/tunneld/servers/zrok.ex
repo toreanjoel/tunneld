@@ -454,10 +454,11 @@ defmodule Tunneld.Servers.Zrok do
       |> Integer.to_string()
       |> Kernel.<>("%")
 
-    exec =
-      [zrok_bin(), "access", "private", reserved, "-b", bind, "--headless"]
-      |> Enum.map(&to_string/1)
-      |> Enum.join(" ")
+    bin = System.find_executable("zrok2") || "/usr/local/bin/zrok2"
+
+    exec_args = [bin, "access", "private", reserved, "-b", bind, "--headless"]
+                 |> Enum.map(&to_string/1)
+                 |> Enum.map(&shell_escape/1)
 
     unit_name = @access_prefix <> id <> @unit_suffix
 
@@ -471,7 +472,7 @@ defmodule Tunneld.Servers.Zrok do
         "[Service]",
         "Type=simple",
         "User=root",
-        "ExecStart=/bin/sh -lc \"#{exec}\"",
+        "ExecStart=#{Enum.join(exec_args, " ")}",
         "Restart=always",
         "RestartSec=3s",
         "CPUQuota=#{cpu_quota}",
@@ -525,10 +526,10 @@ defmodule Tunneld.Servers.Zrok do
     # Use the resolved absolute path so systemd (which has no login PATH) can find the binary
     bin = System.find_executable("zrok2") || "/usr/local/bin/zrok2"
 
-    exec =
+    exec_args =
       ([bin] ++ exec_args)
       |> Enum.map(&to_string/1)
-      |> Enum.join(" ")
+      |> Enum.map(&shell_escape/1)
 
     unit_name = @unit_prefix <> id <> @unit_suffix
 
@@ -548,7 +549,7 @@ defmodule Tunneld.Servers.Zrok do
         "Environment=GOMEMLIMIT=80MiB",
         "Environment=GOGC=15",
         "Environment=GOMAXPROCS=1",
-        "ExecStart=/bin/sh -lc \"#{exec}\"",
+        "ExecStart=#{Enum.join(exec_args, " ")}",
         "Restart=always",
         "RestartSec=3s",
         "MemoryHigh=80M",
@@ -686,6 +687,16 @@ defmodule Tunneld.Servers.Zrok do
       30_000 ->
         Process.exit(pid, :kill)
         {"", 1}
+    end
+  end
+
+  defp shell_escape(arg) do
+    # If the argument contains only safe characters, no quoting needed.
+    # Otherwise, wrap in single quotes and escape any embedded single quotes.
+    if Regex.match?(~r/^[a-zA-Z0-9_\-\.\/:]+$/, arg) do
+      arg
+    else
+      "'" <> String.replace(arg, "'", "'\\''") <> "'"
     end
   end
 

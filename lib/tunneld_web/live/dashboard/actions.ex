@@ -17,7 +17,8 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
     Blocklist,
     Auth,
     Sqm,
-    Dns
+    Dns,
+    Wireguard
   }
 
   @mock Application.compile_env(:tunneld, :mock_data, false)
@@ -138,6 +139,19 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       # DNS Provider
       "set_dns_provider" ->
         Dns.set_provider(data["provider"])
+
+      # WireGuard VPN
+      "enable_wireguard" ->
+        Wireguard.enable_server()
+
+      "disable_wireguard" ->
+        Wireguard.disable_server()
+
+      "add_wireguard_peer" ->
+        Wireguard.add_peer(data["name"], data["full_tunnel"] || false)
+
+      "remove_wireguard_peer" ->
+        Wireguard.remove_peer(data["peer_id"])
 
       # Device restart
       "restart_device" ->

@@ -69,6 +69,7 @@ config :tunneld, :fs,
   root: Path.expand("../data/", __DIR__),
   auth: "auth.json",
   resources: "resources.json",
+  wireguard: "wireguard.json",
   dnscrypt_toml: Path.expand("../data/dnscrypt-proxy.toml", __DIR__)
 
 config :phoenix_live_view,

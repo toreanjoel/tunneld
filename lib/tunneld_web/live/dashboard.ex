@@ -15,6 +15,8 @@ defmodule TunneldWeb.Live.Dashboard do
   alias TunneldWeb.Live.Components.Services
   alias TunneldWeb.Live.Components.Resources
   alias TunneldWeb.Live.Components.Devices
+  alias TunneldWeb.Live.Components.Wireguard.Server, as: WireguardServer
+  alias TunneldWeb.Live.Components.Wireguard.Peers, as: WireguardPeers
   alias TunneldWeb.Live.Dashboard.Actions
 
   @modal_default %{
@@ -63,6 +65,7 @@ defmodule TunneldWeb.Live.Dashboard do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:details")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:devices")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:dns")
+      Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:wireguard")
     end
 
     # Check the scheme and domain to make sure it is possible to show
@@ -91,6 +94,7 @@ defmodule TunneldWeb.Live.Dashboard do
       |> assign(:devices, devices)
       |> assign(:pending_actions, %{})
       |> assign(:dns_state, Tunneld.Servers.Dns.get_state())
+      |> assign(:wireguard_state, wireguard_state())
       |> assign(:settings_menu_open, false)
 
     {:ok, socket}
@@ -121,6 +125,14 @@ defmodule TunneldWeb.Live.Dashboard do
         actions={@modal.actions}
         client_id={@client_id}
         pending_actions={@pending_actions}
+      />
+
+      <.live_component
+        :if={@modal.show && @modal.type === :wireguard_peer}
+        module={TunneldWeb.Live.Components.Wireguard.PeerCreatedModal}
+        id="wg_peer_created_modal"
+        config_text={@modal.body["config_text"]}
+        filename={@modal.body["filename"]}
       />
     </div>
     """
@@ -263,10 +275,18 @@ defmodule TunneldWeb.Live.Dashboard do
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
 
-        <%!-- Resources and Devices --%>
+        <%!-- Resources, VPN, and Devices --%>
         <div class="mt-4 md:mt-6">
           <div class="min-h-[150px] md:min-h-[200px]">
             <.live_component id="resources" module={Resources} />
+          </div>
+
+          <div class="min-h-[100px] md:min-h-[120px]">
+            <.live_component id="wireguard_server" module={WireguardServer} data={@wireguard_state} />
+          </div>
+
+          <div class="min-h-[100px] md:min-h-[120px]">
+            <.live_component id="wireguard_peers" module={WireguardPeers} data={@wireguard_state} />
           </div>
 
           <div class="min-h-[150px] md:min-h-[200px]">
@@ -340,6 +360,18 @@ defmodule TunneldWeb.Live.Dashboard do
   #
   def handle_event("toggle_share_access", params, socket) do
     {:noreply, start_action("toggle_share_access", params, socket)}
+  end
+
+  def handle_event("toggle_vpn", %{"enabled" => "true"}, socket) do
+    {:noreply, start_action("enable_wireguard", %{}, socket)}
+  end
+
+  def handle_event("toggle_vpn", %{"enabled" => "false"}, socket) do
+    {:noreply, start_action("disable_wireguard", %{}, socket)}
+  end
+
+  def handle_event("revoke_wireguard_peer", %{"peer_id" => peer_id, "peer_name" => _name}, socket) do
+    {:noreply, start_action("remove_wireguard_peer", %{"peer_id" => peer_id}, socket)}
   end
 
   #
@@ -447,6 +479,10 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, socket}
   end
 
+  def handle_info(%{id: "wireguard_" <> _, module: _module, data: wg_data}, socket) do
+    {:noreply, assign(socket, :wireguard_state, wg_data)}
+  end
+
   def handle_info(%{id: id, module: module, data: data}, socket) do
     if not is_nil(id) do
       send_update(module, id: id, data: data)
@@ -497,6 +533,26 @@ defmodule TunneldWeb.Live.Dashboard do
       |> assign(:pending_actions, Map.delete(socket.assigns.pending_actions, ref))
       |> maybe_keep_modal_open(pending)
       |> put_flash(:error, "Action failed, please retry.")
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:action_done, ref, "add_wireguard_peer", {:ok, _peer, config}}, socket) do
+    socket =
+      socket
+      |> assign(:pending_actions, Map.delete(socket.assigns.pending_actions, ref))
+      |> assign(:modal, %{
+        show: true,
+        title: "VPN Peer Created",
+        description: nil,
+        body: %{
+          "type" => "wireguard_peer_created",
+          "config_text" => config,
+          "filename" => "wg0-peer.conf"
+        },
+        actions: nil,
+        type: :wireguard_peer
+      })
 
     {:noreply, socket}
   end
@@ -761,5 +817,13 @@ defmodule TunneldWeb.Live.Dashboard do
 
   defp sidebar_close(sidebar) when is_map(sidebar) do
     %{is_open: false, view: Map.get(sidebar, :view), selection: nil}
+  end
+
+  defp wireguard_state do
+    if _pid = GenServer.whereis(Tunneld.Servers.Wireguard) do
+      Tunneld.Servers.Wireguard.get_state()
+    else
+      %{"enabled" => false, "peers" => %{}}
+    end
   end
 end

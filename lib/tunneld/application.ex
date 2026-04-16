@@ -19,7 +19,8 @@ defmodule Tunneld.Application do
     Blocklist,
     Updater,
     Sqm,
-    Dns
+    Dns,
+    Wireguard
   }
 
   @impl true
@@ -46,6 +47,7 @@ defmodule Tunneld.Application do
       {Updater, []},
       {Sqm, []},
       {Dns, []},
+      {Wireguard, []},
       {Tunneld.CertManager, []}
     ]
 
