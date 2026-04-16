@@ -51,7 +51,7 @@ defmodule Tunneld.Iptables do
     dns_forwarding()
 
     # Re-apply WireGuard rules if the VPN server is enabled
-    if wireguard_enabled?(), do: wireguard_up()
+    if wireguard_enabled?(), do: wireguard_up(wireguard_listen_port())
   end
 
   def get_env(:gateway), do: Application.get_env(:tunneld, :network)[:gateway]
@@ -80,13 +80,13 @@ defmodule Tunneld.Iptables do
   - NAT MASQUERADE: wg0 subnet -> wlan — full-tunnel peers exit through upstream
   - INPUT: accept UDP on WireGuard listen port
 
-  Must be called when the VPN server is enabled. Idempotent — each rule
-  is checked before being appended, preventing duplicates on re-apply.
+  Accepts `port` as argument to avoid GenServer.call deadlock when called
+  from within the WireGuard GenServer. Idempotent — each rule is checked
+  before being appended, preventing duplicates on re-apply.
   """
-  def wireguard_up do
+  def wireguard_up(port) do
     eth = get_env(:eth)
     wlan = get_env(:wlan)
-    port = wireguard_listen_port()
 
     # FORWARD: allow VPN peers to reach Ethernet subnet
     append_unique("iptables", [
@@ -161,19 +161,32 @@ defmodule Tunneld.Iptables do
       "-m", "comment", "--comment", "tunneld-wg-input"
     ])
 
+    # INPUT: accept DNS queries from VPN peers
+    # PREROUTING redirects port 53 → 5336, so INPUT sees port 5336
+    for proto <- ["udp", "tcp"] do
+      append_unique("iptables", [
+        "-A", "INPUT",
+        "-i", @wg_interface,
+        "-p", proto,
+        "--dport", "5336",
+        "-j", "ACCEPT",
+        "-m", "comment", "--comment", "tunneld-wg-dns"
+      ])
+    end
+
     :ok
   end
 
   @doc """
   Remove iptables rules for the WireGuard VPN server.
 
-  Deletes each rule by matching the same specification used in `wireguard_up/0`.
-  Safe to call even if rules don't exist — errors are ignored.
+  Accepts `port` as argument to avoid GenServer.call deadlock when called
+  from within the WireGuard GenServer. Safe to call even if rules don't
+  exist — errors are ignored.
   """
-  def wireguard_down do
+  def wireguard_down(port) do
     eth = get_env(:eth)
     wlan = get_env(:wlan)
-    port = wireguard_listen_port()
 
     # Delete FORWARD rules
     del("iptables", ["-D", "FORWARD", "-i", @wg_interface, "-o", eth, "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT", "-m", "comment", "--comment", "tunneld-wg-forward-eth"])
@@ -185,8 +198,12 @@ defmodule Tunneld.Iptables do
     # Delete NAT masquerade
     del("iptables", ["-t", "nat", "-D", "POSTROUTING", "-o", wlan, "-j", "MASQUERADE", "-m", "comment", "--comment", "tunneld-wg-masq"])
 
-    # Delete INPUT rule
+    # Delete INPUT rules
     del("iptables", ["-D", "INPUT", "-p", "udp", "--dport", to_string(port), "-j", "ACCEPT", "-m", "comment", "--comment", "tunneld-wg-input"])
+
+    for proto <- ["udp", "tcp"] do
+      del("iptables", ["-D", "INPUT", "-i", @wg_interface, "-p", proto, "--dport", "5336", "-j", "ACCEPT", "-m", "comment", "--comment", "tunneld-wg-dns"])
+    end
 
     :ok
   end
@@ -407,18 +424,26 @@ defmodule Tunneld.Iptables do
   # --- WireGuard Helpers ---
 
   defp wireguard_enabled? do
-    if _pid = GenServer.whereis(Tunneld.Servers.Wireguard) do
-      Tunneld.Servers.Wireguard.get_state()["enabled"] == true
-    else
-      false
+    case GenServer.whereis(Tunneld.Servers.Wireguard) do
+      nil -> false
+      pid ->
+        try do
+          :sys.get_state(pid)["enabled"] == true
+        catch
+          :exit, _ -> false
+        end
     end
   end
 
   defp wireguard_listen_port do
-    if _pid = GenServer.whereis(Tunneld.Servers.Wireguard) do
-      Tunneld.Servers.Wireguard.get_state()["listen_port"] || 51820
-    else
-      51820
+    case GenServer.whereis(Tunneld.Servers.Wireguard) do
+      nil -> 51820
+      pid ->
+        try do
+          :sys.get_state(pid)["listen_port"] || 51820
+        catch
+          :exit, _ -> 51820
+        end
     end
   end
 end

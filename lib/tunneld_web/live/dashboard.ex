@@ -166,7 +166,7 @@ defmodule TunneldWeb.Live.Dashboard do
         <.icon class="w-5 h-5" name="hero-x-mark" />
       </button>
 
-      <div class="h-full">
+      <div class="h-full pt-12 overflow-y-auto">
         <.live_component
           id="sidebar_details"
           module={SidebarDetails}
@@ -537,7 +537,8 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, socket}
   end
 
-  def handle_info({:action_done, ref, "add_wireguard_peer", {:ok, _peer, config}}, socket) do
+  def handle_info({:action_done, ref, "add_wireguard_peer", {:ok, {:ok, peer, config}}}, socket) do
+    filename = "#{peer["name"]}.conf"
     socket =
       socket
       |> assign(:pending_actions, Map.delete(socket.assigns.pending_actions, ref))
@@ -548,11 +549,20 @@ defmodule TunneldWeb.Live.Dashboard do
         body: %{
           "type" => "wireguard_peer_created",
           "config_text" => config,
-          "filename" => "wg0-peer.conf"
+          "filename" => filename
         },
         actions: nil,
         type: :wireguard_peer
       })
+
+    {:noreply, socket}
+  end
+
+  def handle_info({:action_done, ref, "remove_wireguard_peer", {:ok, _result}}, socket) do
+    socket =
+      socket
+      |> assign(:pending_actions, Map.delete(socket.assigns.pending_actions, ref))
+      |> put_flash(:info, "VPN peer removed")
 
     {:noreply, socket}
   end

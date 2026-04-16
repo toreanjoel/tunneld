@@ -94,25 +94,11 @@ defmodule Tunneld.Servers.Wireguard.ConfigGenTest do
       assert conf =~ "Address = 10.42.0.3/24"
     end
 
-    test "includes DNS pointing to gateway" do
-      # With network config set
-      original = Application.get_env(:tunneld, :network)
-      Application.put_env(:tunneld, :network, gateway: "192.168.1.1")
-
-      conf = ConfigGen.peer_conf(@split_peer, @server_state)
-      assert conf =~ "DNS = 192.168.1.1"
-
-      Application.put_env(:tunneld, :network, original)
-    end
-
-    test "falls back to server IP for DNS when gateway not configured" do
-      original = Application.get_env(:tunneld, :network)
-      Application.put_env(:tunneld, :network, nil)
-
+    test "uses VPN server IP as DNS" do
+      # DNS always points to the VPN server IP (x.x.x.1) so both
+      # split-tunnel and full-tunnel peers can reach it
       conf = ConfigGen.peer_conf(@split_peer, @server_state)
       assert conf =~ "DNS = 10.42.0.1"
-
-      Application.put_env(:tunneld, :network, original)
     end
 
     test "uses custom listen port in endpoint" do
@@ -125,6 +111,24 @@ defmodule Tunneld.Servers.Wireguard.ConfigGenTest do
       state = Map.put(@server_state, "endpoint", "myhome.ddns.net")
       conf = ConfigGen.peer_conf(@split_peer, state)
       assert conf =~ "Endpoint = myhome.ddns.net:51820"
+    end
+
+    test "wraps IPv6 endpoint in brackets with port" do
+      state = Map.put(@server_state, "endpoint", "2c0f:f4c0:2311:66b4:7804:e3f9:9cb5:4")
+      conf = ConfigGen.peer_conf(@split_peer, state)
+      assert conf =~ "Endpoint = [2c0f:f4c0:2311:66b4:7804:e3f9:9cb5:4]:51820"
+    end
+
+    test "preserves bracketed IPv6 endpoint with port" do
+      state = Map.put(@server_state, "endpoint", "[2c0f:f4c0::1]:51821")
+      conf = ConfigGen.peer_conf(@split_peer, state)
+      assert conf =~ "Endpoint = [2c0f:f4c0::1]:51821"
+    end
+
+    test "omits endpoint line when nil" do
+      state = Map.put(@server_state, "endpoint", nil)
+      conf = ConfigGen.peer_conf(@split_peer, state)
+      refute conf =~ "Endpoint ="
     end
   end
 

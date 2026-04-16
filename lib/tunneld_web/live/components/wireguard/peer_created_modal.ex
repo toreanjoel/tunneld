@@ -10,7 +10,7 @@ defmodule TunneldWeb.Live.Components.Wireguard.PeerCreatedModal do
 
   def render(assigns) do
     ~H"""
-    <div class="space-y-4">
+    <div class="space-y-4 p-4">
       <div class="text-center">
         <div class="text-sm font-semibold text-green-400 mb-1">Peer Created</div>
         <div class="text-xs text-gray-400">

@@ -51,22 +51,31 @@ defmodule Tunneld.Servers.Wireguard.ConfigGen do
     address = "#{peer["ip"]}/24"
     dns = dns_server(state)
     public_key = state["public_key"]
-    endpoint = "#{state["endpoint"]}:#{state["listen_port"]}"
+    endpoint = format_endpoint(state["endpoint"], state["listen_port"])
     allowed_ips = allowed_ips(peer, state)
+    name = peer["name"] || "peer"
 
-    """
-    [Interface]
-    PrivateKey = #{priv}
-    Address = #{address}
-    DNS = #{dns}
+    interface_lines = [
+      "[Interface]",
+      "# #{name}",
+      "PrivateKey = #{priv}",
+      "Address = #{address}",
+      "DNS = #{dns}",
+      "MTU = 1280",
+      ""
+    ]
 
-    [Peer]
-    PublicKey = #{public_key}
-    Endpoint = #{endpoint}
-    AllowedIPs = #{allowed_ips}
-    PersistentKeepalive = 25
-    """
-    |> String.trim_trailing()
+    peer_lines =
+      [
+        "[Peer]",
+        "PublicKey = #{public_key}",
+        if(endpoint, do: "Endpoint = #{endpoint}"),
+        "AllowedIPs = #{allowed_ips}",
+        "PersistentKeepalive = 25"
+      ]
+      |> Enum.filter(& &1)
+
+    Enum.join(interface_lines ++ peer_lines, "\n")
   end
 
   @doc """
@@ -85,27 +94,59 @@ defmodule Tunneld.Servers.Wireguard.ConfigGen do
     if peer["full_tunnel"] do
       "0.0.0.0/0"
     else
-      state["subnet"]
+      # Split tunnel: VPN subnet + LAN subnet so peers can reach
+      # other devices on the local network (SSH, dashboard, etc.)
+      gateway_subnet = gateway_subnet()
+      "#{state["subnet"]}, #{gateway_subnet}"
+    end
+  end
+
+  defp gateway_subnet do
+    gateway = Application.get_env(:tunneld, :network, [])[:gateway]
+
+    if gateway do
+      # e.g. "10.0.0.1" → "10.0.0.0/24"
+      [a, b, c, _d] = String.split(gateway, ".")
+      "#{a}.#{b}.#{c}.0/24"
+    else
+      # Fallback — can't determine LAN subnet, only route VPN subnet
+      nil
     end
   end
 
   defp dns_server(state) do
-    # Peers use the gateway's Ethernet IP as DNS server
-    # This inherits the existing dnsmasq + dnscrypt stack
-    gateway = Application.get_env(:tunneld, :network, [])[:gateway]
-
-    if gateway do
-      gateway
-    else
-      # Fallback: derive from subnet (server IP)
-      subnet_to_server_ip(state["subnet"])
-      |> String.replace(~r/\/\d+$/, "")
-    end
+    # Use the VPN server's IP (x.x.x.1) as DNS for peers.
+    # This is on the VPN subnet so both split-tunnel and
+    # full-tunnel peers can reach it. dnsmasq listens on
+    # all interfaces including wg0.
+    subnet_to_server_ip(state["subnet"])
+    |> String.replace(~r/\/\d+$/, "")
   end
 
   defp subnet_to_server_ip(subnet) do
     [prefix, mask] = String.split(subnet, "/")
     [a, b, c, _d] = String.split(prefix, ".")
     "#{a}.#{b}.#{c}.1/#{mask}"
+  end
+
+  defp format_endpoint(nil, _port), do: nil
+  defp format_endpoint(endpoint, port) when is_binary(endpoint) do
+    cond do
+      # Already has brackets — assume port included (e.g. [::1]:51820)
+      String.contains?(endpoint, "[") ->
+        endpoint
+
+      # Bare IPv6 address — wrap in brackets and add port
+      String.contains?(endpoint, ":") and not String.contains?(endpoint, ".") ->
+        "[#{endpoint}]:#{port}"
+
+      # IPv4 or hostname with :port already
+      String.contains?(endpoint, ":") ->
+        endpoint
+
+      # IPv4 or hostname — add port
+      true ->
+        "#{endpoint}:#{port}"
+    end
   end
 end

@@ -119,7 +119,9 @@ defmodule Tunneld.Servers.Wireguard do
 
       with {:ok, private_key, public_key} <- ensure_keypair(state),
            :ok <- bring_up_interface(private_key, port, subnet),
-           :ok <- apply_iptables_rules(),
+           :ok <- apply_iptables_rules(port),
+           :ok <- add_dnsmasq_wg_interface(),
+           :ok <- readd_peers(state["peers"]),
            {:ok, endpoint} <- resolve_endpoint(opts, state) do
         new_state =
           state
@@ -147,7 +149,8 @@ defmodule Tunneld.Servers.Wireguard do
   @impl true
   def handle_call(:disable_server, _from, state) do
     if state["enabled"] do
-      remove_iptables_rules()
+      remove_iptables_rules(state["listen_port"])
+      remove_dnsmasq_wg_interface()
       bring_down_interface()
 
       new_state = Map.put(state, "enabled", false)
@@ -288,6 +291,7 @@ defmodule Tunneld.Servers.Wireguard do
         with {_, 0} <- exec("ip", ["link", "add", @interface, "type", "wireguard"]),
              {_, 0} <- exec("wg", ["set", @interface, "private-key", key_path, "listen-port", to_string(port)]),
              {_, 0} <- exec("ip", ["address", "add", server_addr, "dev", @interface]),
+             {_, 0} <- exec("ip", ["link", "set", @interface, "mtu", "1280"]),
              {_, 0} <- exec("ip", ["link", "set", @interface, "up"]) do
           :ok
         else
@@ -472,14 +476,19 @@ defmodule Tunneld.Servers.Wireguard do
         {ip, 0} ->
           ip = String.trim(ip)
 
-          if Regex.match?(~r/^\d{1,3}(\.\d{1,3}){3}$/, ip) do
-            {:ok, ip}
-          else
-            {:ok, nil}
+          cond do
+            Regex.match?(~r/^\d{1,3}(\.\d{1,3}){3}$/, ip) ->
+              {:ok, ip}
+
+            Regex.match?(~r/^[0-9a-fA-F:]+$/, ip) and String.contains?(ip, ":") ->
+              {:ok, ip}
+
+            true ->
+              {:error, "Could not auto-detect public IP (got: #{ip})"}
           end
 
         _ ->
-          {:ok, nil}
+          {:error, "Could not auto-detect public IP"}
       end
     end
   end
@@ -578,7 +587,9 @@ defmodule Tunneld.Servers.Wireguard do
           # Re-add all persisted peers to the interface
           readd_peers(state["peers"])
           # Re-apply iptables rules
-          apply_iptables_rules()
+          apply_iptables_rules(port)
+          # Re-add wg0 interface to dnsmasq
+          add_dnsmasq_wg_interface()
           Logger.info("WireGuard interface re-enabled with #{map_size(state["peers"])} peer(s)")
           state
 
@@ -604,22 +615,57 @@ defmodule Tunneld.Servers.Wireguard do
 
   # --- Private: Iptables ---
 
-  defp apply_iptables_rules do
+  defp apply_iptables_rules(port) do
     if mock?() do
       Logger.debug("[WireGuard MOCK] Applying iptables rules")
       :ok
     else
-      Tunneld.Iptables.wireguard_up()
+      Tunneld.Iptables.wireguard_up(port)
     end
   end
 
-  defp remove_iptables_rules do
+  defp remove_iptables_rules(port) do
     if mock?() do
       Logger.debug("[WireGuard MOCK] Removing iptables rules")
       :ok
     else
-      Tunneld.Iptables.wireguard_down()
+      Tunneld.Iptables.wireguard_down(port)
     end
+  end
+
+  # --- Private: Dnsmasq ---
+
+  @wg_dnsmasq_conf "/etc/dnsmasq.d/tunneld_wireguard.conf"
+
+  defp add_dnsmasq_wg_interface do
+    if mock?() do
+      Logger.debug("[WireGuard MOCK] Adding wg0 to dnsmasq")
+      :ok
+    else
+      File.write!(@wg_dnsmasq_conf, "interface=wg0\n")
+      reload_dnsmasq()
+      Logger.info("Added wg0 interface to dnsmasq")
+      :ok
+    end
+  end
+
+  defp remove_dnsmasq_wg_interface do
+    if mock?() do
+      Logger.debug("[WireGuard MOCK] Removing wg0 from dnsmasq")
+      :ok
+    else
+      if File.exists?(@wg_dnsmasq_conf) do
+        File.rm!(@wg_dnsmasq_conf)
+        reload_dnsmasq()
+        Logger.info("Removed wg0 interface from dnsmasq")
+      end
+
+      :ok
+    end
+  end
+
+  defp reload_dnsmasq do
+    Tunneld.Servers.Services.restart_service(:dnsmasq, :no_notify)
   end
 
   # --- Private: Initial State ---

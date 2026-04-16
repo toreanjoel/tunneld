@@ -8,18 +8,18 @@ defmodule Tunneld.Iptables.WireguardTest do
   # right arguments, and don't crash — actual iptables rules
   # are validated on the target device.
 
-  describe "wireguard_up/0" do
+  describe "wireguard_up/1" do
     test "returns :ok in mock mode" do
       # In dev/test (mock mode), iptables calls are fire-and-forget
       # wireguard_up uses System.cmd directly, so it will fail
       # on non-Linux systems. Wrap in try.
-      assert :ok = try_do(fn -> Iptables.wireguard_up() end)
+      assert :ok = try_do(fn -> Iptables.wireguard_up(51820) end)
     end
   end
 
-  describe "wireguard_down/0" do
+  describe "wireguard_down/1" do
     test "returns :ok even when rules don't exist" do
-      assert :ok = try_do(fn -> Iptables.wireguard_down() end)
+      assert :ok = try_do(fn -> Iptables.wireguard_down(51820) end)
     end
   end
 
