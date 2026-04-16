@@ -33,6 +33,14 @@ defmodule Tunneld.Iptables do
     # Allow return traffic for outgoing connections
     System.cmd("iptables", ["-A", "INPUT", "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT"])
 
+    # Allow gateway services (HTTP dashboard, SSH)
+    for port <- [80, 22] do
+      System.cmd("iptables", ["-A", "INPUT", "-p", "tcp", "--dport", to_string(port), "-j", "ACCEPT"])
+    end
+
+    # Allow DHCP requests from LAN clients
+    System.cmd("iptables", ["-A", "INPUT", "-i", get_env(:eth), "-p", "udp", "--dport", "67", "-j", "ACCEPT"])
+
     # Make sure the devices can forward data between the different interfaces
     System.cmd("sysctl", ["-w", "net.ipv4.ip_forward=1"])
 
@@ -276,16 +284,20 @@ defmodule Tunneld.Iptables do
       "MASQUERADE"
     ])
 
-    System.cmd("iptables", [
-      "-t",
-      "nat",
-      "-A",
-      "POSTROUTING",
-      "-o",
-      get_env(:vpn),
-      "-j",
-      "MASQUERADE"
-    ])
+    vpn_iface = get_env(:vpn)
+
+    if vpn_iface != nil and vpn_iface != "" do
+      System.cmd("iptables", [
+        "-t",
+        "nat",
+        "-A",
+        "POSTROUTING",
+        "-o",
+        vpn_iface,
+        "-j",
+        "MASQUERADE"
+      ])
+    end
   end
 
   defp dns_forwarding() do
@@ -357,35 +369,39 @@ defmodule Tunneld.Iptables do
   end
 
   defp vpn_forwarding() do
-    System.cmd("iptables", [
-      "-A",
-      "FORWARD",
-      "-i",
-      get_env(:eth),
-      "-o",
-      get_env(:vpn),
-      "-m",
-      "state",
-      "--state",
-      "NEW,ESTABLISHED,RELATED",
-      "-j",
-      "ACCEPT"
-    ])
+    vpn = get_env(:vpn)
 
-    System.cmd("iptables", [
-      "-A",
-      "FORWARD",
-      "-i",
-      get_env(:vpn),
-      "-o",
-      get_env(:eth),
-      "-m",
-      "state",
-      "--state",
-      "ESTABLISHED,RELATED",
-      "-j",
-      "ACCEPT"
-    ])
+    if vpn && vpn != "" do
+      System.cmd("iptables", [
+        "-A",
+        "FORWARD",
+        "-i",
+        get_env(:eth),
+        "-o",
+        vpn,
+        "-m",
+        "state",
+        "--state",
+        "NEW,ESTABLISHED,RELATED",
+        "-j",
+        "ACCEPT"
+      ])
+
+      System.cmd("iptables", [
+        "-A",
+        "FORWARD",
+        "-i",
+        vpn,
+        "-o",
+        get_env(:eth),
+        "-m",
+        "state",
+        "--state",
+        "ESTABLISHED,RELATED",
+        "-j",
+        "ACCEPT"
+      ])
+    end
   end
 
   # --- WireGuard Helpers ---

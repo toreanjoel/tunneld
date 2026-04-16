@@ -369,14 +369,19 @@ defmodule Tunneld.Servers.Wireguard do
       case exec("wg", ["genkey"]) do
         {private_key, 0} ->
           private_key = String.trim(private_key)
+          key_path = write_private_key_temp(private_key)
 
-          case exec("wg", ["pubkey"], private_key) do
-            {public_key, 0} ->
-              {:ok, private_key, String.trim(public_key)}
+          result =
+            case exec("sh", ["-c", "wg pubkey < #{key_path}"]) do
+              {public_key, 0} ->
+                {:ok, private_key, String.trim(public_key)}
 
-            {out, code} ->
-              {:error, "wg pubkey failed (#{code}): #{out}"}
-          end
+              {out, code} ->
+                {:error, "wg pubkey failed (#{code}): #{out}"}
+            end
+
+          File.rm(key_path)
+          result
 
         {out, code} ->
           {:error, "wg genkey failed (#{code}): #{out}"}
@@ -485,19 +490,12 @@ defmodule Tunneld.Servers.Wireguard do
     :erlang.unique_integer([:positive]) |> Integer.to_string()
   end
 
-  defp exec(cmd, args, stdin \\ nil) do
+  defp exec(cmd, args) do
     if mock?() do
       Logger.debug("[WireGuard MOCK] #{cmd} #{Enum.join(args, " ")}")
       {"", 0}
     else
-      opts = [stderr_to_stdout: true]
-
-      if stdin do
-        opts = Keyword.put(opts, :input, stdin)
-        System.cmd(cmd, args, opts)
-      else
-        System.cmd(cmd, args, opts)
-      end
+      System.cmd(cmd, args, stderr_to_stdout: true)
     end
   end
 
