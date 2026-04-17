@@ -6,7 +6,6 @@ defmodule Tunneld.Servers.Nginx do
   - An upstream block pointing to the resource's backend pool (IP:port entries)
   - A public server block (port 18000) matched by the Zrok public share name
   - A private server block (deterministic port via `phash2`) for Zrok private shares
-  - An optional SSL server block (port 443) for local DNS hairpin access
 
   Config files follow the sites-available/sites-enabled symlink pattern.
   In mock mode, files are written under the local data directory instead of `/etc/nginx/`.
@@ -29,12 +28,6 @@ defmodule Tunneld.Servers.Nginx do
     mock? = mock_mode?()
     available_path = available_path(id, mock?)
     enabled_path = enabled_path(id, mock?)
-
-    reserved = get_in(resource, ["tunneld", "share_names"]) || %{}
-    public_name = Map.get(reserved, "public", "#{id}-public")
-    local_ssl = Map.get(resource, "local_ssl", true)
-
-    if local_ssl, do: Tunneld.CertManager.generate_cert(public_name)
 
     with :ok <- ensure_dirs(mock?),
          :ok <- ensure_pool(pool),
@@ -78,7 +71,6 @@ defmodule Tunneld.Servers.Nginx do
   defp render_config(resource) do
     id = resource["id"]
     listen_ip = Map.get(resource, "ip", "127.0.0.1")
-    local_ssl = Map.get(resource, "local_ssl", true)
 
     # Determine names first
     reserved = get_in(resource, ["tunneld", "share_names"]) || %{}
@@ -116,47 +108,10 @@ defmodule Tunneld.Servers.Nginx do
       |> Enum.reject(&(&1 == ""))
       |> Enum.map_join("\n", fn entry -> "    server #{entry};" end)
 
-    gateway_ip = Application.get_env(:tunneld, :network, []) |> Keyword.get(:gateway)
-    cert_dir = Application.get_env(:tunneld, :certs, []) |> Keyword.get(:cert_dir)
-    ssl_crt = Path.join(cert_dir, "#{public_name}.crt")
-    ssl_key = Path.join(cert_dir, "#{public_name}.key")
-
-    ssl_block = if root_domain && local_ssl do
-      """
-      server {
-          listen #{gateway_ip}:443 ssl;
-          server_name #{public_name}.#{root_domain};
-
-          ssl_certificate #{ssl_crt};
-          ssl_certificate_key #{ssl_key};
-
-          location / {
-              proxy_pass http://#{upstream_name};
-
-              client_max_body_size 0;
-              proxy_request_buffering off;
-
-              proxy_http_version 1.1;
-              proxy_set_header Upgrade $http_upgrade;
-              proxy_set_header Connection "upgrade";
-              proxy_set_header Host $host;
-              proxy_set_header X-Real-IP $remote_addr;
-              proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-              proxy_set_header X-Forwarded-Proto https;
-              proxy_set_header X-Forwarded-Port 443;
-          }
-      }
-      """
-    else
-      ""
-    end
-
     """
     upstream #{upstream_name} {
     #{servers}
     }
-
-    #{ssl_block}
 
     server {
         listen #{listen_ip}:#{public_port};

@@ -19,14 +19,7 @@ unless config_env() == :test do
     auth: System.get_env("TUNNELD_AUTH_FILE", "auth.json"),
     resources: System.get_env("TUNNELD_SHARES_FILE", "resources.json"),
     sqm: System.get_env("TUNNELD_SQM_FILE", "sqm.json"),
-    dns_file: System.get_env("TUNNELD_DNS_FILE", "/etc/dnsmasq.d/tunneld_resources.conf"),
-    dnscrypt_toml: System.get_env("TUNNELD_DNSCRYPT_TOML", "/etc/tunneld/dnscrypt/dnscrypt-proxy.toml"),
     wireguard: System.get_env("TUNNELD_WIREGUARD_FILE", "wireguard.json")
-
-  config :tunneld, :certs,
-    cert_dir: System.get_env("TUNNELD_CERT_DIR", "/etc/nginx/certs"),
-    ca_dir: System.get_env("TUNNELD_CA_DIR", "/etc/tunneld/ca"),
-    ca_file: "rootCA.pem"
 end
 
 # Only require these in PROD

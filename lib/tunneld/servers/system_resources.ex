@@ -63,6 +63,23 @@ defmodule Tunneld.Servers.SystemResources do
       |> String.trim_trailing("%")
       |> String.to_integer
 
-    %{cpu: cpu, mem: mem_percent, storage: storage_percent}
+    # Get CPU temperature (millidegrees Celsius from thermal zone).
+    temp = read_temp()
+
+    %{cpu: cpu, mem: mem_percent, storage: storage_percent, temp: temp}
+  end
+
+  defp read_temp do
+    case File.read("/sys/class/thermal/thermal_zone0/temp") do
+      {:ok, content} ->
+        content
+        |> String.trim()
+        |> String.to_integer()
+        |> Kernel./(1000)
+        |> Float.round(1)
+      {:error, _} -> nil
+    end
+  rescue
+    _ -> nil
   end
 end

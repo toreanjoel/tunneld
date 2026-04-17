@@ -4,7 +4,7 @@ defmodule Tunneld.MixProject do
   def project do
     [
       app: :tunneld,
-      version: "0.14.2",
+      version: "0.14.4",
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,
@@ -61,14 +61,10 @@ defmodule Tunneld.MixProject do
       {:jason, "~> 1.2"},
       {:bandit, "~> 1.2"},
       {:dns_cluster, "~> 0.1.1"},
-      {:dns, "~> 2.4.0"},
       {:bcrypt_elixir, "~> 3.0"},
       {:ex_json_schema, "~> 0.10.2"},
-      {:yaml_elixir, "~> 2.11"},
       {:httpoison, "~> 2.0"},
-      {:slipstream, "~> 1.2.0"},
       {:uuid, "~> 1.1"},
-      {:earmark, "~> 1.4"},
       {:eqrcode, "~> 0.1.10"}
     ]
   end

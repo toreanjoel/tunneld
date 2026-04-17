@@ -46,7 +46,6 @@ defmodule TunneldWeb.Live.Login do
     <!-- Login wrapper -->
     <div
       id="auth"
-      phx-hook="Auth"
       class="flex flex-col bg-secondary lg:flex-row min-h-screen sm:height-screen p-2"
     >
       <!-- Overview wrapper -->

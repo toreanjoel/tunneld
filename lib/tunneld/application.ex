@@ -19,7 +19,6 @@ defmodule Tunneld.Application do
     Blocklist,
     Updater,
     Sqm,
-    Dns,
     Wireguard
   }
 
@@ -46,9 +45,7 @@ defmodule Tunneld.Application do
       {Blocklist, []},
       {Updater, []},
       {Sqm, []},
-      {Dns, []},
-      {Wireguard, []},
-      {Tunneld.CertManager, []}
+      {Wireguard, []}
     ]
 
     if not Application.get_env(:tunneld, :mock_data, false) do

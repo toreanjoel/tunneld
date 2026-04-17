@@ -69,8 +69,8 @@ config :tunneld, :fs,
   root: Path.expand("../data/", __DIR__),
   auth: "auth.json",
   resources: "resources.json",
-  wireguard: "wireguard.json",
-  dnscrypt_toml: Path.expand("../data/dnscrypt-proxy.toml", __DIR__)
+  sqm: "sqm.json",
+  wireguard: "wireguard.json"
 
 config :phoenix_live_view,
   # Include HEEx debug annotations as HTML comments in rendered markup

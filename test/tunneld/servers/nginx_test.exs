@@ -7,23 +7,15 @@ defmodule Tunneld.Servers.NginxTest do
     tmp_dir = Path.join(System.tmp_dir!(), "tunneld_nginx_test_#{:rand.uniform(100_000)}")
     File.mkdir_p!(tmp_dir)
 
-    cert_dir = Path.join(tmp_dir, "certs")
-    ca_dir = Path.join(tmp_dir, "ca")
-    File.mkdir_p!(cert_dir)
-    File.mkdir_p!(ca_dir)
-
     original_fs = Application.get_env(:tunneld, :fs)
     original_mock = Application.get_env(:tunneld, :mock_data)
-    original_certs = Application.get_env(:tunneld, :certs)
 
     Application.put_env(:tunneld, :fs, root: tmp_dir, auth: "auth.json", resources: "resources.json")
     Application.put_env(:tunneld, :mock_data, true)
-    Application.put_env(:tunneld, :certs, cert_dir: cert_dir, ca_dir: ca_dir, ca_file: "rootCA.key")
 
     on_exit(fn ->
       Application.put_env(:tunneld, :fs, original_fs)
       Application.put_env(:tunneld, :mock_data, original_mock)
-      Application.put_env(:tunneld, :certs, original_certs)
       File.rm_rf!(tmp_dir)
     end)
 

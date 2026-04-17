@@ -2,8 +2,8 @@ defmodule TunneldWeb.Live.Setup do
   @moduledoc """
   First-run setup wizard shown after initial account creation.
 
-  Guides the user through connecting to Wi-Fi and optionally configuring
-  the Zrok overlay network. Tracked via an `onboarded` flag in auth.json
+  Guides the user through connecting to Wi-Fi and configuring
+  the overlay network. Tracked via an `onboarded` flag in auth.json
   so it only appears once.
   """
   use TunneldWeb, :live_view

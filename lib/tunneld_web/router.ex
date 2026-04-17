@@ -29,7 +29,6 @@ defmodule TunneldWeb.Router do
 
     live "/", Live.Login
     live "/setup", Live.Setup
-    get "/download/ca", CAController, :download
     live "/dashboard", Live.Dashboard
   end
 

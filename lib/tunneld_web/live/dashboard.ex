@@ -16,7 +16,6 @@ defmodule TunneldWeb.Live.Dashboard do
   alias TunneldWeb.Live.Components.Resources
   alias TunneldWeb.Live.Components.Devices
   alias TunneldWeb.Live.Components.Wireguard.Server, as: WireguardServer
-  alias TunneldWeb.Live.Components.Wireguard.Peers, as: WireguardPeers
   alias TunneldWeb.Live.Dashboard.Actions
 
   @modal_default %{
@@ -64,7 +63,6 @@ defmodule TunneldWeb.Live.Dashboard do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "status:internet")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:details")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:devices")
-      Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:dns")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:wireguard")
     end
 
@@ -83,7 +81,6 @@ defmodule TunneldWeb.Live.Dashboard do
       socket
       |> assign(:client_id, client_id)
       |> assign(:uri_info, uri_info)
-      |> assign(:allow_webauthn?, false)
       |> assign(modal: @modal_default)
       |> assign(sidebar: @sidebar_default)
       |> assign(
@@ -93,7 +90,6 @@ defmodule TunneldWeb.Live.Dashboard do
       )
       |> assign(:devices, devices)
       |> assign(:pending_actions, %{})
-      |> assign(:dns_state, Tunneld.Servers.Dns.get_state())
       |> assign(:wireguard_state, wireguard_state())
       |> assign(:settings_menu_open, false)
 
@@ -126,20 +122,11 @@ defmodule TunneldWeb.Live.Dashboard do
         client_id={@client_id}
         pending_actions={@pending_actions}
       />
-
-      <.live_component
-        :if={@modal.show && @modal.type === :wireguard_peer}
-        module={TunneldWeb.Live.Components.Wireguard.PeerCreatedModal}
-        id="wg_peer_created_modal"
-        config_text={@modal.body["config_text"]}
-        filename={@modal.body["filename"]}
-      />
     </div>
     """
   end
 
   @spec sidebar(%{
-          :allow_webauthn? => boolean(),
           :sidebar => %{is_open: boolean(), view: atom(), selection: map() | nil},
           optional(any()) => any()
         }) ::
@@ -147,12 +134,11 @@ defmodule TunneldWeb.Live.Dashboard do
   @doc """
   Overlay sidebar with close button and responsive width.
   """
-  def sidebar(%{sidebar: sidebar, allow_webauthn?: allow_webauthn?, uri_info: uri_info} = assigns) do
+  def sidebar(%{sidebar: sidebar, uri_info: uri_info} = assigns) do
     assigns =
       assigns
       |> assign(:sidebar, sidebar)
       |> assign(:uri_info, uri_info)
-      |> assign(:allow_webauthn?, allow_webauthn?)
 
     ~H"""
     <div
@@ -172,7 +158,7 @@ defmodule TunneldWeb.Live.Dashboard do
           module={SidebarDetails}
           view={@sidebar.view}
           uri_info={@uri_info}
-          web_authn={@allow_webauthn?}
+          selection={@sidebar.selection}
         />
       </div>
     </div>
@@ -239,13 +225,6 @@ defmodule TunneldWeb.Live.Dashboard do
               >
                 <.icon name="hero-lock-closed" class="h-4 w-4" /> Authentication
               </div>
-              <div
-                phx-click="open_settings"
-                phx-value-type="dns_settings"
-                class="flex items-center gap-2 px-3 py-2 text-xs text-gray-1 hover:bg-primary cursor-pointer transition-all"
-              >
-                <.icon name="hero-globe-alt" class="h-4 w-4" /> DNS Provider
-              </div>
               <div class="border-t border-gray-700 my-1" />
               <div
                 phx-click="restart_device"
@@ -265,28 +244,22 @@ defmodule TunneldWeb.Live.Dashboard do
         </div>
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
-        <%!-- System Resources and Services --%>
-        <div class="flex flex-col md:flex-row w-full gap-6">
+        <%!-- System Resources, Services, and VPN --%>
+        <div class="flex flex-col md:flex-row w-full gap-2">
           <div class="flex-1"><.live_component id="system_resources" module={SystemResources} /></div>
-          <div class="flex-1">
+          <div class="flex-1 flex flex-col gap-4">
             <.live_component id="services" module={Services} />
+            <.live_component id="wireguard_server" module={WireguardServer} data={@wireguard_state} />
           </div>
         </div>
+
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
 
-        <%!-- Resources, VPN, and Devices --%>
+        <%!-- Resources and Devices --%>
         <div class="mt-4 md:mt-6">
           <div class="min-h-[150px] md:min-h-[200px]">
             <.live_component id="resources" module={Resources} />
-          </div>
-
-          <div class="min-h-[100px] md:min-h-[120px]">
-            <.live_component id="wireguard_server" module={WireguardServer} data={@wireguard_state} />
-          </div>
-
-          <div class="min-h-[100px] md:min-h-[120px]">
-            <.live_component id="wireguard_peers" module={WireguardPeers} data={@wireguard_state} />
           </div>
 
           <div class="min-h-[150px] md:min-h-[200px]">
@@ -374,6 +347,22 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, start_action("remove_wireguard_peer", %{"peer_id" => peer_id}, socket)}
   end
 
+  def handle_event("show_peer_config", %{"peer_id" => peer_id, "peer_name" => name}, socket) do
+    config = Tunneld.Servers.Wireguard.get_peer_config(peer_id)
+
+    if config do
+      filename = "#{name}.conf"
+      sidebar = %{
+        is_open: true,
+        view: :wireguard_peer_config,
+        selection: %{config_text: config, filename: filename, peer_name: name}
+      }
+      {:noreply, assign(socket, :sidebar, sidebar)}
+    else
+      {:noreply, put_flash(socket, :info, "Config not cached. Regenerate the peer config to view QR code.")}
+    end
+  end
+
   #
   # Close the details bar (relevant when we are in mobile mode)
   #
@@ -381,29 +370,6 @@ defmodule TunneldWeb.Live.Dashboard do
     sidebar = sidebar_close(socket.assigns.sidebar)
 
     {:noreply, assign(socket, :sidebar, sidebar)}
-  end
-
-  #
-  # Completed the WebAuthn registration
-  #
-  def handle_event("webauthn_register_complete", %{} = data, socket) do
-    case Tunneld.Servers.Auth.save_webauthn(data) do
-      :ok ->
-        socket = put_flash(socket, :info, "WebAuthn credential saved successfully")
-        {:noreply, socket}
-
-      {:error, reason} ->
-        Logger.error("Failed to save WebAuthn credential: #{inspect(reason)}")
-        socket = put_flash(socket, :error, "Failed to save WebAuthn credential")
-        {:noreply, socket}
-    end
-  end
-
-  #
-  # Error completing the WebAuthn registration
-  #
-  def handle_event("webauthn_register_error", %{"error" => err}, socket) do
-    {:noreply, socket |> put_flash(:error, err)}
   end
 
   #
@@ -480,7 +446,12 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   def handle_info(%{id: "wireguard_" <> _, module: _module, data: wg_data}, socket) do
-    {:noreply, assign(socket, :wireguard_state, wg_data)}
+    socket =
+      socket
+      |> assign(:wireguard_state, wg_data)
+      |> maybe_refresh_wireguard_sidebar()
+
+    {:noreply, socket}
   end
 
   def handle_info(%{id: id, module: module, data: data}, socket) do
@@ -539,21 +510,17 @@ defmodule TunneldWeb.Live.Dashboard do
 
   def handle_info({:action_done, ref, "add_wireguard_peer", {:ok, {:ok, peer, config}}}, socket) do
     filename = "#{peer["name"]}.conf"
+    sidebar = %{
+      is_open: true,
+      view: :wireguard_peer_config,
+      selection: %{config_text: config, filename: filename, peer_name: peer["name"]}
+    }
+
     socket =
       socket
       |> assign(:pending_actions, Map.delete(socket.assigns.pending_actions, ref))
-      |> assign(:modal, %{
-        show: true,
-        title: "VPN Peer Created",
-        description: nil,
-        body: %{
-          "type" => "wireguard_peer_created",
-          "config_text" => config,
-          "filename" => filename
-        },
-        actions: nil,
-        type: :wireguard_peer
-      })
+      |> assign(:sidebar, sidebar)
+      |> assign(:modal, @modal_default)
 
     {:noreply, socket}
   end
@@ -595,32 +562,6 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   #
-  # Trigger and send options for the webAuthn
-  #
-  def handle_info(:configure_web_authn, socket) do
-    challenge = :crypto.strong_rand_bytes(32) |> Base.url_encode64(padding: false)
-    user_id = :crypto.strong_rand_bytes(16) |> Base.url_encode64(padding: false)
-
-    public_key_options = %{
-      challenge: challenge,
-      rp: %{name: "Tunneld"},
-      user: %{
-        id: user_id,
-        name: "Tunneld Gateway",
-        displayName: "Tunneld Gateway"
-      },
-      pubKeyCredParams: [%{type: "public-key", alg: -7}],
-      timeout: 60000,
-      attestation: "none"
-    }
-
-    {:noreply,
-     push_event(socket, "start_webauthn", %{
-       publicKeyOptions: public_key_options
-     })}
-  end
-
-  #
   # Revoke the login credentials
   #
   def handle_info(:revoke_login_creds, socket) do
@@ -630,27 +571,6 @@ defmodule TunneldWeb.Live.Dashboard do
 
   def handle_info(:close_details, socket) do
     {:noreply, assign(socket, :sidebar, sidebar_close(socket.assigns.sidebar))}
-  end
-
-  #
-  # Handle DNS provider changes from PubSub
-  #
-  def handle_info(%{status: :updated, state: dns_state}, socket) do
-    socket =
-      socket
-      |> assign(:dns_state, dns_state)
-      |> then(fn socket ->
-        if socket.assigns.sidebar.view == :dns_settings do
-          assign(socket, :sidebar, %{
-            socket.assigns.sidebar
-            | selection: %{updated_at: System.monotonic_time()}
-          })
-        else
-          socket
-        end
-      end)
-
-    {:noreply, socket}
   end
 
   def handle_info({:show_details, %{"id" => id, "type" => type}}, socket) do
@@ -688,8 +608,13 @@ defmodule TunneldWeb.Live.Dashboard do
       "authentication" ->
         :authentication
 
-      "dns_settings" ->
-        :dns_settings
+      "wireguard" ->
+        if _pid = GenServer.whereis(Tunneld.Servers.Wireguard) do
+          Tunneld.Servers.Wireguard.get_state()
+        else
+          %{"enabled" => false, "peers" => %{}}
+        end
+        :wireguard
     end
   end
 
@@ -788,7 +713,6 @@ defmodule TunneldWeb.Live.Dashboard do
       "connect_to_wireless_network" -> "Connecting to Wi‑Fi..."
       "disconnect_from_wireless_network" -> "Disconnecting Wi‑Fi..."
       "scan_for_wireless_networks" -> "Scanning Wi‑Fi..."
-      "configure_web_authn" -> "Starting WebAuthn setup..."
       "configure_enable_control_plane" -> "Configuring control plane..."
       "configure_disable_control_plane" -> "Disconnecting control plane..."
       "configure_enable_environment" -> "Enabling device..."
@@ -798,8 +722,10 @@ defmodule TunneldWeb.Live.Dashboard do
       "configure_basic_auth" -> "Configuring Basic Auth..."
       "disable_basic_auth" -> "Disabling Basic Auth..."
       "get_private_token" -> "Fetching private token..."
-      "set_dns_provider" -> "Changing DNS provider..."
-      "toggle_local_ssl" -> "Updating Local SSL..."
+      "add_wireguard_peer" -> "Adding VPN peer..."
+      "remove_wireguard_peer" -> "Removing VPN peer..."
+      "enable_wireguard" -> "Enabling VPN server..."
+      "disable_wireguard" -> "Disabling VPN server..."
       "restart_device" -> "Restarting device..."
       _ -> "Working on request..."
     end
@@ -834,6 +760,19 @@ defmodule TunneldWeb.Live.Dashboard do
       Tunneld.Servers.Wireguard.get_state()
     else
       %{"enabled" => false, "peers" => %{}}
+    end
+  end
+
+  defp maybe_refresh_wireguard_sidebar(socket) do
+    sidebar = Map.get(socket.assigns, :sidebar, %{})
+
+    if Map.get(sidebar, :is_open, false) and Map.get(sidebar, :view) == :wireguard do
+      assign(socket, :sidebar, %{
+        sidebar
+        | selection: %{updated_at: System.monotonic_time()}
+      })
+    else
+      socket
     end
   end
 end

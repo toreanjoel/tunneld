@@ -15,11 +15,6 @@ defmodule TunneldWeb.Endpoint do
     same_site: "Lax"
   ]
 
-  # We need to make sure we have the channel module as the socket one needs and we dont use at the moment
-  # socket "/socket", TunneldWeb.UserSocket,
-  #   websocket: true,
-  #   longpoll: false
-
   socket "/live", Phoenix.LiveView.Socket,
     websocket: [connect_info: [:uri, :peer_data, session: @session_options]],
     longpoll: [connect_info: [session: @session_options]]

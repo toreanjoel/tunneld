@@ -1,16 +1,14 @@
 defmodule TunneldWeb.Live.Components.Wireguard.Server do
   @moduledoc """
-  WireGuard VPN server toggle and status display.
+  WireGuard VPN server summary section on the dashboard.
 
-  Shows the on/off toggle, public key, listen port, and endpoint.
+  Uses the same header style as Resources/Devices sections.
+  Shows detail rows in the sidebar summary pattern (label + value).
+  Action button on the top right opens the sidebar with full configuration.
   """
   use TunneldWeb, :live_component
 
   def mount(socket) do
-    if connected?(socket) do
-      Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:wireguard")
-    end
-
     {:ok, socket}
   end
 
@@ -26,56 +24,59 @@ defmodule TunneldWeb.Live.Components.Wireguard.Server do
     assigns =
       assigns
       |> assign(enabled: assigns.data["enabled"] || false)
+      |> assign(endpoint: assigns.data["endpoint"])
+      |> assign(peers: assigns.data["peers"] || %{})
       |> assign(public_key: assigns.data["public_key"])
       |> assign(listen_port: assigns.data["listen_port"])
-      |> assign(endpoint: assigns.data["endpoint"])
       |> assign(subnet: assigns.data["subnet"])
 
     ~H"""
     <div class="p-3 md:p-5">
-      <div class="mb-4 md:mb-5 flex flex-row items-center gap-2">
+      <div class="mb-4 md:mb-5 flex flex-row">
         <div class="flex-1">
-          <div class="text-lg md:text-xl text-gray-1 font-medium">VPN Server</div>
+          <div class="text-lg md:text-xl text-gray-1 font-medium">VPN</div>
           <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
         </div>
-        <div class="flex flex-row gap-1">
+        <div>
           <div
-            phx-click="toggle_vpn"
-            phx-value-enabled={(!@enabled) |> to_string()}
-            phx-click-loading="opacity-50 cursor-wait"
+            phx-click="show_details"
+            phx-value-type="wireguard"
+            phx-value-id="_"
             class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
           >
-            <.icon class="w-5 h-5 sm:w-6 sm:h-6" name={if @enabled, do: "hero-lock-open", else: "hero-lock-closed"} />
-            <div class="hidden sm:block truncate text-xs">
-              <%= if @enabled, do: "Disable", else: "Enable" %>
-            </div>
+            <.icon class="w-5 h-5 sm:w-6 sm:h-6" name="hero-shield-check" />
+            <div class="hidden sm:block truncate text-xs">Configure VPN</div>
           </div>
         </div>
       </div>
 
-      <div :if={@enabled} class="space-y-2 text-xs text-gray-300">
-        <div class="flex items-center justify-between">
-          <span class="text-gray-400">Public Key</span>
-          <span class="font-mono text-[10px] break-all max-w-[200px]" title={@public_key}>
-            <%= if @public_key, do: String.slice(@public_key, 0, 20) <> "...", else: "—" %>
-          </span>
+      <div class="bg-primary rounded-lg p-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-2 text-xs">
+          <div class="truncate">
+            <span class="font-semibold">Status:</span>
+            <span class={"ml-1 w-[13px] h-[13px] rounded-full inline-block align-middle #{if @enabled, do: "bg-green", else: "bg-red"}"}></span>
+          </div>
+          <div class="truncate">
+            <span class="font-semibold">Endpoint:</span>
+            <span class="ml-1"><%= @endpoint || "—" %></span>
+          </div>
+          <div class="truncate">
+            <span class="font-semibold">Subnet:</span>
+            <span class="ml-1"><%= @subnet || "—" %></span>
+          </div>
+          <div class="truncate">
+            <span class="font-semibold">Listen Port:</span>
+            <span class="ml-1"><%= @listen_port || "—" %></span>
+          </div>
+          <div class="truncate">
+            <span class="font-semibold">Public Key:</span>
+            <span class="ml-1 font-mono text-[10px]"><%= if @public_key, do: String.slice(@public_key, 0, 16) <> "...", else: "—" %></span>
+          </div>
+          <div class="truncate">
+            <span class="font-semibold">Peers:</span>
+            <span class="ml-1"><%= map_size(@peers) %></span>
+          </div>
         </div>
-        <div class="flex items-center justify-between">
-          <span class="text-gray-400">Listen Port</span>
-          <span><%= @listen_port || "—" %></span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-gray-400">Endpoint</span>
-          <span><%= @endpoint || "—" %></span>
-        </div>
-        <div class="flex items-center justify-between">
-          <span class="text-gray-400">Subnet</span>
-          <span><%= @subnet || "—" %></span>
-        </div>
-      </div>
-
-      <div :if={!@enabled} class="mt-2 text-xs text-gray-400">
-        VPN server is disabled. Enable to create peer connections.
       </div>
     </div>
     """

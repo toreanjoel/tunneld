@@ -5,10 +5,6 @@ defmodule TunneldWeb.Live.Components.Wireguard.Peers do
   use TunneldWeb, :live_component
 
   def mount(socket) do
-    if connected?(socket) do
-      Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:wireguard")
-    end
-
     {:ok, socket}
   end
 
@@ -27,13 +23,14 @@ defmodule TunneldWeb.Live.Components.Wireguard.Peers do
       |> assign(peers: assigns.data["peers"] || %{})
 
     ~H"""
-    <div class="p-3 md:p-5">
+    <div>
+    <div :if={@enabled} class="p-3 md:p-5">
       <div class="mb-4 md:mb-5 flex flex-row items-center gap-2">
         <div class="flex-1">
           <div class="text-lg md:text-xl text-gray-1 font-medium">VPN Peers</div>
           <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
         </div>
-        <div :if={@enabled} class="flex flex-row gap-1">
+        <div class="flex flex-row gap-1">
           <div
             phx-click="modal_open"
             phx-value-modal_title="Add VPN Peer"
@@ -58,14 +55,13 @@ defmodule TunneldWeb.Live.Components.Wireguard.Peers do
       </div>
 
       <div>
-        <div
-          :if={!@enabled or Enum.empty?(@peers)}
+        <div :if={Enum.empty?(@peers)}
           class="w-[60px] h-[60px] bg-secondary flex items-center justify-center rounded-md opacity-10"
         >
           <.icon class="w-8 h-8 text-white" name="hero-device-phone-mobile" />
         </div>
 
-        <div :if={@enabled and !Enum.empty?(@peers)} class="space-y-2">
+        <div :if={!Enum.empty?(@peers)} class="space-y-2">
           <%= for {_id, peer} <- @peers do %>
             <div class="flex items-center justify-between p-3 rounded-lg bg-secondary">
               <div class="flex items-center gap-3">
@@ -96,6 +92,7 @@ defmodule TunneldWeb.Live.Components.Wireguard.Peers do
           <% end %>
         </div>
       </div>
+    </div>
     </div>
     """
   end

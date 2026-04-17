@@ -52,34 +52,6 @@ defmodule Tunneld.Servers.AuthTest do
     end
   end
 
-  describe "webauthn operations" do
-    setup do
-      Auth.create_file("admin", "pass")
-      :ok
-    end
-
-    test "has_webauthn? returns false initially" do
-      refute Auth.has_webauthn?()
-    end
-
-    test "save_webauthn stores credential data" do
-      cred = %{"id" => "abc123", "public_key" => "key_data"}
-      Auth.save_webauthn(cred)
-
-      assert Auth.has_webauthn?()
-      {:ok, data} = Auth.read_file()
-      assert data["webauthn"] == cred
-    end
-
-    test "clear_webauthn removes credential data" do
-      Auth.save_webauthn(%{"id" => "abc"})
-      assert Auth.has_webauthn?()
-
-      Auth.clear_webauthn()
-      refute Auth.has_webauthn?()
-    end
-  end
-
   describe "path/0" do
     test "returns the correct path" do
       path = Auth.path()

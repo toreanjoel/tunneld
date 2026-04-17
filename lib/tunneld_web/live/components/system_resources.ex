@@ -4,13 +4,12 @@ defmodule TunneldWeb.Live.Components.SystemResources do
 
   Example of how the data will be sent but will be sent with real data using os_mon
 
-  alias TunneldWeb.Live.Components.SystemResources, as: SystemResources
-
     data = %{
       resources: %{
         cpu: Enum.random(1..100),
         mem: Enum.random(1..100),
-        storage: Enum.random(1..100)
+        storage: Enum.random(1..100),
+        temp: 45.2
       }
     }
 
@@ -48,7 +47,8 @@ defmodule TunneldWeb.Live.Components.SystemResources do
     resources = Map.get(data, :resources, %{
       cpu: 0,
       mem: 0,
-      storage: 0
+      storage: 0,
+      temp: nil
     })
 
     # Calculate the circumference for the progress circles
@@ -66,9 +66,9 @@ defmodule TunneldWeb.Live.Components.SystemResources do
       </div>
 
       <div class="flex items-center justify-center">
-        <div class="grid grid-cols-3 gap-2">
-          <%= for {resource, percent} <- @resources do %>
-            <div class="bg-primary relative w-full max-w-[200px] rounded-lg">
+        <div class="grid grid-cols-2 gap-2">
+          <%= for {label, percent, available?} <- gauges(@resources) do %>
+            <div class={"bg-primary relative w-full max-w-[150px] md:max-w-[180px] rounded-lg #{if not available?, do: "opacity-30 pointer-events-none", else: ""}"}>
               <svg class="w-full h-full" viewBox="0 0 170 170">
                 <!-- Background circle -->
                 <circle
@@ -83,20 +83,20 @@ defmodule TunneldWeb.Live.Components.SystemResources do
                   cx="85"
                   cy="85"
                   r={@radius}
-                  class={get_percent_color(percent) <> " animate-dashoffset"}
+                  class={if available?, do: get_percent_color(percent) <> " animate-dashoffset", else: ""}
                   stroke-width="10"
                   fill="#202226"
                   stroke-dasharray={@circumference}
-                  stroke-dashoffset={@circumference * (1 - percent / 100)}
+                  stroke-dashoffset={if available?, do: @circumference * (1 - percent / 100), else: @circumference}
                   stroke-linecap="round"
                   style="transform: rotate(-90deg); transform-origin: center;"
                   stroke="currentColor"
                 />
               </svg>
               <!-- Percentage and label -->
-              <div class="absolute inset-0 flex flex-col items-center justify-center text-sm sm:text-lg md:text-xl text-white">
-                <%= "#{percent}%" %>
-                <div class="text-[10px] sm:text-xs"><%= String.upcase(to_string(resource)) %></div>
+              <div class="absolute inset-0 flex flex-col items-center justify-center text-xs sm:text-sm text-white">
+                <%= if available?, do: "#{percent}%", else: "—" %>
+                <div class="text-[10px]"><%= label %></div>
               </div>
             </div>
           <% end %>
@@ -104,6 +104,23 @@ defmodule TunneldWeb.Live.Components.SystemResources do
       </div>
     </div>
     """
+  end
+
+  defp gauges(resources) do
+    cpu = Map.get(resources, :cpu)
+    mem = Map.get(resources, :mem)
+    storage = Map.get(resources, :storage)
+    temp = Map.get(resources, :temp)
+
+    # Convert temp (°C) to a percentage for the gauge (0-100°C range)
+    temp_percent = if temp, do: min(round(temp), 100), else: nil
+
+    [
+      {"CPU", cpu || 0, not is_nil(cpu)},
+      {"MEM", mem || 0, not is_nil(mem)},
+      {"STORAGE", storage || 0, not is_nil(storage)},
+      {"TEMP", temp_percent || 0, not is_nil(temp)}
+    ]
   end
 
   # Check the percent and return relevant color

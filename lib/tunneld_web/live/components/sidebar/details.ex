@@ -10,8 +10,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
   def update(assigns, socket) do
     view = Map.get(assigns, :view, socket.assigns[:view] || :system_overview)
-    web_authn = Map.get(assigns, :web_authn, socket.assigns[:web_authn] || false)
     data = Map.get(assigns, :data, %{})
+    selection = Map.get(assigns, :selection, socket.assigns[:selection] || nil)
     sqm = Tunneld.Servers.Sqm.get_state()
 
     socket =
@@ -19,7 +19,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(:view, view)
       |> assign(:sqm, sqm)
       |> assign(:data, data)
-      |> assign(:web_authn, web_authn)
+      |> assign(:selection, selection)
 
     {:ok, socket}
   end
@@ -37,21 +37,15 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
   @spec render(%{:view => :authentication, optional(any()) => any()}) ::
           Phoenix.LiveView.Rendered.t()
-  def render(%{view: :authentication, web_authn: web_authn} = assigns) do
-    assigns = assign(assigns, :web_authn, Map.get(assigns, web_authn, false))
-
+  def render(%{view: :authentication} = assigns) do
     ~H"""
-    <div class="bg-secondary p-4 h-full space-y-6" id="auth" phx-hook="Auth">
-      <%!-- Sidebar header that will house metadat?  --%>
+    <div class="bg-secondary p-4 h-full space-y-6">
       <%= sidebar_header(assigns, %{
         header: "Authentication",
-        body:
-          "Authentication options to access the application dashboard. WebAuthn (required) after you expose dashboard as an resource.
-        This is needed in order to remotely access resources"
+        body: "Reset your login credentials for the dashboard."
       }) %>
 
       <div class="flex flex-row gap-1 justify-end my-2">
-        <%!-- Actions to take --%>
         <div
           phx-click="modal_open"
           phx-value-modal_title="Reset Login?"
@@ -72,49 +66,11 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             })
           }
           phx-click-loading="opacity-50 cursor-wait"
-          class="flex grow items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md w-1/2"
+          class="flex grow items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md w-full"
         >
           <.icon name="hero-no-symbol" class="h-5 w-5" />
           <div class="truncate text-xs">Reset Login</div>
         </div>
-
-        <%!-- Not allowed if the scheme is not HTTPS and we dont have a domain --%>
-        <div
-          :if={!@web_authn}
-          class="flex grow flex-col items-center justify-center gap-1 bg-gray-2 p-2 rounded-md w-1/2"
-        >
-          <div class="flex items-center gap-1">
-            <.icon name="hero-finger-print" class="h-5 w-5" />
-            <div class="truncate text-xs">WebAuthn</div>
-          </div>
-          <div class="text-[10px] text-gray-400">Available over HTTPS</div>
-        </div>
-        <%!-- We have the option to generate --%>
-        <div
-          :if={@web_authn}
-          phx-click="trigger_action"
-          phx-value-action="configure_web_authn"
-          phx-value-data={Jason.encode!(%{})}
-          phx-click-loading="opacity-50 cursor-wait"
-          class="flex grow items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md w-1/2"
-        >
-          <.icon name="hero-finger-print" class="h-5 w-5" />
-          <div class="truncate text-xs">WebAuthn</div>
-        </div>
-      </div>
-
-      <div class="mt-6 border-t border-gray-700 pt-4">
-        <p class="text-xs text-gray-400 mb-3">
-          Download and install the Root CA on your devices to enable trusted SSL access to services on your local subnet.
-        </p>
-        <a
-          href={~p"/download/ca"}
-          download
-          class="flex items-center justify-center gap-1 bg-blue-500 p-2 cursor-pointer rounded-md w-full"
-        >
-          <.icon name="hero-arrow-down-tray" class="h-5 w-5" />
-          <div class="truncate text-xs">Download Root CA</div>
-        </a>
       </div>
     </div>
     """
@@ -240,25 +196,51 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             </div>
           </div>
 
-          <%= if @data.kind == "host" do %>
+          <% gateway = Application.get_env(:tunneld, :network, []) |> Keyword.get(:gateway) %>
+
+          <%= if @data.kind == "host" and @has_data do %>
             <div class="mt-3 border-t border-gray-700 pt-3">
-              <div class="flex items-center justify-between">
-                <div>
-                  <span class="text-sm font-semibold">Local SSL</span>
-                  <p class="text-[10px] text-gray-400 mt-0.5">
-                    DNS hairpin and HTTPS for local devices
-                  </p>
+              <h2 class="text-sm font-semibold mb-2">Local Access</h2>
+              <div class="bg-primary rounded-lg p-2">
+                <div class="flex items-center gap-2 text-xs">
+                  <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4 text-green shrink-0" />
+                  <a
+                    href={"http://#{gateway}:#{@data.port}"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-green hover:text-green-300 underline break-all"
+                  >
+                    <%= gateway %>:<%= @data.port %>
+                  </a>
                 </div>
-                <label
-                  phx-click="trigger_action"
-                  phx-value-action="toggle_local_ssl"
-                  phx-value-data={Jason.encode!(%{"resource_id" => @data.id, "enabled" => "#{!@data.local_ssl}"})}
-                  class="relative inline-flex items-center cursor-pointer"
-                >
-                  <input type="checkbox" class="sr-only peer" checked={@data.local_ssl} />
-                  <div class="w-9 h-5 bg-light_purple rounded-full peer-checked:bg-purple relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-light_purple after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4">
-                  </div>
-                </label>
+                <div :if={length(@data.pool || []) > 1} class="mt-2">
+                  <span class="text-[10px] text-gray-400">Pool backends</span>
+                  <%= for entry <- (@data.pool || []) do %>
+                    <div class="flex items-center gap-1 text-[10px] text-gray-300 ml-2">
+                      <span class="w-1.5 h-1.5 rounded-full bg-green inline-block"></span>
+                      <%= entry %>
+                    </div>
+                  <% end %>
+                </div>
+              </div>
+            </div>
+          <% end %>
+
+          <%= if @data.kind == "access" and @has_data do %>
+            <div class="mt-3 border-t border-gray-700 pt-3">
+              <h2 class="text-sm font-semibold mb-2">Local Access</h2>
+              <div class="bg-primary rounded-lg p-2">
+                <div class="flex items-center gap-2 text-xs">
+                  <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4 text-green shrink-0" />
+                  <a
+                    href={"http://#{gateway}:#{@data.port}"}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-green hover:text-green-300 underline break-all"
+                  >
+                    <%= gateway %>:<%= @data.port %>
+                  </a>
+                </div>
               </div>
             </div>
           <% end %>
@@ -887,88 +869,190 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     """
   end
 
-  @spec render(%{:view => :device, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
-  def render(%{view: :device} = assigns) do
-    ~H"""
-    <div class="bg-secondary p-4 h-full space-y-6">
-      <div class="flex flex-col items-center justify-center">
-        <h1 class="text-2xl font-light text-gray-2 my-4 text-center">
-          No device Information
-        </h1>
-      </div>
-    </div>
-    """
-  end
+  @spec render(%{:view => :wireguard_peer_config, optional(any()) => any()}) ::
+          Phoenix.LiveView.Rendered.t()
+  def render(%{view: :wireguard_peer_config, selection: selection} = assigns) do
+    config_text = Map.get(selection || %{}, :config_text, "")
+    filename = Map.get(selection || %{}, :filename, "wg0.conf")
+    peer_name = Map.get(selection || %{}, :peer_name, "Peer")
 
-  @spec render(%{:view => :dns_settings, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
-  def render(%{view: :dns_settings} = assigns) do
-    dns_state = Tunneld.Servers.Dns.get_state()
-    providers = Tunneld.Servers.Dns.providers()
-    current_provider = dns_state["provider"]
-    status = dns_state["status"]
-    applying? = status == :applying
+    qr_svg =
+      if config_text != "" do
+        config_text
+        |> EQRCode.encode()
+        |> EQRCode.svg(width: 192)
+      else
+        nil
+      end
+
+    download_url =
+      if config_text != "" do
+        "data:application/octet-stream;base64," <> Base.encode64(config_text)
+      else
+        "#"
+      end
 
     assigns =
       assigns
-      |> assign(:dns_state, dns_state)
-      |> assign(:providers, providers)
-      |> assign(:current_provider, current_provider)
-      |> assign(:applying, applying?)
-      |> assign(:status, status)
+      |> assign(:config_text, config_text)
+      |> assign(:filename, filename)
+      |> assign(:peer_name, peer_name)
+      |> assign(:qr_svg, qr_svg)
+      |> assign(:download_url, download_url)
 
     ~H"""
     <div class="bg-secondary p-4 h-full space-y-6">
       <%= sidebar_header(assigns, %{
-        header: "DNS Provider",
-        body: "Select the encrypted DNS resolver for your gateway. Changing providers will briefly pause DNS resolution while the service restarts."
+        header: "Peer Config: #{@peer_name}",
+        body: "Scan the QR code or download the config file to set up your device."
       }) %>
 
-      <div class="bg-primary rounded-lg p-3 space-y-3">
-        <div class="text-xs text-gray-1 mb-2">
-          <span class="font-semibold">Current:</span>
-          <span class={"ml-1 #{if @applying, do: "text-yellow-500", else: "text-green"}"}>
-            <%= if @applying do %>
-              Applying...
-            <% else %>
-              <%= Tunneld.Servers.Dns.label_for(@current_provider) %>
-            <% end %>
-          </span>
+      <div :if={@qr_svg} class="flex justify-center">
+        <%= raw(@qr_svg) %>
+      </div>
+
+      <div class="bg-primary rounded-md p-3">
+        <div class="text-[10px] text-gray-400 mb-1">Config</div>
+        <pre class="text-[10px] text-gray-300 overflow-x-auto whitespace-pre-wrap font-mono break-all"><%= @config_text %></pre>
+      </div>
+
+      <a
+        href={@download_url}
+        download={@filename}
+        class="flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs py-2 px-4 rounded transition-colors duration-150"
+      >
+        <.icon class="w-4 h-4" name="hero-arrow-down-tray" />
+        Download .conf file
+      </a>
+    </div>
+    """
+  end
+
+  @spec render(%{:view => :wireguard, optional(any()) => any()}) ::
+          Phoenix.LiveView.Rendered.t()
+  def render(%{view: :wireguard} = assigns) do
+    wg_state = if _pid = GenServer.whereis(Tunneld.Servers.Wireguard) do
+      Tunneld.Servers.Wireguard.get_state()
+    else
+      %{"enabled" => false, "peers" => %{}}
+    end
+
+    assigns =
+      assigns
+      |> assign(:wg_state, wg_state)
+      |> assign(:enabled, wg_state["enabled"] || false)
+      |> assign(:public_key, wg_state["public_key"])
+      |> assign(:listen_port, wg_state["listen_port"])
+      |> assign(:endpoint, wg_state["endpoint"])
+      |> assign(:subnet, wg_state["subnet"])
+      |> assign(:peers, wg_state["peers"] || %{})
+
+    ~H"""
+    <div class="bg-secondary p-4 h-full space-y-6">
+      <%= sidebar_header(assigns, %{
+        header: "VPN Server",
+        body: "Configure WireGuard VPN server and manage peer connections."
+      }) %>
+
+      <div class="flex flex-row gap-1 justify-end my-2">
+        <div
+          phx-click="toggle_vpn"
+          phx-value-enabled={(!@enabled) |> to_string()}
+          phx-click-loading="opacity-50 cursor-wait"
+          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+        >
+          <.icon class="w-4 h-4" name={if @enabled, do: "hero-lock-open", else: "hero-lock-closed"} />
+          <div class="truncate text-xs text-gray-1">
+            <%= if @enabled, do: "Disable", else: "Enable" %>
+          </div>
         </div>
       </div>
 
-      <div class="grid grid-cols-2 gap-2">
-        <%= for {id, label} <- @providers do %>
-          <button
-            phx-click="modal_open"
-            phx-value-modal_title={"Change DNS Provider to #{label}?"}
-            phx-value-modal_body={Jason.encode!(%{
-              "type" => "string",
-              "data" => "Your internet will briefly pause while the DNS service restarts. This usually takes a few seconds."
-            })}
-            phx-value-modal_actions={Jason.encode!(%{
-              "title" => "Change Provider",
-              "payload" => %{
-                "type" => "set_dns_provider",
-                "data" => %{"provider" => id}
-              }
-            })}
-            disabled={@applying or id == @current_provider}
-            class={[
-              "flex flex-col items-center justify-center rounded-xl border-2 transition-all p-2 text-center",
-              if(id == @current_provider,
-                do: "bg-purple border-purple text-white shadow-lg shadow-purple/20",
-                else: "bg-primary border-transparent text-gray-1 hover:border-purple/40"
-              ),
-              if(@applying or id == @current_provider, do: "opacity-50 cursor-not-allowed", else: "cursor-pointer")
-            ]}
-          >
-            <span class="font-bold text-sm"><%= label %></span>
-          </button>
-        <% end %>
-      </div>
+      <div :if={@enabled} class="space-y-3">
+        <div class="bg-primary rounded-lg p-3 space-y-2 text-xs text-gray-300">
+          <div class="flex items-center justify-between">
+            <span class="text-gray-400 font-semibold">Public Key</span>
+            <span class="font-mono text-[10px] break-all max-w-[200px]" title={@public_key}>
+              <%= if @public_key, do: String.slice(@public_key, 0, 20) <> "...", else: "—" %>
+            </span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-gray-400 font-semibold">Listen Port</span>
+            <span><%= @listen_port || "—" %></span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-gray-400 font-semibold">Endpoint</span>
+            <span><%= @endpoint || "—" %></span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-gray-400 font-semibold">Subnet</span>
+            <span><%= @subnet || "—" %></span>
+          </div>
+        </div>
 
-      <div :if={@status == :failed} class="bg-red bg-opacity-20 p-3 rounded-md">
-        <p class="text-red text-sm">Provider change failed. The previous config has been restored.</p>
+        <div class="py-2">
+          <h2 class="text-sm font-semibold">Peers</h2>
+        </div>
+
+        <div :if={Enum.empty?(@peers)} class="text-xs text-gray-400 text-center py-4">
+          No peers configured
+        </div>
+
+        <div :if={!Enum.empty?(@peers)} class="space-y-2">
+          <%= for {_id, peer} <- @peers do %>
+            <div
+              phx-click="show_peer_config"
+              phx-value-peer_id={peer["id"]}
+              phx-value-peer_name={peer["name"]}
+              class="bg-primary rounded-lg p-3 cursor-pointer hover:bg-primary/80 transition-all"
+            >
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="text-xs font-semibold text-gray-1"><%= peer["name"] %></div>
+                  <div class="text-[10px] text-gray-400 font-mono"><%= peer["ip"] %></div>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span class={
+                    "px-2 py-0.5 rounded-full text-[10px] font-medium " <>
+                    if peer["full_tunnel"], do: "bg-green-500/20 text-green-400", else: "bg-blue-500/20 text-blue-400"
+                  }>
+                    <%= if peer["full_tunnel"], do: "Full Tunnel", else: "Split Tunnel" %>
+                  </span>
+                  <div
+                    phx-click="revoke_wireguard_peer"
+                    phx-value-peer_id={peer["id"]}
+                    phx-value-peer_name={peer["name"]}
+                    class="p-1 rounded hover:bg-red-500/20 cursor-pointer transition-colors duration-150"
+                    title="Revoke peer"
+                  >
+                    <.icon class="w-4 h-4 text-red-400" name="hero-trash" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          <% end %>
+        </div>
+
+        <div
+          phx-click="modal_open"
+          phx-value-modal_title="Add VPN Peer"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "schema",
+              "data" => Tunneld.Schema.Wireguard.data(:add_peer),
+              "default_values" => %{
+                "name" => "",
+                "full_tunnel" => false
+              },
+              "action" => "add_wireguard_peer"
+            })
+          }
+          phx-click-loading="opacity-50 cursor-wait"
+          class="flex items-center justify-center gap-1 bg-purple hover:bg-purple/80 p-2 cursor-pointer rounded-md transition-all duration-150"
+        >
+          <.icon class="w-4 h-4" name="hero-plus" />
+          <div class="truncate text-xs">Add Peer</div>
+        </div>
       </div>
     </div>
     """

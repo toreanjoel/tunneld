@@ -17,7 +17,6 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
     Blocklist,
     Auth,
     Sqm,
-    Dns,
     Wireguard
   }
 
@@ -46,10 +45,6 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
 
       "scan_for_wireless_networks" ->
         send(parent, :scan_for_wireless_networks)
-
-      # WebAuthn
-      "configure_web_authn" ->
-        send(parent, :configure_web_authn)
 
       # Zrok control plane
       "configure_disable_control_plane" ->
@@ -120,10 +115,6 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       "tunneld_settings" ->
         Resources.update_share(data, :tunneld)
 
-      # Local SSL toggle
-      "toggle_local_ssl" ->
-        Resources.toggle_local_ssl(data["resource_id"], data["enabled"])
-
       # Services
       "restart_service" ->
         service = Services.find_service(data["id"])
@@ -135,10 +126,6 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       # SQM
       "set_sqm" ->
         Sqm.set_sqm(data)
-
-      # DNS Provider
-      "set_dns_provider" ->
-        Dns.set_provider(data["provider"])
 
       # WireGuard VPN
       "enable_wireguard" ->

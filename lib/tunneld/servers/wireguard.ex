@@ -45,6 +45,9 @@ defmodule Tunneld.Servers.Wireguard do
   @doc "Return the current WireGuard server state."
   def get_state, do: GenServer.call(__MODULE__, :get_state)
 
+  @doc "Get the cached config text for a peer. Returns nil if not cached."
+  def get_peer_config(peer_id), do: GenServer.call(__MODULE__, {:get_peer_config, peer_id})
+
   @doc "Reset GenServer to initial state (test helper)."
   def reset, do: GenServer.call(__MODULE__, :reset)
 
@@ -88,6 +91,7 @@ defmodule Tunneld.Servers.Wireguard do
           # Restore state from persisted data, add runtime-only fields
           data
           |> Map.put("mock?", mock?())
+          |> Map.put_new("peer_configs", %{})
           |> maybe_reenable()
 
         _ ->
@@ -99,6 +103,12 @@ defmodule Tunneld.Servers.Wireguard do
 
   @impl true
   def handle_call(:get_state, _from, state), do: {:reply, state, state}
+
+  @impl true
+  def handle_call({:get_peer_config, peer_id}, _from, state) do
+    config = get_in(state, ["peer_configs", peer_id])
+    {:reply, config, state}
+  end
 
   @impl true
   def handle_call(:reset, _from, _state), do: {:reply, :ok, initial_state()}
@@ -198,18 +208,22 @@ defmodule Tunneld.Servers.Wireguard do
 
         case add_peer_to_interface(public_key, ip) do
           :ok ->
+            # Build state first so we can generate config
             new_state =
               state
               |> Map.put("peers", Map.put(state["peers"], peer_id, peer))
               |> Map.put("next_ip", state["next_ip"] + 1)
 
-            persist(new_state)
-            broadcast(new_state)
-            Logger.info("WireGuard peer added: #{name} (#{ip})")
-
             # Build full peer with private key for config generation
             full_peer = Map.put(peer, "private_key", private_key)
             config = ConfigGen.peer_conf(full_peer, new_state)
+
+            # Cache config for QR re-view (runtime only, not persisted)
+            new_state = put_in(new_state, ["peer_configs", peer_id], config)
+
+            persist(new_state)
+            broadcast(new_state)
+            Logger.info("WireGuard peer added: #{name} (#{ip})")
 
             {:reply, {:ok, full_peer, config}, new_state}
 
@@ -232,7 +246,10 @@ defmodule Tunneld.Servers.Wireguard do
       peer ->
         case remove_peer_from_interface(peer["public_key"]) do
           :ok ->
-            new_state = Map.put(state, "peers", Map.delete(state["peers"], peer_id))
+            new_state =
+            state
+            |> Map.put("peers", Map.delete(state["peers"], peer_id))
+            |> update_in(["peer_configs"], &Map.delete(&1, peer_id))
             persist(new_state)
             broadcast(new_state)
             Logger.info("WireGuard peer removed: #{peer["name"]}")
@@ -256,14 +273,17 @@ defmodule Tunneld.Servers.Wireguard do
           updated_peer = Map.put(peer, "public_key", new_public_key)
 
           new_state =
-            Map.put(state, "peers", Map.put(state["peers"], peer_id, updated_peer))
+            state
+            |> Map.put("peers", Map.put(state["peers"], peer_id, updated_peer))
+
+          full_peer = Map.put(updated_peer, "private_key", new_private_key)
+          config = ConfigGen.peer_conf(full_peer, new_state)
+
+          new_state = put_in(new_state, ["peer_configs", peer_id], config)
 
           persist(new_state)
           broadcast(new_state)
           Logger.info("WireGuard peer config regenerated: #{peer["name"]}")
-
-          full_peer = Map.put(updated_peer, "private_key", new_private_key)
-          config = ConfigGen.peer_conf(full_peer, new_state)
 
           {:reply, {:ok, full_peer, config}, new_state}
         else
@@ -568,7 +588,7 @@ defmodule Tunneld.Servers.Wireguard do
   defp persist(state) do
     # Strip runtime-only fields before writing to disk
     state
-    |> Map.drop(["mock?"])
+    |> Map.drop(["mock?", "peer_configs"])
     |> write_file()
   end
 
@@ -679,6 +699,7 @@ defmodule Tunneld.Servers.Wireguard do
       "endpoint" => nil,
       "subnet" => nil,
       "peers" => %{},
+      "peer_configs" => %{},
       "next_ip" => 2,
       "mock?" => mock?()
     }

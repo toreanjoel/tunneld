@@ -5,10 +5,6 @@ defmodule TunneldWeb.Live.Components.Devices do
   use TunneldWeb, :live_component
 
   def mount(socket) do
-    if connected?(socket) do
-      Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:devices")
-    end
-
     {:ok, socket |> assign(loading: true)}
   end
 

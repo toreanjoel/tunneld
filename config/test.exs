@@ -7,14 +7,7 @@ config :tunneld, :fs,
   auth: "auth.json",
   resources: "resources.json",
   sqm: "sqm.json",
-  wireguard: "wireguard.json",
-  dns_file: Path.expand("../data/", __DIR__) <> "/dnsmasq_test.conf",
-  dnscrypt_toml: Path.expand("../data/dnscrypt-proxy.toml", __DIR__)
-
-config :tunneld, :certs,
-  cert_dir: Path.expand("../data/", __DIR__) <> "/certs",
-  ca_dir: Path.expand("../data/", __DIR__) <> "/ca",
-  ca_file: "rootCA.pem"
+  wireguard: "wireguard.json"
 
 config :tunneld, :network,
   gateway: "192.168.1.1",
@@ -28,9 +21,6 @@ config :tunneld, TunneldWeb.Endpoint,
   http: [ip: {127, 0, 0, 1}, port: 4002],
   secret_key_base: "9qgEbV9vpL0KYgml27yPiLjbv4G4ar4oBR7un+hoAWAzygjHN6nFMUVSZ/KHvmMI",
   server: false
-
-# In test we don't send emails.
-config :tunneld, Tunneld.Mailer, adapter: Swoosh.Adapters.Test
 
 # Print only warnings and errors during test
 config :logger, level: :warning
