@@ -67,7 +67,7 @@ defmodule TunneldWeb.Live.Components.SystemResources do
 
       <div class="flex items-center justify-center">
         <div class="grid grid-cols-2 gap-2">
-          <%= for {label, percent, available?} <- gauges(@resources) do %>
+          <%= for {label, percent, available?, unit} <- gauges(@resources) do %>
             <div class={"bg-primary relative w-full max-w-[150px] md:max-w-[180px] rounded-lg #{if not available?, do: "opacity-30 pointer-events-none", else: ""}"}>
               <svg class="w-full h-full" viewBox="0 0 170 170">
                 <!-- Background circle -->
@@ -95,7 +95,7 @@ defmodule TunneldWeb.Live.Components.SystemResources do
               </svg>
               <!-- Percentage and label -->
               <div class="absolute inset-0 flex flex-col items-center justify-center text-xs sm:text-sm text-white">
-                <%= if available?, do: "#{percent}%", else: "—" %>
+                <%= if available?, do: "#{percent}#{unit}", else: "—" %>
                 <div class="text-[10px]"><%= label %></div>
               </div>
             </div>
@@ -116,10 +116,10 @@ defmodule TunneldWeb.Live.Components.SystemResources do
     temp_percent = if temp, do: min(round(temp), 100), else: nil
 
     [
-      {"CPU", cpu || 0, not is_nil(cpu)},
-      {"MEM", mem || 0, not is_nil(mem)},
-      {"STORAGE", storage || 0, not is_nil(storage)},
-      {"TEMP", temp_percent || 0, not is_nil(temp)}
+      {"CPU", cpu || 0, not is_nil(cpu), "%"},
+      {"MEM", mem || 0, not is_nil(mem), "%"},
+      {"STORAGE", storage || 0, not is_nil(storage), "%"},
+      {"TEMP", temp_percent || 0, not is_nil(temp), "°C"}
     ]
   end
 
