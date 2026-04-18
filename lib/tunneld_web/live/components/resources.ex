@@ -115,10 +115,8 @@ defmodule TunneldWeb.Live.Components.Resources do
                       <%= kind %>
                     </span>
                     <%= if kind == "host" do %>
-                      <% pool_size = length(resource.pool || []) %>
-                      <span class="px-2 py-0.5 rounded-full bg-white/10 text-gray-200 text-[10px] font-medium">
-                        pool: <%= pool_size %>
-                      </span>
+                      <% health = Map.get(resource, :health) || Map.get(resource, "health") || %{} %>
+                      <span class={"w-[13px] h-[13px] rounded-full inline-block #{pool_health_dot(health[:status])}"}></span>
                     <% end %>
                   </div>
                 </div>
@@ -134,4 +132,9 @@ defmodule TunneldWeb.Live.Components.Resources do
   defp kind_icon("access"), do: "hero-arrows-right-left"
   defp kind_icon("host"), do: "hero-server-stack"
   defp kind_icon(_), do: "hero-question-mark-circle"
+
+  defp pool_health_dot(:all_up), do: "bg-green"
+  defp pool_health_dot(:none), do: "bg-red"
+  defp pool_health_dot(:partial), do: "bg-yellow"
+  defp pool_health_dot(_), do: "bg-gray-500"
 end

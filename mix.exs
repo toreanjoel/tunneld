@@ -4,7 +4,7 @@ defmodule Tunneld.MixProject do
   def project do
     [
       app: :tunneld,
-      version: "0.14.4",
+      version: "0.14.5",
       elixir: "~> 1.18",
       elixirc_paths: elixirc_paths(Mix.env()),
       start_permanent: Mix.env() == :prod,

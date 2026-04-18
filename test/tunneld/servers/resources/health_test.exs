@@ -4,16 +4,16 @@ defmodule Tunneld.Servers.ResourcesTest.HealthTest do
   alias Tunneld.Servers.Resources
 
   describe "pool_health/2 in mock mode" do
-    test "returns mock status with pool count" do
+    test "returns partial status with one down entry" do
       result = Resources.pool_health(["192.168.1.1:8080", "192.168.1.2:8080"], true)
-      assert result.status == :mock
+      assert result.status == :partial
       assert result.total == 2
-      assert result.up == nil
+      assert result.up == 1
     end
 
-    test "returns mock status for empty pool" do
+    test "returns empty for empty pool in mock mode" do
       result = Resources.pool_health([], true)
-      assert result.status == :mock
+      assert result.status == :all_up
       assert result.total == 0
     end
   end

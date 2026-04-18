@@ -214,6 +214,7 @@ defmodule Tunneld.Servers.Resources do
               port: s["port"],
               status: Map.get(s, "status", false),
               pool: pool,
+              pool_details: pool_health_details(pool, mock?()),
               health: pool_health(pool, mock?()),
               tunneld: s["tunneld"],
               kind: s["kind"]
@@ -482,6 +483,7 @@ defmodule Tunneld.Servers.Resources do
                       port: s["port"],
                       status: Map.get(s, "status", false),
                       pool: pool,
+                      pool_details: pool_health_details(pool, mock?()),
                       health: health,
                       tunneld: s["tunneld"],
                       kind: s["kind"]
@@ -944,6 +946,7 @@ defmodule Tunneld.Servers.Resources do
         description: s["description"],
         port: port,
         pool: pool,
+        pool_details: pool_health_details(pool, mock?()),
         status: status_bool,
         health: health,
         tunneld: s["tunneld"],
@@ -1082,7 +1085,10 @@ defmodule Tunneld.Servers.Resources do
 
   @doc "Check the health of a pool of backend servers."
   def pool_health(pool, true) when is_list(pool) do
-    %{status: :mock, total: length(pool), up: nil}
+    total = length(pool)
+    up = max(total - 1, 0)
+    status = if up == total, do: :all_up, else: :partial
+    %{status: status, total: total, up: up}
   end
 
   def pool_health(pool, false) when is_list(pool) do
@@ -1123,6 +1129,34 @@ defmodule Tunneld.Servers.Resources do
   end
 
   def pool_health(_, _), do: %{status: :empty, total: 0, up: 0}
+
+  @doc "Returns per-entry health for each pool backend. Each entry is {address, up?}."
+  def pool_health_details(pool, true) when is_list(pool) do
+    pool
+    |> Enum.with_index()
+    |> Enum.map(fn {entry, i} -> {entry, i != 0} end)
+  end
+
+  def pool_health_details(pool, false) when is_list(pool) do
+    pool
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.map(fn entry ->
+      case String.split(entry, ":", parts: 2) do
+        [ip, port_str] ->
+          up = case Integer.parse(port_str) do
+            {port, _} -> backend_up?(ip, port)
+            _ -> false
+          end
+          {entry, up}
+
+        _ ->
+          {entry, false}
+      end
+    end)
+  end
+
+  def pool_health_details(_, _), do: []
 
   defp backend_up?(ip, port) do
     case :gen_tcp.connect(String.to_charlist(ip), port, [:binary, active: false], 1500) do

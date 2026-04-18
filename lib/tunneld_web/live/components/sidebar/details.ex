@@ -183,12 +183,10 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             <div class="text-sm truncate">
               <span class="font-bold">Name:</span> <%= @data.name %>
             </div>
-            <div class="text-sm truncate">
-              <span class="font-bold">Pool size:</span> <%= length(@data.pool || []) %>
-            </div>
             <% health = Map.get(@data, :health) || Map.get(@data, "health") || %{} %>
             <div class="text-sm truncate">
-              <span class="font-bold">Pool health:</span>
+              <span class="font-bold">Health:</span>
+              <span class={"ml-1 w-[13px] h-[13px] rounded-full inline-block align-middle #{pool_health_dot(health[:status])}"}></span>
               <span class="ml-1 capitalize"><%= human_health(health[:status]) %></span>
               <%= if is_number(health[:up]) and is_number(health[:total]) do %>
                 <span class="ml-1 text-xs text-gray-300">(<%= health[:up] %>/<%= health[:total] %> up)</span>
@@ -196,51 +194,40 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             </div>
           </div>
 
-          <% gateway = Application.get_env(:tunneld, :network, []) |> Keyword.get(:gateway) %>
+          <% pool_details = Map.get(@data, :pool_details, []) %>
 
           <%= if @data.kind == "host" and @has_data do %>
             <div class="mt-3 border-t border-gray-700 pt-3">
-              <h2 class="text-sm font-semibold mb-2">Local Access</h2>
-              <div class="bg-primary rounded-lg p-2">
-                <div class="flex items-center gap-2 text-xs">
-                  <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4 text-green shrink-0" />
-                  <a
-                    href={"http://#{gateway}:#{@data.port}"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-green hover:text-green-300 underline break-all"
-                  >
-                    <%= gateway %>:<%= @data.port %>
-                  </a>
-                </div>
-                <div :if={length(@data.pool || []) > 1} class="mt-2">
-                  <span class="text-[10px] text-gray-400">Pool backends</span>
-                  <%= for entry <- (@data.pool || []) do %>
-                    <div class="flex items-center gap-1 text-[10px] text-gray-300 ml-2">
-                      <span class="w-1.5 h-1.5 rounded-full bg-green inline-block"></span>
-                      <%= entry %>
+              <h2 class="text-sm font-semibold mb-2">Pool Backends</h2>
+              <div class="bg-primary rounded-lg p-2 space-y-1.5">
+                <%= if Enum.empty?(pool_details) do %>
+                  <div class="text-xs text-gray-400">No backends configured</div>
+                <% else %>
+                  <%= for {entry, up?} <- pool_details do %>
+                    <div class="flex items-center gap-2">
+                      <span class={"w-2 h-2 rounded-full inline-block #{if up?, do: "bg-green", else: "bg-yellow"}"}></span>
+                      <span class="font-mono text-xs text-gray-300"><%= entry %></span>
                     </div>
                   <% end %>
-                </div>
+                <% end %>
               </div>
             </div>
           <% end %>
 
           <%= if @data.kind == "access" and @has_data do %>
             <div class="mt-3 border-t border-gray-700 pt-3">
-              <h2 class="text-sm font-semibold mb-2">Local Access</h2>
-              <div class="bg-primary rounded-lg p-2">
-                <div class="flex items-center gap-2 text-xs">
-                  <.icon name="hero-arrow-top-right-on-square" class="w-4 h-4 text-green shrink-0" />
-                  <a
-                    href={"http://#{gateway}:#{@data.port}"}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-green hover:text-green-300 underline break-all"
-                  >
-                    <%= gateway %>:<%= @data.port %>
-                  </a>
-                </div>
+              <h2 class="text-sm font-semibold mb-2">Pool Backends</h2>
+              <div class="bg-primary rounded-lg p-2 space-y-1.5">
+                <%= if Enum.empty?(pool_details) do %>
+                  <div class="text-xs text-gray-400">No backends configured</div>
+                <% else %>
+                  <%= for {entry, up?} <- pool_details do %>
+                    <div class="flex items-center gap-2">
+                      <span class={"w-2 h-2 rounded-full inline-block #{if up?, do: "bg-green", else: "bg-yellow"}"}></span>
+                      <span class="font-mono text-xs text-gray-300"><%= entry %></span>
+                    </div>
+                  <% end %>
+                <% end %>
               </div>
             </div>
           <% end %>
@@ -1091,6 +1078,11 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   defp human_health(:empty), do: "no backends"
   defp human_health(:not_applicable), do: "n/a"
   defp human_health(_), do: "unknown"
+
+  defp pool_health_dot(:all_up), do: "bg-green"
+  defp pool_health_dot(:none), do: "bg-red"
+  defp pool_health_dot(:partial), do: "bg-yellow"
+  defp pool_health_dot(_), do: "bg-gray-500"
 
   defp human_health_text(false, _resource), do: "disabled"
 
