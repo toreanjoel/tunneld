@@ -174,9 +174,6 @@ defmodule TunneldWeb.Live.Dashboard do
   def main(assigns) do
     ~H"""
     <div class="flex-1 flex flex-col p-3 md:p-5 system-scroll">
-      <%!-- Hooks to mount on startup --%>
-      <div id="clipboard-hook" phx-hook="CopyToClipboard"></div>
-
       <div class="flex flex-row items-center gap-2">
         <!-- Logout -->
         <%= nav(assigns) %>
@@ -445,7 +442,7 @@ defmodule TunneldWeb.Live.Dashboard do
         %{id: "devices", module: TunneldWeb.Live.Components.Devices, data: data} = message,
         socket
       ) do
-    send_update(message.module, id: message.id, data: message.data)
+    send_update(message.module, id: message.id, data: message.data, obfuscated: socket.assigns.obfuscated)
 
     devices = Map.get(data, :devices, [])
 
@@ -456,7 +453,7 @@ defmodule TunneldWeb.Live.Dashboard do
         %{id: "resources", module: TunneldWeb.Live.Components.Resources, data: data} = message,
         socket
       ) do
-    send_update(message.module, id: message.id, data: message.data)
+    send_update(message.module, id: message.id, data: message.data, obfuscated: socket.assigns.obfuscated)
 
     socket =
       socket
@@ -476,7 +473,7 @@ defmodule TunneldWeb.Live.Dashboard do
 
   def handle_info(%{id: id, module: module, data: data}, socket) do
     if not is_nil(id) do
-      send_update(module, id: id, data: data)
+      send_update(module, id: id, data: data, obfuscated: socket.assigns.obfuscated)
     end
 
     {:noreply, socket}

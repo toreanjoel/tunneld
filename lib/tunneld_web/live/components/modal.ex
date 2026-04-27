@@ -18,7 +18,7 @@ defmodule TunneldWeb.Live.Components.Modal do
   @impl true
   def render(assigns) do
     ~H"""
-    <div>
+    <div id="modal-root" phx-hook="CopyToClipboard">
       <%!-- Render the different modal content --%>
       <%= content_type(assigns, @type) %>
     </div>
