@@ -13,7 +13,15 @@ defmodule TunneldWeb.Live.Components.Services do
   end
 
   def update(assigns, socket) do
-    {:ok, socket |> assign(data: Map.get(assigns, :data, %{}))}
+    obfuscated = Map.get(assigns, :obfuscated, false)
+
+    socket =
+      socket
+      |> assign_new(:obfuscated, fn -> false end)
+      |> assign(data: Map.get(assigns, :data, %{}))
+      |> assign(:obfuscated, obfuscated)
+
+    {:ok, socket}
   end
 
   @doc """

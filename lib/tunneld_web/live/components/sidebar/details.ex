@@ -13,13 +13,16 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     data = Map.get(assigns, :data, %{})
     selection = Map.get(assigns, :selection, socket.assigns[:selection] || nil)
     sqm = Tunneld.Servers.Sqm.get_state()
+    obfuscated = Map.get(assigns, :obfuscated, false)
 
     socket =
       socket
+      |> assign_new(:obfuscated, fn -> false end)
       |> assign(:view, view)
       |> assign(:sqm, sqm)
       |> assign(:data, data)
       |> assign(:selection, selection)
+      |> assign(:obfuscated, obfuscated)
 
     {:ok, socket}
   end
@@ -91,7 +94,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     <div class="bg-secondary p-4 h-full space-y-6">
       <div :if={@has_data}>
         <%= sidebar_header(assigns, %{
-          header: @data.name,
+          header: mask(@obfuscated, @data.name),
           body:
             @data.description ||
               "A reference to a running service accessible from this device over the network. This tracks availability and allows exposure to the internet"
@@ -181,7 +184,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         <div :if={@has_data}>
           <div class="flex flex-col p-3 mb-2 bg-primary rounded-lg font-light">
             <div class="text-sm truncate">
-              <span class="font-bold">Name:</span> <%= @data.name %>
+              <span class="font-bold">Name:</span>
+              <%= mask(@obfuscated, @data.name) %>
             </div>
             <% health = Map.get(@data, :health) || Map.get(@data, "health") || %{} %>
             <div class="text-sm truncate">
@@ -206,7 +210,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                   <%= for {entry, up?} <- pool_details do %>
                     <div class="flex items-center gap-2">
                       <span class={"w-2 h-2 rounded-full inline-block #{if up?, do: "bg-green", else: "bg-yellow"}"}></span>
-                      <span class="font-mono text-xs text-gray-300"><%= entry %></span>
+                      <span class="font-mono text-xs text-gray-300"><%= mask(@obfuscated, entry) %></span>
                     </div>
                   <% end %>
                 <% end %>
@@ -224,7 +228,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                   <%= for {entry, up?} <- pool_details do %>
                     <div class="flex items-center gap-2">
                       <span class={"w-2 h-2 rounded-full inline-block #{if up?, do: "bg-green", else: "bg-yellow"}"}></span>
-                      <span class="font-mono text-xs text-gray-300"><%= entry %></span>
+                      <span class="font-mono text-xs text-gray-300"><%= mask(@obfuscated, entry) %></span>
                     </div>
                   <% end %>
                 <% end %>
@@ -340,7 +344,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                       </div>
                       <%= if has_token? do %>
                         <div class="mt-1 bg-gray-800 rounded px-2 py-1">
-                          <code class="text-xs text-green-400 break-all"><%= reserved %></code>
+                          <code class="text-xs text-green-400 break-all"><%= mask(@obfuscated, reserved) %></code>
                         </div>
                         <p class="text-[10px] text-gray-400 mt-1">Use this token to access this resource from another device</p>
                       <% end %>
@@ -900,7 +904,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
       <div class="bg-primary rounded-md p-3">
         <div class="text-[10px] text-gray-400 mb-1">Config</div>
-        <pre class="text-[10px] text-gray-300 overflow-x-auto whitespace-pre-wrap font-mono break-all"><%= @config_text %></pre>
+        <pre class="text-[10px] text-gray-300 overflow-x-auto whitespace-pre-wrap font-mono break-all"><%= mask(@obfuscated, @config_text) %></pre>
       </div>
 
       <a
@@ -960,20 +964,20 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <div class="flex items-center justify-between">
             <span class="text-gray-400 font-semibold">Public Key</span>
             <span class="font-mono text-[10px] break-all max-w-[200px]" title={@public_key}>
-              <%= if @public_key, do: String.slice(@public_key, 0, 20) <> "...", else: "—" %>
+              <%= mask(@obfuscated, (if @public_key, do: String.slice(@public_key, 0, 20) <> "...", else: "—")) %>
             </span>
           </div>
           <div class="flex items-center justify-between">
             <span class="text-gray-400 font-semibold">Listen Port</span>
-            <span><%= @listen_port || "—" %></span>
+            <span><%= mask(@obfuscated, @listen_port || "—") %></span>
           </div>
           <div class="flex items-center justify-between">
             <span class="text-gray-400 font-semibold">Endpoint</span>
-            <span><%= @endpoint || "—" %></span>
+            <span><%= mask(@obfuscated, @endpoint || "—") %></span>
           </div>
           <div class="flex items-center justify-between">
             <span class="text-gray-400 font-semibold">Subnet</span>
-            <span><%= @subnet || "—" %></span>
+            <span><%= mask(@obfuscated, @subnet || "—") %></span>
           </div>
         </div>
 
@@ -995,8 +999,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             >
               <div class="flex items-center justify-between">
                 <div>
-                  <div class="text-xs font-semibold text-gray-1"><%= peer["name"] %></div>
-                  <div class="text-[10px] text-gray-400 font-mono"><%= peer["ip"] %></div>
+                  <div class="text-xs font-semibold text-gray-1"><%= mask(@obfuscated, peer["name"]) %></div>
+                  <div class="text-[10px] text-gray-400 font-mono"><%= mask(@obfuscated, peer["ip"]) %></div>
                 </div>
                 <div class="flex items-center gap-2">
                   <span class={

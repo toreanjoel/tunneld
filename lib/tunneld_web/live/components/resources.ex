@@ -13,10 +13,13 @@ defmodule TunneldWeb.Live.Components.Resources do
   end
 
   def update(assigns, socket) do
-    # Example list of resources, each with a type and a status.
+    obfuscated = Map.get(assigns, :obfuscated, false)
+
     socket =
       socket
+      |> assign_new(:obfuscated, fn -> false end)
       |> assign(data: Map.get(assigns, :data, %{}))
+      |> assign(:obfuscated, obfuscated)
 
     {:ok, socket}
   end
@@ -121,7 +124,7 @@ defmodule TunneldWeb.Live.Components.Resources do
                 <div class="flex items-center gap-2 grow">
                   <.icon class="w-5 h-5 shrink-0" name={kind_icon(kind)} />
                   <div class="grow">
-                    <div class="text-xs font-semibold truncate"><%= resource.name %></div>
+                    <div class="text-xs font-semibold truncate"><%= mask(@obfuscated, resource.name) %></div>
                   </div>
                 </div>
 

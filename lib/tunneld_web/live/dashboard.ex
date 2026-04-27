@@ -92,6 +92,7 @@ defmodule TunneldWeb.Live.Dashboard do
       |> assign(:pending_actions, %{})
       |> assign(:wireguard_state, wireguard_state())
       |> assign(:settings_menu_open, false)
+      |> assign(:obfuscated, false)
 
     {:ok, socket}
   end
@@ -159,6 +160,7 @@ defmodule TunneldWeb.Live.Dashboard do
           view={@sidebar.view}
           uri_info={@uri_info}
           selection={@sidebar.selection}
+          obfuscated={@obfuscated}
         />
       </div>
     </div>
@@ -202,6 +204,19 @@ defmodule TunneldWeb.Live.Dashboard do
           >
             <.icon name="hero-wifi" class="h-4 w-4" />
             <span class="hidden sm:inline">Internet Access</span>
+          </div>
+
+          <%!-- Obfuscation Toggle --%>
+          <div
+            id="obfuscation-toggle"
+            phx-hook="ObfuscationToggle"
+            class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1 hover:opacity-80 transition-all"
+            title={if @obfuscated, do: "Show sensitive data", else: "Hide sensitive data"}
+          >
+            <.icon
+              name={if @obfuscated, do: "hero-eye-slash", else: "hero-eye"}
+              class="h-4 w-4"
+            />
           </div>
 
           <%!-- Settings Menu --%>
@@ -248,8 +263,8 @@ defmodule TunneldWeb.Live.Dashboard do
         <div class="flex flex-col md:flex-row w-full gap-2">
           <div class="flex-1"><.live_component id="system_resources" module={SystemResources} /></div>
           <div class="flex-1 flex flex-col gap-4">
-            <.live_component id="services" module={Services} />
-            <.live_component id="wireguard_server" module={WireguardServer} data={@wireguard_state} />
+            <.live_component id="services" module={Services} obfuscated={@obfuscated} />
+            <.live_component id="wireguard_server" module={WireguardServer} data={@wireguard_state} obfuscated={@obfuscated} />
           </div>
         </div>
 
@@ -259,11 +274,11 @@ defmodule TunneldWeb.Live.Dashboard do
         <%!-- Resources and Devices --%>
         <div class="mt-4 md:mt-6">
           <div class="min-h-[150px] md:min-h-[200px]">
-            <.live_component id="resources" module={Resources} />
+            <.live_component id="resources" module={Resources} obfuscated={@obfuscated} />
           </div>
 
           <div class="min-h-[150px] md:min-h-[200px]">
-            <.live_component id="devices" module={Devices} />
+            <.live_component id="devices" module={Devices} obfuscated={@obfuscated} />
           </div>
         </div>
       </div>
@@ -306,6 +321,11 @@ defmodule TunneldWeb.Live.Dashboard do
     })
 
     {:noreply, socket |> assign(:modal, modal_data) |> assign(:settings_menu_open, false)}
+  end
+
+  def handle_event("toggle_obfuscation", %{"obfuscated" => obfuscated}, socket) do
+    obfuscated = obfuscated in ["true", true]
+    {:noreply, assign(socket, :obfuscated, obfuscated)}
   end
 
   def handle_event("toggle_settings_menu", _params, socket) do
@@ -534,6 +554,22 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, socket}
   end
 
+  def handle_info({:action_done, ref, action, _result}, socket)
+      when action in ["add_device_tag", "remove_device_tag"] do
+    pending = Map.get(socket.assigns.pending_actions, ref, %{})
+    devices = DevicesServer.fetch_devices()
+
+    send_update(Devices, id: "devices", data: %{count: length(devices), devices: devices})
+
+    socket =
+      socket
+      |> assign(:pending_actions, Map.delete(socket.assigns.pending_actions, ref))
+      |> assign(:devices, devices)
+      |> maybe_close_modal_after_success(pending)
+
+    {:noreply, socket}
+  end
+
   def handle_info({:action_done, ref, _action, _result}, socket) do
     pending = Map.get(socket.assigns.pending_actions, ref, %{})
 
@@ -712,6 +748,8 @@ defmodule TunneldWeb.Live.Dashboard do
       "revoke_release_ip" -> "Releasing device IP..."
       "allow_device_expose" -> "Enabling Quick Expose..."
       "revoke_device_expose" -> "Revoking Quick Expose..."
+      "add_device_tag" -> "Adding tag..."
+      "remove_device_tag" -> "Removing tag..."
       "connect_to_wireless_network" -> "Connecting to Wi‑Fi..."
       "disconnect_from_wireless_network" -> "Disconnecting Wi‑Fi..."
       "scan_for_wireless_networks" -> "Scanning Wi‑Fi..."

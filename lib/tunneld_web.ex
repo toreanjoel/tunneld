@@ -80,6 +80,7 @@ defmodule TunneldWeb do
       # Core UI components and translation
       import TunneldWeb.CoreComponents
       import TunneldWeb.Gettext
+      import TunneldWeb.Live.Components.Obfuscation, only: [mask: 2]
 
       # Shortcut for generating JS commands
       alias Phoenix.LiveView.JS

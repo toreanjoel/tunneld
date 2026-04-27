@@ -19,4 +19,25 @@ Hooks.CopyToClipboard = {
   },
 };
 
+/**
+ * Obfuscation toggle — reads/writes localStorage and broadcasts to live view.
+ */
+Hooks.ObfuscationToggle = {
+  mounted() {
+    const stored = localStorage.getItem("tunneld_obfuscated");
+    const obfuscated = stored === "true";
+
+    if (obfuscated) {
+      this.pushEvent("toggle_obfuscation", { obfuscated: true });
+    }
+
+    this.el.addEventListener("click", () => {
+      const current = localStorage.getItem("tunneld_obfuscated") === "true";
+      const next = !current;
+      localStorage.setItem("tunneld_obfuscated", next.toString());
+      this.pushEvent("toggle_obfuscation", { obfuscated: next });
+    });
+  },
+};
+
 export default Hooks;

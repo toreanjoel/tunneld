@@ -94,6 +94,27 @@ defmodule Tunneld.Schema do
     }
   end
 
+  def data(:device_tag, %{hostname: hostname}) do
+    %{
+      "title" => "Add tag to #{hostname}",
+      "description" => "Enter a label or category for this device. Use commas to add multiple tags at once.",
+      "type" => "object",
+      "properties" => %{
+        "tag" => %{
+          "type" => "string",
+          "minLength" => 1,
+          "maxLength" => 30,
+          "description" => "Tag name (e.g. living-room, work-laptop, IoT)"
+        },
+        "mac" => %{
+          "type" => "string",
+          "ui:widget" => "hidden"
+        }
+      },
+      "required" => ["tag", "mac"]
+    }
+  end
+
   def data(:zrok, :conf_device) do
     %{
       "title" => "Enable device on an account",

@@ -41,6 +41,22 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       "revoke_device_expose" ->
         if mac = data["mac"], do: Tunneld.Servers.ExposeAllowed.revoke(mac)
 
+      "add_device_tag" ->
+        mac = data["mac"]
+        raw = data["tag"] || ""
+
+        raw
+        |> String.split(~r/,\s*/, trim: true)
+        |> Enum.each(fn t ->
+          t = String.trim(t)
+          if t != "", do: Tunneld.Servers.DeviceTags.add_tag(mac, t)
+        end)
+
+      "remove_device_tag" ->
+        mac = data["mac"]
+        tag = data["tag"]
+        if mac && tag, do: Tunneld.Servers.DeviceTags.remove_tag(mac, tag)
+
       # Wireless networking
       "connect_to_wireless_network" ->
         Wlan.connect_with_pass(data["ssid"], data["password"])

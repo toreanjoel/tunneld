@@ -13,9 +13,13 @@ defmodule TunneldWeb.Live.Components.Wireguard.Server do
   end
 
   def update(assigns, socket) do
+    obfuscated = Map.get(assigns, :obfuscated, false)
+
     socket =
       socket
+      |> assign_new(:obfuscated, fn -> false end)
       |> assign(data: Map.get(assigns, :data, %{}))
+      |> assign(:obfuscated, obfuscated)
 
     {:ok, socket}
   end
@@ -58,19 +62,19 @@ defmodule TunneldWeb.Live.Components.Wireguard.Server do
           </div>
           <div class="truncate">
             <span class="font-semibold">Endpoint:</span>
-            <span class="ml-1"><%= @endpoint || "—" %></span>
+            <span class="ml-1"><%= mask(@obfuscated, @endpoint || "—") %></span>
           </div>
           <div class="truncate">
             <span class="font-semibold">Subnet:</span>
-            <span class="ml-1"><%= @subnet || "—" %></span>
+            <span class="ml-1"><%= mask(@obfuscated, @subnet || "—") %></span>
           </div>
           <div class="truncate">
             <span class="font-semibold">Listen Port:</span>
-            <span class="ml-1"><%= @listen_port || "—" %></span>
+            <span class="ml-1"><%= mask(@obfuscated, @listen_port || "—") %></span>
           </div>
           <div class="truncate">
             <span class="font-semibold">Public Key:</span>
-            <span class="ml-1 font-mono text-[10px]"><%= if @public_key, do: String.slice(@public_key, 0, 16) <> "...", else: "—" %></span>
+            <span class="ml-1 font-mono text-[10px]"><%= mask(@obfuscated, (if @public_key, do: String.slice(@public_key, 0, 16) <> "...", else: "—")) %></span>
           </div>
           <div class="truncate">
             <span class="font-semibold">Peers:</span>
