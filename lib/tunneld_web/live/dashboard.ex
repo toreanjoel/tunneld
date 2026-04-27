@@ -710,6 +710,8 @@ defmodule TunneldWeb.Live.Dashboard do
       "restart_service" -> "Restarting service..."
       "refresh_service_logs" -> "Refreshing service logs..."
       "revoke_release_ip" -> "Releasing device IP..."
+      "allow_device_expose" -> "Enabling Quick Expose..."
+      "revoke_device_expose" -> "Revoking Quick Expose..."
       "connect_to_wireless_network" -> "Connecting to Wi‑Fi..."
       "disconnect_from_wireless_network" -> "Disconnecting Wi‑Fi..."
       "scan_for_wireless_networks" -> "Scanning Wi‑Fi..."

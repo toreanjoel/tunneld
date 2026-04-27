@@ -85,8 +85,65 @@ defmodule TunneldWeb.Live.Components.Modal do
     {:noreply, socket}
   end
 
+  @impl true
+  def handle_event("copy_code", %{"text" => text}, socket) do
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+      type: :info,
+      message: "Copied to clipboard"
+    })
+
+    {:noreply, push_event(socket, "copy_to_clipboard", %{text: text})}
+  end
+
   defp render_body(_assigns, %{"type" => "string", "data" => data}) do
     data
+  end
+
+  defp render_body(assigns, %{"type" => "code", "data" => data}) do
+    assigns = assign(assigns, :data, data)
+
+    ~H"""
+    <div class="mt-2">
+      <p class="text-xs text-gray-300 mb-2">From any allowed device on the subnet, run:</p>
+      <div class="relative">
+        <pre class="bg-black/60 p-3 pr-10 rounded text-xs font-mono text-green-400 whitespace-pre-wrap border border-gray-700"><%= @data %></pre>
+        <button
+          phx-click="copy_code"
+          phx-target={@myself}
+          phx-value-text={@data}
+          class="absolute top-2 right-2 p-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors"
+          title="Copy to clipboard"
+        >
+          <.icon name="hero-clipboard" class="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+    """
+  end
+
+  defp render_body(assigns, %{"type" => "code_blocks", "data" => blocks}) when is_list(blocks) do
+    assigns = assign(assigns, :blocks, blocks)
+
+    ~H"""
+    <div class="mt-2 space-y-3">
+      <p class="text-xs text-gray-300">From any allowed device on the subnet:</p>
+      <%= for block <- @blocks do %>
+        <div class="relative">
+          <p class="text-[10px] uppercase font-medium text-gray-400 mb-0.5"><%= block["title"] %></p>
+          <pre class="bg-black/60 p-3 pr-10 rounded text-xs font-mono text-green-400 whitespace-pre-wrap border border-gray-700"><%= block["code"] %></pre>
+          <button
+            phx-click="copy_code"
+            phx-target={@myself}
+            phx-value-text={block["code"]}
+            class="absolute top-5 right-2 p-1 rounded bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors"
+            title="Copy to clipboard"
+          >
+            <.icon name="hero-clipboard" class="h-4 w-4" />
+          </button>
+        </div>
+      <% end %>
+    </div>
+    """
   end
 
   defp render_body(

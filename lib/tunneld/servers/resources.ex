@@ -868,7 +868,7 @@ defmodule Tunneld.Servers.Resources do
              }
            }) do
       {:ok,
-       %{
+       Map.merge(tunneld, %{
          "share_names" => %{"public" => pub_name, "private" => priv_name},
          "units" => %{
            "public" => %{"id" => pub_id, "unit" => pub_unit},
@@ -876,7 +876,7 @@ defmodule Tunneld.Servers.Resources do
          },
          "enabled" => %{"public" => false, "private" => false},
          "auth" => %{"basic" => basic_auth}
-       }}
+       })}
     else
       {:error, reason} -> {:error, reason}
       other -> {:error, other}
@@ -950,7 +950,10 @@ defmodule Tunneld.Servers.Resources do
         status: status_bool,
         health: health,
         tunneld: s["tunneld"],
-        kind: kind
+        kind: kind,
+        expose_source: s["expose_source"],
+        expose_device_mac: s["expose_device_mac"],
+        expose_device_ip: s["expose_device_ip"]
       }
     end)
   end

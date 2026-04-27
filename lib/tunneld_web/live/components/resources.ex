@@ -36,7 +36,22 @@ defmodule TunneldWeb.Live.Components.Resources do
           <div class="text-lg md:text-xl text-gray-1 font-medium">Resources</div>
           <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
         </div>
-        <div class="flex flex-row gap-1">
+        <div class="flex flex-row items-center gap-2">
+          <div
+            phx-click="modal_open"
+            phx-value-modal_title="Quick Expose"
+            phx-value-modal_body={
+              Jason.encode!(%{
+                "type" => "code_blocks",
+                "data" => quick_expose_blocks()
+              })
+            }
+            class="flex items-center gap-1 text-gray-1 cursor-pointer hover:text-white transition-all"
+          >
+            <.icon name="hero-information-circle" class="h-4 w-4" />
+            <span class="hidden sm:block text-xs">Quick Expose</span>
+          </div>
+          <div class="flex flex-row gap-1">
           <div
             phx-click="modal_open"
             phx-value-modal_title="Add Private Resource"
@@ -82,8 +97,9 @@ defmodule TunneldWeb.Live.Components.Resources do
           </div>
         </div>
       </div>
+    </div>
 
-      <div>
+    <div>
         <div
           :if={Enum.empty?(@resources)}
           class="w-[60px] h-[60px] bg-secondary flex items-center justify-center rounded-md opacity-10"
@@ -118,6 +134,9 @@ defmodule TunneldWeb.Live.Components.Resources do
                       <% health = Map.get(resource, :health) || Map.get(resource, "health") || %{} %>
                       <span class={"w-[13px] h-[13px] rounded-full inline-block #{pool_health_dot(health[:status])}"}></span>
                     <% end %>
+                    <%= if get_in(resource.tunneld, ["expose_source"]) == "device" do %>
+                      <span class="px-2 py-0.5 rounded-full bg-white/10 text-gray-200 uppercase text-[10px] font-medium">QE</span>
+                    <% end %>
                   </div>
                 </div>
               </div>
@@ -137,4 +156,37 @@ defmodule TunneldWeb.Live.Components.Resources do
   defp pool_health_dot(:none), do: "bg-red"
   defp pool_health_dot(:partial), do: "bg-yellow"
   defp pool_health_dot(_), do: "bg-gray-500"
+
+  defp quick_expose_blocks do
+    case gateway_host() do
+      nil ->
+        [%{"title" => "Error", "code" => "Gateway IP not configured"}]
+
+      host ->
+        [
+          %{
+            "title" => "Create a share",
+            "code" => """
+            curl -X POST http://#{host}/api/v1/expose \
+              -H 'Content-Type: application/json' \
+              -d '{"port": 3000, "name": "myapp"}'
+            """
+            |> String.trim_trailing()
+          },
+          %{
+            "title" => "List your shares",
+            "code" => "curl http://#{host}/api/v1/expose"
+          },
+          %{
+            "title" => "Remove a share",
+            "code" => "curl -X DELETE http://#{host}/api/v1/expose/myapp"
+          }
+        ]
+    end
+  end
+
+  defp gateway_host do
+    network = Application.get_env(:tunneld, :network, [])
+    Keyword.get(network, :gateway)
+  end
 end

@@ -35,6 +35,12 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       "revoke_release_ip" ->
         if mac = data["mac"], do: Devices.revoke_lease(mac)
 
+      "allow_device_expose" ->
+        if mac = data["mac"], do: Tunneld.Servers.ExposeAllowed.allow(mac)
+
+      "revoke_device_expose" ->
+        if mac = data["mac"], do: Tunneld.Servers.ExposeAllowed.revoke(mac)
+
       # Wireless networking
       "connect_to_wireless_network" ->
         Wlan.connect_with_pass(data["ssid"], data["password"])

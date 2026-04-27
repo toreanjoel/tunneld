@@ -10,10 +10,18 @@ defmodule TunneldWeb.Live.Components.Devices do
 
   def update(assigns, socket) do
     new_data = Map.get(assigns, :data, %{})
+    devices = Map.get(new_data, :devices, [])
+
+    devices =
+      Enum.map(devices, fn d ->
+        Map.put(d, :expose_allowed, Tunneld.Servers.ExposeAllowed.allowed?(d.mac))
+      end)
+
+    new_data = Map.put(new_data, :devices, devices)
 
     # Only turn off loading when we have a non-empty list of devices
     new_loading =
-      case Map.get(new_data, :devices, []) do
+      case devices do
         [] -> true
         _ -> false
       end
@@ -64,6 +72,36 @@ defmodule TunneldWeb.Live.Components.Devices do
               <div class="flex-1 truncate ellipsis"><%= device.hostname %></div>
               <div
                 phx-click="modal_open"
+                phx-value-modal_title={if device.expose_allowed, do: "Revoke Quick Expose?", else: "Allow Quick Expose?"}
+                phx-value-modal_body={
+                  Jason.encode!(%{
+                    "type" => "string",
+                    "data" =>
+                      if device.expose_allowed do
+                        "This device will no longer be able to create public shares via Quick Expose."
+                      else
+                        "This device will be able to run curl commands to create public shares via Quick Expose."
+                      end
+                  })
+                }
+                phx-value-modal_actions={
+                  Jason.encode!(%{
+                    "title" => (if device.expose_allowed, do: "Revoke", else: "Allow"),
+                    "payload" => %{
+                      "type" => (if device.expose_allowed, do: "revoke_device_expose", else: "allow_device_expose"),
+                      "data" => %{
+                        "mac" => device.mac
+                      }
+                    }
+                  })
+                }
+                phx-click-loading="opacity-50 cursor-wait"
+                class="cursor-pointer"
+              >
+                <.icon name="hero-link" class={if device.expose_allowed, do: "h-4 w-4 text-green", else: "h-4 w-4 text-gray-2"} />
+              </div>
+              <div
+                phx-click="modal_open"
                 phx-value-modal_title="Revoke devices IP address?"
                 phx-value-modal_body={
                   Jason.encode!(%{
@@ -72,23 +110,23 @@ defmodule TunneldWeb.Live.Components.Devices do
                       "This will release the device #{device.hostname} (#{device.ip}). The device will get a new ip address when connecting"
                   })
                 }
-              phx-value-modal_actions={
-                Jason.encode!(%{
-                  "title" => "Revoke",
-                  "payload" => %{
-                    "type" => "revoke_release_ip",
-                    "data" => %{
-                      "mac" => device.mac
+                phx-value-modal_actions={
+                  Jason.encode!(%{
+                    "title" => "Revoke",
+                    "payload" => %{
+                      "type" => "revoke_release_ip",
+                      "data" => %{
+                        "mac" => device.mac
+                      }
                     }
-                  }
-                })
-              }
-              phx-click-loading="opacity-50 cursor-wait"
-              class="cursor-pointer"
-            >
-              <.icon name="hero-x-mark-solid" class="h-4 w-4 text-red" />
+                  })
+                }
+                phx-click-loading="opacity-50 cursor-wait"
+                class="cursor-pointer"
+              >
+                <.icon name="hero-x-mark-solid" class="h-4 w-4 text-red" />
+              </div>
             </div>
-          </div>
             <div class="grow" />
             <div class="text-xs"><%= device.ip %></div>
             <div class="text-xs"><%= device.mac %></div>

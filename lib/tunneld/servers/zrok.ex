@@ -299,6 +299,15 @@ defmodule Tunneld.Servers.Zrok do
     {:reply, {:ok, items}, state}
   end
 
+  def handle_call(:enabled?, _from, %{mock?: true} = state) do
+    {:reply, true, state}
+  end
+
+  def handle_call(:enabled?, _from, state) do
+    result = zrok_enabled?()
+    {:reply, result, state}
+  end
+
   def handle_call({:create_access_unit, access_map}, _from, state) do
     with {:ok, {id, unit_name, content}} <- build_access_unit(access_map, state),
          :ok <- write_unit(state.systemd_dir, unit_name, content),
@@ -682,7 +691,7 @@ defmodule Tunneld.Servers.Zrok do
 
     receive do
       {^ref, {:ok, result}} -> result
-      {^ref, {:error, e}} -> {:error, e}
+      {^ref, {:error, e}} -> {"#{inspect(e)}", 1}
     after
       30_000 ->
         Process.exit(pid, :kill)
@@ -870,6 +879,8 @@ defmodule Tunneld.Servers.Zrok do
     do: GenServer.call(__MODULE__, {:set_api_endpoint, endpoint}, 30_000)
 
   def get_api_endpoint(), do: GenServer.call(__MODULE__, :get_api_endpoint, 15_000)
+
+  def enabled?(), do: GenServer.call(__MODULE__, :enabled?, 15_000)
 
   def get_root_domain do
     case get_api_endpoint() do

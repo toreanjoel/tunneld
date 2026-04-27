@@ -34,6 +34,9 @@ All DNS queries are intercepted and routed through `dnscrypt-proxy` with DNS-ove
 ### Resource Management & Health Monitoring
 Define resources that point to services running on your subnet. Each resource has a pool of backends that are health-checked via TCP probes. Nginx load-balances across healthy backends with auto-generated configs.
 
+### Quick Expose
+Devices on the subnet can create, list, and remove public Zrok shares with a single `curl` — no credentials required. The gateway resolves the caller from its DHCP lease and immediately provisions a public URL. Enable per-device from the dashboard.
+
 ### Overlay Networking (Zrok/OpenZiti)
 Expose resources publicly or privately through Zrok tunnels without port forwarding. Share services across Tunneld instances — bind remote shares locally and add them to your nginx pool for distributed load balancing.
 

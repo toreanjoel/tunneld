@@ -21,6 +21,12 @@ defmodule TunneldWeb.Router do
   scope "/api", TunneldWeb do
     pipe_through :api
     get "/health", HealthController, :index
+
+    scope "/v1" do
+      post "/expose", ExposeController, :create
+      get "/expose", ExposeController, :index
+      delete "/expose/:name", ExposeController, :delete
+    end
   end
 
   # These are the open routes
