@@ -531,21 +531,29 @@ defmodule Tunneld.Servers.Wireguard do
   defp broadcast(state) do
     safe_state = Map.drop(state, ["private_key"])
 
-    Phoenix.PubSub.broadcast(@pubsub, @topic, %{
-      id: "wireguard_server",
-      module: TunneldWeb.Live.Components.Wireguard.Server,
-      data: safe_state
-    })
+    if pubsub_running?() do
+      Phoenix.PubSub.broadcast(@pubsub, @topic, %{
+        id: "wireguard_server",
+        module: TunneldWeb.Live.Components.Wireguard.Server,
+        data: safe_state
+      })
 
-    Phoenix.PubSub.broadcast(@pubsub, @topic, %{
-      id: "wireguard_peers",
-      module: TunneldWeb.Live.Components.Wireguard.Peers,
-      data: safe_state
-    })
+      Phoenix.PubSub.broadcast(@pubsub, @topic, %{
+        id: "wireguard_peers",
+        module: TunneldWeb.Live.Components.Wireguard.Peers,
+        data: safe_state
+      })
+    end
   end
 
   defp notify(type, message) do
-    Phoenix.PubSub.broadcast(@pubsub, "notifications", %{type: type, message: message})
+    if pubsub_running?() do
+      Phoenix.PubSub.broadcast(@pubsub, "notifications", %{type: type, message: message})
+    end
+  end
+
+  defp pubsub_running? do
+    Process.whereis(@pubsub) != nil
   end
 
   defp mock?, do: Application.get_env(:tunneld, :mock_data, false)
