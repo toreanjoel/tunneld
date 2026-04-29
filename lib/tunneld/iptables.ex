@@ -14,6 +14,7 @@ defmodule Tunneld.Iptables do
   """
 
   @wg_interface "wg0"
+  @default_dns "1.1.1.1"
 
   @doc """
   Flush iptables and reinitialize firewall rules.
@@ -31,15 +32,44 @@ defmodule Tunneld.Iptables do
     System.cmd("iptables", ["-A", "INPUT", "-i", "lo", "-j", "ACCEPT"])
 
     # Allow return traffic for outgoing connections
-    System.cmd("iptables", ["-A", "INPUT", "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT"])
+    System.cmd("iptables", [
+      "-A",
+      "INPUT",
+      "-m",
+      "conntrack",
+      "--ctstate",
+      "ESTABLISHED,RELATED",
+      "-j",
+      "ACCEPT"
+    ])
 
     # Allow gateway services (HTTP dashboard, SSH)
     for port <- [80, 22] do
-      System.cmd("iptables", ["-A", "INPUT", "-p", "tcp", "--dport", to_string(port), "-j", "ACCEPT"])
+      System.cmd("iptables", [
+        "-A",
+        "INPUT",
+        "-p",
+        "tcp",
+        "--dport",
+        to_string(port),
+        "-j",
+        "ACCEPT"
+      ])
     end
 
     # Allow DHCP requests from LAN clients
-    System.cmd("iptables", ["-A", "INPUT", "-i", get_env(:eth), "-p", "udp", "--dport", "67", "-j", "ACCEPT"])
+    System.cmd("iptables", [
+      "-A",
+      "INPUT",
+      "-i",
+      get_env(:eth),
+      "-p",
+      "udp",
+      "--dport",
+      "67",
+      "-j",
+      "ACCEPT"
+    ])
 
     # Make sure the devices can forward data between the different interfaces
     System.cmd("sysctl", ["-w", "net.ipv4.ip_forward=1"])
@@ -49,6 +79,7 @@ defmodule Tunneld.Iptables do
     vpn_forwarding()
     internet_passthrough()
     dns_forwarding()
+    set_dns_server(@default_dns)
 
     # Re-apply WireGuard rules if the VPN server is enabled
     if wireguard_enabled?(), do: wireguard_up(wireguard_listen_port())
@@ -90,87 +121,154 @@ defmodule Tunneld.Iptables do
 
     # FORWARD: allow VPN peers to reach Ethernet subnet
     append_unique("iptables", [
-      "-A", "FORWARD",
-      "-i", @wg_interface,
-      "-o", eth,
-      "-m", "conntrack",
-      "--ctstate", "ESTABLISHED,RELATED",
-      "-j", "ACCEPT",
-      "-m", "comment", "--comment", "tunneld-wg-forward-eth"
+      "-A",
+      "FORWARD",
+      "-i",
+      @wg_interface,
+      "-o",
+      eth,
+      "-m",
+      "conntrack",
+      "--ctstate",
+      "ESTABLISHED,RELATED",
+      "-j",
+      "ACCEPT",
+      "-m",
+      "comment",
+      "--comment",
+      "tunneld-wg-forward-eth"
     ])
 
     # FORWARD: allow return traffic from Ethernet to VPN peers
     append_unique("iptables", [
-      "-A", "FORWARD",
-      "-i", eth,
-      "-o", @wg_interface,
-      "-m", "conntrack",
-      "--ctstate", "ESTABLISHED,RELATED",
-      "-j", "ACCEPT",
-      "-m", "comment", "--comment", "tunneld-wg-return-eth"
+      "-A",
+      "FORWARD",
+      "-i",
+      eth,
+      "-o",
+      @wg_interface,
+      "-m",
+      "conntrack",
+      "--ctstate",
+      "ESTABLISHED,RELATED",
+      "-j",
+      "ACCEPT",
+      "-m",
+      "comment",
+      "--comment",
+      "tunneld-wg-return-eth"
     ])
 
     # FORWARD: allow VPN peers to initiate to Ethernet subnet
     append_unique("iptables", [
-      "-A", "FORWARD",
-      "-i", @wg_interface,
-      "-o", eth,
-      "-m", "conntrack",
-      "--ctstate", "NEW,ESTABLISHED,RELATED",
-      "-j", "ACCEPT",
-      "-m", "comment", "--comment", "tunneld-wg-init-eth"
+      "-A",
+      "FORWARD",
+      "-i",
+      @wg_interface,
+      "-o",
+      eth,
+      "-m",
+      "conntrack",
+      "--ctstate",
+      "NEW,ESTABLISHED,RELATED",
+      "-j",
+      "ACCEPT",
+      "-m",
+      "comment",
+      "--comment",
+      "tunneld-wg-init-eth"
     ])
 
     # FORWARD: allow VPN peers to reach internet via WiFi upstream
     append_unique("iptables", [
-      "-A", "FORWARD",
-      "-i", @wg_interface,
-      "-o", wlan,
-      "-m", "conntrack",
-      "--ctstate", "NEW,ESTABLISHED,RELATED",
-      "-j", "ACCEPT",
-      "-m", "comment", "--comment", "tunneld-wg-forward-wlan"
+      "-A",
+      "FORWARD",
+      "-i",
+      @wg_interface,
+      "-o",
+      wlan,
+      "-m",
+      "conntrack",
+      "--ctstate",
+      "NEW,ESTABLISHED,RELATED",
+      "-j",
+      "ACCEPT",
+      "-m",
+      "comment",
+      "--comment",
+      "tunneld-wg-forward-wlan"
     ])
 
     # FORWARD: allow return traffic from WiFi to VPN peers
     append_unique("iptables", [
-      "-A", "FORWARD",
-      "-i", wlan,
-      "-o", @wg_interface,
-      "-m", "conntrack",
-      "--ctstate", "ESTABLISHED,RELATED",
-      "-j", "ACCEPT",
-      "-m", "comment", "--comment", "tunneld-wg-return-wlan"
+      "-A",
+      "FORWARD",
+      "-i",
+      wlan,
+      "-o",
+      @wg_interface,
+      "-m",
+      "conntrack",
+      "--ctstate",
+      "ESTABLISHED,RELATED",
+      "-j",
+      "ACCEPT",
+      "-m",
+      "comment",
+      "--comment",
+      "tunneld-wg-return-wlan"
     ])
 
     # NAT MASQUERADE: full-tunnel peers exit through upstream
     append_unique("iptables", [
-      "-t", "nat",
-      "-A", "POSTROUTING",
-      "-o", wlan,
-      "-j", "MASQUERADE",
-      "-m", "comment", "--comment", "tunneld-wg-masq"
+      "-t",
+      "nat",
+      "-A",
+      "POSTROUTING",
+      "-o",
+      wlan,
+      "-j",
+      "MASQUERADE",
+      "-m",
+      "comment",
+      "--comment",
+      "tunneld-wg-masq"
     ])
 
     # INPUT: accept UDP on WireGuard listen port
     append_unique("iptables", [
-      "-A", "INPUT",
-      "-p", "udp",
-      "--dport", to_string(port),
-      "-j", "ACCEPT",
-      "-m", "comment", "--comment", "tunneld-wg-input"
+      "-A",
+      "INPUT",
+      "-p",
+      "udp",
+      "--dport",
+      to_string(port),
+      "-j",
+      "ACCEPT",
+      "-m",
+      "comment",
+      "--comment",
+      "tunneld-wg-input"
     ])
 
     # INPUT: accept DNS queries from VPN peers
     # PREROUTING redirects port 53 → 5336, so INPUT sees port 5336
     for proto <- ["udp", "tcp"] do
       append_unique("iptables", [
-        "-A", "INPUT",
-        "-i", @wg_interface,
-        "-p", proto,
-        "--dport", "5336",
-        "-j", "ACCEPT",
-        "-m", "comment", "--comment", "tunneld-wg-dns"
+        "-A",
+        "INPUT",
+        "-i",
+        @wg_interface,
+        "-p",
+        proto,
+        "--dport",
+        "5336",
+        "-j",
+        "ACCEPT",
+        "-m",
+        "comment",
+        "--comment",
+        "tunneld-wg-dns"
       ])
     end
 
@@ -189,20 +287,150 @@ defmodule Tunneld.Iptables do
     wlan = get_env(:wlan)
 
     # Delete FORWARD rules
-    del("iptables", ["-D", "FORWARD", "-i", @wg_interface, "-o", eth, "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT", "-m", "comment", "--comment", "tunneld-wg-forward-eth"])
-    del("iptables", ["-D", "FORWARD", "-i", eth, "-o", @wg_interface, "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT", "-m", "comment", "--comment", "tunneld-wg-return-eth"])
-    del("iptables", ["-D", "FORWARD", "-i", @wg_interface, "-o", eth, "-m", "conntrack", "--ctstate", "NEW,ESTABLISHED,RELATED", "-j", "ACCEPT", "-m", "comment", "--comment", "tunneld-wg-init-eth"])
-    del("iptables", ["-D", "FORWARD", "-i", @wg_interface, "-o", wlan, "-m", "conntrack", "--ctstate", "NEW,ESTABLISHED,RELATED", "-j", "ACCEPT", "-m", "comment", "--comment", "tunneld-wg-forward-wlan"])
-    del("iptables", ["-D", "FORWARD", "-i", wlan, "-o", @wg_interface, "-m", "conntrack", "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT", "-m", "comment", "--comment", "tunneld-wg-return-wlan"])
+    del("iptables", [
+      "-D",
+      "FORWARD",
+      "-i",
+      @wg_interface,
+      "-o",
+      eth,
+      "-m",
+      "conntrack",
+      "--ctstate",
+      "ESTABLISHED,RELATED",
+      "-j",
+      "ACCEPT",
+      "-m",
+      "comment",
+      "--comment",
+      "tunneld-wg-forward-eth"
+    ])
+
+    del("iptables", [
+      "-D",
+      "FORWARD",
+      "-i",
+      eth,
+      "-o",
+      @wg_interface,
+      "-m",
+      "conntrack",
+      "--ctstate",
+      "ESTABLISHED,RELATED",
+      "-j",
+      "ACCEPT",
+      "-m",
+      "comment",
+      "--comment",
+      "tunneld-wg-return-eth"
+    ])
+
+    del("iptables", [
+      "-D",
+      "FORWARD",
+      "-i",
+      @wg_interface,
+      "-o",
+      eth,
+      "-m",
+      "conntrack",
+      "--ctstate",
+      "NEW,ESTABLISHED,RELATED",
+      "-j",
+      "ACCEPT",
+      "-m",
+      "comment",
+      "--comment",
+      "tunneld-wg-init-eth"
+    ])
+
+    del("iptables", [
+      "-D",
+      "FORWARD",
+      "-i",
+      @wg_interface,
+      "-o",
+      wlan,
+      "-m",
+      "conntrack",
+      "--ctstate",
+      "NEW,ESTABLISHED,RELATED",
+      "-j",
+      "ACCEPT",
+      "-m",
+      "comment",
+      "--comment",
+      "tunneld-wg-forward-wlan"
+    ])
+
+    del("iptables", [
+      "-D",
+      "FORWARD",
+      "-i",
+      wlan,
+      "-o",
+      @wg_interface,
+      "-m",
+      "conntrack",
+      "--ctstate",
+      "ESTABLISHED,RELATED",
+      "-j",
+      "ACCEPT",
+      "-m",
+      "comment",
+      "--comment",
+      "tunneld-wg-return-wlan"
+    ])
 
     # Delete NAT masquerade
-    del("iptables", ["-t", "nat", "-D", "POSTROUTING", "-o", wlan, "-j", "MASQUERADE", "-m", "comment", "--comment", "tunneld-wg-masq"])
+    del("iptables", [
+      "-t",
+      "nat",
+      "-D",
+      "POSTROUTING",
+      "-o",
+      wlan,
+      "-j",
+      "MASQUERADE",
+      "-m",
+      "comment",
+      "--comment",
+      "tunneld-wg-masq"
+    ])
 
     # Delete INPUT rules
-    del("iptables", ["-D", "INPUT", "-p", "udp", "--dport", to_string(port), "-j", "ACCEPT", "-m", "comment", "--comment", "tunneld-wg-input"])
+    del("iptables", [
+      "-D",
+      "INPUT",
+      "-p",
+      "udp",
+      "--dport",
+      to_string(port),
+      "-j",
+      "ACCEPT",
+      "-m",
+      "comment",
+      "--comment",
+      "tunneld-wg-input"
+    ])
 
     for proto <- ["udp", "tcp"] do
-      del("iptables", ["-D", "INPUT", "-i", @wg_interface, "-p", proto, "--dport", "5336", "-j", "ACCEPT", "-m", "comment", "--comment", "tunneld-wg-dns"])
+      del("iptables", [
+        "-D",
+        "INPUT",
+        "-i",
+        @wg_interface,
+        "-p",
+        proto,
+        "--dport",
+        "5336",
+        "-j",
+        "ACCEPT",
+        "-m",
+        "comment",
+        "--comment",
+        "tunneld-wg-dns"
+      ])
     end
 
     :ok
@@ -210,10 +438,11 @@ defmodule Tunneld.Iptables do
 
   defp append_unique(cmd, args) do
     # Replace -A with -C to check if the rule already exists
-    check_args = Enum.map(args, fn
-      "-A" -> "-C"
-      other -> other
-    end)
+    check_args =
+      Enum.map(args, fn
+        "-A" -> "-C"
+        other -> other
+      end)
 
     case System.cmd(cmd, check_args, stderr_to_stdout: true) do
       {_, 0} -> :ok
@@ -227,6 +456,91 @@ defmodule Tunneld.Iptables do
     # Fire-and-forget: rule may not exist, that's fine
     System.cmd(cmd, args, stderr_to_stdout: true)
     :ok
+  end
+
+  def set_dns_server(dns_server) do
+    # Remove existing exemptions
+    for proto <- ["udp", "tcp"] do
+      del("iptables", [
+        "-t",
+        "nat",
+        "-D",
+        "OUTPUT",
+        "-d",
+        dns_server,
+        "-p",
+        proto,
+        "--dport",
+        "53",
+        "-j",
+        "ACCEPT",
+        "-m",
+        "comment",
+        "--comment",
+        "tunneld-dns-exempt"
+      ])
+
+      del("iptables", [
+        "-t",
+        "nat",
+        "-D",
+        "PREROUTING",
+        "-s",
+        dns_server,
+        "-p",
+        proto,
+        "--dport",
+        "53",
+        "-j",
+        "RETURN",
+        "-m",
+        "comment",
+        "--comment",
+        "tunneld-dns-exempt"
+      ])
+    end
+
+    # Add new exemptions — INSERT before the REDIRECT rules
+    for proto <- ["udp", "tcp"] do
+      System.cmd("iptables", [
+        "-t",
+        "nat",
+        "-I",
+        "PREROUTING",
+        "1",
+        "-s",
+        dns_server,
+        "-p",
+        proto,
+        "--dport",
+        "53",
+        "-j",
+        "RETURN",
+        "-m",
+        "comment",
+        "--comment",
+        "tunneld-dns-exempt"
+      ])
+
+      append_unique("iptables", [
+        "-t",
+        "nat",
+        "-A",
+        "OUTPUT",
+        "-d",
+        dns_server,
+        "-p",
+        proto,
+        "--dport",
+        "53",
+        "-j",
+        "ACCEPT",
+        "-m",
+        "comment",
+        "--comment",
+        "tunneld-dns-exempt"
+      ])
+    end
   end
 
   defp gateway_access() do
@@ -425,7 +739,9 @@ defmodule Tunneld.Iptables do
 
   defp wireguard_enabled? do
     case GenServer.whereis(Tunneld.Servers.Wireguard) do
-      nil -> false
+      nil ->
+        false
+
       pid ->
         try do
           :sys.get_state(pid)["enabled"] == true
@@ -437,7 +753,9 @@ defmodule Tunneld.Iptables do
 
   defp wireguard_listen_port do
     case GenServer.whereis(Tunneld.Servers.Wireguard) do
-      nil -> 51820
+      nil ->
+        51820
+
       pid ->
         try do
           :sys.get_state(pid)["listen_port"] || 51820
