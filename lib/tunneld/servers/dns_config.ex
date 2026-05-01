@@ -25,10 +25,19 @@ defmodule Tunneld.Servers.DnsConfig do
 
   @doc "Returns the current DNS server IP."
   def get_dns_server do
-    try do
-      GenServer.call(__MODULE__, :get_dns_server)
-    rescue
-      _ -> @default_dns
+    case Process.whereis(__MODULE__) do
+      nil ->
+        # GenServer hasn't started yet (e.g. called from Application.start/2
+        # before the supervisor brings children up). Fall back to the
+        # persisted value, or the hardcoded default if disk read fails.
+        read_dns_server()
+
+      _pid ->
+        try do
+          GenServer.call(__MODULE__, :get_dns_server)
+        catch
+          :exit, _ -> read_dns_server()
+        end
     end
   end
 
@@ -64,6 +73,7 @@ defmodule Tunneld.Servers.DnsConfig do
 
   defp ensure_dnsmasq_config(server) do
     mock? = Application.get_env(:tunneld, :mock_data, false)
+
     unless mock? do
       write_dnsmasq_config(server)
       Tunneld.Servers.Services.restart_service(:dnsmasq, :no_notify)
