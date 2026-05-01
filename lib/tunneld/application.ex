@@ -16,7 +16,7 @@ defmodule Tunneld.Application do
     SystemResources,
     Wlan,
     Resources,
-    Blocklist,
+    DnsConfig,
     Updater,
     Sqm,
     Wireguard
@@ -42,7 +42,7 @@ defmodule Tunneld.Application do
       {Resources, []},
       {Devices, []},
       {Auth, []},
-      {Blocklist, []},
+      {DnsConfig, []},
       {Updater, []},
       {Sqm, []},
       {Wireguard, []}

@@ -237,6 +237,13 @@ defmodule TunneldWeb.Live.Dashboard do
               >
                 <.icon name="hero-lock-closed" class="h-4 w-4" /> Authentication
               </div>
+              <div
+                phx-click="open_settings"
+                phx-value-type="dns_server"
+                class="flex items-center gap-2 px-3 py-2 text-xs text-gray-1 hover:bg-primary cursor-pointer transition-all"
+              >
+                <.icon name="hero-globe-alt" class="h-4 w-4" /> DNS Server
+              </div>
               <div class="border-t border-gray-700 my-1" />
               <div
                 phx-click="restart_device"
@@ -629,14 +636,13 @@ defmodule TunneldWeb.Live.Dashboard do
         Tunneld.Servers.Wlan.scan_networks()
         :wlan
 
-      "blocklist" ->
-        Tunneld.Servers.Blocklist.get_details()
-        :blocklist
-
       "zrok" ->
         # Get the current state so we can prepopulate
         Tunneld.Servers.Zrok.get_details()
         :zrok
+
+      "dns_server" ->
+        :dns_server
 
       "authentication" ->
         :authentication
@@ -750,12 +756,12 @@ defmodule TunneldWeb.Live.Dashboard do
       "connect_to_wireless_network" -> "Connecting to Wi‑Fi..."
       "disconnect_from_wireless_network" -> "Disconnecting Wi‑Fi..."
       "scan_for_wireless_networks" -> "Scanning Wi‑Fi..."
+      "set_dns_server" -> "Updating DNS server..."
       "configure_enable_control_plane" -> "Configuring control plane..."
       "configure_disable_control_plane" -> "Disconnecting control plane..."
       "configure_enable_environment" -> "Enabling device..."
       "configure_disable_environment" -> "Disabling device..."
       "revoke_login_creds" -> "Resetting login..."
-      "update_blocklist" -> "Updating blocklist..."
       "configure_basic_auth" -> "Configuring Basic Auth..."
       "disable_basic_auth" -> "Disabling Basic Auth..."
       "get_private_token" -> "Fetching private token..."

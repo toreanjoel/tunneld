@@ -506,70 +506,42 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     """
   end
 
-  @spec render(%{:view => :blocklist, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
-  def render(%{view: :blocklist} = assigns) do
-    data = Map.get(assigns, :data)
+  @spec render(%{:view => :dns_server, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{view: :dns_server} = assigns) do
+    dns_server = Tunneld.Servers.DnsConfig.get_dns_server()
 
     assigns =
       assigns
-      |> assign(:title, Map.get(data, "title", ""))
-      |> assign(:description, Map.get(data, "description", ""))
-      |> assign(:version, Map.get(data, "version", ""))
-      |> assign(:last_mod, Map.get(data, "last modified", ""))
-      |> assign(:link, Map.get(data, "homepage", ""))
+      |> assign(dns_server: dns_server)
 
     ~H"""
     <div class="bg-secondary p-4 h-full space-y-6">
-      <%!-- Sidebar header that will house blocklist metadata --%>
       <%= sidebar_header(assigns, %{
-        header: "Blocklist Details",
-        body: @description
+        header: "DNS Server",
+        body: "All DNS queries on the subnet are forwarded to this server. Use a public resolver like 1.1.1.1 or a local Pi-hole on your network."
       }) %>
 
-      <div class="flex flex-row gap-1 justify-end my-2">
-        <%!-- Actions to take --%>
-        <div
-          phx-click="trigger_action"
-          phx-value-action="update_blocklist"
-          phx-value-data={Jason.encode!(%{})}
-          phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
-        >
-          <.icon class="w-4 h-4" name="hero-arrow-path" />
-          <div class="truncate text-xs">Update</div>
+      <div class="bg-primary rounded-lg p-3 space-y-3">
+        <div class="text-xs text-gray-400">
+          Current DNS server: <span class="text-gray-1 font-mono"><%= @dns_server %></span>
         </div>
-      </div>
 
-      <div class="bg-primary rounded-lg p-3">
-        <div class="mt-2 grid grid-rows-1 md:grid-rows-3 gap-2 text-xs">
-          <div class="truncate">
-            <span class="font-semibold">Creator:</span>
-            <span class="ml-1"><%= @title || "—" %></span>
-          </div>
-          <div class="truncate">
-            <span class="font-semibold">Version:</span>
-            <span class="ml-1"><%= @version || "—" %></span>
-          </div>
-          <div class="truncate">
-            <span class="font-semibold">Last Modified:</span>
-            <span class="ml-1"><%= @last_mod || "—" %></span>
-          </div>
-          <div class="truncate">
-            <span class="font-semibold">Link:</span>
-
-            <%= if @link do %>
-              <a
-                href={@link}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="ml-1 underline text-blue-400 hover:text-blue-300"
-              >
-                <%= @link %>
-              </a>
-            <% else %>
-              <span class="ml-1">—</span>
-            <% end %>
-          </div>
+        <div
+          phx-click="modal_open"
+          phx-value-modal_title="Set DNS Server"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "schema",
+              "data" => Tunneld.Schema.data(:dns_server),
+              "default_values" => %{"server" => @dns_server},
+              "action" => "set_dns_server"
+            })
+          }
+          phx-click-loading="opacity-50 cursor-wait"
+          class="flex items-center justify-center gap-1 bg-purple hover:bg-purple/80 p-2 cursor-pointer rounded-md transition-all duration-150 text-xs text-white"
+        >
+          <.icon class="w-4 h-4" name="hero-pencil-square" />
+          Change DNS Server
         </div>
       </div>
     </div>
@@ -764,14 +736,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             name: service |> Atom.to_string() |> String.capitalize(),
             description:
               "Client daemon that manages the upstream network lease and interface config"
-          }
-
-        :"dnscrypt-proxy" ->
-          %{
-            id: service,
-            name: service |> Atom.to_string() |> String.capitalize(),
-            description:
-              "Encrypts and filters DNS with DoH/DoT to block ads/trackers and prevent snooping."
           }
 
         :nginx ->

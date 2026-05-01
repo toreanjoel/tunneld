@@ -34,12 +34,12 @@ The app is running in MOCK_DATA mode with fake but realistic data.
 Top bar has 3 buttons:
 - "Configure Network" (opens Zrok/overlay sidebar)
 - "Internet Access" (opens WiFi sidebar)
-- Settings gear icon (dropdown: Authentication, Restart Device)
+- Settings gear icon (dropdown: Authentication, DNS Server, Restart Device)
 
 Main content sections (top to bottom):
 1. Welcome banner — version info, "Update Now" button
 2. System Resources — CPU, Memory, Storage gauge charts
-3. Services — dnsmasq, dhcpcd, dnscrypt-proxy, nginx (status dots green/red)
+3. Services — dnsmasq, dhcpcd, nginx (status dots green/red)
 4. Resources — public/private tunneled services cards with toggle switches
 5. Devices — connected network devices with hostname, IP, MAC
 
@@ -49,6 +49,7 @@ Opened by clicking dashboard buttons. Types:
 - "zrok" — Overlay network: control plane URL, environment status, connect/disconnect
 - "resource" — Individual resource details
 - "service" — Service logs, restart button
+- "dns_server" — Configure upstream DNS server IP
 - "authentication" — Reset login, WebAuthn setup, download Root CA
 
 Close sidebar: click the X button or the overlay backdrop.

@@ -28,8 +28,8 @@ Implements the CAKE algorithm to eliminate bufferbloat and reduce latency. Choos
 ### Local PKI & Auto-SSL
 Generates a Root CA on first run. Every resource gets a TLS certificate signed by your CA, served through nginx. Install the Root CA on your devices for trusted HTTPS across your subnet.
 
-### Secure DNS
-All DNS queries are intercepted and routed through `dnscrypt-proxy` with DNS-over-HTTPS. Includes a DNS sinkhole (via dnsmasq blocklists) for ad and tracker blocking at the network level.
+### DNS Server
+All DNS queries on the subnet are intercepted via iptables and routed through a user-configured DNS server. Point the gateway at any resolver — Cloudflare (1.1.1.1), Google (8.8.8.8), or a local Pi-hole on your network. Same-subnet DNS servers are supported via automatic prerouting rules.
 
 ### Resource Management & Health Monitoring
 Define resources that point to services running on your subnet. Each resource has a pool of backends that are health-checked via TCP probes. Nginx load-balances across healthy backends with auto-generated configs.
@@ -50,8 +50,7 @@ Guided onboarding flow after initial account creation: connect to Wi-Fi, optiona
 
 | Component | Role |
 |-----------|------|
-| `dnsmasq` | DHCP server + DNS resolver with caching and blocklist filtering |
-| `dnscrypt-proxy` | DNS-over-HTTPS enforcement with secure resolvers |
+| `dnsmasq` | DHCP server + DNS resolver forwarding to user-configured upstream |
 | `nginx` | Reverse proxy with per-resource SSL and upstream load balancing |
 | `iptables` | NAT, packet forwarding, and DNS interception |
 | `Zrok v2/OpenZiti` | Overlay tunnel orchestration (namespace names, share, access) |
@@ -75,7 +74,7 @@ Tunneld is designed for Debian-based SBCs such as Raspberry Pi, NanoPi, or any c
 curl -sSf https://raw.githubusercontent.com/toreanjoel/tunneld-installer/main/install.sh | sudo bash
 ```
 
-The installer handles all dependencies: `dnsmasq`, `dhcpcd`, `nginx`, `iptables`, `dnscrypt-proxy`, and `zrok2`.
+The installer handles all dependencies: `dnsmasq`, `dhcpcd`, `nginx`, `iptables`, and `zrok2`.
 
 ## Project Structure
 
@@ -95,13 +94,11 @@ lib/
       services.ex           # systemd service monitoring (dnsmasq, dhcpcd, etc.)
       wlan.ex               # Wi-Fi interface management (wpa_supplicant)
       nginx.ex              # Nginx reverse proxy config generation
-      dnsmasq.ex            # DNS hairpin entry management
+      dns_config.ex         # DNS server IP configuration
       zrok.ex               # Zrok v2 CLI orchestration (names, shares, access units)
-      blocklist.ex          # DNS sinkhole blocklist management
       sqm.ex                # Smart Queue Management (tc/CAKE)
       updater.ex            # OTA update checking
       system_resources.ex   # CPU, memory, disk monitoring
-    schema/                 # JSON Schema validation (login, signup, resource, wlan, zrok)
   tunneld_web/
     live/
       dashboard.ex          # Main dashboard LiveView

@@ -19,7 +19,7 @@ graph TD
         RES[Resources Server]
         DEV[Devices Server]
         AUTH[Auth Server]
-        BL[Blocklist Server]
+        DNS_CFG[DnsConfig]
         UPD[Updater Server]
         SQM[Sqm Server]
         CERT[CertManager]
@@ -55,7 +55,7 @@ graph TD
 | Server | Interval | What It Does |
 |--------|----------|--------------|
 | Session | 30s | Clean expired sessions |
-| Devices | 10s | Read dnsmasq.leases, broadcast device list |
+| Devices | 10s | Read dnsmasq leases, broadcast device list |
 | Services | 10s | Check systemd service statuses |
 | SystemResources | 10s | Read CPU, memory, disk via :os_mon |
 | Resources | 10s | Broadcast resource list + health |
@@ -74,7 +74,7 @@ graph LR
         SR[SystemResources]
         WLAN[Wlan]
         UPD[Updater]
-        BL[Blocklist]
+        DNS_CFG[DnsConfig]
         ZROK[Zrok]
     end
 
@@ -100,7 +100,7 @@ graph LR
     WLAN --> CDT --> DLV
     WLAN --> SI --> DLV
     UPD --> CW --> DLV
-    BL --> CDT
+    DNS_CFG --> CDT
     ZROK --> CDT
     RES --> NT --> DLV
 

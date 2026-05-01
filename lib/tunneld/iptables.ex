@@ -6,7 +6,7 @@ defmodule Tunneld.Iptables do
   - IP forwarding between ethernet and WiFi interfaces
   - NAT masquerading for internet access via WiFi and VPN
   - DNS redirection: all port-53 traffic is redirected to port 5336
-    (where dnscrypt-proxy listens) to enforce encrypted DNS
+    (where dnsmasq listens) for consistent subnet DNS resolution
   - Gateway access rules allowing devices to reach the Tunneld host
   - WireGuard VPN forwarding and masquerading (applied dynamically)
 
@@ -14,7 +14,6 @@ defmodule Tunneld.Iptables do
   """
 
   @wg_interface "wg0"
-  @default_dns "1.1.1.1"
 
   @doc """
   Flush iptables and reinitialize firewall rules.
@@ -79,7 +78,7 @@ defmodule Tunneld.Iptables do
     vpn_forwarding()
     internet_passthrough()
     dns_forwarding()
-    set_dns_server(@default_dns)
+    set_dns_server(Tunneld.Servers.DnsConfig.get_dns_server())
 
     # Re-apply WireGuard rules if the VPN server is enabled
     if wireguard_enabled?(), do: wireguard_up(wireguard_listen_port())

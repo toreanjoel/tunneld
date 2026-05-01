@@ -54,6 +54,24 @@ defmodule Tunneld.Schema do
     }
   end
 
+  def data(:dns_server) do
+    %{
+      "title" => "DNS Server",
+      "description" => "Set the upstream DNS server that all subnet DNS queries are forwarded to.",
+      "type" => "object",
+      "properties" => %{
+        "server" => %{
+          "type" => "string",
+          "format" => "ipv4",
+          "minLength" => 7,
+          "maxLength" => 15,
+          "description" => "DNS server IP address (e.g. 1.1.1.1, 8.8.8.8, or a subnet Pi-hole IP)"
+        }
+      },
+      "required" => ["server"]
+    }
+  end
+
   # --- Arity-2 schemas ---
 
   def data(:wlan, %{title: title}) do

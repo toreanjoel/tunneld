@@ -44,7 +44,7 @@ graph LR
 1. **Resource created** with a pool of backends (`ip:port` entries)
 2. **Nginx config generated** with an `upstream` block listing all pool members
 3. **Health checking** — the Resources server periodically probes each backend via TCP
-4. **DNS hairpin** — dnsmasq resolves `resource.tunneld.sh` to the gateway IP
+4. **DNS resolution** — dnsmasq resolves `resource.tunneld.sh` to the gateway IP
 5. **SSL termination** — nginx handles TLS using a per-resource cert signed by the local Root CA
 6. **Traffic distributed** across healthy backends
 

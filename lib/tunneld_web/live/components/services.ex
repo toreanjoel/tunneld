@@ -36,25 +36,12 @@ defmodule TunneldWeb.Live.Components.Services do
       |> assign(status: status)
       |> assign(loading: Enum.empty?(status))
 
-    # We need to make sure we have the details of the block list here already in case
-
     ~H"""
     <div class="p-3 md:p-5">
       <div class="mb-4 md:mb-5 flex flex-row">
         <div class="flex-1">
           <div class="text-lg md:text-xl text-gray-1 font-medium">Services</div>
           <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
-        </div>
-        <div>
-          <div
-            phx-click="show_details"
-            phx-value-type="blocklist"
-            phx-value-id="blacklist"
-            class="flex items-center justify-center gap-1 bg-primary hover:bg-secondary p-2 transition-all cursor-pointer rounded-md duration-150 text-gray-1"
-          >
-            <.icon class="w-5 h-5 sm:w-6 sm:h-6" name="hero-shield-check" />
-            <div class="hidden sm:block truncate text-xs">Blocklist Details</div>
-          </div>
         </div>
       </div>
 

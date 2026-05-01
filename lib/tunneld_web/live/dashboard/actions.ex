@@ -14,7 +14,6 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
     Zrok,
     Resources,
     Services,
-    Blocklist,
     Auth,
     Sqm,
     Wireguard
@@ -90,9 +89,10 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
         File.rm(Auth.path())
         send(parent, :revoke_login_creds)
 
-      # Blocklist
-      "update_blocklist" ->
-        Blocklist.update()
+      # DNS
+      "set_dns_server" ->
+        ip = data["server"]
+        Tunneld.Servers.DnsConfig.set_dns_server(ip)
 
       # Resources
       "add_share" ->

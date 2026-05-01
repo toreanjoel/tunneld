@@ -13,7 +13,7 @@ graph TB
         ETH[eth0 - Subnet Gateway]
         FW[iptables NAT + Forwarding]
         DHCP[dnsmasq - DHCP Server]
-        DNS[dnsmasq + dnscrypt-proxy]
+        DNS[dnsmasq - DNS Forwarder]
         NGINX[nginx - Reverse Proxy]
         APP[Tunneld - Phoenix LiveView]
     end
@@ -36,7 +36,7 @@ graph TB
     D1 -->|DNS Query| DNS
     D2 -->|DNS Query| DNS
     D3 -->|DNS Query| DNS
-    DNS -->|DoH| ISP
+    DNS -->|Forward to User-Configured Server| ISP
     APP --> NGINX
     APP --> DHCP
     APP --> FW
@@ -55,5 +55,5 @@ graph TB
 1. **Upstream**: Tunneld connects to the internet via Wi-Fi (`wlan0`)
 2. **Downstream**: Devices plug into the ethernet port (`eth0`) and receive IPs via DHCP
 3. **NAT**: iptables forwards traffic from eth0 through wlan0 with masquerading
-4. **DNS**: All DNS queries are intercepted and routed through dnscrypt-proxy (DoH) with blocklist filtering
+4. **DNS**: All DNS queries are intercepted via iptables and routed through dnsmasq to the user-configured upstream DNS server
 5. **Management**: The Phoenix LiveView dashboard controls all components
