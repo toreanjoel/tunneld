@@ -45,7 +45,8 @@ defmodule Tunneld.Application do
       {DnsConfig, []},
       {Updater, []},
       {Sqm, []},
-      {Wireguard, []}
+      {Wireguard, []},
+      {Tunneld.Servers.Mesh, []}
     ]
 
     if not Application.get_env(:tunneld, :mock_data, false) do

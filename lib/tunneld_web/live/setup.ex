@@ -25,6 +25,8 @@ defmodule TunneldWeb.Live.Setup do
         Phoenix.PubSub.subscribe(Tunneld.PubSub, "status:internet")
       end
 
+      mesh_preconfigured = mesh_configured?()
+
       socket =
         socket
         |> assign(:step, :wifi)
@@ -37,6 +39,8 @@ defmodule TunneldWeb.Live.Setup do
         |> assign(:zrok_configured, false)
         |> assign(:env_loading, false)
         |> assign(:env_enabled, false)
+        |> assign(:mesh_configured, mesh_preconfigured)
+        |> assign(:mesh_loading, false)
 
       # Kick off initial scan
       if connected?(socket), do: start_scan()
@@ -63,6 +67,8 @@ defmodule TunneldWeb.Live.Setup do
             <div class={step_dot(:wifi, @step)} />
             <div class="w-8 h-px bg-gray-600" />
             <div class={step_dot(:zrok, @step)} />
+            <div class="w-8 h-px bg-gray-600" />
+            <div class={step_dot(:mesh, @step)} />
           </div>
 
           <!-- Step content -->
@@ -293,6 +299,98 @@ defmodule TunneldWeb.Live.Setup do
           Back
         </button>
         <button
+          phx-click="next_step"
+          class="flex-1 p-3 rounded-lg bg-purple text-sm font-medium hover:bg-opacity-80 transition"
+        >
+          Skip & Next
+        </button>
+      </div>
+    </div>
+    """
+  end
+
+  # Mesh step
+  defp render_step(%{step: :mesh} = assigns) do
+    ~H"""
+    <div class="space-y-4">
+      <!-- Mesh configured -->
+      <div :if={@mesh_configured} class="flex flex-col items-center justify-center py-6 gap-3">
+        <div class="w-12 h-12 rounded-full bg-green bg-opacity-10 flex items-center justify-center">
+          <.icon name="hero-check" class="w-6 h-6 text-green" />
+        </div>
+        <div class="text-center">
+          <div class="text-sm font-medium">Mesh relay configured</div>
+          <div class="text-xs text-gray-1 mt-1">You can manage this from the dashboard</div>
+        </div>
+      </div>
+
+      <div :if={@mesh_configured} class="flex gap-3 pt-4">
+        <button
+          phx-click="finish_setup"
+          class="w-full p-3 rounded-lg bg-purple text-sm font-medium hover:bg-opacity-80 transition"
+        >
+          Finish
+        </button>
+      </div>
+
+      <!-- Initial: configure mesh relay -->
+      <div :if={not @mesh_configured} class="bg-secondary rounded-lg p-4">
+        <div class="text-sm">
+          Mesh networking connects this node to other tunneld instances through a relay.
+          This step is optional — you can configure it later from the dashboard.
+        </div>
+      </div>
+
+      <form :if={not @mesh_configured} phx-submit="configure_mesh" class="space-y-3">
+        <div>
+          <label class="text-xs text-gray-1 mb-1 block">Relay URL</label>
+          <input
+            type="url"
+            name="coordinator_url"
+            placeholder="http://relay.example.com:4000"
+            class="w-full bg-secondary border border-gray-600 rounded-lg p-3 text-sm text-white placeholder-gray-500 focus:border-purple focus:outline-none"
+          />
+        </div>
+        <div>
+          <label class="text-xs text-gray-1 mb-1 block">Token</label>
+          <input
+            type="password"
+            name="token"
+            placeholder="shared-secret"
+            autocomplete="off"
+            class="w-full bg-secondary border border-gray-600 rounded-lg p-3 text-sm text-white placeholder-gray-500 focus:border-purple focus:outline-none"
+          />
+        </div>
+        <div>
+          <label class="text-xs text-gray-1 mb-1 block">Node Name</label>
+          <input
+            type="text"
+            name="node_name"
+            placeholder="living-room-gateway"
+            class="w-full bg-secondary border border-gray-600 rounded-lg p-3 text-sm text-white placeholder-gray-500 focus:border-purple focus:outline-none"
+          />
+        </div>
+        <button
+          type="submit"
+          disabled={@mesh_loading}
+          class={"w-full p-3 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 #{if @mesh_loading, do: "bg-purple bg-opacity-50 cursor-wait", else: "bg-purple hover:bg-opacity-80"}"}
+        >
+          <svg :if={@mesh_loading} class="animate-spin h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+          <%= if @mesh_loading, do: "Saving...", else: "Save Mesh Config" %>
+        </button>
+      </form>
+
+      <div :if={not @mesh_configured} class="flex gap-3 pt-4">
+        <button
+          phx-click="prev_step"
+          class="flex-1 p-3 rounded-lg bg-secondary text-sm hover:bg-gray-700 transition"
+        >
+          Back
+        </button>
+        <button
           phx-click="finish_setup"
           class="flex-1 p-3 rounded-lg bg-purple text-sm font-medium hover:bg-opacity-80 transition"
         >
@@ -341,7 +439,8 @@ defmodule TunneldWeb.Live.Setup do
     next =
       case socket.assigns.step do
         :wifi -> :zrok
-        :zrok -> :zrok
+        :zrok -> :mesh
+        :mesh -> :mesh
       end
 
     {:noreply, assign(socket, :step, next)}
@@ -352,6 +451,7 @@ defmodule TunneldWeb.Live.Setup do
       case socket.assigns.step do
         :wifi -> :wifi
         :zrok -> :wifi
+        :mesh -> :zrok
       end
 
     {:noreply, assign(socket, :step, prev)}
@@ -373,6 +473,53 @@ defmodule TunneldWeb.Live.Setup do
 
   def handle_event("enable_environment", _, socket) do
     {:noreply, put_flash(socket, :error, "Please enter an account token")}
+  end
+
+  def handle_event("configure_mesh", %{
+        "coordinator_url" => url,
+        "token" => token,
+        "node_name" => name
+      }, socket) do
+    url = String.trim(url)
+    token = String.trim(token)
+    name = String.trim(name)
+
+    if url == "" or token == "" do
+      {:noreply, put_flash(socket, :error, "Relay URL and token are required")}
+    else
+      config = %{
+        "coordinator_url" => url,
+        "token" => token,
+        "node_name" => name,
+        "enabled" => true
+      }
+
+      socket = assign(socket, :mesh_loading, true)
+
+      path = Path.join(Tunneld.Config.fs_root(), "mesh_config.json")
+      Tunneld.Persistence.write_json(path, config)
+
+      current_interval =
+        Application.get_env(:tunneld, :mesh, [])
+        |> Keyword.get(:poll_interval, 25_000)
+
+      Application.put_env(:tunneld, :mesh,
+        coordinator_url: url,
+        token: token,
+        node_name: name,
+        enabled: true,
+        poll_interval: current_interval
+      )
+
+      Tunneld.Servers.Mesh.reconfigure()
+
+      socket =
+        socket
+        |> put_flash(:info, "Mesh configuration saved")
+        |> assign(:mesh_configured, true)
+
+      {:noreply, socket}
+    end
   end
 
   def handle_event("finish_setup", _, socket) do
@@ -399,6 +546,7 @@ defmodule TunneldWeb.Live.Setup do
   def handle_info(%{type: type, message: message}, socket) when type in [:info, :error] do
     zrok_success = socket.assigns.zrok_loading and type == :info
     env_success = socket.assigns.env_loading and type == :info
+    mesh_success = socket.assigns.mesh_loading and type == :info
     socket = put_flash(socket, type, message)
 
     {:noreply,
@@ -406,8 +554,10 @@ defmodule TunneldWeb.Live.Setup do
        connecting: false,
        zrok_loading: false,
        env_loading: false,
+       mesh_loading: false,
        zrok_configured: socket.assigns.zrok_configured || zrok_success,
-       env_enabled: socket.assigns.env_enabled || env_success
+       env_enabled: socket.assigns.env_enabled || env_success,
+       mesh_configured: socket.assigns.mesh_configured || mesh_success
      )}
   end
 
@@ -452,6 +602,7 @@ defmodule TunneldWeb.Live.Setup do
 
   defp step_description(:wifi), do: "Connect to a Wi-Fi network for internet access"
   defp step_description(:zrok), do: "Configure your overlay network (optional)"
+  defp step_description(:mesh), do: "Configure mesh relay (optional)"
 
   defp step_dot(step, current) do
     base = "w-3 h-3 rounded-full transition"
@@ -465,4 +616,18 @@ defmodule TunneldWeb.Live.Setup do
 
   defp step_index(:wifi), do: 0
   defp step_index(:zrok), do: 1
+  defp step_index(:mesh), do: 2
+
+  defp mesh_configured? do
+    path = Path.join(Tunneld.Config.fs_root(), "mesh_config.json")
+
+    case Tunneld.Persistence.read_json(path) do
+      {:ok, %{"enabled" => true, "coordinator_url" => url, "token" => token}}
+        when is_binary(url) and url != "" and is_binary(token) and token != "" ->
+        true
+
+      _ ->
+        false
+    end
+  end
 end

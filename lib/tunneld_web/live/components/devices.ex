@@ -157,7 +157,7 @@ defmodule TunneldWeb.Live.Components.Devices do
             <div class={if device.tags != [], do: "grow-0 h-1", else: "grow"} />
             <div :if={device.tags != []} class="flex flex-wrap gap-1 mb-1 pt-1">
               <%= for tag <- Enum.take(device.tags, 2) do %>
-                <span class="group px-1.5 py-0.5 text-[10px] bg-blue-900/60 text-blue-200 rounded border border-blue-700/40 flex items-center gap-1 shrink-0" title={tag}>
+                <span class={"group px-1.5 py-0.5 text-[10px] rounded border flex items-center gap-1 shrink-0 " <> tag_classes(tag)} title={tag}>
                   <span class="truncate max-w-[90px]"><%= tag %></span>
                   <span
                     phx-click="trigger_action"
@@ -182,5 +182,13 @@ defmodule TunneldWeb.Live.Components.Devices do
       </div>
     </div>
     """
+  end
+
+  defp tag_classes(tag) when is_binary(tag) do
+    if String.starts_with?(tag, "wg::") do
+      "bg-purple-900/60 text-purple-200 border-purple-700/40"
+    else
+      "bg-blue-900/60 text-blue-200 border-blue-700/40"
+    end
   end
 end

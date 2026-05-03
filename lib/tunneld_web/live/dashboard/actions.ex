@@ -15,8 +15,7 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
     Resources,
     Services,
     Auth,
-    Sqm,
-    Wireguard
+    Sqm
   }
 
   @mock Application.compile_env(:tunneld, :mock_data, false)
@@ -149,18 +148,9 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       "set_sqm" ->
         Sqm.set_sqm(data)
 
-      # WireGuard VPN
-      "enable_wireguard" ->
-        Wireguard.enable_server()
-
-      "disable_wireguard" ->
-        Wireguard.disable_server()
-
-      "add_wireguard_peer" ->
-        Wireguard.add_peer(data["name"], data["full_tunnel"] || false)
-
-      "remove_wireguard_peer" ->
-        Wireguard.remove_peer(data["peer_id"])
+      # Mesh
+      "mesh_sync" ->
+        Tunneld.Servers.Mesh.sync_now()
 
       # Device restart
       "restart_device" ->

@@ -64,3 +64,14 @@ if config_env() == :prod do
   config :tunneld, :config_dir, path: System.get_env("TUNNELD_CONFIG", "/etc/tunneld")
   config :tunneld, :build_dir, path: System.get_env("TUNNELD_BUILD", "/opt/tunneld")
 end
+
+coordinator_url = System.get_env("COORDINATOR_URL", "")
+coordinator_token = System.get_env("COORDINATOR_TOKEN", "")
+node_name = System.get_env("NODE_NAME", "")
+
+config :tunneld, :mesh,
+  coordinator_url: if(coordinator_url != "", do: coordinator_url, else: nil),
+  token: if(coordinator_token != "", do: coordinator_token, else: nil),
+  node_name: if(node_name != "", do: node_name, else: nil),
+  enabled: System.get_env("MESH_ENABLED", "false") == "true",
+  poll_interval: String.to_integer(System.get_env("POLL_INTERVAL", "25000"))

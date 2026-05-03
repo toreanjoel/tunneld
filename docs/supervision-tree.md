@@ -23,6 +23,7 @@ graph TD
         UPD[Updater Server]
         SQM[Sqm Server]
         CERT[CertManager]
+        MESH[Mesh Server]
     end
 
     subgraph Not Supervised - Called at Startup
@@ -60,6 +61,7 @@ graph TD
 | SystemResources | 10s | Read CPU, memory, disk via :os_mon |
 | Resources | 10s | Broadcast resource list + health |
 | Wlan | 15s | Check Wi-Fi connection status |
+| Mesh | 25s | Poll coordinator for peers, heartbeat, and mesh sync |
 | Updater | 5min | Check GitHub for new version |
 | CertManager | 6h | Check SSL cert expiry |
 
@@ -87,6 +89,7 @@ graph LR
         CW[component:welcome]
         SI[status:internet]
         NT[notifications]
+        CM[component:mesh]
     end
 
     subgraph Dashboard LiveView
@@ -103,6 +106,7 @@ graph LR
     DNS_CFG --> CDT
     ZROK --> CDT
     RES --> NT --> DLV
+    MESH --> CM --> DLV
 
     style DLV fill:#7c3aed,color:#fff
 ```

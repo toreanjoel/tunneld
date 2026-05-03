@@ -824,190 +824,103 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     """
   end
 
-  @spec render(%{:view => :wireguard_peer_config, optional(any()) => any()}) ::
+
+  @spec render(%{:view => :mesh, optional(any()) => any()}) ::
           Phoenix.LiveView.Rendered.t()
-  def render(%{view: :wireguard_peer_config, selection: selection} = assigns) do
-    config_text = Map.get(selection || %{}, :config_text, "")
-    filename = Map.get(selection || %{}, :filename, "wg0.conf")
-    peer_name = Map.get(selection || %{}, :peer_name, "Peer")
-
-    qr_svg =
-      if config_text != "" do
-        config_text
-        |> EQRCode.encode()
-        |> EQRCode.svg(width: 192)
-      else
-        nil
-      end
-
-    download_url =
-      if config_text != "" do
-        "data:application/octet-stream;base64," <> Base.encode64(config_text)
-      else
-        "#"
-      end
-
-    assigns =
-      assigns
-      |> assign(:config_text, config_text)
-      |> assign(:filename, filename)
-      |> assign(:peer_name, peer_name)
-      |> assign(:qr_svg, qr_svg)
-      |> assign(:download_url, download_url)
-
-    ~H"""
-    <div class="bg-secondary p-4 h-full space-y-6">
-      <%= sidebar_header(assigns, %{
-        header: "Peer Config: #{@peer_name}",
-        body: "Scan the QR code or download the config file to set up your device."
-      }) %>
-
-      <div :if={@qr_svg} class="flex justify-center">
-        <%= raw(@qr_svg) %>
-      </div>
-
-      <div class="bg-primary rounded-md p-3">
-        <div class="text-[10px] text-gray-400 mb-1">Config</div>
-        <pre class="text-[10px] text-gray-300 overflow-x-auto whitespace-pre-wrap font-mono break-all"><%= mask(@obfuscated, @config_text) %></pre>
-      </div>
-
-      <a
-        href={@download_url}
-        download={@filename}
-        class="flex items-center justify-center gap-1 bg-blue-600 hover:bg-blue-700 text-white text-xs py-2 px-4 rounded transition-colors duration-150"
-      >
-        <.icon class="w-4 h-4" name="hero-arrow-down-tray" />
-        Download .conf file
-      </a>
-    </div>
-    """
-  end
-
-  @spec render(%{:view => :wireguard, optional(any()) => any()}) ::
-          Phoenix.LiveView.Rendered.t()
-  def render(%{view: :wireguard} = assigns) do
-    wg_state = if _pid = GenServer.whereis(Tunneld.Servers.Wireguard) do
-      Tunneld.Servers.Wireguard.get_state()
+  def render(%{view: :mesh} = assigns) do
+    mesh_state = if _pid = GenServer.whereis(Tunneld.Servers.Mesh) do
+      Tunneld.Servers.Mesh.get_state()
     else
-      %{"enabled" => false, "peers" => %{}}
+      %{status: :disabled, peers: %{}}
     end
 
+    config = Application.get_env(:tunneld, :mesh, [])
+    coordinator_url = Keyword.get(config, :coordinator_url, "")
+    token = Keyword.get(config, :token, "")
+    node_name = Keyword.get(config, :node_name, "")
+
     assigns =
       assigns
-      |> assign(:wg_state, wg_state)
-      |> assign(:enabled, wg_state["enabled"] || false)
-      |> assign(:public_key, wg_state["public_key"])
-      |> assign(:listen_port, wg_state["listen_port"])
-      |> assign(:endpoint, wg_state["endpoint"])
-      |> assign(:subnet, wg_state["subnet"])
-      |> assign(:peers, wg_state["peers"] || %{})
+      |> assign(:mesh_state, mesh_state)
+      |> assign(:status, mesh_state[:status] || :disabled)
+      |> assign(:relay_endpoint, mesh_state[:relay_endpoint])
+      |> assign(:relay_pubkey, mesh_state[:relay_pubkey])
+      |> assign(:mesh_ip, mesh_state[:mesh_ip])
+      |> assign(:coordinator_url, coordinator_url)
+      |> assign(:token, token)
+      |> assign(:node_name, node_name)
 
     ~H"""
     <div class="bg-secondary p-4 h-full space-y-6">
       <%= sidebar_header(assigns, %{
-        header: "VPN Server",
-        body: "Configure WireGuard VPN server and manage peer connections."
+        header: "Mesh Configuration",
+        body: "Connect this node to a tunneld-relay for mesh networking between instances."
       }) %>
 
-      <div class="flex flex-row gap-1 justify-end my-2">
-        <div
-          phx-click="toggle_vpn"
-          phx-value-enabled={(!@enabled) |> to_string()}
-          phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
-        >
-          <.icon class="w-4 h-4" name={if @enabled, do: "hero-lock-open", else: "hero-lock-closed"} />
-          <div class="truncate text-xs text-gray-1">
-            <%= if @enabled, do: "Disable", else: "Enable" %>
-          </div>
-        </div>
-      </div>
-
-      <div :if={@enabled} class="space-y-3">
+      <div class="space-y-3">
         <div class="bg-primary rounded-lg p-3 space-y-2 text-xs text-gray-300">
           <div class="flex items-center justify-between">
-            <span class="text-gray-400 font-semibold">Public Key</span>
-            <span class="font-mono text-[10px] break-all max-w-[200px]" title={@public_key}>
-              <%= mask(@obfuscated, (if @public_key, do: String.slice(@public_key, 0, 20) <> "...", else: "—")) %>
-            </span>
+            <span class="text-gray-400 font-semibold">Status</span>
+            <span class="capitalize"><%= @status %></span>
           </div>
-          <div class="flex items-center justify-between">
-            <span class="text-gray-400 font-semibold">Listen Port</span>
-            <span><%= mask(@obfuscated, @listen_port || "—") %></span>
+          <div :if={@mesh_ip} class="flex items-center justify-between">
+            <span class="text-gray-400 font-semibold">Mesh IP</span>
+            <span class="font-mono text-[10px]"><%= @mesh_ip %></span>
           </div>
-          <div class="flex items-center justify-between">
-            <span class="text-gray-400 font-semibold">Endpoint</span>
-            <span><%= mask(@obfuscated, @endpoint || "—") %></span>
+          <div :if={@relay_endpoint} class="flex items-center justify-between">
+            <span class="text-gray-400 font-semibold">Relay Endpoint</span>
+            <span class="font-mono text-[10px] break-all max-w-[200px]"><%= @relay_endpoint %></span>
           </div>
-          <div class="flex items-center justify-between">
-            <span class="text-gray-400 font-semibold">Subnet</span>
-            <span><%= mask(@obfuscated, @subnet || "—") %></span>
+          <div :if={@relay_pubkey} class="flex items-center justify-between">
+            <span class="text-gray-400 font-semibold">Relay Pubkey</span>
+            <span class="font-mono text-[10px] break-all max-w-[200px]"><%= String.slice(@relay_pubkey, 0, 20) <> "..." %></span>
           </div>
         </div>
 
-        <div class="py-2">
-          <h2 class="text-sm font-semibold">Peers</h2>
+        <div class="text-sm text-gray-1">
+          Set these values to connect to the relay.
+          A tunneld-relay instance is required — see documentation for deployment.
         </div>
 
-        <div :if={Enum.empty?(@peers)} class="text-xs text-gray-400 text-center py-4">
-          No peers configured
-        </div>
-
-        <div :if={!Enum.empty?(@peers)} class="space-y-2">
-          <%= for {_id, peer} <- @peers do %>
-            <div
-              phx-click="show_peer_config"
-              phx-value-peer_id={peer["id"]}
-              phx-value-peer_name={peer["name"]}
-              class="bg-primary rounded-lg p-3 cursor-pointer hover:bg-primary/80 transition-all"
-            >
-              <div class="flex items-center justify-between">
-                <div>
-                  <div class="text-xs font-semibold text-gray-1"><%= mask(@obfuscated, peer["name"]) %></div>
-                  <div class="text-[10px] text-gray-400 font-mono"><%= mask(@obfuscated, peer["ip"]) %></div>
-                </div>
-                <div class="flex items-center gap-2">
-                  <span class={
-                    "px-2 py-0.5 rounded-full text-[10px] font-medium " <>
-                    if peer["full_tunnel"], do: "bg-green-500/20 text-green-400", else: "bg-blue-500/20 text-blue-400"
-                  }>
-                    <%= if peer["full_tunnel"], do: "Full Tunnel", else: "Split Tunnel" %>
-                  </span>
-                  <div
-                    phx-click="revoke_wireguard_peer"
-                    phx-value-peer_id={peer["id"]}
-                    phx-value-peer_name={peer["name"]}
-                    class="p-1 rounded hover:bg-red-500/20 cursor-pointer transition-colors duration-150"
-                    title="Revoke peer"
-                  >
-                    <.icon class="w-4 h-4 text-red-400" name="hero-trash" />
-                  </div>
-                </div>
-              </div>
-            </div>
-          <% end %>
-        </div>
-
-        <div
-          phx-click="modal_open"
-          phx-value-modal_title="Add VPN Peer"
-          phx-value-modal_body={
-            Jason.encode!(%{
-              "type" => "schema",
-              "data" => Tunneld.Schema.Wireguard.data(:add_peer),
-              "default_values" => %{
-                "name" => "",
-                "full_tunnel" => false
-              },
-              "action" => "add_wireguard_peer"
-            })
-          }
-          phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-purple hover:bg-purple/80 p-2 cursor-pointer rounded-md transition-all duration-150"
-        >
-          <.icon class="w-4 h-4" name="hero-plus" />
-          <div class="truncate text-xs">Add Peer</div>
-        </div>
+        <form phx-submit="save_mesh_config" class="space-y-3">
+          <div>
+            <label class="text-xs text-gray-1 mb-1 block">Relay URL</label>
+            <input
+              type="url"
+              name="coordinator_url"
+              value={@coordinator_url}
+              placeholder="http://relay.example.com:4000"
+              class="w-full bg-primary border border-gray-600 rounded-lg p-3 text-sm text-white placeholder-gray-500 focus:border-purple focus:outline-none"
+            />
+          </div>
+          <div>
+            <label class="text-xs text-gray-1 mb-1 block">Token</label>
+            <input
+              type="password"
+              name="token"
+              value={@token}
+              placeholder="shared-secret"
+              class="w-full bg-primary border border-gray-600 rounded-lg p-3 text-sm text-white placeholder-gray-500 focus:border-purple focus:outline-none"
+            />
+          </div>
+          <div>
+            <label class="text-xs text-gray-1 mb-1 block">Node Name</label>
+            <input
+              type="text"
+              name="node_name"
+              value={@node_name}
+              placeholder="living-room-gateway"
+              class="w-full bg-primary border border-gray-600 rounded-lg p-3 text-sm text-white placeholder-gray-500 focus:border-purple focus:outline-none"
+            />
+          </div>
+          <button
+            type="submit"
+            class="w-full p-3 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 bg-purple hover:bg-purple/80"
+          >
+            <.icon class="w-4 h-4" name="hero-check" />
+            Save Mesh Config
+          </button>
+        </form>
       </div>
     </div>
     """

@@ -64,8 +64,7 @@ defmodule Tunneld.MixProject do
       {:bcrypt_elixir, "~> 3.0"},
       {:ex_json_schema, "~> 0.10.2"},
       {:httpoison, "~> 2.0"},
-      {:uuid, "~> 1.1"},
-      {:eqrcode, "~> 0.1.10"}
+      {:uuid, "~> 1.1"}
     ]
   end
 

@@ -15,7 +15,7 @@ defmodule TunneldWeb.Live.Dashboard do
   alias TunneldWeb.Live.Components.Services
   alias TunneldWeb.Live.Components.Resources
   alias TunneldWeb.Live.Components.Devices
-  alias TunneldWeb.Live.Components.Wireguard.Server, as: WireguardServer
+  alias TunneldWeb.Live.Components.Mesh.Server, as: MeshServer
   alias TunneldWeb.Live.Dashboard.Actions
 
   @modal_default %{
@@ -63,7 +63,6 @@ defmodule TunneldWeb.Live.Dashboard do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "status:internet")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:details")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:devices")
-      Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:wireguard")
     end
 
     # Check the scheme and domain to make sure it is possible to show
@@ -90,7 +89,7 @@ defmodule TunneldWeb.Live.Dashboard do
       )
       |> assign(:devices, devices)
       |> assign(:pending_actions, %{})
-      |> assign(:wireguard_state, wireguard_state())
+      |> assign(:mesh_state, mesh_state())
       |> assign(:settings_menu_open, false)
       |> assign(:obfuscated, false)
 
@@ -268,7 +267,7 @@ defmodule TunneldWeb.Live.Dashboard do
           <div class="flex-1"><.live_component id="system_resources" module={SystemResources} /></div>
           <div class="flex-1 flex flex-col gap-4">
             <.live_component id="services" module={Services} obfuscated={@obfuscated} />
-            <.live_component id="wireguard_server" module={WireguardServer} data={@wireguard_state} obfuscated={@obfuscated} />
+            <.live_component id="mesh_server" module={MeshServer} data={@mesh_state} obfuscated={@obfuscated} />
           </div>
         </div>
 
@@ -359,32 +358,41 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, start_action("toggle_share_access", params, socket)}
   end
 
-  def handle_event("toggle_vpn", %{"enabled" => "true"}, socket) do
-    {:noreply, start_action("enable_wireguard", %{}, socket)}
+  def handle_event("copy_to_clipboard", %{"text" => text}, socket) do
+    {:noreply, push_event(socket, "clipboard-copy", %{text: text})}
   end
 
-  def handle_event("toggle_vpn", %{"enabled" => "false"}, socket) do
-    {:noreply, start_action("disable_wireguard", %{}, socket)}
-  end
+  def handle_event("save_mesh_config", params, socket) do
+    url = String.trim(params["coordinator_url"] || "")
+    token = String.trim(params["token"] || "")
+    node_name = String.trim(params["node_name"] || "")
+    enabled = url != "" and token != ""
 
-  def handle_event("revoke_wireguard_peer", %{"peer_id" => peer_id, "peer_name" => _name}, socket) do
-    {:noreply, start_action("remove_wireguard_peer", %{"peer_id" => peer_id}, socket)}
-  end
+    config = %{
+      "coordinator_url" => url,
+      "token" => token,
+      "node_name" => node_name,
+      "enabled" => enabled
+    }
 
-  def handle_event("show_peer_config", %{"peer_id" => peer_id, "peer_name" => name}, socket) do
-    config = Tunneld.Servers.Wireguard.get_peer_config(peer_id)
+    path = Path.join(Tunneld.Config.fs_root(), "mesh_config.json")
+    Tunneld.Persistence.write_json(path, config)
 
-    if config do
-      filename = "#{name}.conf"
-      sidebar = %{
-        is_open: true,
-        view: :wireguard_peer_config,
-        selection: %{config_text: config, filename: filename, peer_name: name}
-      }
-      {:noreply, assign(socket, :sidebar, sidebar)}
-    else
-      {:noreply, put_flash(socket, :info, "Config not cached. Regenerate the peer config to view QR code.")}
-    end
+    current_interval =
+      Application.get_env(:tunneld, :mesh, [])
+      |> Keyword.get(:poll_interval, 25_000)
+
+    Application.put_env(:tunneld, :mesh,
+      coordinator_url: if(url != "", do: url, else: nil),
+      token: if(token != "", do: token, else: nil),
+      node_name: if(node_name != "", do: node_name, else: nil),
+      enabled: enabled,
+      poll_interval: current_interval
+    )
+
+    Tunneld.Servers.Mesh.reconfigure()
+
+    {:noreply, put_flash(socket, :info, "Mesh configuration saved")}
   end
 
   #
@@ -469,11 +477,11 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, socket}
   end
 
-  def handle_info(%{id: "wireguard_" <> _, module: _module, data: wg_data}, socket) do
+  def handle_info(%{id: "mesh_server", module: _module, data: mesh_data}, socket) do
     socket =
       socket
-      |> assign(:wireguard_state, wg_data)
-      |> maybe_refresh_wireguard_sidebar()
+      |> assign(:mesh_state, mesh_data)
+      |> maybe_refresh_mesh_sidebar()
 
     {:noreply, socket}
   end
@@ -528,32 +536,6 @@ defmodule TunneldWeb.Live.Dashboard do
       |> assign(:pending_actions, Map.delete(socket.assigns.pending_actions, ref))
       |> maybe_keep_modal_open(pending)
       |> put_flash(:error, "Action failed, please retry.")
-
-    {:noreply, socket}
-  end
-
-  def handle_info({:action_done, ref, "add_wireguard_peer", {:ok, {:ok, peer, config}}}, socket) do
-    filename = "#{peer["name"]}.conf"
-    sidebar = %{
-      is_open: true,
-      view: :wireguard_peer_config,
-      selection: %{config_text: config, filename: filename, peer_name: peer["name"]}
-    }
-
-    socket =
-      socket
-      |> assign(:pending_actions, Map.delete(socket.assigns.pending_actions, ref))
-      |> assign(:sidebar, sidebar)
-      |> assign(:modal, @modal_default)
-
-    {:noreply, socket}
-  end
-
-  def handle_info({:action_done, ref, "remove_wireguard_peer", {:ok, _result}}, socket) do
-    socket =
-      socket
-      |> assign(:pending_actions, Map.delete(socket.assigns.pending_actions, ref))
-      |> put_flash(:info, "VPN peer removed")
 
     {:noreply, socket}
   end
@@ -647,13 +629,14 @@ defmodule TunneldWeb.Live.Dashboard do
       "authentication" ->
         :authentication
 
-      "wireguard" ->
-        if _pid = GenServer.whereis(Tunneld.Servers.Wireguard) do
-          Tunneld.Servers.Wireguard.get_state()
+      "mesh" ->
+        if _pid = GenServer.whereis(Tunneld.Servers.Mesh) do
+          Tunneld.Servers.Mesh.get_state()
         else
-          %{"enabled" => false, "peers" => %{}}
+          %{status: :disabled, peers: %{}}
         end
-        :wireguard
+        :mesh
+
     end
   end
 
@@ -765,10 +748,7 @@ defmodule TunneldWeb.Live.Dashboard do
       "configure_basic_auth" -> "Configuring Basic Auth..."
       "disable_basic_auth" -> "Disabling Basic Auth..."
       "get_private_token" -> "Fetching private token..."
-      "add_wireguard_peer" -> "Adding VPN peer..."
-      "remove_wireguard_peer" -> "Removing VPN peer..."
-      "enable_wireguard" -> "Enabling VPN server..."
-      "disable_wireguard" -> "Disabling VPN server..."
+      "mesh_sync" -> "Syncing mesh..."
       "restart_device" -> "Restarting device..."
       _ -> "Working on request..."
     end
@@ -798,18 +778,18 @@ defmodule TunneldWeb.Live.Dashboard do
     %{is_open: false, view: Map.get(sidebar, :view), selection: nil}
   end
 
-  defp wireguard_state do
-    if _pid = GenServer.whereis(Tunneld.Servers.Wireguard) do
-      Tunneld.Servers.Wireguard.get_state()
+  defp mesh_state do
+    if _pid = GenServer.whereis(Tunneld.Servers.Mesh) do
+      Tunneld.Servers.Mesh.get_state()
     else
-      %{"enabled" => false, "peers" => %{}}
+      %{status: :disabled, peers: %{}}
     end
   end
 
-  defp maybe_refresh_wireguard_sidebar(socket) do
+  defp maybe_refresh_mesh_sidebar(socket) do
     sidebar = Map.get(socket.assigns, :sidebar, %{})
 
-    if Map.get(sidebar, :is_open, false) and Map.get(sidebar, :view) == :wireguard do
+    if Map.get(sidebar, :is_open, false) and Map.get(sidebar, :view) == :mesh do
       assign(socket, :sidebar, %{
         sidebar
         | selection: %{updated_at: System.monotonic_time()}

@@ -15,6 +15,13 @@ config :tunneld, :network,
   eth: "eth0",
   country: "US"
 
+config :tunneld, :mesh,
+  coordinator_url: "http://localhost:4000",
+  token: "test-token",
+  node_name: "test-node",
+  enabled: false,
+  poll_interval: 25000
+
 # We don't run a server during test. If one is required,
 # you can enable the server option below.
 config :tunneld, TunneldWeb.Endpoint,
