@@ -749,6 +749,7 @@ defmodule TunneldWeb.Live.Dashboard do
       "disable_basic_auth" -> "Disabling Basic Auth..."
       "get_private_token" -> "Fetching private token..."
       "mesh_sync" -> "Syncing mesh..."
+      "disconnect_mesh" -> "Disconnecting mesh..."
       "restart_device" -> "Restarting device..."
       _ -> "Working on request..."
     end

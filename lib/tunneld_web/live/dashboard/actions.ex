@@ -152,6 +152,44 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       "mesh_sync" ->
         Tunneld.Servers.Mesh.sync_now()
 
+      "disconnect_mesh" ->
+        path = Path.join(Tunneld.Config.fs_root(), "mesh_config.json")
+
+        config =
+          case File.read(path) do
+            {:ok, content} ->
+              case Jason.decode(content) do
+                {:ok, existing} ->
+                  Map.merge(existing, %{"enabled" => false})
+
+                _ ->
+                  %{"enabled" => false}
+              end
+
+            _ ->
+              %{"enabled" => false}
+          end
+
+        Tunneld.Persistence.write_json(path, config)
+
+        current_interval =
+          Application.get_env(:tunneld, :mesh, [])
+          |> Keyword.get(:poll_interval, 25_000)
+
+        url = Map.get(config, "coordinator_url", "")
+        token = Map.get(config, "token", "")
+        node_name = Map.get(config, "node_name", "")
+
+        Application.put_env(:tunneld, :mesh,
+          coordinator_url: if(url != "", do: url, else: nil),
+          token: if(token != "", do: token, else: nil),
+          node_name: if(node_name != "", do: node_name, else: nil),
+          enabled: false,
+          poll_interval: current_interval
+        )
+
+        Tunneld.Servers.Mesh.reconfigure()
+
       # Device restart
       "restart_device" ->
         if @mock do

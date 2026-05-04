@@ -116,14 +116,24 @@ defmodule TunneldWeb.Live.Components.Mesh.Server do
           <div>
             <div class="flex items-center justify-between mb-2">
               <span class="text-sm font-semibold">Connected Nodes (<%= map_size(@peers) %>)</span>
-              <button
-                phx-click="trigger_action"
-                phx-value-action="mesh_sync"
-                phx-value-data="{}"
-                class="text-xs text-blue-400 hover:text-blue-300 cursor-pointer"
-              >
-                Sync Now
-              </button>
+              <div class="flex gap-2">
+                <button
+                  phx-click="trigger_action"
+                  phx-value-action="mesh_sync"
+                  phx-value-data="{}"
+                  class="text-xs text-blue-400 hover:text-blue-300 cursor-pointer"
+                >
+                  Sync Now
+                </button>
+                <button
+                  phx-click="trigger_action"
+                  phx-value-action="disconnect_mesh"
+                  phx-value-data="{}"
+                  class="text-xs text-red-400 hover:text-red-300 cursor-pointer"
+                >
+                  Disconnect
+                </button>
+              </div>
             </div>
 
             <div :if={Enum.empty?(@peers)} class="text-xs text-gray-400 text-center py-2">

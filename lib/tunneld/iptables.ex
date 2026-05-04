@@ -394,67 +394,75 @@ defmodule Tunneld.Iptables do
 
   def add_mesh_forwarding do
     iface = "wg-mesh"
+    eth = get_env(:eth)
 
-    case System.cmd("ip", ["link", "show", iface], stderr_to_stdout: true) do
-      {_, 0} ->
-        append_unique("iptables", [
-          "-A",
-          "FORWARD",
-          "-i",
-          iface,
-          "-o",
-          get_env(:eth),
-          "-m",
-          "state",
-          "--state",
-          "NEW,ESTABLISHED,RELATED",
-          "-j",
-          "ACCEPT"
-        ])
+    if eth == nil or eth == "" do
+      :noop
+    else
+      case System.cmd("ip", ["link", "show", iface], stderr_to_stdout: true) do
+        {_, 0} ->
+          append_unique("iptables", [
+            "-A",
+            "FORWARD",
+            "-i",
+            iface,
+            "-o",
+            eth,
+            "-m",
+            "state",
+            "--state",
+            "NEW,ESTABLISHED,RELATED",
+            "-j",
+            "ACCEPT"
+          ])
 
-        append_unique("iptables", [
-          "-A",
-          "FORWARD",
-          "-i",
-          get_env(:eth),
-          "-o",
-          iface,
-          "-m",
-          "state",
-          "--state",
-          "ESTABLISHED,RELATED",
-          "-j",
-          "ACCEPT"
-        ])
+          append_unique("iptables", [
+            "-A",
+            "FORWARD",
+            "-i",
+            eth,
+            "-o",
+            iface,
+            "-m",
+            "state",
+            "--state",
+            "ESTABLISHED,RELATED",
+            "-j",
+            "ACCEPT"
+          ])
 
-        :ok
+          :ok
 
-      _ ->
-        :noop
+        _ ->
+          :noop
+      end
     end
   end
 
   def remove_mesh_forwarding do
     iface = "wg-mesh"
+    eth = get_env(:eth)
 
-    for {in_if, out_if, states} <- [
-          {iface, get_env(:eth), "NEW,ESTABLISHED,RELATED"},
-          {get_env(:eth), iface, "ESTABLISHED,RELATED"}
-        ] do
-      del("iptables", [
-        "-D",
-        "FORWARD",
-        "-i",
-        in_if,
-        "-o",
-        out_if,
-        "-m",
-        "state",
-        "--state",
-        states,
-        "-j",
-        "ACCEPT"
-      ])
+    if eth != nil and eth != "" do
+      for {in_if, out_if, states} <- [
+            {iface, eth, "NEW,ESTABLISHED,RELATED"},
+            {eth, iface, "ESTABLISHED,RELATED"}
+          ] do
+        del("iptables", [
+          "-D",
+          "FORWARD",
+          "-i",
+          in_if,
+          "-o",
+          out_if,
+          "-m",
+          "state",
+          "--state",
+          states,
+          "-j",
+          "ACCEPT"
+        ])
+      end
     end
 
     :ok
