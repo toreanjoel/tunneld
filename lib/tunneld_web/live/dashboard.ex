@@ -16,6 +16,7 @@ defmodule TunneldWeb.Live.Dashboard do
   alias TunneldWeb.Live.Components.Resources
   alias TunneldWeb.Live.Components.Devices
   alias TunneldWeb.Live.Components.Mesh.Server, as: MeshServer
+  alias TunneldWeb.Live.Components.Mesh.Nodes, as: MeshNodes
   alias TunneldWeb.Live.Dashboard.Actions
 
   @modal_default %{
@@ -270,6 +271,9 @@ defmodule TunneldWeb.Live.Dashboard do
             <.live_component id="mesh_server" module={MeshServer} data={@mesh_state} obfuscated={@obfuscated} />
           </div>
         </div>
+
+        <%!-- Mesh peer nodes --%>
+        <.live_component id="mesh_nodes" module={MeshNodes} data={@mesh_state} obfuscated={@obfuscated} />
 
         <%!-- Divider --%>
         <div class="border-t-2 border-dashed border-secondary" />
@@ -780,10 +784,14 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   defp mesh_state do
-    if _pid = GenServer.whereis(Tunneld.Servers.Mesh) do
-      Tunneld.Servers.Mesh.get_state()
+    if Application.get_env(:tunneld, :mock_data, false) do
+      Tunneld.Servers.FakeData.mesh()
     else
-      %{status: :disabled, peers: %{}}
+      if _pid = GenServer.whereis(Tunneld.Servers.Mesh) do
+        Tunneld.Servers.Mesh.get_state()
+      else
+        %{status: :disabled, peers: %{}}
+      end
     end
   end
 

@@ -10,6 +10,36 @@ defmodule Tunneld.Servers.FakeData do
       0}
   end
 
+  @doc "Fake mesh state with connected peers."
+  def mesh do
+    %{
+      status: :connected,
+      coordinator_url: "http://relay.example.com:4000",
+      token: "fake-token",
+      node_name: "mock-gateway",
+      mesh_ip: "10.0.0.2",
+      relay_endpoint: "139.84.227.63:51820",
+      relay_pubkey: "cz7L+YZiThnl+kul8SyrEKsp94zry3QBGVMwl8c3g3o=",
+      peers: %{
+        "peer1Pubkey" => %{
+          "node_id" => "node-office",
+          "name" => "Office Gateway",
+          "mesh_ip" => "10.0.0.3",
+          "allowed_ips" => ["192.168.10.0/24"],
+          "last_seen" => System.os_time(:millisecond)
+        },
+        "peer2Pubkey" => %{
+          "node_id" => "node-home",
+          "name" => "Home Gateway",
+          "mesh_ip" => "10.0.0.4",
+          "allowed_ips" => ["192.168.1.0/24"],
+          "last_seen" => System.os_time(:millisecond)
+        }
+      },
+      last_sync: DateTime.utc_now()
+    }
+  end
+
   @doc "Fake Wi-Fi scan results."
   def wlan do
     [
