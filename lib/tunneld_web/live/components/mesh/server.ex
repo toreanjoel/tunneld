@@ -129,7 +129,7 @@ defmodule TunneldWeb.Live.Components.Mesh.Server do
                   phx-click="trigger_action"
                   phx-value-action="disconnect_mesh"
                   phx-value-data="{}"
-                  class="text-xs text-red-400 hover:text-red-300 cursor-pointer"
+                  class="text-xs text-red hover:text-red-400 cursor-pointer"
                 >
                   Disconnect
                 </button>

@@ -118,6 +118,7 @@ defmodule Tunneld.Servers.Mesh do
       node_id = load_or_create_node_id()
       new_state = %{new_state | node_id: node_id}
       Wireguard.ensure_keypair()
+      broadcast(new_state)
       send(self(), :init_mesh)
       {:noreply, new_state}
     else
@@ -125,7 +126,9 @@ defmodule Tunneld.Servers.Mesh do
         Logger.warning("Mesh enabled but coordinator_url or token missing — mesh idle")
       end
 
-      {:noreply, %{new_state | node_id: nil}}
+      disabled_state = %{new_state | node_id: nil}
+      broadcast(disabled_state)
+      {:noreply, disabled_state}
     end
   end
 
@@ -139,13 +142,17 @@ defmodule Tunneld.Servers.Mesh do
         Tunneld.Iptables.add_mesh_forwarding()
         cancel_timer(new_state.timer_ref)
         ref = Process.send_after(self(), :do_poll, new_state.poll_interval)
-        {:noreply, %{new_state | timer_ref: ref, status: :connected, backoff: 5000}}
+        connected_state = %{new_state | timer_ref: ref, status: :connected, backoff: 5000}
+        broadcast(connected_state)
+        {:noreply, connected_state}
 
       {:error, reason} ->
         Logger.warning("Mesh setup failed: #{inspect(reason)} — retrying in #{state.backoff}ms")
         ref = Process.send_after(self(), :init_mesh, state.backoff)
         new_backoff = min(state.backoff * 2, 60_000)
-        {:noreply, %{state | timer_ref: ref, status: :relay_unreachable, backoff: new_backoff}}
+        error_state = %{state | timer_ref: ref, status: :relay_unreachable, backoff: new_backoff}
+        broadcast(error_state)
+        {:noreply, error_state}
       end
     end
   end
