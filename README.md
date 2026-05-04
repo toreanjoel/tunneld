@@ -40,11 +40,14 @@ Devices on the subnet can create, list, and remove public Zrok shares with a sin
 ### Overlay Networking (Zrok/OpenZiti)
 Expose resources publicly or privately through Zrok tunnels without port forwarding. Share services across Tunneld instances — bind remote shares locally and add them to your nginx pool for distributed load balancing.
 
+### Mesh Networking
+Connect multiple Tunneld nodes into a single mesh through a relay coordinator. Each node registers outbound-only over WireGuard, receives a mesh IP, and syncs peers automatically. Tag LAN devices with `wg::` prefixes to expose them to the mesh — no port forwarding required.
+
 ### Distributed Service Pooling
 Combine local and remote backends in a single resource pool. Nginx distributes traffic across all entries — whether they're on your subnet or bound from a peer's Tunneld instance over the overlay.
 
 ### First-Run Setup Wizard
-Guided onboarding flow after initial account creation: connect to Wi-Fi, optionally configure the overlay network control plane.
+Guided onboarding flow after initial account creation: connect to Wi-Fi, optionally configure the overlay network control plane and mesh relay.
 
 ## Architecture
 
@@ -54,6 +57,7 @@ Guided onboarding flow after initial account creation: connect to Wi-Fi, optiona
 | `nginx` | Reverse proxy with per-resource SSL and upstream load balancing |
 | `iptables` | NAT, packet forwarding, and DNS interception |
 | `Zrok v2/OpenZiti` | Overlay tunnel orchestration (namespace names, share, access) |
+| `WireGuard` | Mesh networking interface (`wg-mesh`) for node-to-node connectivity via relay |
 | `Elixir/Phoenix` | Application server, LiveView dashboard, GenServer process management |
 
 ### Diagrams
@@ -97,6 +101,8 @@ lib/
       dns_config.ex         # DNS server IP configuration
       zrok.ex               # Zrok v2 CLI orchestration (names, shares, access units)
       sqm.ex                # Smart Queue Management (tc/CAKE)
+      wireguard.ex          # WireGuard keypair and wg-mesh interface
+      mesh.ex               # Mesh relay coordinator client
       updater.ex            # OTA update checking
       system_resources.ex   # CPU, memory, disk monitoring
   tunneld_web/

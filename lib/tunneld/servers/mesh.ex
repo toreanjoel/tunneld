@@ -83,6 +83,7 @@ defmodule Tunneld.Servers.Mesh do
     cancel_timer(state.timer_ref)
 
     if state.enabled do
+      Tunneld.Iptables.remove_mesh_forwarding()
       Wireguard.bring_down_mesh()
     end
 
@@ -135,6 +136,7 @@ defmodule Tunneld.Servers.Mesh do
     else
       case setup_mesh(state) do
       {:ok, new_state} ->
+        Tunneld.Iptables.add_mesh_forwarding()
         cancel_timer(new_state.timer_ref)
         ref = Process.send_after(self(), :do_poll, new_state.poll_interval)
         {:noreply, %{new_state | timer_ref: ref, status: :connected, backoff: 5000}}

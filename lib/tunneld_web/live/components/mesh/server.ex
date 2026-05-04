@@ -149,9 +149,6 @@ defmodule TunneldWeb.Live.Components.Mesh.Server do
             Mesh networking connects this node to other tunneld instances through a relay.
             No port forwarding required, all devices connect through the relay's public IP.
           </div>
-          <div class="text-xs text-gray-400 mt-2">
-            Click <span class="text-blue-400">Configure Mesh</span> to set up relay URL and token.
-          </div>
         <% end %>
       </div>
     </div>
