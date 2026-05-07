@@ -3,6 +3,7 @@ defmodule TunneldWeb.Live.Components.Devices do
   The connected devices to the network and their access
   """
   use TunneldWeb, :live_component
+  import TunneldWeb.Live.Components.SectionHeader
 
   def mount(socket) do
     {:ok, socket |> assign(loading: true)}
@@ -27,7 +28,6 @@ defmodule TunneldWeb.Live.Components.Devices do
       |> assign_new(:obfuscated, fn -> false end)
       |> assign(:obfuscated, obfuscated)
 
-    # Only turn off loading when we have a non-empty list of devices
     new_loading =
       case devices do
         [] -> true
@@ -48,32 +48,22 @@ defmodule TunneldWeb.Live.Components.Devices do
   def render(assigns) do
     ~H"""
     <div class="p-3 md:p-5">
-      <div class="mb-4 md:mb-5 flex flex-row">
-        <div class="flex-1">
-          <div class="text-lg md:text-xl text-gray-1 font-medium">Devices</div>
-          <div class="mt-1 w-5 border-b-2 border-gray-1"></div>
-        </div>
-        <div class="grid grid-cols-1 gap-1">
-          <%!-- This is the button above the devices --%>
-        </div>
-      </div>
+      <.section_header>Devices</.section_header>
 
-      <%!-- Loading indicator --%>
       <div :if={@loading} class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-        <div class="p-4 flex flex-col bg-secondary rounded-lg w-full h-[130px] opacity-10">
+        <div class="p-4 flex flex-col bg-surface rounded-lg w-full h-[130px] opacity-10">
           <div class="grow">
-            <.icon class="w-10 h-10 text-white" name="hero-computer-desktop" />
+            <.icon class="w-10 h-10 text-text-primary" name="hero-computer-desktop" />
           </div>
           <div class="grow" />
-          <div class="text-md text-white">Scanning Devices...</div>
+          <div class="text-md text-text-primary">Scanning Devices...</div>
         </div>
       </div>
 
-      <%!-- Content after loading --%>
       <div :if={!@loading} class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         <%= for device <- Map.get(@data, :devices, []) do %>
           <div
-            class="p-4 flex flex-col bg-secondary rounded-lg w-full min-h-[130px] h-auto hover:bg-secondary"
+            class="p-4 flex flex-col bg-surface rounded-lg w-full min-h-[130px] h-auto"
             style="animation: fadeIn 0.5s ease-out forwards;"
           >
             <div class="flex flex-row gap-2">
@@ -95,7 +85,7 @@ defmodule TunneldWeb.Live.Components.Devices do
                 phx-click-loading="opacity-50 cursor-wait"
                 class="cursor-pointer"
               >
-                <.icon name="hero-tag" class={if device.tags != [], do: "h-4 w-4 text-blue-400", else: "h-4 w-4 text-gray-2"} />
+                <.icon name="hero-tag" class={if device.tags != [], do: "h-4 w-4 text-blue-400", else: "h-4 w-4 text-text-secondary"} />
               </div>
               <div
                 phx-click="modal_open"
@@ -125,7 +115,7 @@ defmodule TunneldWeb.Live.Components.Devices do
                 phx-click-loading="opacity-50 cursor-wait"
                 class="cursor-pointer"
               >
-                <.icon name="hero-link" class={if device.expose_allowed, do: "h-4 w-4 text-green", else: "h-4 w-4 text-gray-2"} />
+                <.icon name="hero-link" class={if device.expose_allowed, do: "h-4 w-4 text-green", else: "h-4 w-4 text-text-secondary"} />
               </div>
               <div
                 phx-click="modal_open"
@@ -170,12 +160,12 @@ defmodule TunneldWeb.Live.Components.Devices do
                 </span>
               <% end %>
               <%= if length(device.tags) > 2 do %>
-                <span class="px-1.5 py-0.5 text-[10px] text-gray-400">+<%= length(device.tags) - 2 %></span>
+                <span class="px-1.5 py-0.5 text-[10px] text-text-tertiary">+<%= length(device.tags) - 2 %></span>
               <% end %>
             </div>
             <div class="mt-auto">
-              <div class="text-xs text-gray-400"><%= mask(@obfuscated, device.ip) %></div>
-              <div class="text-xs text-gray-400"><%= mask(@obfuscated, device.mac) %></div>
+              <div class="text-xs text-text-tertiary"><%= mask(@obfuscated, device.ip) %></div>
+              <div class="text-xs text-text-tertiary"><%= mask(@obfuscated, device.mac) %></div>
             </div>
           </div>
         <% end %>

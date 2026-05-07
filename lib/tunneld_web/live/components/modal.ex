@@ -34,19 +34,16 @@ defmodule TunneldWeb.Live.Components.Modal do
     assigns = assigns |> assign(pending_actions)
 
     ~H"""
-    <div class="fixed inset-0 bg-secondary bg-opacity-80 flex items-center justify-center">
-      <div class="bg-primary rounded-md p-6 max-w-[500px] lg:w-1/3 relative z-20">
-        <%!-- closing the modal --%>
-        <div phx-click="modal_close" class="absolute top-[0px] right-[0px] p-3 cursor-pointer">
+    <div class="fixed inset-0 bg-black/70 flex items-center justify-center z-[100]" style="animation: fadeIn 180ms ease-out">
+      <div class="bg-surface rounded-2xl p-6 max-w-[500px] lg:w-1/3 relative border border-border">
+        <div phx-click="modal_close" class="absolute top-0 right-0 p-3 cursor-pointer text-text-tertiary hover:text-text-primary">
           <.icon name="hero-x-mark-solid" class="h-5 w-5" />
         </div>
         <div class="py-2">
-          <h2 class="text-xl"><%= @title %></h2>
-          <h2 class="text-sm"><%= @description %></h2>
+          <h2 class="text-xl text-text-primary font-medium -tracking-[0.01em]"><%= @title %></h2>
+          <h2 :if={@description} class="text-sm text-text-secondary mt-1"><%= @description %></h2>
         </div>
-         <!-- Render the dynamic body -->
-         <div class="text-sm"><%= render_body(assigns, @body) %></div>
-         <!-- Modal Actions -->
+         <div class="text-sm text-text-primary"><%= render_body(assigns, @body) %></div>
          <div :if={@body["type"] !== "schema"} class="flex justify-end space-x-3 pt-2 mt-3">
           <% action_loading =
             if @actions do
@@ -65,7 +62,7 @@ defmodule TunneldWeb.Live.Components.Modal do
             phx-value-client_id={@client_id}
             phx-disable-with="Working..."
             disabled={action_loading}
-            class="text-sm font-light gap-1 bg-red hover:bg-opacity-60 p-3 cursor-pointer rounded-md"
+            class="btn-primary disabled:opacity-50"
           >
             <%= @actions["title"] %>
           </button>

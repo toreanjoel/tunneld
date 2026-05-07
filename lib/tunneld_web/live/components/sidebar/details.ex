@@ -42,7 +42,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           Phoenix.LiveView.Rendered.t()
   def render(%{view: :authentication} = assigns) do
     ~H"""
-    <div class="bg-secondary p-4 h-full space-y-6">
+    <div class="bg-surface-2 p-4 h-full space-y-6">
       <%= sidebar_header(assigns, %{
         header: "Authentication",
         body: "Reset your login credentials for the dashboard."
@@ -91,7 +91,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(health: Map.get(data || %{}, :health) || Map.get(data || %{}, "health") || %{})
 
     ~H"""
-    <div class="bg-secondary p-4 h-full space-y-6">
+    <div class="bg-surface-2 p-4 h-full space-y-6">
       <div :if={@has_data}>
         <%= sidebar_header(assigns, %{
           header: mask(@obfuscated, @data.name),
@@ -134,7 +134,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             })
           }
           phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+          class="flex items-center justify-center gap-1 bg-surface p-2 cursor-pointer rounded-md"
         >
           <.icon name="hero-pencil-square" class="h-5 w-5" />
           <div class="truncate text-xs">Edit</div>
@@ -142,7 +142,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
         <div
           :if={@data.kind == "host" and any_enabled?}
-          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-not-allowed rounded-md opacity-50"
+          class="flex items-center justify-center gap-1 bg-surface p-2 cursor-not-allowed rounded-md opacity-50"
           title="Disable shares to edit"
         >
           <.icon name="hero-pencil-square" class="h-5 w-5" />
@@ -182,7 +182,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         </h1>
 
         <div :if={@has_data}>
-          <div class="flex flex-col p-3 mb-2 bg-primary rounded-lg font-light">
+          <div class="flex flex-col p-3 mb-2 bg-surface rounded-lg font-light">
             <div class="text-sm truncate">
               <span class="font-bold">Name:</span>
               <%= mask(@obfuscated, @data.name) %>
@@ -203,7 +203,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <%= if @data.kind == "host" and @has_data do %>
             <div class="mt-3 border-t border-gray-700 pt-3">
               <h2 class="text-sm font-semibold mb-2">Pool Backends</h2>
-              <div class="bg-primary rounded-lg p-2 space-y-1.5">
+              <div class="bg-surface rounded-lg p-2 space-y-1.5">
                 <%= if Enum.empty?(pool_details) do %>
                   <div class="text-xs text-gray-400">No backends configured</div>
                 <% else %>
@@ -221,7 +221,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <%= if @data.kind == "access" and @has_data do %>
             <div class="mt-3 border-t border-gray-700 pt-3">
               <h2 class="text-sm font-semibold mb-2">Pool Backends</h2>
-              <div class="bg-primary rounded-lg p-2 space-y-1.5">
+              <div class="bg-surface rounded-lg p-2 space-y-1.5">
                 <%= if Enum.empty?(pool_details) do %>
                   <div class="text-xs text-gray-400">No backends configured</div>
                 <% else %>
@@ -258,7 +258,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                 <% unit_id = get_in(tunneld, ["units", kind, "id"]) %>
                 <% indicator_class = status_class(@data, kind) %>
 
-                <div class="bg-primary rounded-lg p-3">
+                <div class="bg-surface rounded-lg p-3">
                   <div class="flex items-center justify-between">
                     <div class="text-sm font-medium capitalize"><%= kind %> instance</div>
                     <label
@@ -269,7 +269,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                       class="relative inline-flex items-center cursor-pointer"
                     >
                       <input type="checkbox" class="sr-only peer" checked={enabled?} />
-                      <div class="w-9 h-5 bg-light_purple rounded-full peer-checked:bg-purple relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-light_purple after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4">
+                      <div class="w-9 h-5 bg-light_purple rounded-full peer-checked:bg-accent relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-light_purple after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4">
                       </div>
                     </label>
                   </div>
@@ -387,8 +387,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     data = Map.get(assigns, :data, %{})
 
     # unset check
-    unset_check = Map.get(data, :api_endpoint, "") |> String.contains?("unset")
-    default_endpoint = if unset_check, do: nil, else: Map.get(data, :api_endpoint, nil)
+    unset_check = Map.get(data, :api_endpoint, "") |> to_string() |> String.contains?("unset")
+    default_endpoint = if unset_check or not is_binary(Map.get(data, :api_endpoint)), do: nil, else: Map.get(data, :api_endpoint)
 
     assigns =
       assigns
@@ -398,7 +398,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(has_data: not Enum.empty?(data))
 
     ~H"""
-    <div class="bg-secondary p-4 h-full space-y-6">
+    <div class="bg-surface-2 p-4 h-full space-y-6">
       <%!-- Sidebar header that will house metadat?  --%>
       <%= sidebar_header(assigns, %{
         header: "Overlay Network Settings",
@@ -449,10 +449,10 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             })
           }
           phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+          class="flex items-center justify-center gap-1 bg-surface p-2 cursor-pointer rounded-md"
         >
           <.icon class="w-4 h-4" name="hero-globe-alt" />
-          <div class="truncate text-xs text-gray-1">Configure Control Plane</div>
+          <div class="truncate text-xs text-text-secondary">Configure Control Plane</div>
         </div>
 
         <%!-- enabled options --%>
@@ -496,10 +496,10 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             })
           }
           phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+          class="flex items-center justify-center gap-1 bg-surface p-2 cursor-pointer rounded-md"
         >
           <.icon class="w-4 h-4" name="hero-link" />
-          <div class="truncate text-xs text-gray-1">Enable Device</div>
+          <div class="truncate text-xs text-text-secondary">Enable Device</div>
         </div>
       </div>
     </div>
@@ -515,15 +515,15 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(dns_server: dns_server)
 
     ~H"""
-    <div class="bg-secondary p-4 h-full space-y-6">
+    <div class="bg-surface-2 p-4 h-full space-y-6">
       <%= sidebar_header(assigns, %{
         header: "DNS Server",
         body: "All DNS queries on the subnet are forwarded to this server. Use a public resolver like 1.1.1.1 or a local Pi-hole on your network."
       }) %>
 
-      <div class="bg-primary rounded-lg p-3 space-y-3">
+      <div class="bg-surface rounded-lg p-3 space-y-3">
         <div class="text-xs text-gray-400">
-          Current DNS server: <span class="text-gray-1 font-mono"><%= @dns_server %></span>
+          Current DNS server: <span class="text-text-secondary font-mono"><%= @dns_server %></span>
         </div>
 
         <div
@@ -538,7 +538,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             })
           }
           phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-purple hover:bg-purple/80 p-2 cursor-pointer rounded-md transition-all duration-150 text-xs text-white"
+          class="flex items-center justify-center gap-1 bg-accent hover:bg-accent-light p-2 cursor-pointer rounded-md transition-all duration-150 text-xs text-white"
         >
           <.icon class="w-4 h-4" name="hero-pencil-square" />
           Change DNS Server
@@ -561,7 +561,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(count: length(networks))
 
     ~H"""
-    <div class="bg-secondary p-4 h-full space-y-6">
+    <div class="bg-surface-2 p-4 h-full space-y-6">
       <div class="relative">
         <%= sidebar_header(assigns, %{
           header: "Wireless Access",
@@ -575,11 +575,11 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           phx-value-action="scan_for_wireless_networks"
           phx-value-data={Jason.encode!(%{})}
           phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+          class="flex items-center justify-center gap-1 bg-surface p-2 cursor-pointer rounded-md"
           title="Scan for networks"
         >
           <.icon class="w-4 h-4" name="hero-arrow-path" />
-          <div class="truncate text-xs text-gray-1">Refresh</div>
+          <div class="truncate text-xs text-text-secondary">Refresh</div>
         </button>
       </div>
 
@@ -594,8 +594,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             class={[
               "grow flex flex-col items-center justify-center rounded-xl border-2 transition-all p-2 text-center",
               if(@sqm["mode"] == "latency",
-                do: "bg-purple border-purple text-white shadow-lg shadow-purple/20",
-                else: "bg-primary border-transparent text-gray-1"
+                do: "bg-accent border-accent text-white shadow-lg shadow-accent/20",
+                else: "bg-surface border-transparent text-text-secondary"
               )
             ]}
           >
@@ -612,8 +612,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             class={[
               "grow flex flex-col items-center justify-center rounded-xl border-2 transition-all p-2 text-center",
               if(@sqm["mode"] == "balanced",
-                do: "bg-purple border-purple text-white shadow-lg shadow-purple/20",
-                else: "bg-primary border-transparent text-gray-1"
+                do: "bg-accent border-accent text-white shadow-lg shadow-accent/20",
+                else: "bg-surface border-transparent text-text-secondary"
               )
             ]}
           >
@@ -629,7 +629,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               "grow flex flex-col items-center justify-center rounded-xl border-2 transition-all p-2 text-center",
               if(@sqm["mode"] == "off",
                 do: "bg-red border-red text-white shadow-lg shadow-red/20",
-                else: "bg-primary border-transparent text-gray-1"
+                else: "bg-surface border-transparent text-text-secondary"
               )
             ]}
           >
@@ -641,7 +641,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
       <pre
         :if={@info["wpa_state"] !== "COMPLETED" and not Enum.empty?(@info)}
-        class="bg-gray-900 text-gray-100 text-xs p-3 rounded-md overflow-auto"
+        class="bg-bg text-text-secondary00 text-xs p-3 rounded-md overflow-auto"
       ><%= Jason.encode!(@info, pretty: true) %></pre>
 
       <div class={"flex flex-col #{if @count== 0, do: "items-center justify-center", else: ""}"}>
@@ -653,7 +653,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <%= for %{ open: open, security: security, signal: signal, ssid: ssid } <- @networks do %>
             <% current_connected = @info["ssid"] === ssid %>
 
-            <div class={"flex flex-col p-3 mb-2 #{if current_connected, do: "bg-purple", else: "bg-primary"} rounded-lg font-light"}>
+            <div class={"flex flex-col p-3 mb-2 #{if current_connected, do: "bg-accent", else: "bg-surface"} rounded-lg font-light"}>
               <div class="text-md truncate"><span class="font-bold">SSID:</span> <%= ssid %></div>
               <div class="text-sm truncate">
                 <span class="font-bold">Security:</span> <%= security %>
@@ -668,7 +668,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               <div class="py-2">
                 <pre
                   :if={current_connected}
-                  class="bg-gray-900 text-gray-100 text-xs p-3 rounded-md overflow-auto"
+                  class="bg-bg text-text-secondary00 text-xs p-3 rounded-md overflow-auto"
                 ><%= Jason.encode!(@info, pretty: true) %></pre>
               </div>
 
@@ -683,7 +683,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                   phx-click-loading="opacity-50 cursor-wait"
                   class="flex items-center justify-center gap-1 bg-secondary p-2 cursor-pointer rounded-md"
                 >
-                  <div class="truncate text-xs text-gray-1">disconnect</div>
+                  <div class="truncate text-xs text-text-secondary">disconnect</div>
                 </div>
 
                 <%!-- If we are not connected to the network --%>
@@ -704,7 +704,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                   phx-click-loading="opacity-50 cursor-wait"
                   class="flex items-center justify-center gap-1 bg-secondary p-2 cursor-pointer rounded-md"
                 >
-                  <div class="truncate text-xs text-gray-1">connect</div>
+                  <div class="truncate text-xs text-text-secondary">connect</div>
                 </div>
               </div>
             </div>
@@ -762,7 +762,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(service: service)
 
     ~H"""
-    <div class="bg-secondary p-4 h-full space-y-6">
+    <div class="bg-surface-2 p-4 h-full space-y-6">
       <%!-- Sidebar header that will house metadat?  --%>
       <%= sidebar_header(assigns, %{
         header: Map.get(@service, :name),
@@ -776,10 +776,10 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           phx-value-action="refresh_service_logs"
           phx-value-data={Jason.encode!(%{ "id" => Map.get(@service, :id)})}
           phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md"
+          class="flex items-center justify-center gap-1 bg-surface p-2 cursor-pointer rounded-md"
         >
           <.icon class="w-4 h-4" name="hero-arrow-path" />
-          <div class="truncate text-xs text-gray-1">Refresh</div>
+          <div class="truncate text-xs text-text-secondary">Refresh</div>
         </div>
         <div
           phx-click="modal_open"
@@ -800,7 +800,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             })
           }
           phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-purple p-2 cursor-pointer rounded-md"
+          class="flex items-center justify-center gap-1 bg-accent p-2 cursor-pointer rounded-md"
         >
           <.icon name="hero-arrow-path" class="h-4 w-4" />
           <div class="truncate text-xs">Restart Service</div>
@@ -814,7 +814,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
         <div :if={@count > 0}>
           <%= for log <- @logs do %>
-            <div class="flex flex-col p-3 mb-2 bg-primary rounded-lg font-light">
+            <div class="flex flex-col p-3 mb-2 bg-surface rounded-lg font-light">
               <div class="text-sm"><%= log %></div>
             </div>
           <% end %>
@@ -851,14 +851,14 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(:node_name, node_name)
 
     ~H"""
-    <div class="bg-secondary p-4 h-full space-y-6">
+    <div class="bg-surface-2 p-4 h-full space-y-6">
       <%= sidebar_header(assigns, %{
         header: "Mesh Configuration",
         body: "Connect this node to a tunneld-relay for mesh networking between instances."
       }) %>
 
       <div class="space-y-3">
-        <div class="bg-primary rounded-lg p-3 space-y-2 text-xs text-gray-300">
+        <div class="bg-surface rounded-lg p-3 space-y-2 text-xs text-gray-300">
           <div class="flex items-center justify-between">
             <span class="text-gray-400 font-semibold">Status</span>
             <span class="capitalize"><%= @status %></span>
@@ -877,45 +877,45 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           </div>
         </div>
 
-        <div class="text-sm text-gray-1">
+        <div class="text-sm text-text-secondary">
           Set these values to connect to the relay.
           A tunneld-relay instance is required — see documentation for deployment.
         </div>
 
         <form phx-submit="save_mesh_config" class="space-y-3">
           <div>
-            <label class="text-xs text-gray-1 mb-1 block">Relay URL</label>
+            <label class="text-xs text-text-secondary mb-1 block">Relay URL</label>
             <input
               type="url"
               name="coordinator_url"
               value={@coordinator_url}
               placeholder="http://relay.example.com:4000"
-              class="w-full bg-primary border border-gray-600 rounded-lg p-3 text-sm text-white placeholder-gray-500 focus:border-purple focus:outline-none"
+              class="tunl-input"
             />
           </div>
           <div>
-            <label class="text-xs text-gray-1 mb-1 block">Token</label>
+            <label class="text-xs text-text-secondary mb-1 block">Token</label>
             <input
               type="password"
               name="token"
               value={@token}
               placeholder="shared-secret"
-              class="w-full bg-primary border border-gray-600 rounded-lg p-3 text-sm text-white placeholder-gray-500 focus:border-purple focus:outline-none"
+              class="tunl-input"
             />
           </div>
           <div>
-            <label class="text-xs text-gray-1 mb-1 block">Node Name</label>
+            <label class="text-xs text-text-secondary mb-1 block">Node Name</label>
             <input
               type="text"
               name="node_name"
               value={@node_name}
               placeholder="living-room-gateway"
-              class="w-full bg-primary border border-gray-600 rounded-lg p-3 text-sm text-white placeholder-gray-500 focus:border-purple focus:outline-none"
+              class="tunl-input"
             />
           </div>
           <button
             type="submit"
-            class="w-full p-3 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 bg-purple hover:bg-purple/80"
+            class="w-full p-3 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 bg-accent hover:bg-accent-light"
           >
             <.icon class="w-4 h-4" name="hero-check" />
             Save Mesh Config
@@ -983,7 +983,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(body: body)
 
     ~H"""
-    <div class="bg-primary bg-gradient-to-r from-secondary to-primary rounded-md p-3">
+    <div class="bg-surface-2 bg-gradient-to-r from-surface-2 to-surface rounded-md p-3">
       <div class="text-xl font-medium"><%= @header %></div>
       <div class="text-sm">
         <%= @body %>

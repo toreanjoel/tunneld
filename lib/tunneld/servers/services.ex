@@ -24,6 +24,10 @@ defmodule Tunneld.Servers.Services do
   @doc """
   Get the system logs for the services that we can render
   """
+  def handle_call(:get_status, _from, state) do
+    {:reply, state, state}
+  end
+
   def handle_call({:get_service_logs, service}, _from, state) do
     service_atom = Enum.find(@services, fn s -> to_string(s) == service end)
 
@@ -154,6 +158,16 @@ defmodule Tunneld.Servers.Services do
   @doc "Find a service atom by string name, returns nil if not in the allowlist."
   def find_service(name) when is_binary(name) do
     Enum.find(@services, fn s -> to_string(s) == name end)
+  end
+
+  @doc "Returns the current status of all monitored services."
+  @spec get_status :: %{atom() => boolean()}
+  def get_status do
+    try do
+      GenServer.call(__MODULE__, :get_status)
+    catch
+      :exit, _ -> %{}
+    end
   end
 
   def get_service_logs(service), do: GenServer.call(__MODULE__, {:get_service_logs, service})
