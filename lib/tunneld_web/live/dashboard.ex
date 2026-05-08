@@ -63,6 +63,7 @@ defmodule TunneldWeb.Live.Dashboard do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:resources")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:system_resources")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "geolocation:device")
+      Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:mesh")
     end
 
     uri_info = get_connect_info(socket, :uri)
@@ -139,6 +140,7 @@ defmodule TunneldWeb.Live.Dashboard do
                 relay={Map.get(mesh_data, :token)}
                 geo_location={@geo_location}
                 map_status={@map_status}
+                mesh_peers={mesh_data[:peers] |> Map.values()}
               />
 
               <div class="grid grid-rows-[1fr_3fr] gap-6">
@@ -230,13 +232,15 @@ defmodule TunneldWeb.Live.Dashboard do
     ~H"""
     <div
       :if={@sidebar.is_open}
-      class="fixed top-0 right-0 z-50 h-screen w-screen lg:w-[35%] lg:max-w-[700px] bg-surface system-scroll shadow-lg transition-transform duration-300 ease-in-out"
+      class="fixed top-0 right-0 z-50 h-screen w-screen lg:w-[35%] lg:max-w-[700px] shadow-lg transition-transform duration-300 ease-in-out"
+
+      style="background-color: var(--surface);"
     >
       <button phx-click="close_details" class="absolute top-4 right-4 z-10 ghost-icon w-9 h-9 flex items-center justify-center">
         <.icon class="w-5 h-5" name="hero-x-mark" />
       </button>
 
-      <div class="h-full overflow-y-auto">
+      <div class="h-full overflow-y-auto system-scroll bg-surface">
         <.live_component
           id="sidebar_details"
           module={SidebarDetails}
@@ -297,7 +301,7 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   def handle_event("copy_to_clipboard", %{"text" => text}, socket) do
-    {:noreply, push_event(socket, "clipboard-copy", %{text: text})}
+    {:noreply, push_event(socket, "copy_to_clipboard", %{text: text})}
   end
 
   def handle_event("save_mesh_config", params, socket) do
@@ -394,6 +398,10 @@ defmodule TunneldWeb.Live.Dashboard do
       |> maybe_refresh_mesh_sidebar()
 
     {:noreply, socket}
+  end
+
+  def handle_info(%{id: "sidebar_details", module: _module, data: %{dns_server: dns_server}}, socket) do
+    {:noreply, assign(socket, :dns_server, dns_server)}
   end
 
   def handle_info(%{id: "system_resources", module: TunneldWeb.Live.Components.SystemResources, data: data}, socket) do

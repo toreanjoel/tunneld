@@ -6,7 +6,9 @@ const MapPinHover = {
       const pin = e.target.closest("[data-pin-name]")
       if (!pin) return
 
-      this.tooltip = this.tooltip || this.buildTooltip()
+      const oldTip = this.tooltip
+      this.tooltip = this.buildTooltip()
+
       const name = pin.dataset.pinName || ""
       const country = pin.dataset.pinCountry || ""
       const ip = pin.dataset.pinIp || ""
@@ -18,27 +20,40 @@ const MapPinHover = {
       `
 
       const rect = pin.getBoundingClientRect()
-      const svgRect = this.el.closest("svg").getBoundingClientRect()
+      const svg = this.el.closest("svg")
+      if (!svg) return
+      const svgRect = svg.getBoundingClientRect()
       const x = rect.left + rect.width / 2
       const y = rect.top
 
       this.tooltip.style.left = `${x - svgRect.left}px`
       this.tooltip.style.top = `${y - svgRect.top - 8}px`
       this.tooltip.classList.remove("hidden")
+
+      if (oldTip && oldTip !== this.tooltip) {
+        oldTip.remove()
+      }
     }
 
     this.hideTooltip = () => {
-      if (this.tooltip) this.tooltip.classList.add("hidden")
+      if (this.tooltip) {
+        this.tooltip.classList.add("hidden")
+        this.tooltip.remove()
+        this.tooltip = null
+      }
     }
 
-    this.el.addEventListener("mouseover", this.showTooltip)
-    this.el.addEventListener("mouseout", this.hideTooltip)
+    this.el.addEventListener("pointerenter", this.showTooltip)
+    this.el.addEventListener("pointerleave", this.hideTooltip)
   },
 
   destroyed() {
-    this.el.removeEventListener("mouseover", this.showTooltip)
-    this.el.removeEventListener("mouseout", this.hideTooltip)
-    if (this.tooltip) this.tooltip.remove()
+    this.el.removeEventListener("pointerenter", this.showTooltip)
+    this.el.removeEventListener("pointerleave", this.hideTooltip)
+    if (this.tooltip) {
+      this.tooltip.remove()
+      this.tooltip = null
+    }
   },
 
   buildTooltip() {

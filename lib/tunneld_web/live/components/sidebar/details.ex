@@ -42,7 +42,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           Phoenix.LiveView.Rendered.t()
   def render(%{view: :authentication} = assigns) do
     ~H"""
-    <div class="bg-surface-2 p-4 h-full space-y-6">
+    <div class="bg-surface-2 p-4 space-y-6">
       <%= sidebar_header(assigns, %{
         header: "Authentication",
         body: "Reset your login credentials for the dashboard."
@@ -91,7 +91,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(health: Map.get(data || %{}, :health) || Map.get(data || %{}, "health") || %{})
 
     ~H"""
-    <div class="bg-surface-2 p-4 h-full space-y-6">
+    <div class="bg-surface-2 p-4 space-y-6">
       <div :if={@has_data}>
         <%= sidebar_header(assigns, %{
           header: mask(@obfuscated, @data.name),
@@ -398,7 +398,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(has_data: not Enum.empty?(data))
 
     ~H"""
-    <div class="bg-surface-2 p-4 h-full space-y-6">
+    <div class="bg-surface-2 p-4 space-y-6">
       <%!-- Sidebar header that will house metadat?  --%>
       <%= sidebar_header(assigns, %{
         header: "Overlay Network Settings",
@@ -515,7 +515,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(dns_server: dns_server)
 
     ~H"""
-    <div class="bg-surface-2 p-4 h-full space-y-6">
+    <div class="bg-surface-2 p-4 space-y-6">
       <%= sidebar_header(assigns, %{
         header: "DNS Server",
         body: "All DNS queries on the subnet are forwarded to this server. Use a public resolver like 1.1.1.1 or a local Pi-hole on your network."
@@ -561,7 +561,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(count: length(networks))
 
     ~H"""
-    <div class="bg-surface-2 p-4 h-full space-y-6">
+    <div class="bg-surface-2 p-4 space-y-6">
       <div class="relative">
         <%= sidebar_header(assigns, %{
           header: "Wireless Access",
@@ -762,7 +762,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(service: service)
 
     ~H"""
-    <div class="bg-surface-2 p-4 h-full space-y-6">
+    <div class="bg-surface-2 p-4 space-y-6">
       <%!-- Sidebar header that will house metadat?  --%>
       <%= sidebar_header(assigns, %{
         header: Map.get(@service, :name),
@@ -851,7 +851,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(:node_name, node_name)
 
     ~H"""
-    <div class="bg-surface-2 p-4 h-full space-y-6">
+    <div class="bg-surface-2 p-4 space-y-6">
       <%= sidebar_header(assigns, %{
         header: "Mesh Configuration",
         body: "Connect this node to a tunneld-relay for mesh networking between instances."

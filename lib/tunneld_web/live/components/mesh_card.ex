@@ -17,6 +17,7 @@ defmodule TunneldWeb.Live.Components.MeshCard do
   attr :relay, :string, default: nil
   attr :geo_location, :map, default: nil
   attr :map_status, :atom, default: :loading
+  attr :mesh_peers, :list, default: []
 
   def mesh_card(assigns) do
     ~H"""
@@ -53,8 +54,16 @@ defmodule TunneldWeb.Live.Components.MeshCard do
             }}
           />
           <.map_pin
+            :for={peer <- @mesh_peers}
             :if={@geo_location}
-            node={%{id: "peer-za", name: "Cape Town", ip: "102.0.0.1", country_code: "ZA", country_name: "South Africa", is_local: false}}
+            node={%{
+              id: Map.get(peer, "node_id", Map.get(peer, :node_id, "")),
+              name: Map.get(peer, "name", Map.get(peer, :name, "—")),
+              ip: Map.get(peer, "public_ip", Map.get(peer, :public_ip, "—")),
+              country_code: Map.get(peer, "country_code", Map.get(peer, :country_code, "")),
+              country_name: Map.get(peer, "country_name", Map.get(peer, :country_name, "")),
+              is_local: false
+            }}
           />
         </svg>
 
@@ -97,6 +106,9 @@ defmodule TunneldWeb.Live.Components.MeshCard do
           </div>
         </div>
         <div class="flex gap-1">
+          <button :if={@connected} class="ghost-btn !text-red" phx-click="trigger_action" phx-value-action="disconnect_mesh" phx-value-data="{}">
+            Disconnect
+          </button>
           <button :if={@connected} class="ghost-icon" phx-click="show_details" phx-value-type="mesh" phx-value-id="_" aria-label="Configure mesh">
             <.settings size={16} />
           </button>

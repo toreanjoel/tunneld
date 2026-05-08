@@ -320,12 +320,19 @@ defmodule Tunneld.Servers.Mesh do
   defp register_with_relay(state, pubkey, name, allowed_ips) do
     url = "#{state.coordinator_url}/register"
 
+    geo_data =
+      case Tunneld.Geolocation.get_location() do
+        {:ok, loc} -> %{public_ip: loc[:ip], country_code: loc[:country_code]}
+        _ -> %{}
+      end
+
     payload = %{
       node_id: state.node_id,
       pubkey: pubkey,
       name: name,
       allowed_ips: allowed_ips
     }
+    |> Map.merge(geo_data)
 
     case HTTPoison.post(url, Jason.encode!(payload), headers(state)) do
       {:ok, %{status_code: 200, body: body}} ->

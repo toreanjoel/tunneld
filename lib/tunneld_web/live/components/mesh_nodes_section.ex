@@ -4,6 +4,7 @@ defmodule TunneldWeb.Live.Components.MeshNodesSection do
   sync/disconnect action buttons.
   """
   use Phoenix.Component
+  alias Phoenix.LiveView.JS
   import TunneldWeb.Icons
   import TunneldWeb.Live.Components.SectionHeader
 
@@ -58,7 +59,8 @@ defmodule TunneldWeb.Live.Components.MeshNodesSection do
     <div
       id={if @safe_id, do: "mesh-node-#{@safe_id}"}
       class={[
-        "bg-surface border border-border rounded-xl p-4 flex flex-col justify-between gap-2.5 min-h-[140px] transition-colors duration-[120ms] group hover:bg-[#17161F] hover:border-[#2A2838]"
+        "bg-surface border border-border rounded-xl p-4 flex flex-col justify-between gap-2.5 min-h-[140px] transition-colors duration-[120ms] group hover:bg-[#17161F] hover:border-[#2A2838]",
+        @has_devices and @safe_id && "cursor-pointer"
       ]}
       phx-click={if @has_devices and @safe_id, do: JS.toggle_class("hidden", to: "#mesh-node-#{@safe_id}-devices")}
     >
