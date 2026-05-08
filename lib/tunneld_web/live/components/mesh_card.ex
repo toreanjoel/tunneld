@@ -1,16 +1,22 @@
 defmodule TunneldWeb.Live.Components.MeshCard do
   @moduledoc """
-  Mesh network hero card with globe visualization, connection status, peer count,
-  mesh IP, last sync time, and configure button.
+  Mesh network hero card with 2D world map visualization, device pin,
+  connection status, peer count, mesh IP, last sync time, and configure button.
+
+  The map is entirely offline — country paths are compiled directly into
+  Tunneld.GeoData.WorldMap from Natural Earth 110m TopoJSON.
   """
   use Phoenix.Component
   import TunneldWeb.Icons
+  import TunneldWeb.Live.Components.MapPin
 
   attr :connected, :boolean, default: false
   attr :peer_count, :integer, default: 0
   attr :mesh_ip, :string, default: nil
   attr :last_sync, :string, default: nil
   attr :relay, :string, default: nil
+  attr :geo_location, :map, default: nil
+  attr :map_status, :atom, default: :loading
 
   def mesh_card(assigns) do
     ~H"""
@@ -26,8 +32,54 @@ defmodule TunneldWeb.Live.Components.MeshCard do
         </div>
       </div>
 
-      <div class="relative flex-1 flex items-center justify-center min-h-[200px]">
-        <div :if={!@connected} class="text-[13px] text-text-secondary italic">Connect to a relay to enable mesh</div>
+      <div class="relative flex-1 min-h-[200px]">
+        <svg
+          :if={@map_status in [:ready, :stale, :geo_failed]}
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 800 450"
+          class="absolute inset-0 w-full h-full"
+          preserveAspectRatio="xMidYMid meet"
+        >
+          <Tunneld.GeoData.WorldMap.world_map />
+          <.map_pin
+            :if={@geo_location}
+            node={%{
+              id: "local",
+              name: "This device",
+              ip: Map.get(@geo_location, :ip, "—"),
+              country_code: Map.get(@geo_location, :country_code, ""),
+              country_name: Map.get(@geo_location, :country_name, ""),
+              is_local: true
+            }}
+          />
+          <.map_pin
+            :if={@geo_location}
+            node={%{id: "peer-za", name: "Cape Town", ip: "102.0.0.1", country_code: "ZA", country_name: "South Africa", is_local: false}}
+          />
+        </svg>
+
+        <div :if={@map_status == :loading} class="absolute inset-0 flex items-center justify-center">
+          <span class="text-[13px] text-text-secondary italic">Locating device…</span>
+        </div>
+
+        <div :if={@map_status == :unavailable} class="absolute inset-0 flex items-center justify-center">
+          <span class="text-[13px] text-text-secondary italic text-center px-4">
+            Connect to the internet to see peer locations
+          </span>
+        </div>
+
+        <div :if={@map_status == :geo_failed} class="absolute inset-0 flex items-center justify-center">
+          <span class="text-[13px] text-text-secondary italic z-10">
+            Couldn't determine location
+          </span>
+        </div>
+
+        <div
+          :if={@map_status == :stale}
+          class="absolute bottom-2 right-3 text-[10px] text-text-tertiary font-mono bg-[#0B0A14]/80 px-2 py-0.5 rounded z-[3]"
+        >
+          stale · auto-refresh hourly
+        </div>
       </div>
 
       <div class="h-px bg-border mx-6" />

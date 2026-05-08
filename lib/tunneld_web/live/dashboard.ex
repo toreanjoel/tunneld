@@ -62,6 +62,7 @@ defmodule TunneldWeb.Live.Dashboard do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:devices")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:resources")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:system_resources")
+      Phoenix.PubSub.subscribe(Tunneld.PubSub, "geolocation:device")
     end
 
     uri_info = get_connect_info(socket, :uri)
@@ -91,6 +92,15 @@ defmodule TunneldWeb.Live.Dashboard do
       |> assign(:dns_server, dns_server)
       |> assign(:devices_expanded, false)
       |> assign(:system_resources, %{})
+      |> assign(:map_status, :loading)
+      |> assign(:geo_location, nil)
+
+    socket =
+      case Tunneld.Geolocation.get_location() do
+        {:ok, loc} -> socket |> assign(:geo_location, loc) |> assign(:map_status, :ready)
+        :stale -> assign(socket, :map_status, :stale)
+        :unavailable -> assign(socket, :map_status, :unavailable)
+      end
 
     {:ok, socket}
   end
@@ -127,6 +137,8 @@ defmodule TunneldWeb.Live.Dashboard do
                 mesh_ip={Map.get(mesh_data, :mesh_ip)}
                 last_sync={if mesh_data[:last_sync], do: Calendar.strftime(mesh_data[:last_sync], "%H:%M:%S")}
                 relay={Map.get(mesh_data, :token)}
+                geo_location={@geo_location}
+                map_status={@map_status}
               />
 
               <div class="grid grid-rows-[1fr_3fr] gap-6">
@@ -486,6 +498,37 @@ defmodule TunneldWeb.Live.Dashboard do
   def handle_info({:show_details, %{"id" => id, "type" => type}}, socket) do
     sidebar = sidebar_open(get_sidebar_details(type, id), sidebar_selection(type, id))
     {:noreply, assign(socket, :sidebar, sidebar)}
+  end
+
+  def handle_info({:location_updated, location}, socket) do
+    {:noreply,
+     socket
+     |> assign(:geo_location, location)
+     |> assign(:map_status, :ready)}
+  end
+
+  def handle_info(:location_unavailable, socket) do
+    if socket.assigns.geo_location do
+      {:noreply, assign(socket, :map_status, :stale)}
+    else
+      {:noreply, assign(socket, :map_status, :unavailable)}
+    end
+  end
+
+  def handle_info(:geo_failed, socket) do
+    if socket.assigns.geo_location do
+      {:noreply, assign(socket, :map_status, :stale)}
+    else
+      {:noreply, assign(socket, :map_status, :geo_failed)}
+    end
+  end
+
+  def handle_info(:location_stale, socket) do
+    if socket.assigns.geo_location do
+      {:noreply, assign(socket, :map_status, :stale)}
+    else
+      {:noreply, assign(socket, :map_status, :unavailable)}
+    end
   end
 
   defp get_sidebar_details(type, id) do

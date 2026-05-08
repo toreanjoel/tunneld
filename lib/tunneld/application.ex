@@ -46,6 +46,7 @@ defmodule Tunneld.Application do
       {Updater, []},
       {Sqm, []},
       {Wireguard, []},
+      {Tunneld.Geolocation, []},
       {Tunneld.Servers.Mesh, []}
     ]
 
