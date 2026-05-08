@@ -100,14 +100,18 @@ defmodule Tunneld.Geolocation do
       {:ok, location} ->
         state = %{state | location: location, status: :ok, last_updated: System.monotonic_time(), error_count: 0}
         broadcast({:location_updated, location})
-        {:noreply, schedule_refresh(state)}
+        {:noreply, %{state | refresh_timer: schedule_refresh(state)}}
+
+      {:error, :ip_ok_no_geo} ->
+        broadcast(:geo_failed)
+        {:noreply, %{state | refresh_timer: schedule_refresh(state)}}
 
       {:error, :all_exhausted} ->
         broadcast(:location_unavailable)
-        {:noreply, schedule_refresh(state)}
+        {:noreply, %{state | refresh_timer: schedule_refresh(state)}}
 
       _ ->
-        {:noreply, schedule_refresh(state)}
+        {:noreply, %{state | refresh_timer: schedule_refresh(state)}}
     end
   end
 

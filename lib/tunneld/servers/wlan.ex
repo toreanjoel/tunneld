@@ -17,8 +17,6 @@ defmodule Tunneld.Servers.Wlan do
 
   @impl true
   def init(_) do
-    # We make sure the WP Supplicant is running
-    init_wp_supplicant()
     send(self(), :check_connection)
     {:ok, %{}}
   end
@@ -92,8 +90,6 @@ defmodule Tunneld.Servers.Wlan do
     wlan_iface = network_conf[:wlan]
     country = network_conf[:country] || ""
 
-    # Sanitize inputs to prevent WPA config injection.
-    # Escape backslashes and double quotes which could break out of the value fields.
     safe_ssid = sanitize_wpa_value(ssid)
     safe_password = sanitize_wpa_value(password)
     safe_country = sanitize_wpa_value(country)
@@ -113,9 +109,11 @@ defmodule Tunneld.Servers.Wlan do
 
     :ok = File.write(@wpa_config, new_config)
 
-    init_wp_supplicant()
-
+    # Reload config into the systemd-managed daemon; no kill/restart needed
+    run_cmd("wpa_cli", ["-i", wlan_iface, "reconfigure"])
     run_cmd("wpa_cli", ["-i", wlan_iface, "reconnect"])
+    # dhcpcd will acquire an IP lease automatically on connect
+    Process.sleep(2000)
     run_cmd("dhcpcd", [wlan_iface])
 
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
@@ -209,56 +207,6 @@ defmodule Tunneld.Servers.Wlan do
     end
   end
 
-  # we reinit the wp supplicant on startup initially
-  def init_wp_supplicant() do
-    if mock?() do
-      :local_development_mode
-    else
-      Logger.info("Restarting wpa_supplicant...")
-
-      # Kill existing wpa_supplicant
-      run_cmd("pkill", ["-f", "wpa_supplicant"])
-      # Wait 2 seconds for the process to fully terminate
-      Process.sleep(2000)
-
-      # Restart wpa_supplicant
-      {_, exit_code} =
-        run_cmd("wpa_supplicant", [
-          "-B",
-          "-i",
-          Application.get_env(:tunneld, :network)[:wlan],
-          "-c",
-          @wpa_config
-        ])
-
-      if exit_code == 0 do
-        Logger.info("wpa_supplicant restarted successfully")
-        # Ensure wpa_cli is ready before proceeding
-        wait_for_wpa_cli_ready()
-      else
-        Logger.error("Failed to restart wpa_supplicant")
-      end
-    end
-  end
-
-  # Ensures wpa_cli is available before proceeding
-  defp wait_for_wpa_cli_ready(attempts \\ 5) do
-    {output, exit_code} = run_cmd("wpa_cli", ["status"])
-
-    if exit_code == 0 and String.contains?(output, "wpa_state") do
-      Logger.info("wpa_cli is ready")
-      :ok
-    else
-      if attempts > 0 do
-        Process.sleep(2000)
-        wait_for_wpa_cli_ready(attempts - 1)
-      else
-        Logger.error("Failed to detect wpa_cli readiness after multiple attempts")
-        :error
-      end
-    end
-  end
-
   # Escape characters that could break out of a double-quoted WPA config value.
   defp sanitize_wpa_value(value) when is_binary(value) do
     value
@@ -318,11 +266,6 @@ defmodule Tunneld.Servers.Wlan do
 
   @impl true
   def terminate(_reason, _state) do
-    unless mock?() do
-      Logger.info("Wlan shutting down, stopping wpa_supplicant")
-      run_cmd("pkill", ["-f", "wpa_supplicant"])
-    end
-
     :ok
   end
 end

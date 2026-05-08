@@ -64,7 +64,7 @@ defmodule TunneldWeb.Live.Components.MeshCard do
 
         <div :if={@map_status == :unavailable} class="absolute inset-0 flex items-center justify-center">
           <span class="text-[13px] text-text-secondary italic text-center px-4">
-            Connect to the internet to see peer locations
+            Connect to a relay to see peer locations
           </span>
         </div>
 
