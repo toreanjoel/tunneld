@@ -63,7 +63,7 @@ defmodule TunneldWeb.Live.Components.Devices do
       <div :if={!@loading} class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         <%= for device <- Map.get(@data, :devices, []) do %>
           <div
-            class="p-4 flex flex-col bg-surface rounded-lg w-full min-h-[130px] h-auto"
+            class="p-4 flex flex-col bg-surface border border-border rounded-lg w-full min-h-[130px] h-auto transition-colors duration-[120ms] hover:bg-[#17161F] hover:border-[#2A2838]"
             style="animation: fadeIn 0.5s ease-out forwards;"
           >
             <div class="flex flex-row gap-2">
@@ -146,7 +146,7 @@ defmodule TunneldWeb.Live.Components.Devices do
             </div>
             <div class={if device.tags != [], do: "grow-0 h-1", else: "grow"} />
             <div :if={device.tags != []} class="flex flex-wrap gap-1 mb-1 pt-1">
-              <%= for tag <- Enum.take(device.tags, 2) do %>
+              <%= for tag <- device.tags |> Enum.sort_by(fn t -> if String.starts_with?(t, "wg"), do: 0, else: 1 end) |> Enum.take(2) do %>
                 <span class={"group px-1.5 py-0.5 text-[10px] rounded border flex items-center gap-1 shrink-0 " <> tag_classes(tag)} title={tag}>
                   <span class="truncate max-w-[90px]"><%= tag %></span>
                   <span
@@ -175,10 +175,10 @@ defmodule TunneldWeb.Live.Components.Devices do
   end
 
   defp tag_classes(tag) when is_binary(tag) do
-    if String.starts_with?(tag, "wg::") do
-      "bg-purple-900/60 text-purple-200 border-purple-700/40"
-    else
+    if String.starts_with?(tag, "wg") do
       "bg-blue-900/60 text-blue-200 border-blue-700/40"
+    else
+      "bg-surface-2 text-text-secondary border-border"
     end
   end
 end

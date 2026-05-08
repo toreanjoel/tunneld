@@ -238,7 +238,7 @@ defmodule Tunneld.Servers.Mesh do
       Enum.flat_map(devices, fn d ->
         tags = DeviceTags.get_tags(d.mac)
 
-        if Enum.any?(tags, &String.starts_with?(&1, "wg::")) do
+        if Enum.any?(tags, &String.starts_with?(&1, "wg")) do
           [d.ip <> "/32"]
         else
           []

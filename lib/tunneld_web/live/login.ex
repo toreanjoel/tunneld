@@ -54,7 +54,7 @@ defmodule TunneldWeb.Live.Login do
           </div>
         </div>
         <div class="text-sm text-text-secondary pb-4 text-center">
-          <a href="https://github.com/toreanjoel/tunneld" target="_blank" class="hover:text-text-primary transition-colors">
+          <a href="https://github.com/toreanjoel/tunneld" target="_blank" class="underline underline-offset-4 decoration-text-tertiary hover:text-text-primary hover:decoration-text-secondary transition-colors">
             Made with ☕️ | by Torean
           </a>
         </div>

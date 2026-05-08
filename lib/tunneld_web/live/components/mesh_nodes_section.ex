@@ -58,8 +58,7 @@ defmodule TunneldWeb.Live.Components.MeshNodesSection do
     <div
       id={if @safe_id, do: "mesh-node-#{@safe_id}"}
       class={[
-        "bg-surface rounded-xl p-4 flex flex-col justify-between gap-2.5 min-h-[140px] transition-colors duration-[120ms] group",
-        "hover:bg-[#17161F]"
+        "bg-surface border border-border rounded-xl p-4 flex flex-col justify-between gap-2.5 min-h-[140px] transition-colors duration-[120ms] group hover:bg-[#17161F] hover:border-[#2A2838]"
       ]}
       phx-click={if @has_devices and @safe_id, do: JS.toggle_class("hidden", to: "#mesh-node-#{@safe_id}-devices")}
     >
@@ -104,7 +103,7 @@ defmodule TunneldWeb.Live.Components.MeshNodesSection do
             </div>
             <div :if={dtags != []} class="flex gap-1 flex-wrap mt-0.5">
               <%= for t <- dtags do %>
-                <span class="bg-accent/10 text-accent px-1.5 py-0.5 rounded text-[10px] font-mono"><%= t %></span>
+                <span class="bg-surface-2 text-text-secondary border border-border px-1.5 py-0.5 rounded text-[10px] font-mono"><%= t %></span>
               <% end %>
             </div>
           </div>

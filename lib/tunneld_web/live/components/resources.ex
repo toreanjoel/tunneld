@@ -61,7 +61,7 @@ defmodule TunneldWeb.Live.Components.Resources do
             phx-click="show_details"
             phx-value-type="resource"
             phx-value-id={resource.id || resource["id"]}
-            class="p-3 gap-2 flex flex-col rounded-lg w-full h-[80px] cursor-pointer bg-surface transition-colors duration-150"
+            class="p-3 gap-2 flex flex-col rounded-lg w-full h-[80px] cursor-pointer bg-surface border border-border transition-colors duration-150 hover:bg-[#17161F] hover:border-[#2A2838]"
             style="animation: fadeIn 0.5s ease-out forwards;"
           >
             <div class="flex items-center gap-2 grow">

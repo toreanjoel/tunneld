@@ -8,6 +8,8 @@ defmodule TunneldWeb.Live.Dashboard do
   alias Tunneld.Servers.Devices, as: DevicesServer
   alias TunneldWeb.Router.Helpers, as: Routes
 
+  import TunneldWeb.Live.Components.SectionHeader
+
   alias TunneldWeb.Live.Components.Sidebar.Details, as: SidebarDetails
   alias TunneldWeb.Live.Components.Modal
   alias TunneldWeb.Live.Dashboard.Actions
@@ -157,6 +159,7 @@ defmodule TunneldWeb.Live.Dashboard do
             </div>
 
             <div class="mt-12">
+              <.section_header>Local devices</.section_header>
               <div class="bg-surface border border-border rounded-xl p-6 h-24 flex items-center justify-between">
                 <div class="flex items-center gap-5">
                   <span class="text-text-secondary inline-flex">
@@ -165,9 +168,9 @@ defmodule TunneldWeb.Live.Dashboard do
                   <span class="text-[28px] text-text-primary font-medium -tracking-[0.02em]">
                     <%= length(@devices) %>
                   </span>
-                  <span class="text-sm text-text-secondary leading-[1.3] max-w-[180px]">
-                    connected devices
-                  </span>
+          <span class="text-sm text-text-secondary leading-[1.3] max-w-[180px]">
+            local devices
+          </span>
                 </div>
                 <button class="ghost-btn" phx-click="toggle_devices_expanded">
                   View all devices
@@ -434,7 +437,13 @@ defmodule TunneldWeb.Live.Dashboard do
   def handle_info({:action_done, ref, action, _result}, socket)
       when action in ["add_device_tag", "remove_device_tag"] do
     pending = Map.get(socket.assigns.pending_actions, ref, %{})
-    devices = DevicesServer.fetch_devices()
+    devices =
+      DevicesServer.fetch_devices()
+      |> Enum.map(fn d ->
+        d
+        |> Map.put(:expose_allowed, Tunneld.Servers.ExposeAllowed.allowed?(d.mac))
+        |> Map.put(:tags, Tunneld.Servers.DeviceTags.get_tags(d.mac))
+      end)
 
     socket =
       socket

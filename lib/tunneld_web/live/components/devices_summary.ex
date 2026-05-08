@@ -56,7 +56,7 @@ defmodule TunneldWeb.Live.Components.DevicesSummary do
 
               <div :if={device_tags != []} class="flex gap-1 flex-wrap">
                 <%= for tag <- Enum.take(device_tags, 3) do %>
-                  <span class="bg-accent/10 text-accent px-1.5 py-0.5 rounded text-[10px] font-mono"><%= tag %></span>
+                  <span class="bg-surface-2 text-text-secondary border border-border px-1.5 py-0.5 rounded text-[10px] font-mono"><%= tag %></span>
                 <% end %>
               </div>
               <div :if={device_tags == []} class="grow" />

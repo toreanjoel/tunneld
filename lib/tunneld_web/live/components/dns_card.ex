@@ -23,9 +23,6 @@ defmodule TunneldWeb.Live.Components.DnsCard do
         <div class="font-mono text-[22px] text-text-primary font-medium -tracking-[0.01em]">
           <%= @server %>
         </div>
-        <div class="text-[11px] text-text-tertiary tracking-[0.05em]">
-          forwarding subnet queries
-        </div>
       </div>
     </div>
     """
