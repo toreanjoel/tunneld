@@ -23,10 +23,10 @@ defmodule TunneldWeb.Live.Components.GaugeGrid do
         <.gauge_cell icon={:cpu} label="CPU" value={@cpu} max={100} suffix="%" />
       </div>
       <div class="border-b border-border">
-        <.gauge_cell icon={:hard_drive} label="MEM" value={@mem_pct} max={100} suffix="%" sub={"#{@mem_used} / #{@mem_total} GB"} />
+        <.gauge_cell icon={:hard_drive} label="MEM" value={@mem_pct} max={100} suffix="%" />
       </div>
       <div class="border-r border-border">
-        <.gauge_cell icon={:database} label="STORAGE" value={@storage_pct} max={100} suffix="%" sub={"#{@storage_used} / #{@storage_total} GB"} />
+        <.gauge_cell icon={:database} label="STORAGE" value={@storage_pct} max={100} suffix="%" />
       </div>
       <div>
         <.gauge_cell icon={:thermometer} label="TEMP" value={@temp_value} max={@temp_max} suffix="°" />
@@ -50,7 +50,7 @@ defmodule TunneldWeb.Live.Components.GaugeGrid do
     assigns = assign(assigns, val: val, shown: shown, id: id)
 
     ~H"""
-    <div class="h-full flex flex-col items-center justify-center gap-1.5 relative">
+    <div class="h-full flex flex-col items-center justify-center relative">
       <div class="absolute top-3.5 left-3.5 flex items-center gap-1.5 text-text-secondary">
         <%= case @icon do %>
           <% :cpu -> %><.cpu size={12} />
@@ -84,8 +84,6 @@ defmodule TunneldWeb.Live.Components.GaugeGrid do
           <%= @shown %>
         </div>
       </div>
-
-      <div :if={@sub != ""} class="font-mono text-[10px] text-text-tertiary leading-none"><%= @sub %></div>
     </div>
     """
   end

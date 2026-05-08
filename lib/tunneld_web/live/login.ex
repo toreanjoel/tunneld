@@ -43,18 +43,17 @@ defmodule TunneldWeb.Live.Login do
   def render(assigns) do
     ~H"""
     <div id="auth" class="flex flex-col lg:flex-row min-h-screen">
-      <div class="relative text-text-primary lg:w-3/5 w-full lg:flex flex-col items-center justify-center p-8 rounded-lg">
+      <div class="relative text-text-primary lg:w-3/5 w-full lg:flex flex-col p-8 rounded-lg">
         <div class="absolute inset-0 bg-grid pointer-events-none"></div>
 
-        <div class="grow" />
-        <div class="text-center grow flex flex-col items-center justify-center">
+        <div class="flex-1 flex flex-col items-center justify-center text-center">
           <h1 class="text-4xl font-semibold text-text-primary mb-2 -tracking-[0.01em]">Tunneld</h1>
           <p class="text-sm text-text-secondary font-light tracking-[0.02em]">A subnet in your pocket.</p>
           <div class="text-xs text-text-tertiary font-mono mt-4">
             <%= Application.get_env(:tunneld, :metadata)[:device_id] || System.get_env("DEVICE_ID") %>
           </div>
         </div>
-        <div class="text-sm text-text-secondary pb-4">
+        <div class="text-sm text-text-secondary pb-4 text-center">
           <a href="https://github.com/toreanjoel/tunneld" target="_blank" class="hover:text-text-primary transition-colors">
             Made with ☕️ | by Torean
           </a>

@@ -28,13 +28,13 @@ defmodule TunneldWeb.Live.Components.TopBar do
       <% end %>
       <div class="flex items-center gap-2.5">
         <span class="text-lg font-medium text-text-primary -tracking-[0.01em]">Tunneld</span>
-        <div :if={@version} class="hidden sm:flex items-center gap-2 ml-2">
-          <span class="text-xs text-text-tertiary font-mono"><%= @version %></span>
+        <div class="flex items-center gap-2 ml-2">
+          <span class="text-xs text-text-secondary font-mono"><%= @version %></span>
           <span
             :if={@update_available and @new_version}
             class="bg-accent/15 text-accent px-2 py-0.5 rounded text-[10px] font-mono"
           >
-            <%= @new_version %>
+            Update available
           </span>
         </div>
       </div>

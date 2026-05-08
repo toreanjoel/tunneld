@@ -383,6 +383,12 @@ defmodule TunneldWeb.Live.Dashboard do
 
   def handle_info(%{id: "system_resources", module: TunneldWeb.Live.Components.SystemResources, data: data}, socket) do
     resources = Map.get(data, :resources, %{})
+    # Preserve update check state from existing assignment
+    resources =
+      resources
+      |> Map.put(:is_latest, Map.get(socket.assigns.system_resources, :is_latest, true))
+      |> Map.put(:new_version, Map.get(socket.assigns.system_resources, :new_version))
+
     {:noreply, assign(socket, :system_resources, resources)}
   end
 
