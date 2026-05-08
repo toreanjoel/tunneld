@@ -31,7 +31,7 @@ config :tunneld, TunneldWeb.Endpoint,
 
 # Configure esbuild (the version is required)
 config :esbuild,
-  version: "0.17.21",
+  version: "0.18.01",
   tunneld: [
     args:
       ~w(js/app.js --bundle --target=es2017 --outdir=../priv/static/assets --external:/fonts/* --loader:.svg=file --public-path=/assets --asset-names=images/[name]-[hash]),
@@ -63,7 +63,7 @@ config :phoenix, :json_library, Jason
 config :tunneld, :auth,
   ttl: 1800
 
-config :tunneld, version: "0.17.2"
+config :tunneld, version: "0.18.0"
 
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.

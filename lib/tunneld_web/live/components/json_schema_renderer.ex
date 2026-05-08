@@ -2,30 +2,22 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
   @moduledoc """
   A Phoenix LiveComponent that dynamically renders forms based on JSON Schema.
   """
-
   use Phoenix.LiveComponent
   alias ExJsonSchema.Validator
   alias ExJsonSchema.Schema
 
-  @doc """
-  Initializes or updates the component state.
+  alias TunneldWeb.Icons
 
-  ## Assigns:
-  - `schema` (map) - JSON schema for form structure.
-  - `values` (map, optional) - Prepopulated form values.
-  """
   @spec update(map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
   def update(assigns, socket) do
     schema = Schema.resolve(assigns.schema)
     client_id = Map.get(assigns, :client_id, nil)
 
-    # Defaults to empty if not provided
     title = Map.get(assigns, :title, "Submit")
     values = Map.get(assigns, :values, %{})
     loading = Map.get(assigns, :loading, false)
     existing_changeset = Map.get(socket.assigns, :changeset, %{})
 
-    # This should allow a default of the keys that is already on the form to handle fallback order
     ui_order = Map.get(assigns.schema, "ui:order", assigns.schema["properties"] |> Map.keys())
 
     fields =
@@ -37,7 +29,6 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
           name: key,
           type: props["type"],
           description: props["description"],
-          # Prioritize enums passed in `values` (dynamic injection)
           enum:
             if(props["type"] == "array",
               do: nil,
@@ -61,15 +52,11 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
      |> assign(action: assigns.action)
      |> assign(schema: schema)
      |> assign(fields: fields)
-     # Preserve user-entered values during re-renders (e.g., while submitting)
      |> assign(changeset: changeset)
      |> assign(client_id: client_id)
      |> assign(errors: nil)}
   end
 
-  @doc """
-  Renders a dynamic form based on the provided JSON schema.
-  """
   @spec render(map()) :: Phoenix.LiveView.Rendered.t()
   def render(assigns) do
     ~H"""
@@ -78,12 +65,12 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
         <div class="mb-4">
           <% hidden = if field.hidden, do: "hidden", else: "" %>
 
-          <label class={"#{hidden} text-white text-sm font-semibold mb-1 capitalize"}>
+          <label class={"#{hidden} text-text-secondary text-sm font-medium mb-1 capitalize block"}>
             <%= field.name %>
           </label>
           <label
             :if={field.description}
-            class={"#{hidden} block text-white text-xs font-semibold mb-1"}
+            class={"#{hidden} block text-text-tertiary text-xs mb-1"}
           >
             <%= field.description %>
           </label>
@@ -93,17 +80,16 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
               <textarea
                 name={"form[#{field.name}]"}
                 rows="5"
-                class={"#{hidden} bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200 font-mono text-sm"}
+                class={"#{hidden} tunl-input font-mono min-h-[6rem]"}
                 readonly={field.readonly}
               ><%= array_to_text(Map.get(@changeset, field.name, field.default || [])) %></textarea>
-              <div :if={field.help} class="bg-blue-800 bg-opacity-20 py-2 px-3 rounded-md my-2 text-xs text-blue-500">
+              <div :if={field.help} class="bg-accent/10 py-2 px-3 rounded-md my-2 text-xs text-accent">
                 <%= field.help %>
               </div>
             <% else %>
-              <!-- Enum dropdown -->
               <select
                 name={"form[#{field.name}]"}
-                class={"#{hidden} bg-primary rounded-md px-3 py-2 w-full"}
+                class={"#{hidden} tunl-input"}
               >
                 <%= for option <- field.enum do %>
                   <option value={option} selected={Map.get(@changeset, field.name, "") == option}>
@@ -119,17 +105,17 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
                 name={"form[#{field.name}]"}
                 value="true"
                 checked={Map.get(@changeset, field.name) in [true, "true", "on", 1]}
-                class={"#{hidden} rounded border-gray-300 text-purple shadow-sm focus:ring-2 focus:ring-purple"}
+                class={"#{hidden} rounded border-border bg-bg text-accent focus:ring-accent"}
               />
             <% else %>
               <%= if field.type == "array" do %>
                 <textarea
                   name={"form[#{field.name}]"}
                   rows="5"
-                  class={"#{hidden} bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200 font-mono text-sm"}
+                  class={"#{hidden} tunl-input font-mono min-h-[6rem]"}
                   readonly={field.readonly}
                 ><%= array_to_text(Map.get(@changeset, field.name, field.default || [])) %></textarea>
-                <div :if={field.help} class="bg-blue-800 bg-opacity-20 py-2 px-3 rounded-md my-2 text-xs text-blue-500">
+                <div :if={field.help} class="bg-accent/10 py-2 px-3 rounded-md my-2 text-xs text-accent">
                   <%= field.help %>
                 </div>
               <% else %>
@@ -137,7 +123,7 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
                   <textarea
                     name={"form[#{field.name}]"}
                     rows="6"
-                    class={"#{hidden} bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200 font-mono text-sm"}
+                    class={"#{hidden} tunl-input font-mono min-h-[6rem]"}
                     readonly={field.readonly}
                   ><%= Map.get(@changeset, field.name, field.default || "") %></textarea>
                 <% else %>
@@ -146,10 +132,10 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
                     type={input_type}
                     name={"form[#{field.name}]"}
                     value={Map.get(@changeset, field.name, field.default || "")}
-                    class={"#{hidden} bg-primary rounded-md px-3 py-2 w-full text-gray-1 focus:ring-2 focus:ring-purple transition duration-200"}
+                    class={"#{hidden} tunl-input"}
                     readonly={field.readonly}
                   />
-                  <div :if={field.help} class="bg-blue-800 bg-opacity-20 py-2 px-3 rounded-md my-2 text-xs text-blue-500">
+                  <div :if={field.help} class="bg-accent/10 py-2 px-3 rounded-md my-2 text-xs text-accent">
                     <%= field.help %>
                   </div>
                 <% end %>
@@ -159,22 +145,18 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
         </div>
       <% end %>
 
-      <div :if={@errors} class="bg-red bg-opacity-20 p-3 rounded-md mb-4">
+      <div :if={@errors} class="bg-red/10 p-3 rounded-lg mb-4">
         <%= for error <- @errors do %>
           <p class="text-red text-sm"><%= error %></p>
         <% end %>
       </div>
 
-      <div class="flex flex-row">
+      <div class="flex flex-row pt-2">
         <div class="grow w-full" />
         <button
           type="submit"
           disabled={@loading}
-          class={"
-            #{if not @loading, do: "bg-purple hover:bg-light_purple", else: "bg-light_purple"}
-            text-white px-4 py-2 rounded-lg font-semibold
-            transition duration-200"
-          }
+          class="btn-primary disabled:opacity-50 disabled:cursor-not-allowed"
           phx-disable-with="Submitting..."
         >
           <%= if @loading, do: "Loading...", else: @title %>
@@ -191,7 +173,6 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
           {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_event("submit", %{"form" => raw_params}, socket) do
     if socket.assigns.loading do
-      # Ignore duplicate submits while an action is already pending
       {:noreply, socket}
     else
       params =
@@ -200,8 +181,6 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
           value =
             case field.type do
               "boolean" ->
-                # HTML checkboxes only send data when checked
-                # So if the key is present, it's checked
                 Map.has_key?(raw_params, field.name)
 
               "array" ->
@@ -247,9 +226,6 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
   defp array_to_text(value) when is_binary(value), do: value
   defp array_to_text(_), do: ""
 
-  #
-  # Validation error output
-  #
   defp clean_errors(errors) do
     Enum.map(errors, fn {field, msg} ->
       "#{msg |> String.replace("#/", "") |> String.capitalize()} :: #{field}"

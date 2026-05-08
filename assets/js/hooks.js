@@ -1,9 +1,13 @@
-// Base hooks
+import { HemisphereHook } from "./hemisphere.js"
+import GaugeHook from "./gauge_hook.js"
+import MapPinHover from "./map_pin_hover.js"
+
 let Hooks = {};
 
-/**
- * Copy to the clipboard
- */
+Hooks.Hemisphere = HemisphereHook;
+Hooks.Gauge = GaugeHook;
+Hooks.MapPinHover = MapPinHover;
+
 Hooks.CopyToClipboard = {
   mounted() {
     this.handleEvent("copy_to_clipboard", ({ text }) => {

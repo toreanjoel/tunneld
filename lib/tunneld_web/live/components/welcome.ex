@@ -1,6 +1,7 @@
 defmodule TunneldWeb.Live.Components.Welcome do
   @moduledoc """
-  The welcome message to welcome the user. This will contain message and some details potentially.
+  @deprecated Will be removed in v2 in favor of version badge in TopBar.
+  The welcome message to welcome the user.
   """
   use TunneldWeb, :live_component
 

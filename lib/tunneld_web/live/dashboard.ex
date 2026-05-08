@@ -8,16 +8,18 @@ defmodule TunneldWeb.Live.Dashboard do
   alias Tunneld.Servers.Devices, as: DevicesServer
   alias TunneldWeb.Router.Helpers, as: Routes
 
-  # Components
+  import TunneldWeb.Live.Components.SectionHeader
+
   alias TunneldWeb.Live.Components.Sidebar.Details, as: SidebarDetails
-  alias TunneldWeb.Live.Components.Welcome
-  alias TunneldWeb.Live.Components.SystemResources
-  alias TunneldWeb.Live.Components.Services
-  alias TunneldWeb.Live.Components.Resources
-  alias TunneldWeb.Live.Components.Devices
-  alias TunneldWeb.Live.Components.Mesh.Server, as: MeshServer
-  alias TunneldWeb.Live.Components.Mesh.Nodes, as: MeshNodes
+  alias TunneldWeb.Live.Components.Modal
   alias TunneldWeb.Live.Dashboard.Actions
+
+  import TunneldWeb.Live.Components.TopBar
+  import TunneldWeb.Live.Components.MeshCard
+  import TunneldWeb.Live.Components.InternetCard
+  import TunneldWeb.Live.Components.DnsCard
+  import TunneldWeb.Live.Components.GaugeGrid
+  import TunneldWeb.Live.Components.MeshNodesSection
 
   @modal_default %{
     show: false,
@@ -34,15 +36,9 @@ defmodule TunneldWeb.Live.Dashboard do
     selection: nil
   }
 
-  # auth check if this page needs to be behind auth
   on_mount TunneldWeb.Hooks.CheckAuth
 
-  @spec mount(map(), map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
-  @doc """
-  Initialize the dashboard with sidebar set to false.
-  """
   def mount(_params, %{"client_id" => client_id} = _session, socket) do
-    # Redirect to setup wizard if not yet onboarded
     needs_setup =
       case Tunneld.Servers.Auth.read_file() do
         {:ok, auth} -> not Map.get(auth, "onboarded", false)
@@ -64,11 +60,14 @@ defmodule TunneldWeb.Live.Dashboard do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "status:internet")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:details")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:devices")
+      Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:resources")
+      Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:system_resources")
+      Phoenix.PubSub.subscribe(Tunneld.PubSub, "geolocation:device")
     end
 
-    # Check the scheme and domain to make sure it is possible to show
     uri_info = get_connect_info(socket, :uri)
     devices = DevicesServer.fetch_devices()
+    dns_server = Tunneld.Servers.DnsConfig.get_dns_server()
 
     internet_status =
       try do
@@ -83,38 +82,133 @@ defmodule TunneldWeb.Live.Dashboard do
       |> assign(:uri_info, uri_info)
       |> assign(modal: @modal_default)
       |> assign(sidebar: @sidebar_default)
-      |> assign(
-        status: %{
-          internet: internet_status
-        }
-      )
+      |> assign(status: %{internet: internet_status})
       |> assign(:devices, devices)
       |> assign(:pending_actions, %{})
       |> assign(:mesh_state, mesh_state())
       |> assign(:settings_menu_open, false)
       |> assign(:obfuscated, false)
+      |> assign(:services_popover_open, false)
+      |> assign(:dns_server, dns_server)
+      |> assign(:devices_expanded, false)
+      |> assign(:system_resources, %{})
+      |> assign(:map_status, :loading)
+      |> assign(:geo_location, nil)
+
+    socket =
+      case Tunneld.Geolocation.get_location() do
+        {:ok, loc} -> socket |> assign(:geo_location, loc) |> assign(:map_status, :ready)
+        :stale -> assign(socket, :map_status, :stale)
+        :unavailable -> assign(socket, :map_status, :unavailable)
+      end
 
     {:ok, socket}
   end
 
-  @doc """
-  Render the dashboard.
-  """
   def render(assigns) do
     ~H"""
-    <div class="relative flex flex-row flex-1 h-screen text-white bg-primary">
-      <!-- Flexible middle column -->
-      <%= main(assigns) %>
+    <div class="min-h-screen bg-bg text-text-primary">
+      <div class="absolute top-0 left-0 right-0 h-[760px] pointer-events-none z-0"
+        style="background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(6,182,212,0.30) 0%, rgba(6,182,212,0.08) 30%, transparent 70%);">
+      </div>
+      <div class="absolute top-[720px] left-0 right-0 h-20 pointer-events-none z-0"
+        style="background: linear-gradient(to bottom, rgba(11,10,20,0) 0%, #0B0A14 100%);">
+      </div>
+
+      <div class="relative z-[1]">
+        <.top_bar
+          services={services_list()}
+          version={Application.get_env(:tunneld, :version)}
+          update_available={Map.get(@system_resources, :is_latest, true) == false}
+          new_version={Map.get(@system_resources, :new_version)}
+          obfuscated={@obfuscated}
+          settings_menu_open={@settings_menu_open}
+          services_popover_open={@services_popover_open}
+          device_id={Application.get_env(:tunneld, :metadata)[:device_id] || System.get_env("DEVICE_ID")}
+        />
+
+        <%= if !@devices_expanded do %>
+          <main class="max-w-[1280px] mx-auto px-8 pt-2 pb-16">
+            <div class="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6">
+              <% mesh_data = @mesh_state || %{} %>
+              <.mesh_card
+                connected={Map.get(mesh_data, :status) == :connected}
+                peer_count={mesh_data[:peers] |> Map.values() |> length()}
+                mesh_ip={Map.get(mesh_data, :mesh_ip)}
+                last_sync={if mesh_data[:last_sync], do: Calendar.strftime(mesh_data[:last_sync], "%H:%M:%S")}
+                relay={Map.get(mesh_data, :token)}
+                geo_location={@geo_location}
+                map_status={@map_status}
+              />
+
+              <div class="grid grid-rows-[1fr_3fr] gap-6">
+                <div class="grid grid-cols-2 gap-6">
+                  <.internet_card on={@status.internet} />
+                  <.dns_card server={@dns_server} />
+                </div>
+                <.gauge_grid
+                  cpu={Map.get(@system_resources, :cpu, 0)}
+                  mem_pct={Map.get(@system_resources, :mem, 0)}
+                  mem_used={Map.get(@system_resources, :mem_used, "—")}
+                  mem_total={Map.get(@system_resources, :mem_total, "—")}
+                  storage_pct={Map.get(@system_resources, :storage, 0)}
+                  storage_used={Map.get(@system_resources, :storage_used, "—")}
+                  storage_total={Map.get(@system_resources, :storage_total, "—")}
+                  temp_value={Map.get(@system_resources, :temp, 0)}
+                  temp_max={80}
+                />
+              </div>
+            </div>
+
+            <%= if Map.get(@mesh_state || %{}, :status) == :connected do %>
+              <.mesh_nodes_section
+                nodes={Map.get(@mesh_state, :peers, %{}) |> Map.values()}
+              />
+            <% end %>
+
+            <div class="mt-6">
+              <.live_component id="resources" module={TunneldWeb.Live.Components.Resources} obfuscated={@obfuscated} />
+            </div>
+
+            <div class="mt-12">
+              <.section_header>Local devices</.section_header>
+              <div class="bg-surface border border-border rounded-xl p-6 h-24 flex items-center justify-between">
+                <div class="flex items-center gap-5">
+                  <span class="text-text-secondary inline-flex">
+                    <.icon name="hero-computer-desktop" class="w-8 h-8" />
+                  </span>
+                  <span class="text-[28px] text-text-primary font-medium -tracking-[0.02em]">
+                    <%= length(@devices) %>
+                  </span>
+          <span class="text-sm text-text-secondary leading-[1.3] max-w-[180px]">
+            local devices
+          </span>
+                </div>
+                <button class="ghost-btn" phx-click="toggle_devices_expanded">
+                  View all devices
+                  <.icon name="hero-chevron-right" class="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          </main>
+        <% else %>
+          <main class="max-w-[1280px] mx-auto px-8 pt-2 pb-16">
+            <button class="ghost-btn mb-6" phx-click="toggle_devices_expanded">
+              <.icon name="hero-arrow-left" class="w-4 h-4" /> Back to dashboard
+            </button>
+            <.live_component id="devices" module={TunneldWeb.Live.Components.Devices} obfuscated={@obfuscated} />
+          </main>
+        <% end %>
+      </div>
 
       <%= if @sidebar.is_open do %>
-        <div class="fixed inset-0 bg-black bg-opacity-50 z-2" phx-click="close_details" />
+        <div class="fixed inset-0 bg-black bg-opacity-50 z-40" phx-click="close_details" />
       <% end %>
-      <!-- Sidebar for more details -->
       <%= if not is_nil(@sidebar.view), do: sidebar(assigns) %>
 
       <.live_component
         :if={@modal.show && @modal.type === :default}
-        module={TunneldWeb.Live.Components.Modal}
+        module={Modal}
         id="generic_modal"
         title={@modal.title}
         description={@modal.description}
@@ -127,14 +221,6 @@ defmodule TunneldWeb.Live.Dashboard do
     """
   end
 
-  @spec sidebar(%{
-          :sidebar => %{is_open: boolean(), view: atom(), selection: map() | nil},
-          optional(any()) => any()
-        }) ::
-          Phoenix.LiveView.Rendered.t()
-  @doc """
-  Overlay sidebar with close button and responsive width.
-  """
   def sidebar(%{sidebar: sidebar, uri_info: uri_info} = assigns) do
     assigns =
       assigns
@@ -144,16 +230,13 @@ defmodule TunneldWeb.Live.Dashboard do
     ~H"""
     <div
       :if={@sidebar.is_open}
-      class="fixed top-0 right-0 z-19 h-screen w-screen lg:w-[35%] lg:max-w-[700px] bg-secondary system-scroll shadow-lg transition-transform duration-300 ease-in-out"
+      class="fixed top-0 right-0 z-50 h-screen w-screen lg:w-[35%] lg:max-w-[700px] bg-surface system-scroll shadow-lg transition-transform duration-300 ease-in-out"
     >
-      <button
-        phx-click="close_details"
-        class="absolute top-4 right-5 z-10"
-      >
+      <button phx-click="close_details" class="absolute top-4 right-4 z-10 ghost-icon w-9 h-9 flex items-center justify-center">
         <.icon class="w-5 h-5" name="hero-x-mark" />
       </button>
 
-      <div class="h-full pt-12 overflow-y-auto">
+      <div class="h-full overflow-y-auto">
         <.live_component
           id="sidebar_details"
           module={SidebarDetails}
@@ -167,164 +250,20 @@ defmodule TunneldWeb.Live.Dashboard do
     """
   end
 
-  @spec main(any()) :: Phoenix.LiveView.Rendered.t()
-  @doc """
-  The main view content section
-  """
-  def main(assigns) do
-    ~H"""
-    <div class="flex-1 flex flex-col p-3 md:p-5 system-scroll">
-      <div class="flex flex-row items-center gap-2">
-        <!-- Logout -->
-        <%= nav(assigns) %>
+  defp services_list do
+    status = Tunneld.Servers.Services.get_status()
 
-        <div class="flex-1" />
-
-        <div class="flex flex-row flex-wrap justify-end gap-1">
-          <%!-- Private Network Access --%>
-          <div
-            phx-click="show_details"
-            phx-value-type="zrok"
-            phx-value-id="_"
-            class="bg-purple flex flex-row gap-2 py-2 px-2 md:px-3 items-center rounded-md cursor-pointer text-white text-xs font-medium hover:opacity-80 transition-all"
-          >
-            <.icon name="hero-signal" class="h-4 w-4" />
-            <span class="hidden sm:inline">Configure Network</span>
-          </div>
-
-          <%!-- Internet Access --%>
-          <div
-            phx-click="show_details"
-            phx-value-type="wlan"
-            phx-value-id="_"
-            class={"#{if @status.internet, do: "bg-green", else: "bg-red"} flex flex-row gap-2 py-2 px-2 md:px-3 items-center rounded-md cursor-pointer text-white text-xs font-medium hover:opacity-80 transition-all"}
-          >
-            <.icon name="hero-wifi" class="h-4 w-4" />
-            <span class="hidden sm:inline">Internet Access</span>
-          </div>
-
-          <%!-- Obfuscation Toggle --%>
-          <div
-            id="obfuscation-toggle"
-            phx-hook="ObfuscationToggle"
-            class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1 hover:opacity-80 transition-all"
-            title={if @obfuscated, do: "Show sensitive data", else: "Hide sensitive data"}
-          >
-            <.icon
-              name={if @obfuscated, do: "hero-eye-slash", else: "hero-eye"}
-              class="h-4 w-4"
-            />
-          </div>
-
-          <%!-- Settings Menu --%>
-          <div class="relative">
-            <div
-              phx-click="toggle_settings_menu"
-              class="flex items-center justify-center gap-1 bg-primary p-2 cursor-pointer rounded-md text-gray-1 hover:opacity-80 transition-all"
-            >
-              <.icon name="hero-cog-6-tooth" class="h-4 w-4" />
-            </div>
-
-            <div
-              :if={@settings_menu_open}
-              phx-click-away="close_settings_menu"
-              class="absolute right-0 top-full mt-1 w-48 bg-secondary rounded-md shadow-lg z-10 py-1 border border-gray-700"
-            >
-              <div
-                phx-click="open_settings"
-                phx-value-type="authentication"
-                class="flex items-center gap-2 px-3 py-2 text-xs text-gray-1 hover:bg-primary cursor-pointer transition-all"
-              >
-                <.icon name="hero-lock-closed" class="h-4 w-4" /> Authentication
-              </div>
-              <div
-                phx-click="open_settings"
-                phx-value-type="dns_server"
-                class="flex items-center gap-2 px-3 py-2 text-xs text-gray-1 hover:bg-primary cursor-pointer transition-all"
-              >
-                <.icon name="hero-globe-alt" class="h-4 w-4" /> DNS Server
-              </div>
-              <div class="border-t border-gray-700 my-1" />
-              <div
-                phx-click="restart_device"
-                class="flex items-center gap-2 px-3 py-2 text-xs text-red hover:bg-primary cursor-pointer transition-all"
-              >
-                <.icon name="hero-arrow-path" class="h-4 w-4" /> Restart Device
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="flex flex-col mx-auto max-w-[1280px] w-full">
-        <%!-- Welcome section --%>
-        <div>
-          <.live_component id="welcome" module={Welcome} />
-        </div>
-        <%!-- Divider --%>
-        <div class="border-t-2 border-dashed border-secondary" />
-        <%!-- System Resources, Services, and VPN --%>
-        <div class="flex flex-col md:flex-row w-full gap-2">
-          <div class="flex-1"><.live_component id="system_resources" module={SystemResources} /></div>
-          <div class="flex-1 flex flex-col gap-4">
-            <.live_component id="services" module={Services} obfuscated={@obfuscated} />
-            <.live_component id="mesh_server" module={MeshServer} data={@mesh_state} obfuscated={@obfuscated} />
-          </div>
-        </div>
-
-        <%!-- Mesh peer nodes --%>
-        <.live_component id="mesh_nodes" module={MeshNodes} data={@mesh_state} obfuscated={@obfuscated} />
-
-        <%!-- Divider --%>
-        <div class="border-t-2 border-dashed border-secondary" />
-
-        <%!-- Resources and Devices --%>
-        <div class="mt-4 md:mt-6">
-          <div class="min-h-[150px] md:min-h-[200px]">
-            <.live_component id="resources" module={Resources} obfuscated={@obfuscated} />
-          </div>
-
-          <div class="min-h-[150px] md:min-h-[200px]">
-            <.live_component id="devices" module={Devices} obfuscated={@obfuscated} />
-          </div>
-        </div>
-      </div>
-    </div>
-    """
+    for {name, up?} <- status do
+      %{name: to_string(name), up: up?}
+    end
   end
 
-  @spec nav(any()) :: Phoenix.LiveView.Rendered.t()
-  @doc """
-  Navigation used for general navigation (only logging in and out at the moment)
-  """
-  def nav(assigns) do
-    ~H"""
-    <div phx-click="logout" class="flex items-center justify-center cursor-pointer">
-      <.icon class="w-6 text-gray-2" name="hero-arrow-left-start-on-rectangle" />
-    </div>
-    """
-  end
-
-  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
-          {:noreply, Phoenix.LiveView.Socket.t()}
-  @doc """
-  Render Sidebar content
-  """
   def handle_event("restart_device", _params, socket) do
     modal_data = modal_open(%{
       title: "Restart Device?",
       description: "This will restart the gateway service. The dashboard will be temporarily unavailable.",
-      body: %{
-        "type" => "string",
-        "data" => "All active connections will be interrupted. The device will come back online automatically."
-      },
-      actions: %{
-        "title" => "Restart",
-        "payload" => %{
-          "type" => "restart_device",
-          "data" => %{}
-        }
-      }
+      body: %{"type" => "string", "data" => "All active connections will be interrupted. The device will come back online automatically."},
+      actions: %{"title" => "Restart", "payload" => %{"type" => "restart_device", "data" => %{}}}
     })
 
     {:noreply, socket |> assign(:modal, modal_data) |> assign(:settings_menu_open, false)}
@@ -345,19 +284,14 @@ defmodule TunneldWeb.Live.Dashboard do
 
   def handle_event("open_settings", %{"type" => type}, socket) do
     sidebar = sidebar_open(get_sidebar_details(type, "_"), sidebar_selection(type, "_"))
-
     {:noreply, socket |> assign(:sidebar, sidebar) |> assign(:settings_menu_open, false)}
   end
 
   def handle_event("show_details", %{"id" => id, "type" => type}, socket) do
     sidebar = sidebar_open(get_sidebar_details(type, id), sidebar_selection(type, id))
-
     {:noreply, assign(socket, :sidebar, sidebar)}
   end
 
-  #
-  # Catch the toggle event to enable/disable the resources and their resources
-  #
   def handle_event("toggle_share_access", params, socket) do
     {:noreply, start_action("toggle_share_access", params, socket)}
   end
@@ -372,19 +306,12 @@ defmodule TunneldWeb.Live.Dashboard do
     node_name = String.trim(params["node_name"] || "")
     enabled = url != "" and token != ""
 
-    config = %{
-      "coordinator_url" => url,
-      "token" => token,
-      "node_name" => node_name,
-      "enabled" => enabled
-    }
+    config = %{"coordinator_url" => url, "token" => token, "node_name" => node_name, "enabled" => enabled}
 
     path = Path.join(Tunneld.Config.fs_root(), "mesh_config.json")
     Tunneld.Persistence.write_json(path, config)
 
-    current_interval =
-      Application.get_env(:tunneld, :mesh, [])
-      |> Keyword.get(:poll_interval, 25_000)
+    current_interval = Application.get_env(:tunneld, :mesh, []) |> Keyword.get(:poll_interval, 25_000)
 
     Application.put_env(:tunneld, :mesh,
       coordinator_url: if(url != "", do: url, else: nil),
@@ -395,40 +322,25 @@ defmodule TunneldWeb.Live.Dashboard do
     )
 
     Tunneld.Servers.Mesh.reconfigure()
-
     {:noreply, put_flash(socket, :info, "Mesh configuration saved")}
   end
 
-  #
-  # Close the details bar (relevant when we are in mobile mode)
-  #
   def handle_event("close_details", _, socket) do
     sidebar = sidebar_close(socket.assigns.sidebar)
-
     {:noreply, assign(socket, :sidebar, sidebar)}
   end
 
-  #
-  # Log out of the tunneld dashboard
-  #
   def handle_event("logout", _, socket) do
     Session.delete(socket.assigns.client_id)
     {:noreply, socket |> push_navigate(to: Routes.live_path(socket, TunneldWeb.Live.Login))}
   end
 
-  #
-  # Trigger actions
-  #
   def handle_event("trigger_action", params, socket) do
     action = params["action"]
     data = Jason.decode!(params["data"])
-
     {:noreply, start_action(action, data, socket)}
   end
 
-  #
-  # Open the modal
-  #
   def handle_event("modal_open", params, socket) do
     actions = if params["modal_actions"], do: Jason.decode!(params["modal_actions"]), else: nil
 
@@ -441,43 +353,37 @@ defmodule TunneldWeb.Live.Dashboard do
       type: :default
     }
 
-    # We make sure when opening the modal, we are updating the fields we need based on type
     {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal_data))}
   end
 
-  #
-  # Close the modal
-  #
   def handle_event("modal_close", _params, socket) do
     {:noreply, assign(socket, :modal, @modal_default)}
   end
 
-  @spec handle_info(%{id: String.t(), module: atom(), data: map()}, Phoenix.LiveView.Socket.t()) ::
-          {:noreply, Phoenix.LiveView.Socket.t()}
-  @doc """
-  This will have the parent dashboard view be responsible for sending update messages to components
-  """
+  def handle_event("toggle_services_popover", _params, socket) do
+    {:noreply, assign(socket, :services_popover_open, !socket.assigns.services_popover_open)}
+  end
+
+  def handle_event("toggle_devices_expanded", _params, socket) do
+    {:noreply, assign(socket, :devices_expanded, !socket.assigns.devices_expanded)}
+  end
+
   def handle_info(
         %{id: "devices", module: TunneldWeb.Live.Components.Devices, data: data} = message,
         socket
       ) do
-    send_update(message.module, id: message.id, data: message.data, obfuscated: socket.assigns.obfuscated)
-
     devices = Map.get(data, :devices, [])
+
+    if socket.assigns.devices_expanded do
+      send_update(message.module, id: message.id, data: message.data, obfuscated: socket.assigns.obfuscated)
+    end
 
     {:noreply, assign(socket, :devices, devices)}
   end
 
-  def handle_info(
-        %{id: "resources", module: TunneldWeb.Live.Components.Resources, data: data} = message,
-        socket
-      ) do
+  def handle_info(%{id: "resources", module: TunneldWeb.Live.Components.Resources, data: data} = message, socket) do
     send_update(message.module, id: message.id, data: message.data, obfuscated: socket.assigns.obfuscated)
-
-    socket =
-      socket
-      |> maybe_refresh_sidebar_details(data)
-
+    socket = maybe_refresh_sidebar_details(socket, data)
     {:noreply, socket}
   end
 
@@ -490,6 +396,17 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, socket}
   end
 
+  def handle_info(%{id: "system_resources", module: TunneldWeb.Live.Components.SystemResources, data: data}, socket) do
+    resources = Map.get(data, :resources, %{})
+    # Preserve update check state from existing assignment
+    resources =
+      resources
+      |> Map.put(:is_latest, Map.get(socket.assigns.system_resources, :is_latest, true))
+      |> Map.put(:new_version, Map.get(socket.assigns.system_resources, :new_version))
+
+    {:noreply, assign(socket, :system_resources, resources)}
+  end
+
   def handle_info(%{id: id, module: module, data: data}, socket) do
     if not is_nil(id) do
       send_update(module, id: id, data: data, obfuscated: socket.assigns.obfuscated)
@@ -498,39 +415,24 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, socket}
   end
 
-  #
-  # Handle recieving event for internet status changes
-  #
   def handle_info(%{type: :internet, status: status}, socket) do
-    socket =
-      socket
-      |> assign(status: %{internet: status})
-
-    {:noreply, socket}
+    {:noreply, assign(socket, status: %{internet: status})}
   end
 
-  #
-  # Handle recieving a notification event to show the notification popup
-  #
   def handle_info(%{type: type, message: message}, socket) do
     type = if type in [:info, :error], do: type, else: :info
-    # Set the flash message
-    socket = put_flash(socket, type, message)
-    # Schedule flash removal after 3 seconds (3000 ms)
-    # Process.send_after(self(), :clear_flash, 3000)
-    {:noreply, socket}
+    Process.send_after(self(), :clear_flash, 3500)
+    {:noreply, put_flash(socket, type, message)}
   end
 
-  #
-  # handle the actions from the schema form
-  #
+  def handle_info(:clear_flash, socket) do
+    {:noreply, clear_flash(socket)}
+  end
+
   def handle_info(%{action: action, data: data}, socket) do
     {:noreply, start_action(action, data, socket)}
   end
 
-  #
-  # Handle the completion of an async action
-  #
   def handle_info({:action_done, ref, _action, {:error, reason}}, socket) do
     pending = Map.get(socket.assigns.pending_actions, ref, %{})
     Logger.error("Action failed: #{inspect(reason)}")
@@ -547,9 +449,13 @@ defmodule TunneldWeb.Live.Dashboard do
   def handle_info({:action_done, ref, action, _result}, socket)
       when action in ["add_device_tag", "remove_device_tag"] do
     pending = Map.get(socket.assigns.pending_actions, ref, %{})
-    devices = DevicesServer.fetch_devices()
-
-    send_update(Devices, id: "devices", data: %{count: length(devices), devices: devices})
+    devices =
+      DevicesServer.fetch_devices()
+      |> Enum.map(fn d ->
+        d
+        |> Map.put(:expose_allowed, Tunneld.Servers.ExposeAllowed.allowed?(d.mac))
+        |> Map.put(:tags, Tunneld.Servers.DeviceTags.get_tags(d.mac))
+      end)
 
     socket =
       socket
@@ -571,28 +477,18 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, socket}
   end
 
-  #
-  # handle delayed scan for wireless networks
-  #
   def handle_info(:delayed_scan, socket) do
     Tunneld.Servers.Wlan.scan_networks()
     {:noreply, socket}
   end
 
-  #
-  # Background job in order to process the network fetch
-  #
   def handle_info(:scan_for_wireless_networks, socket) do
     Task.start(fn -> Tunneld.Servers.Wlan.scan_networks() end)
     {:noreply, put_flash(socket, :info, "Scanning for wireless networks")}
   end
 
-  #
-  # Revoke the login credentials
-  #
   def handle_info(:revoke_login_creds, socket) do
-    {:noreply,
-     put_flash(socket, :info, "Auth reset. Next login will require a new password to be setup")}
+    {:noreply, put_flash(socket, :info, "Auth reset. Next login will require a new password to be setup")}
   end
 
   def handle_info(:close_details, socket) do
@@ -601,13 +497,40 @@ defmodule TunneldWeb.Live.Dashboard do
 
   def handle_info({:show_details, %{"id" => id, "type" => type}}, socket) do
     sidebar = sidebar_open(get_sidebar_details(type, id), sidebar_selection(type, id))
-
     {:noreply, assign(socket, :sidebar, sidebar)}
   end
 
-  #
-  # Get the sidebar details that is used for client and server sider trigger render
-  #
+  def handle_info({:location_updated, location}, socket) do
+    {:noreply,
+     socket
+     |> assign(:geo_location, location)
+     |> assign(:map_status, :ready)}
+  end
+
+  def handle_info(:location_unavailable, socket) do
+    if socket.assigns.geo_location do
+      {:noreply, assign(socket, :map_status, :stale)}
+    else
+      {:noreply, assign(socket, :map_status, :unavailable)}
+    end
+  end
+
+  def handle_info(:geo_failed, socket) do
+    if socket.assigns.geo_location do
+      {:noreply, assign(socket, :map_status, :stale)}
+    else
+      {:noreply, assign(socket, :map_status, :geo_failed)}
+    end
+  end
+
+  def handle_info(:location_stale, socket) do
+    if socket.assigns.geo_location do
+      {:noreply, assign(socket, :map_status, :stale)}
+    else
+      {:noreply, assign(socket, :map_status, :unavailable)}
+    end
+  end
+
   defp get_sidebar_details(type, id) do
     case type do
       "resource" ->
@@ -623,7 +546,6 @@ defmodule TunneldWeb.Live.Dashboard do
         :wlan
 
       "zrok" ->
-        # Get the current state so we can prepopulate
         Tunneld.Servers.Zrok.get_details()
         :zrok
 
@@ -640,7 +562,6 @@ defmodule TunneldWeb.Live.Dashboard do
           %{status: :disabled, peers: %{}}
         end
         :mesh
-
     end
   end
 
@@ -666,9 +587,6 @@ defmodule TunneldWeb.Live.Dashboard do
     res_id == id
   end
 
-  #
-  # Wrap actions in an async task to prevent UI hangs while tracking pending state
-  #
   defp start_action(action, data, socket) do
     action_ref = System.unique_integer([:positive, :monotonic])
     parent = self()
@@ -725,7 +643,6 @@ defmodule TunneldWeb.Live.Dashboard do
   defp maybe_close_modal_after_success(socket, %{keep_modal_open: true}), do: reset_modal(socket)
   defp maybe_close_modal_after_success(socket, _), do: socket
 
-  # Human friendly messages for pending actions
   defp start_message(action) do
     case action do
       "add_share" -> "Adding resource..."
@@ -758,8 +675,6 @@ defmodule TunneldWeb.Live.Dashboard do
       _ -> "Working on request..."
     end
   end
-
-  # --- Modal & Sidebar state helpers ---
 
   defp modal_open(fields) when is_map(fields) do
     Map.merge(@modal_default, Map.put(fields, :show, true))
