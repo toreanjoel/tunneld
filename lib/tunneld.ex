@@ -13,16 +13,18 @@ defmodule Tunneld do
     Copies from priv/templates/error.gohtml if the file doesn't already exist.
     """
 
-    @template_source Path.join(:code.priv_dir(:tunneld), "templates/error.gohtml")
-
     def ensure_template do
       root = Application.get_env(:tunneld, :fs)[:root]
       path = Path.join(root, "error.gohtml")
 
       unless File.exists?(path) do
         File.mkdir_p!(root)
-        File.cp!(@template_source, path)
+        File.cp!(template_source(), path)
       end
+    end
+
+    defp template_source do
+      Path.join(:code.priv_dir(:tunneld), "templates/error.gohtml")
     end
   end
 end
