@@ -192,6 +192,7 @@ defmodule Tunneld.Servers.Mesh do
            {:ok, mesh_ip} <- register_with_relay(state, pubkey, state.node_name, state.allowed_ips),
            {:ok, hub} <- fetch_hub(state),
            :ok <- configure_relay_peer(hub) do
+        Tunneld.Geolocation.refresh()
         allowed_ips = [mesh_ip <> "/32"]
 
         {:ok,

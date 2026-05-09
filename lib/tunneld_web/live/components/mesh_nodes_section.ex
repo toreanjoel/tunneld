@@ -62,7 +62,13 @@ defmodule TunneldWeb.Live.Components.MeshNodesSection do
         "bg-surface border border-border rounded-xl p-4 flex flex-col justify-between gap-2.5 min-h-[140px] transition-colors duration-[120ms] group hover:bg-[#17161F] hover:border-[#2A2838]",
         @has_devices and @safe_id && "cursor-pointer"
       ]}
-      phx-click={if @has_devices and @safe_id, do: JS.toggle_class("hidden", to: "#mesh-node-#{@safe_id}-devices")}
+      phx-click={
+        if @has_devices and @safe_id do
+          JS.push("show_details", value: %{id: @safe_id, type: "mesh_node"})
+        else
+          JS.push("show_details", value: %{id: @safe_id || "_", type: "mesh_node"})
+        end
+      }
     >
       <div class="flex justify-between items-start">
         <span class="text-sm text-text-primary font-medium"><%= @name %></span>
@@ -89,27 +95,6 @@ defmodule TunneldWeb.Live.Components.MeshNodesSection do
             <.chevron_right size={14} />
           </span>
         </div>
-      </div>
-
-      <div
-        :if={@has_devices}
-        id={"mesh-node-#{@safe_id}-devices"}
-        class="hidden mt-1 pt-2.5 border-t border-border flex flex-col gap-2"
-      >
-        <%= for d <- @devices do %>
-          <% dtags = d[:tags] || d["tags"] || [] %>
-          <div>
-            <div class="flex justify-between">
-              <span class="text-xs text-text-primary"><%= d[:name] || d["name"] %></span>
-              <span class="font-mono text-[11px] text-text-secondary"><%= d[:ip] || d["ip"] %></span>
-            </div>
-            <div :if={dtags != []} class="flex gap-1 flex-wrap mt-0.5">
-              <%= for t <- dtags do %>
-                <span class="bg-surface-2 text-text-secondary border border-border px-1.5 py-0.5 rounded text-[10px] font-mono"><%= t %></span>
-              <% end %>
-            </div>
-          </div>
-        <% end %>
       </div>
     </div>
     """

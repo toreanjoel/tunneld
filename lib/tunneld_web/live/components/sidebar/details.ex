@@ -926,6 +926,59 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     """
   end
 
+  @spec render(%{:view => :mesh_node, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{view: :mesh_node} = assigns) do
+    peer_id = Map.get(assigns.selection || %{}, :id, "")
+    mesh_state = if _pid = GenServer.whereis(Tunneld.Servers.Mesh) do
+      Tunneld.Servers.Mesh.get_state()
+    else
+      %{status: :disabled, peers: %{}}
+    end
+
+    peer = mesh_state[:peers] |> Map.values() |> Enum.find(fn p ->
+      Map.get(p, "node_id", Map.get(p, :node_id, "")) == peer_id
+    end)
+
+    name = if peer, do: Map.get(peer, "name", Map.get(peer, :name, "—")), else: "—"
+    ip = if peer, do: Map.get(peer, "mesh_ip", Map.get(peer, :mesh_ip, "—")), else: "—"
+    devices = if peer, do: Map.get(peer, :devices, Map.get(peer, "devices", [])), else: []
+    country = if peer, do: Map.get(peer, "country_name", Map.get(peer, :country_name, "")), else: ""
+
+    assigns =
+      assigns
+      |> assign(:peer_name, name)
+      |> assign(:peer_ip, ip)
+      |> assign(:peer_country, country)
+      |> assign(:devices, devices)
+
+    ~H"""
+    <div class="bg-surface-2 p-4 space-y-6">
+      <%= sidebar_header(assigns, %{
+        header: @peer_name,
+        body: "Mesh peer #{@peer_ip} · #{@peer_country}"
+      }) %>
+
+      <div class="space-y-3">
+        <div :if={@devices == []} class="text-sm text-text-secondary italic">
+          No shared devices
+        </div>
+        <div :for={d <- @devices} class="bg-surface rounded-lg p-3 border border-border">
+          <% dtags = d[:tags] || d["tags"] || [] %>
+          <div class="flex justify-between">
+            <span class="text-sm text-text-primary font-medium"><%= d[:name] || d["name"] %></span>
+            <span class="font-mono text-[12px] text-text-secondary"><%= d[:ip] || d["ip"] %></span>
+          </div>
+          <div :if={dtags != []} class="flex gap-1 flex-wrap mt-2">
+            <%= for t <- dtags do %>
+              <span class="bg-surface-2 text-text-secondary border border-border px-1.5 py-0.5 rounded text-[10px] font-mono"><%= t %></span>
+            <% end %>
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+  end
+
   def handle_event("set_sqm", %{"mode" => mode} = params, socket) do
     # Prepare params for the server
     sqm_params = %{

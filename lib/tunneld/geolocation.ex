@@ -78,6 +78,7 @@ defmodule Tunneld.Geolocation do
   @impl true
   def handle_call(:get_location, _from, state) do
     case state.location do
+      nil when state.status == :unavailable -> {:reply, :unavailable, state}
       nil -> {:reply, :unavailable, state}
       loc -> {:reply, {:ok, loc}, state}
     end
@@ -104,14 +105,14 @@ defmodule Tunneld.Geolocation do
 
       {:error, :ip_ok_no_geo} ->
         broadcast(:geo_failed)
-        {:noreply, %{state | refresh_timer: schedule_refresh(state)}}
+        {:noreply, %{state | error_count: state.error_count + 1, refresh_timer: retry_timer(state)}}
 
       {:error, :all_exhausted} ->
         broadcast(:location_unavailable)
-        {:noreply, %{state | refresh_timer: schedule_refresh(state)}}
+        {:noreply, %{state | error_count: state.error_count + 1, refresh_timer: retry_timer(state)}}
 
       _ ->
-        {:noreply, %{state | refresh_timer: schedule_refresh(state)}}
+        {:noreply, %{state | error_count: state.error_count + 1, refresh_timer: retry_timer(state)}}
     end
   end
 
@@ -250,10 +251,13 @@ defmodule Tunneld.Geolocation do
     ip =~ ~r/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/
   end
 
-  defp schedule_refresh(state) do
-    cancel_timer(state.refresh_timer)
-    ref = Process.send_after(self(), :do_refresh, @refresh_interval_ms)
-    ref
+  defp schedule_refresh(_state) do
+    Process.send_after(self(), :do_refresh, @refresh_interval_ms)
+  end
+
+  defp retry_timer(state) do
+    delay = min(300_000, 30_000 * :math.pow(2, min(state.error_count, 4)) |> round())
+    Process.send_after(self(), :do_refresh, delay)
   end
 
   defp cancel_timer(nil), do: :ok

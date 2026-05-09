@@ -570,10 +570,14 @@ defmodule TunneldWeb.Live.Dashboard do
           %{status: :disabled, peers: %{}}
         end
         :mesh
+
+      "mesh_node" ->
+        :mesh_node
     end
   end
 
   defp sidebar_selection("resource", id) when is_binary(id), do: %{type: :resource, id: id}
+  defp sidebar_selection("mesh_node", id), do: %{type: :mesh_node, id: id}
   defp sidebar_selection(_, _), do: nil
 
   defp maybe_refresh_sidebar_details(socket, resources) do

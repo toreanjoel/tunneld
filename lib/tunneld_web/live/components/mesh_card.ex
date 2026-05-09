@@ -5,6 +5,9 @@ defmodule TunneldWeb.Live.Components.MeshCard do
 
   The map is entirely offline — country paths are compiled directly into
   Tunneld.GeoData.WorldMap from Natural Earth 110m TopoJSON.
+
+  Peer pins are grouped by country code; multiple peers in the same country
+  render as a single larger pin with a count badge.
   """
   use Phoenix.Component
   import TunneldWeb.Icons
@@ -20,6 +23,9 @@ defmodule TunneldWeb.Live.Components.MeshCard do
   attr :mesh_peers, :list, default: []
 
   def mesh_card(assigns) do
+    grouped_peers = group_peers_by_country(assigns.mesh_peers)
+    assigns = assign(assigns, :grouped_peers, grouped_peers)
+
     ~H"""
     <div class="hero-card flex flex-col">
       <div class="px-7 pt-6 pb-4 flex justify-between items-start relative z-[2]">
@@ -54,16 +60,10 @@ defmodule TunneldWeb.Live.Components.MeshCard do
             }}
           />
           <.map_pin
-            :for={peer <- @mesh_peers}
+            :for={entry <- @grouped_peers}
             :if={@geo_location}
-            node={%{
-              id: Map.get(peer, "node_id", Map.get(peer, :node_id, "")),
-              name: Map.get(peer, "name", Map.get(peer, :name, "—")),
-              ip: Map.get(peer, "public_ip", Map.get(peer, :public_ip, "—")),
-              country_code: Map.get(peer, "country_code", Map.get(peer, :country_code, "")),
-              country_name: Map.get(peer, "country_name", Map.get(peer, :country_name, "")),
-              is_local: false
-            }}
+            node={entry.node}
+            count={entry.count}
           />
         </svg>
 
@@ -117,5 +117,29 @@ defmodule TunneldWeb.Live.Components.MeshCard do
       </div>
     </div>
     """
+  end
+
+  defp group_peers_by_country(peers) do
+    peers
+    |> Enum.group_by(fn p ->
+      Map.get(p, "country_code", Map.get(p, :country_code, "")) |> String.upcase()
+    end)
+    |> Enum.reject(fn {cc, _} -> cc == "" end)
+    |> Enum.map(fn {cc, group} ->
+      names = Enum.map(group, fn p -> Map.get(p, "name", Map.get(p, :name, "—")) end)
+      ips = Enum.map(group, fn p -> Map.get(p, "public_ip", Map.get(p, :public_ip, "—")) end)
+
+      node = %{
+        id: "peer-#{cc}",
+        name: hd(names),
+        ip: hd(ips),
+        country_code: cc,
+        country_name: Tunneld.GeoData.Centroids.name(cc) || cc,
+        is_local: false,
+        peer_names: names |> Enum.join(", ")
+      }
+
+      %{node: node, count: length(group)}
+    end)
   end
 end

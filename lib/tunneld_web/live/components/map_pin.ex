@@ -1,28 +1,19 @@
 defmodule TunneldWeb.Live.Components.MapPin do
   @moduledoc """
-  Renders a pin circle on the world map SVG for a tunnel node.
+  Renders a pin circle on the world map SVG for one or more tunnel nodes.
 
-  Position is derived from the node's country_code via Tunneld.GeoData.Centroids,
+  Position is derived from the country_code via Tunneld.GeoData.Centroids,
   with seeded jitter applied server-side for privacy.
+
+  When `count > 1`, the pin renders larger and shows a count badge,
+  and the tooltip lists all peer names.
   """
 
   use Phoenix.Component
 
-  attr :node, :map, required: true, doc: "%{id, name, ip, country_code, is_local}"
+  attr :node, :map, required: true, doc: "%{id, name, ip, country_code, is_local, peer_names}"
   attr :count, :integer, default: 1
 
-  @doc """
-  Renders a map pin for a single node. The `count` attr is forward-compatible
-  for clustering when peer pins are added.
-
-  ## Node map keys
-    - `:id` — unique identifier
-    - `:name` — display name
-    - `:ip` — public IP (used to seed jitter)
-    - `:country_code` — ISO 3166-1 alpha-2
-    - `:country_name` — full country name
-    - `:is_local` — true if this is the local device
-  """
   def map_pin(assigns) do
     node = assigns.node
     country_code = Map.get(node, :country_code)
@@ -30,60 +21,78 @@ defmodule TunneldWeb.Live.Components.MapPin do
     is_local = Map.get(node, :is_local, false)
     country_name = Map.get(node, :country_name, "")
     name = Map.get(node, :name, "Unknown")
+    count = assigns.count
+    peer_names = Map.get(node, :peer_names, name)
 
     {cx, cy} =
       case Tunneld.GeoData.Centroids.get(country_code) do
         {x, y} when is_integer(x) and is_integer(y) ->
-          # Apply seeded jitter so the pin isn't exactly on the centroid
           jx = seeded_jitter(ip <> "_x", 6)
           jy = seeded_jitter(ip <> "_y", 6)
           {x + jx, y + jy}
 
         _ ->
-          # Fallback to center of canvas if country unknown
           {400, 225}
       end
 
-    pulse_class = if is_local, do: "animate-pulse-pin", else: ""
+    mult = count > 1
+    r = if mult, do: 8, else: 6
+    halo_r = if mult, do: 16, else: 12
     tooltip_id = "pin-tooltip-#{Map.get(node, :id, "unknown")}"
 
     assigns =
       assigns
       |> assign(:cx, cx)
       |> assign(:cy, cy)
-      |> assign(:pulse_class, pulse_class)
+      |> assign(:r, r)
+      |> assign(:halo_r, halo_r)
+      |> assign(:mult, mult)
       |> assign(:is_local, is_local)
       |> assign(:country_name, country_name)
       |> assign(:name, name)
       |> assign(:ip, ip)
       |> assign(:tooltip_id, tooltip_id)
+      |> assign(:peer_names, peer_names)
 
     ~H"""
     <g
       id={"map-pin-#{@tooltip_id}"}
       class="map-pin-group cursor-default"
-      data-pin-name={@name}
+      data-pin-name={@peer_names}
       data-pin-country={@country_name}
       data-pin-ip={@ip}
+      data-pin-count={to_string(@count)}
       data-pin-is-local={to_string(@is_local)}
       phx-hook="MapPinHover"
     >
       <circle
-        :if={@is_local}
+        :if={@is_local or @mult}
         cx={@cx}
         cy={@cy}
-        r="12"
+        r={@halo_r}
         fill="#2ECC71"
         opacity="0.20"
-        class={["pointer-events-none", @pulse_class]}
+        class={["pointer-events-none", @is_local && "animate-pulse-pin"]}
       />
       <circle
         cx={@cx}
         cy={@cy}
-        r="6"
+        r={@r}
         fill="#2ECC71"
         class="pointer-events-auto"
       />
+      <text
+        :if={@mult}
+        x={@cx}
+        y={@cy}
+        text-anchor="middle"
+        dominant-baseline="central"
+        fill="#0B0A14"
+        font-size="9"
+        font-family="Inter, sans-serif"
+        font-weight="600"
+        class="pointer-events-none"
+      ><%= @count %></text>
     </g>
     """
   end
