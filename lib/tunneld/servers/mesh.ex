@@ -190,6 +190,7 @@ defmodule Tunneld.Servers.Mesh do
     else
       with :ok <- Wireguard.bring_up_mesh(),
            {:ok, mesh_ip} <- register_with_relay(state, pubkey, state.node_name, state.allowed_ips),
+           :ok <- Wireguard.assign_mesh_ip(mesh_ip),
            {:ok, hub} <- fetch_hub(state),
            :ok <- configure_relay_peer(hub) do
         Tunneld.Geolocation.refresh()
@@ -297,25 +298,22 @@ defmodule Tunneld.Servers.Mesh do
   end
 
   defp update_mesh_peers(state, peers) do
-    old_pubkeys = Map.keys(state.peers)
-    new_pubkeys = Map.keys(peers)
+    peer_allowed =
+      peers
+      |> Map.values()
+      |> Enum.flat_map(fn p -> [p["mesh_ip"] <> "/32" | p["allowed_ips"] || []] end)
+      |> Enum.uniq()
 
-    added = new_pubkeys -- old_pubkeys
-    removed = old_pubkeys -- new_pubkeys
+    all_allowed = ["10.0.0.0/8" | peer_allowed]
 
-    for pubkey <- removed do
-      Logger.info("Removing mesh peer #{pubkey}")
-      Wireguard.remove_mesh_peer(pubkey)
+    pubkey = state.relay_pubkey
+
+    if pubkey do
+      Logger.info("Updating relay peer allowed-ips: #{Enum.join(all_allowed, ",")}")
+      Wireguard.add_mesh_peer(pubkey, state.relay_endpoint, all_allowed)
     end
 
-    for pubkey <- added do
-      peer = peers[pubkey]
-      allowed = [peer["mesh_ip"] <> "/32" | peer["allowed_ips"] || []]
-      Logger.info("Adding mesh peer #{peer["name"]} (#{pubkey}) allowed-ips #{Enum.join(allowed, ",")}")
-      Wireguard.add_mesh_peer(pubkey, nil, allowed)
-    end
-
-    state
+    %{state | peers: peers}
   end
 
   defp register_with_relay(state, pubkey, name, allowed_ips) do

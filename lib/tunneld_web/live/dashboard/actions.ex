@@ -136,14 +136,6 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       "tunneld_settings" ->
         Resources.update_share(data, :tunneld)
 
-      # Services
-      "restart_service" ->
-        service = Services.find_service(data["id"])
-        if service, do: Services.restart_service(service)
-
-      "refresh_service_logs" ->
-        Services.get_service_logs(data["id"])
-
       # SQM
       "set_sqm" ->
         Sqm.set_sqm(data)

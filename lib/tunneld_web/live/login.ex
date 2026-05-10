@@ -42,26 +42,26 @@ defmodule TunneldWeb.Live.Login do
   """
   def render(assigns) do
     ~H"""
-    <div id="auth" class="flex flex-col lg:flex-row min-h-screen">
-      <div class="relative text-text-primary lg:w-3/5 w-full lg:flex flex-col p-8 rounded-lg">
-        <div class="absolute inset-0 bg-grid pointer-events-none"></div>
+    <div id="auth" class="flex flex-col-reverse lg:flex-row min-h-screen">
+      <div class="relative text-text-primary lg:w-3/5 w-full lg:flex flex-col p-6 lg:p-8 rounded-lg lg:min-h-0">
+        <div class="absolute inset-0 bg-grid pointer-events-none hidden lg:block"></div>
 
-        <div class="flex-1 flex flex-col items-center justify-center text-center">
+        <div class="flex-1 flex flex-col items-center justify-center text-center hidden lg:flex">
           <h1 class="text-4xl font-semibold text-text-primary mb-2 -tracking-[0.01em]">Tunneld</h1>
           <p class="text-sm text-text-secondary font-light tracking-[0.02em]">A subnet in your pocket.</p>
           <div class="text-xs text-text-tertiary font-mono mt-4">
             <%= Application.get_env(:tunneld, :metadata)[:device_id] || System.get_env("DEVICE_ID") %>
           </div>
         </div>
-        <div class="text-sm text-text-secondary pb-4 text-center">
+        <div class="text-sm text-text-secondary pt-3 lg:pb-4 text-center">
           <a href="https://github.com/toreanjoel/tunneld" target="_blank" class="underline underline-offset-4 decoration-text-tertiary hover:text-text-primary hover:decoration-text-secondary transition-colors">
-            Made with ☕️ | by Torean
+            Made with coffee | by Torean
           </a>
         </div>
       </div>
 
-      <div class="lg:w-2/5 w-full flex flex-col items-center justify-center p-8 bg-surface">
-        <div :if={@type === :login} class="w-full max-w-sm">
+      <div class="lg:w-2/5 w-full flex flex-col justify-center p-6 lg:p-8 bg-surface min-h-[70vh] lg:min-h-0">
+        <div :if={@type === :login} class="w-full max-w-sm mx-auto">
           <h1 class="text-2xl text-text-primary font-medium mb-6 text-center -tracking-[0.01em]">Login</h1>
           <.live_component
             id={"login_#{DateTime.utc_now()}"}
@@ -72,7 +72,7 @@ defmodule TunneldWeb.Live.Login do
             client_id={@client_id}
           />
         </div>
-        <div :if={@type === :signup} class="w-full max-w-sm">
+        <div :if={@type === :signup} class="w-full max-w-sm mx-auto">
           <h1 class="text-2xl text-text-primary font-medium mb-6 text-center -tracking-[0.01em]">Register</h1>
           <.live_component
             id={"signup_#{DateTime.utc_now()}"}

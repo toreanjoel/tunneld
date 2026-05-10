@@ -74,7 +74,7 @@ defmodule TunneldWeb.Live.Components.MapPin do
         r={@halo_r}
         fill="#2ECC71"
         opacity="0.20"
-        class={["pointer-events-none", @is_local && "animate-pulse-pin"]}
+        class={["pointer-events-none", @is_local && "opacity-40"]}
       />
       <circle
         cx={@cx}

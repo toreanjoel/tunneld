@@ -21,7 +21,7 @@ defmodule TunneldWeb.Live.Components.TopBar do
 
   def top_bar(assigns) do
     ~H"""
-    <div class="relative flex items-center justify-between h-[72px] px-8">
+    <div id="top-bar" class="relative flex items-center justify-between h-[72px] px-8" phx-hook="ObfuscationToggle">
       <div :if={@services_popover_open} class="fixed inset-0 z-60" phx-click="toggle_services_popover" />
       <%= if @settings_menu_open do %>
         <div class="fixed inset-0 z-40" phx-click="close_settings_menu" />
@@ -39,24 +39,24 @@ defmodule TunneldWeb.Live.Components.TopBar do
         </div>
       </div>
 
-      <div class="flex items-center gap-2 relative">
+      <div class="flex items-center gap-1 sm:gap-2 relative flex-shrink-0">
         <div class="relative">
           <button class="services-chip" phx-click="toggle_services_popover">
             <% up_count = Enum.count(@services, & Map.get(&1, :up, true)) %>
             <% total = length(@services) %>
             <% has_failing = Enum.any?(@services, fn s -> not Map.get(s, :up, true) end) %>
             <span class={"status-dot #{if has_failing, do: "status-dot--red", else: "status-dot--green"}"} />
-            <span class="text-[11px] text-text-primary tracking-[0.06em] font-medium">
+            <span class="hidden sm:inline text-[11px] text-text-primary tracking-[0.06em] font-medium">
               Services <%= up_count %>/<%= total %>
             </span>
           </button>
           <div
             :if={@services_popover_open}
-            class="absolute top-full right-0 mt-1 min-w-[200px] bg-surface border border-border rounded-[10px] p-2 z-[61] shadow-[0_8px_24px_rgba(0,0,0,0.5)]"
+            class="absolute top-full right-0 mt-1 min-w-[200px] bg-surface border border-border rounded-[10px] p-2 z-[61] shadow-[0_8px_24px_rgba(0,0,0,0.5)] sm:w-auto w-[180px]"
           >
             <%= for s <- @services do %>
               <% up = Map.get(s, :up, true) %>
-              <div class="flex items-center gap-2.5 px-2.5 py-2 text-[13px] font-mono text-text-primary cursor-pointer menu-item" phx-click="show_details" phx-value-type="service" phx-value-id={to_string(s.name)}>
+              <div class="flex items-center gap-2.5 px-2.5 py-2 text-[13px] font-mono text-text-primary">
                 <span class={"status-dot #{if up, do: "status-dot--green", else: "status-dot--red"}"} />
                 <span class="flex-1"><%= s.name %></span>
                 <span class="text-[11px] text-text-tertiary uppercase tracking-[0.08em]">
@@ -67,8 +67,9 @@ defmodule TunneldWeb.Live.Components.TopBar do
           </div>
         </div>
 
-        <button class="btn-primary" phx-click="show_details" phx-value-type="zrok" phx-value-id="_">
-          Configure network
+        <button class="btn-primary text-xs sm:text-[13px] px-2 sm:px-4" phx-click="show_details" phx-value-type="zrok" phx-value-id="_">
+          <span class="hidden sm:inline">Configure network</span>
+          <span class="inline sm:hidden">Network</span>
         </button>
         <button
           class="ghost-icon"

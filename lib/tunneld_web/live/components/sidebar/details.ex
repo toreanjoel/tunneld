@@ -42,7 +42,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           Phoenix.LiveView.Rendered.t()
   def render(%{view: :authentication} = assigns) do
     ~H"""
-    <div class="bg-surface-2 p-4 space-y-6">
+    <div class="p-4 space-y-6 min-h-full">
       <%= sidebar_header(assigns, %{
         header: "Authentication",
         body: "Reset your login credentials for the dashboard."
@@ -91,7 +91,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(health: Map.get(data || %{}, :health) || Map.get(data || %{}, "health") || %{})
 
     ~H"""
-    <div class="bg-surface-2 p-4 space-y-6">
+    <div class="p-4 space-y-6 min-h-full">
       <div :if={@has_data}>
         <%= sidebar_header(assigns, %{
           header: mask(@obfuscated, @data.name),
@@ -398,7 +398,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(has_data: not Enum.empty?(data))
 
     ~H"""
-    <div class="bg-surface-2 p-4 space-y-6">
+    <div class="p-4 space-y-6 min-h-full">
       <%!-- Sidebar header that will house metadat?  --%>
       <%= sidebar_header(assigns, %{
         header: "Overlay Network Settings",
@@ -515,7 +515,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(dns_server: dns_server)
 
     ~H"""
-    <div class="bg-surface-2 p-4 space-y-6">
+    <div class="p-4 space-y-6 min-h-full">
       <%= sidebar_header(assigns, %{
         header: "DNS Server",
         body: "All DNS queries on the subnet are forwarded to this server. Use a public resolver like 1.1.1.1 or a local Pi-hole on your network."
@@ -561,7 +561,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(count: length(networks))
 
     ~H"""
-    <div class="bg-surface-2 p-4 space-y-6">
+    <div class="p-4 space-y-6 min-h-full">
       <div class="relative">
         <%= sidebar_header(assigns, %{
           header: "Wireless Access",
@@ -762,7 +762,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(service: service)
 
     ~H"""
-    <div class="bg-surface-2 p-4 space-y-6">
+    <div class="p-4 space-y-6 min-h-full">
       <%!-- Sidebar header that will house metadat?  --%>
       <%= sidebar_header(assigns, %{
         header: Map.get(@service, :name),
@@ -851,7 +851,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(:node_name, node_name)
 
     ~H"""
-    <div class="bg-surface-2 p-4 space-y-6">
+    <div class="p-4 space-y-6 min-h-full">
       <%= sidebar_header(assigns, %{
         header: "Mesh Configuration",
         body: "Connect this node to a tunneld-relay for mesh networking between instances."
@@ -942,6 +942,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     name = if peer, do: Map.get(peer, "name", Map.get(peer, :name, "—")), else: "—"
     ip = if peer, do: Map.get(peer, "mesh_ip", Map.get(peer, :mesh_ip, "—")), else: "—"
     devices = if peer, do: Map.get(peer, :devices, Map.get(peer, "devices", [])), else: []
+    allowed_ips = if peer, do: Map.get(peer, "allowed_ips", Map.get(peer, :allowed_ips, [])), else: []
     country = if peer, do: Map.get(peer, "country_name", Map.get(peer, :country_name, "")), else: ""
 
     assigns =
@@ -950,18 +951,24 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(:peer_ip, ip)
       |> assign(:peer_country, country)
       |> assign(:devices, devices)
+      |> assign(:allowed_ips, allowed_ips)
 
     ~H"""
-    <div class="bg-surface-2 p-4 space-y-6">
+    <div class="p-4 space-y-6 min-h-full">
       <%= sidebar_header(assigns, %{
         header: @peer_name,
         body: "Mesh peer #{@peer_ip} · #{@peer_country}"
       }) %>
 
-      <div class="space-y-3">
-        <div :if={@devices == []} class="text-sm text-text-secondary italic">
-          No shared devices
+      <div :if={@allowed_ips != []} class="space-y-3">
+        <h3 class="text-[11px] tracking-[0.08em] uppercase text-text-secondary font-medium">Allowed IPs (Wireguard devices)</h3>
+        <div :for={ip <- @allowed_ips} class="bg-surface rounded-lg p-3 border border-border">
+          <span class="font-mono text-xs text-text-primary"><%= ip %></span>
         </div>
+      </div>
+
+      <div :if={@devices != []} class="space-y-3">
+        <h3 :if={@allowed_ips != []} class="text-[11px] tracking-[0.08em] uppercase text-text-secondary font-medium">Shared Devices</h3>
         <div :for={d <- @devices} class="bg-surface rounded-lg p-3 border border-border">
           <% dtags = d[:tags] || d["tags"] || [] %>
           <div class="flex justify-between">
@@ -974,6 +981,10 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             <% end %>
           </div>
         </div>
+      </div>
+
+      <div :if={length(@allowed_ips) == 0 and length(@devices) == 0} class="text-sm text-text-secondary italic">
+        No shared devices
       </div>
     </div>
     """

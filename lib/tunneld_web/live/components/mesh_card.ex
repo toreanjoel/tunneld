@@ -56,7 +56,9 @@ defmodule TunneldWeb.Live.Components.MeshCard do
               ip: Map.get(@geo_location, :ip, "—"),
               country_code: Map.get(@geo_location, :country_code, ""),
               country_name: Map.get(@geo_location, :country_name, ""),
-              is_local: true
+              is_local: true,
+              latitude: Map.get(@geo_location, :latitude),
+              longitude: Map.get(@geo_location, :longitude)
             }}
           />
           <.map_pin

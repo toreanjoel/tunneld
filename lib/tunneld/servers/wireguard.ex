@@ -105,6 +105,14 @@ defmodule Tunneld.Servers.Wireguard do
   end
 
   @impl true
+  def handle_call({:assign_mesh_ip, mesh_ip}, _from, state) do
+    case do_assign_mesh_ip(mesh_ip) do
+      :ok -> {:reply, :ok, state}
+      {:error, reason} -> {:reply, {:error, reason}, state}
+    end
+  end
+
+  @impl true
   def handle_call({:set_state, new_state}, _from, _state) do
     persist(new_state)
     {:reply, :ok, new_state}
@@ -140,6 +148,10 @@ defmodule Tunneld.Servers.Wireguard do
     do_bring_down_mesh()
   end
 
+  def assign_mesh_ip(mesh_ip) do
+    GenServer.call(__MODULE__, {:assign_mesh_ip, mesh_ip}, 15_000)
+  end
+
   defp do_bring_up_mesh(private_key) do
     if mock?() do
       Logger.debug("[WireGuard MOCK] Bringing up #{@interface}")
@@ -171,6 +183,18 @@ defmodule Tunneld.Servers.Wireguard do
       :ok
     else
       case exec("ip", ["link", "del", @interface]) do
+        {_, 0} -> :ok
+        {out, code} -> {:error, "Command failed (#{code}): #{out}"}
+      end
+    end
+  end
+
+  defp do_assign_mesh_ip(mesh_ip) do
+    if mock?() do
+      Logger.debug("[WireGuard MOCK] Assigning IP #{mesh_ip} to #{@interface}")
+      :ok
+    else
+      case exec("ip", ["address", "add", mesh_ip <> "/32", "dev", @interface]) do
         {_, 0} -> :ok
         {out, code} -> {:error, "Command failed (#{code}): #{out}"}
       end

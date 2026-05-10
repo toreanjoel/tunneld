@@ -11,17 +11,35 @@ Hooks.MapPinHover = MapPinHover;
 Hooks.CopyToClipboard = {
   mounted() {
     this.handleEvent("copy_to_clipboard", ({ text }) => {
-      navigator.clipboard
-        .writeText(text)
-        .then(() => {
-          // Some logging or pushing event to the server to render UI
-        })
-        .catch((err) => {
-          // Push errors here to the liveview
-        });
+      copyText(text);
     });
   },
 };
+
+function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).catch(() => {
+      fallbackCopy(text);
+    });
+  } else {
+    fallbackCopy(text);
+  }
+}
+
+function fallbackCopy(text) {
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.appendChild(textarea);
+  textarea.select();
+  try {
+    document.execCommand("copy");
+  } catch (e) {
+    // ignore
+  }
+  document.body.removeChild(textarea);
+}
 
 /**
  * Obfuscation toggle — reads/writes localStorage and broadcasts to live view.
@@ -35,11 +53,8 @@ Hooks.ObfuscationToggle = {
       this.pushEvent("toggle_obfuscation", { obfuscated: true });
     }
 
-    this.el.addEventListener("click", () => {
-      const current = localStorage.getItem("tunneld_obfuscated") === "true";
-      const next = !current;
-      localStorage.setItem("tunneld_obfuscated", next.toString());
-      this.pushEvent("toggle_obfuscation", { obfuscated: next });
+    this.handleEvent("update_obfuscation", ({ obfuscated }) => {
+      localStorage.setItem("tunneld_obfuscated", obfuscated.toString());
     });
   },
 };

@@ -204,7 +204,7 @@ defmodule TunneldWeb.Live.Dashboard do
       </div>
 
       <%= if @sidebar.is_open do %>
-        <div class="fixed inset-0 bg-black bg-opacity-50 z-40" phx-click="close_details" />
+        <div class="fixed inset-0 bg-black/50 z-40" phx-click="close_details" />
       <% end %>
       <%= if not is_nil(@sidebar.view), do: sidebar(assigns) %>
 
@@ -241,6 +241,7 @@ defmodule TunneldWeb.Live.Dashboard do
       </button>
 
       <div class="h-full overflow-y-auto system-scroll bg-surface">
+        <div class="min-h-full">
         <.live_component
           id="sidebar_details"
           module={SidebarDetails}
@@ -249,6 +250,7 @@ defmodule TunneldWeb.Live.Dashboard do
           selection={@sidebar.selection}
           obfuscated={@obfuscated}
         />
+        </div>
       </div>
     </div>
     """
@@ -275,7 +277,7 @@ defmodule TunneldWeb.Live.Dashboard do
 
   def handle_event("toggle_obfuscation", %{"obfuscated" => obfuscated}, socket) do
     obfuscated = obfuscated in ["true", true]
-    {:noreply, assign(socket, :obfuscated, obfuscated)}
+    {:noreply, socket |> assign(:obfuscated, obfuscated) |> push_event("update_obfuscation", %{obfuscated: obfuscated})}
   end
 
   def handle_event("toggle_settings_menu", _params, socket) do
@@ -546,8 +548,7 @@ defmodule TunneldWeb.Live.Dashboard do
         :resource
 
       "service" ->
-        Tunneld.Servers.Services.get_service_logs(id)
-        :service
+        :system_overview
 
       "wlan" ->
         Tunneld.Servers.Wlan.scan_networks()
