@@ -128,6 +128,11 @@ defmodule TunneldWeb.Live.Components.MeshCard do
     |> Enum.map(fn {cc, group} ->
       names = Enum.map(group, fn p -> Map.get(p, "name", Map.get(p, :name, "—")) end)
       ips = Enum.map(group, fn p -> Map.get(p, "public_ip", Map.get(p, :public_ip, "—")) end)
+      first_with_geo = Enum.find(group, fn p ->
+        lat = Map.get(p, "latitude") || Map.get(p, :latitude)
+        lng = Map.get(p, "longitude") || Map.get(p, :longitude)
+        is_number(lat) and is_number(lng)
+      end)
 
       node = %{
         id: "peer-#{cc}",
@@ -136,7 +141,9 @@ defmodule TunneldWeb.Live.Components.MeshCard do
         country_code: cc,
         country_name: Tunneld.GeoData.Centroids.name(cc) || cc,
         is_local: false,
-        peer_names: names |> Enum.join(", ")
+        peer_names: names |> Enum.join(", "),
+        latitude: if(first_with_geo, do: Map.get(first_with_geo, "latitude") || Map.get(first_with_geo, :latitude)),
+        longitude: if(first_with_geo, do: Map.get(first_with_geo, "longitude") || Map.get(first_with_geo, :longitude))
       }
 
       %{node: node, count: length(group)}

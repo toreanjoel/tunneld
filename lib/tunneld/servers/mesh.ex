@@ -323,8 +323,17 @@ defmodule Tunneld.Servers.Mesh do
 
     geo_data =
       case Tunneld.Geolocation.get_location() do
-        {:ok, loc} -> %{public_ip: loc[:ip], country_code: loc[:country_code]}
-        _ -> %{}
+        {:ok, loc} ->
+          %{
+            public_ip: loc[:ip],
+            country_code: loc[:country_code],
+            country_name: loc[:country_name],
+            latitude: loc[:latitude],
+            longitude: loc[:longitude]
+          }
+
+        _ ->
+          %{}
       end
 
     payload = %{

@@ -26,14 +26,24 @@ defmodule Tunneld.Servers.FakeData do
           "name" => "Office Gateway",
           "mesh_ip" => "10.0.0.3",
           "allowed_ips" => ["192.168.10.0/24"],
-          "last_seen" => System.os_time(:millisecond)
+          "last_seen" => System.os_time(:millisecond),
+          "public_ip" => "203.0.113.1",
+          "country_code" => "US",
+          "country_name" => "United States",
+          "latitude" => 37.7749,
+          "longitude" => -122.4194
         },
         "peer2Pubkey" => %{
           "node_id" => "node-home",
           "name" => "Home Gateway",
           "mesh_ip" => "10.0.0.4",
           "allowed_ips" => ["192.168.1.0/24"],
-          "last_seen" => System.os_time(:millisecond)
+          "last_seen" => System.os_time(:millisecond),
+          "public_ip" => "198.51.100.5",
+          "country_code" => "GB",
+          "country_name" => "United Kingdom",
+          "latitude" => 51.5074,
+          "longitude" => -0.1278
         }
       },
       last_sync: DateTime.utc_now()

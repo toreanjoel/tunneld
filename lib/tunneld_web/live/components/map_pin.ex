@@ -23,10 +23,12 @@ defmodule TunneldWeb.Live.Components.MapPin do
     name = Map.get(node, :name, "Unknown")
     count = assigns.count
     peer_names = Map.get(node, :peer_names, name)
+    latitude = Map.get(node, :latitude) || Map.get(node, "latitude")
+    longitude = Map.get(node, :longitude) || Map.get(node, "longitude")
 
     {cx, cy} =
-      case Tunneld.GeoData.Centroids.get(country_code) do
-        {x, y} when is_integer(x) and is_integer(y) ->
+      case project_or_fallback(latitude, longitude, country_code, ip) do
+        {x, y} when is_number(x) and is_number(y) ->
           jx = seeded_jitter(ip <> "_x", 6)
           jy = seeded_jitter(ip <> "_y", 6)
           {x + jx, y + jy}
@@ -95,6 +97,25 @@ defmodule TunneldWeb.Live.Components.MapPin do
       ><%= @count %></text>
     </g>
     """
+  end
+
+  defp project_or_fallback(lat, lng, _country_code, _ip)
+       when is_number(lat) and is_number(lng) do
+    cx = (lng + 180) / 360 * 800
+    cy = (90 - lat) / 180 * 450
+    {round(cx), round(cy)}
+  end
+
+  defp project_or_fallback(_lat, _lng, country_code, ip) do
+    case Tunneld.GeoData.Centroids.get(country_code) do
+      {x, y} when is_integer(x) and is_integer(y) ->
+        jx = seeded_jitter(ip <> "_x", 6)
+        jy = seeded_jitter(ip <> "_y", 6)
+        {x + jx, y + jy}
+
+      _ ->
+        nil
+    end
   end
 
   defp seeded_jitter(seed, range) do
