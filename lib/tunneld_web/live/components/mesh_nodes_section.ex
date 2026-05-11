@@ -28,7 +28,7 @@ defmodule TunneldWeb.Live.Components.MeshNodesSection do
 
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <%= for node <- @nodes do %>
-          <.mesh_node_card node={node} highlight={@highlight_id == node["id"]} />
+          <.mesh_node_card node={node} highlight={@highlight_id == node["node_id"]} />
         <% end %>
       </div>
     </section>
@@ -40,11 +40,11 @@ defmodule TunneldWeb.Live.Components.MeshNodesSection do
 
   defp mesh_node_card(assigns) do
     node = assigns.node
-    node_id = Map.get(node, "id", "") |> to_string()
+    node_id = Map.get(node, "node_id", "") |> to_string()
     safe_id = if node_id == "", do: nil, else: node_id
     is_self = Map.get(node, "self", false)
-    devices = Map.get(node, :devices, Map.get(node, "devices", []))
-    has_devices = is_list(devices) and length(devices) > 0
+    allowed_ips = Map.get(node, "allowed_ips", [])
+    has_devices = is_list(allowed_ips) and length(allowed_ips) > 0
     mesh_ip = Map.get(node, "mesh_ip", "—")
     online = Map.get(node, "online", true)
     last_seen_raw = Map.get(node, "last_seen", "—")
@@ -52,7 +52,7 @@ defmodule TunneldWeb.Live.Components.MeshNodesSection do
     name = Map.get(node, "name", "—")
     region = Map.get(node, "region", nil)
 
-    assigns = assign(assigns, node_id: node_id, is_self: is_self, devices: devices, has_devices: has_devices,
+    assigns = assign(assigns, node_id: node_id, is_self: is_self, devices: allowed_ips, has_devices: has_devices,
       mesh_ip: mesh_ip, online: online, last_seen: last_seen, name: name, region: region, safe_id: safe_id)
 
     ~H"""
