@@ -941,8 +941,9 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
     name = if peer, do: Map.get(peer, "name", Map.get(peer, :name, "—")), else: "—"
     ip = if peer, do: Map.get(peer, "mesh_ip", Map.get(peer, :mesh_ip, "—")), else: "—"
-    devices = if peer, do: Map.get(peer, :devices, Map.get(peer, "devices", [])), else: []
     allowed_ips = if peer, do: Map.get(peer, "allowed_ips", Map.get(peer, :allowed_ips, [])), else: []
+    mesh_ip_entry = Enum.find(allowed_ips, &String.starts_with?(&1, ip <> "/"))
+    shared_devices = if mesh_ip_entry, do: allowed_ips -- [mesh_ip_entry], else: allowed_ips
     country = if peer, do: Map.get(peer, "country_name", Map.get(peer, :country_name, "")), else: ""
 
     assigns =
@@ -950,8 +951,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(:peer_name, name)
       |> assign(:peer_ip, ip)
       |> assign(:peer_country, country)
-      |> assign(:devices, devices)
-      |> assign(:allowed_ips, allowed_ips)
+      |> assign(:shared_devices, shared_devices)
 
     ~H"""
     <div class="p-4 space-y-6 min-h-full">
@@ -960,30 +960,21 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         body: "Mesh peer #{@peer_ip} · #{@peer_country}"
       }) %>
 
-      <div :if={@allowed_ips != []} class="space-y-3">
-        <h3 class="text-[11px] tracking-[0.08em] uppercase text-text-secondary font-medium">Allowed IPs (Wireguard devices)</h3>
-        <div :for={ip <- @allowed_ips} class="bg-surface rounded-lg p-3 border border-border">
-          <span class="font-mono text-xs text-text-primary"><%= ip %></span>
+      <div :if={@peer_ip != "—"} class="space-y-3">
+        <h3 class="text-[11px] tracking-[0.08em] uppercase text-text-secondary font-medium">Mesh IP</h3>
+        <div class="bg-surface rounded-lg p-3 border border-border">
+          <span class="font-mono text-xs text-text-primary"><%= @peer_ip %>/32</span>
         </div>
       </div>
 
-      <div :if={@devices != []} class="space-y-3">
-        <h3 :if={@allowed_ips != []} class="text-[11px] tracking-[0.08em] uppercase text-text-secondary font-medium">Shared Devices</h3>
-        <div :for={d <- @devices} class="bg-surface rounded-lg p-3 border border-border">
-          <% dtags = d[:tags] || d["tags"] || [] %>
-          <div class="flex justify-between">
-            <span class="text-sm text-text-primary font-medium"><%= d[:name] || d["name"] %></span>
-            <span class="font-mono text-[12px] text-text-secondary"><%= d[:ip] || d["ip"] %></span>
-          </div>
-          <div :if={dtags != []} class="flex gap-1 flex-wrap mt-2">
-            <%= for t <- dtags do %>
-              <span class="bg-surface-2 text-text-secondary border border-border px-1.5 py-0.5 rounded text-[10px] font-mono"><%= t %></span>
-            <% end %>
-          </div>
+      <div :if={@shared_devices != []} class="space-y-3">
+        <h3 class="text-[11px] tracking-[0.08em] uppercase text-text-secondary font-medium">Shared Devices</h3>
+        <div :for={device <- @shared_devices} class="bg-surface rounded-lg p-3 border border-border">
+          <span class="font-mono text-xs text-text-primary"><%= device %></span>
         </div>
       </div>
 
-      <div :if={length(@allowed_ips) == 0 and length(@devices) == 0} class="text-sm text-text-secondary italic">
+      <div :if={@peer_ip == "—" and @shared_devices == []} class="text-sm text-text-secondary italic">
         No shared devices
       </div>
     </div>

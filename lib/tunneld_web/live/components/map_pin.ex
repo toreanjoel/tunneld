@@ -39,7 +39,6 @@ defmodule TunneldWeb.Live.Components.MapPin do
 
     mult = count > 1
     r = if mult, do: 8, else: 6
-    halo_r = if mult, do: 16, else: 12
     tooltip_id = "pin-tooltip-#{Map.get(node, :id, "unknown")}"
 
     assigns =
@@ -47,7 +46,6 @@ defmodule TunneldWeb.Live.Components.MapPin do
       |> assign(:cx, cx)
       |> assign(:cy, cy)
       |> assign(:r, r)
-      |> assign(:halo_r, halo_r)
       |> assign(:mult, mult)
       |> assign(:is_local, is_local)
       |> assign(:country_name, country_name)
@@ -68,19 +66,18 @@ defmodule TunneldWeb.Live.Components.MapPin do
       phx-hook="MapPinHover"
     >
       <circle
-        :if={@is_local or @mult}
         cx={@cx}
         cy={@cy}
-        r={@halo_r}
-        fill="#2ECC71"
+        r={@r + 4}
+        fill={if @is_local, do: "#06B6D4", else: "#2ECC71"}
         opacity="0.20"
-        class={["pointer-events-none", @is_local && "opacity-40"]}
+        class="pointer-events-none"
       />
       <circle
         cx={@cx}
         cy={@cy}
         r={@r}
-        fill="#2ECC71"
+        fill={if @is_local, do: "#06B6D4", else: "#2ECC71"}
         class="pointer-events-auto"
       />
       <text

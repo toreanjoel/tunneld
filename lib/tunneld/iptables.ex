@@ -426,9 +426,20 @@ defmodule Tunneld.Iptables do
             "-m",
             "state",
             "--state",
-            "ESTABLISHED,RELATED",
+            "NEW,ESTABLISHED,RELATED",
             "-j",
             "ACCEPT"
+          ])
+
+          append_unique("iptables", [
+            "-t",
+            "nat",
+            "-A",
+            "POSTROUTING",
+            "-o",
+            iface,
+            "-j",
+            "MASQUERADE"
           ])
 
           :ok
@@ -446,7 +457,7 @@ defmodule Tunneld.Iptables do
     if eth != nil and eth != "" do
       for {in_if, out_if, states} <- [
             {iface, eth, "NEW,ESTABLISHED,RELATED"},
-            {eth, iface, "ESTABLISHED,RELATED"}
+            {eth, iface, "NEW,ESTABLISHED,RELATED"}
           ] do
         del("iptables", [
           "-D",
@@ -463,6 +474,17 @@ defmodule Tunneld.Iptables do
           "ACCEPT"
         ])
       end
+
+      del("iptables", [
+        "-t",
+        "nat",
+        "-D",
+        "POSTROUTING",
+        "-o",
+        iface,
+        "-j",
+        "MASQUERADE"
+      ])
     end
 
     :ok

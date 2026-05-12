@@ -124,9 +124,9 @@ defmodule TunneldWeb.Live.Components.MeshCard do
   defp group_peers_by_country(peers) do
     peers
     |> Enum.group_by(fn p ->
-      Map.get(p, "country_code", Map.get(p, :country_code, "")) |> String.upcase()
+      cc = Map.get(p, "country_code", Map.get(p, :country_code, "")) |> String.upcase()
+      if cc == "", do: "UNKNOWN", else: cc
     end)
-    |> Enum.reject(fn {cc, _} -> cc == "" end)
     |> Enum.map(fn {cc, group} ->
       names = Enum.map(group, fn p -> Map.get(p, "name", Map.get(p, :name, "—")) end)
       ips = Enum.map(group, fn p -> Map.get(p, "public_ip", Map.get(p, :public_ip, "—")) end)
