@@ -60,8 +60,8 @@ defmodule TunneldWeb.Live.Login do
         </div>
       </div>
 
-      <div class="lg:w-2/5 w-full flex flex-col justify-center p-6 lg:p-8 lg:bg-surface lg:min-h-0">
-        <div :if={@type === :login} class="w-full max-w-sm mx-auto">
+      <div class="lg:w-2/5 w-full flex flex-col flex-1 lg:flex-none lg:justify-center p-6 lg:p-8 lg:bg-surface lg:min-h-0">
+        <div :if={@type === :login} class="w-full max-w-sm mx-auto flex-1 flex flex-col justify-center lg:block lg:flex-none">
           <h1 class="text-2xl text-text-primary font-medium mb-6 text-center -tracking-[0.01em]">Login</h1>
           <.live_component
             id={"login_#{DateTime.utc_now()}"}
@@ -72,7 +72,7 @@ defmodule TunneldWeb.Live.Login do
             client_id={@client_id}
           />
         </div>
-        <div :if={@type === :signup} class="w-full max-w-sm mx-auto">
+        <div :if={@type === :signup} class="w-full max-w-sm mx-auto flex-1 flex flex-col justify-center lg:block lg:flex-none">
           <h1 class="text-2xl text-text-primary font-medium mb-6 text-center -tracking-[0.01em]">Register</h1>
           <.live_component
             id={"signup_#{DateTime.utc_now()}"}

@@ -442,6 +442,28 @@ defmodule Tunneld.Iptables do
             "MASQUERADE"
           ])
 
+          append_unique("iptables", [
+            "-A",
+            "INPUT",
+            "-i",
+            iface,
+            "-m",
+            "state",
+            "--state",
+            "ESTABLISHED,RELATED",
+            "-j",
+            "ACCEPT"
+          ])
+
+          append_unique("iptables", [
+            "-A",
+            "INPUT",
+            "-i",
+            iface,
+            "-j",
+            "ACCEPT"
+          ])
+
           :ok
 
         _ ->
@@ -484,6 +506,28 @@ defmodule Tunneld.Iptables do
         iface,
         "-j",
         "MASQUERADE"
+      ])
+
+      del("iptables", [
+        "-D",
+        "INPUT",
+        "-i",
+        iface,
+        "-m",
+        "state",
+        "--state",
+        "ESTABLISHED,RELATED",
+        "-j",
+        "ACCEPT"
+      ])
+
+      del("iptables", [
+        "-D",
+        "INPUT",
+        "-i",
+        iface,
+        "-j",
+        "ACCEPT"
       ])
     end
 

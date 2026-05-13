@@ -218,8 +218,18 @@ defmodule Tunneld.Servers.Wireguard do
         end
 
       case exec("wg", args) do
-        {_, 0} -> :ok
-        {out, code} -> {:error, "Command failed (#{code}): #{out}"}
+        {_, 0} ->
+          # Explicitly install routes for each allowed-ip range
+          for ip_range <- allowed_ips do
+            System.cmd("ip", ["route", "add", ip_range, "dev", @interface],
+              stderr_to_stdout: true
+            )
+          end
+
+          :ok
+
+        {out, code} ->
+          {:error, "Command failed (#{code}): #{out}"}
       end
     end
   end

@@ -304,7 +304,7 @@ defmodule Tunneld.Servers.Mesh do
       |> Enum.flat_map(fn p -> [p["mesh_ip"] <> "/32" | p["allowed_ips"] || []] end)
       |> Enum.uniq()
 
-    all_allowed = ["10.0.0.0/8" | peer_allowed]
+    all_allowed = ["10.200.0.0/16" | peer_allowed]
 
     pubkey = state.relay_pubkey
 
@@ -390,7 +390,7 @@ defmodule Tunneld.Servers.Mesh do
   defp configure_relay_peer(hub) do
     pubkey = hub["relay_pubkey"]
     endpoint = hub["relay_endpoint"]
-    Wireguard.add_mesh_peer(pubkey, endpoint, ["10.0.0.0/8"])
+    Wireguard.add_mesh_peer(pubkey, endpoint, ["10.200.0.0/16"])
   end
 
   defp headers(state, node_id \\ nil) do
