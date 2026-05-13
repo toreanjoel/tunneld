@@ -19,10 +19,11 @@ defmodule Tunneld.Iptables do
   def reset() do
     flush_tables()
 
-    # Set default DROP policies immediately after flush to minimize
-    # the window where no firewall rules are active
-    System.cmd("iptables", ["-P", "INPUT", "DROP"])
-    System.cmd("iptables", ["-P", "FORWARD", "DROP"])
+    # IMPORTANT: keep default ACCEPT policies until rules are in place,
+    # otherwise an existing SSH session over which we deploy can be
+    # dropped between -F and the subsequent -A rules.
+    System.cmd("iptables", ["-P", "INPUT", "ACCEPT"])
+    System.cmd("iptables", ["-P", "FORWARD", "ACCEPT"])
     System.cmd("iptables", ["-P", "OUTPUT", "ACCEPT"])
 
     # Allow loopback
@@ -77,6 +78,11 @@ defmodule Tunneld.Iptables do
     internet_passthrough()
     dns_forwarding()
     set_dns_server(Tunneld.Servers.DnsConfig.get_dns_server())
+
+    # Set DROP policies LAST, after all rules are in place,
+    # so existing SSH sessions survive the transition.
+    System.cmd("iptables", ["-P", "INPUT", "DROP"])
+    System.cmd("iptables", ["-P", "FORWARD", "DROP"])
   end
 
   def get_env(:gateway), do: Application.get_env(:tunneld, :network)[:gateway]
