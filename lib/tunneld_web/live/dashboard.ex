@@ -565,11 +565,6 @@ defmodule TunneldWeb.Live.Dashboard do
         :authentication
 
       "mesh" ->
-        if _pid = GenServer.whereis(Tunneld.Servers.Mesh) do
-          Tunneld.Servers.Mesh.get_state()
-        else
-          %{status: :disabled, peers: %{}}
-        end
         :mesh
 
       "mesh_node" ->
@@ -715,10 +710,14 @@ defmodule TunneldWeb.Live.Dashboard do
     if Application.get_env(:tunneld, :mock_data, false) do
       Tunneld.Servers.FakeData.mesh()
     else
-      if _pid = GenServer.whereis(Tunneld.Servers.Mesh) do
-        Tunneld.Servers.Mesh.get_state()
-      else
-        %{status: :disabled, peers: %{}}
+      try do
+        if _pid = GenServer.whereis(Tunneld.Servers.Mesh) do
+          Tunneld.Servers.Mesh.get_state()
+        else
+          %{status: :disabled, peers: %{}}
+        end
+      catch
+        :exit, _ -> %{status: :connecting, peers: %{}}
       end
     end
   end

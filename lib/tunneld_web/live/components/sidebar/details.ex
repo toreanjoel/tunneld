@@ -828,11 +828,16 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   @spec render(%{:view => :mesh, optional(any()) => any()}) ::
           Phoenix.LiveView.Rendered.t()
   def render(%{view: :mesh} = assigns) do
-    mesh_state = if _pid = GenServer.whereis(Tunneld.Servers.Mesh) do
-      Tunneld.Servers.Mesh.get_state()
-    else
-      %{status: :disabled, peers: %{}}
-    end
+    mesh_state =
+      try do
+        if _pid = GenServer.whereis(Tunneld.Servers.Mesh) do
+          Tunneld.Servers.Mesh.get_state()
+        else
+          %{status: :disabled, peers: %{}}
+        end
+      catch
+        :exit, _ -> %{status: :connecting, peers: %{}}
+      end
 
     config = Application.get_env(:tunneld, :mesh, [])
     coordinator_url = Keyword.get(config, :coordinator_url, "")
@@ -929,11 +934,16 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   @spec render(%{:view => :mesh_node, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :mesh_node} = assigns) do
     peer_id = Map.get(assigns.selection || %{}, :id, "")
-    mesh_state = if _pid = GenServer.whereis(Tunneld.Servers.Mesh) do
-      Tunneld.Servers.Mesh.get_state()
-    else
-      %{status: :disabled, peers: %{}}
-    end
+    mesh_state =
+      try do
+        if _pid = GenServer.whereis(Tunneld.Servers.Mesh) do
+          Tunneld.Servers.Mesh.get_state()
+        else
+          %{status: :disabled, peers: %{}}
+        end
+      catch
+        :exit, _ -> %{status: :connecting, peers: %{}}
+      end
 
     peer = mesh_state[:peers] |> Map.values() |> Enum.find(fn p ->
       Map.get(p, "node_id", Map.get(p, :node_id, "")) == peer_id
