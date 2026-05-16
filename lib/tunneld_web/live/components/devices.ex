@@ -14,19 +14,30 @@ defmodule TunneldWeb.Live.Components.Devices do
     devices = Map.get(new_data, :devices, [])
     obfuscated = Map.get(assigns, :obfuscated, false)
 
-    devices =
-      Enum.map(devices, fn d ->
-        d
-        |> Map.put(:expose_allowed, Tunneld.Servers.ExposeAllowed.allowed?(d.mac))
-        |> Map.put(:tags, Tunneld.Servers.DeviceTags.get_tags(d.mac))
+    probe_cache = Map.get(socket.assigns, :probe_cache, %{})
+    now = System.monotonic_time(:second)
+
+    {devices, probe_cache} =
+      Enum.reduce(devices, {[], probe_cache}, fn d, {acc, cache} ->
+        online =
+          case Map.get(cache, d.mac) do
+            %{at: at, online: val} when now - at < 30 -> val
+            _ -> probe_online(d.ip)
+          end
+
+        cache = Map.put(cache, d.mac, %{at: now, online: online})
+        d = d |> Map.put(:expose_allowed, Tunneld.Servers.ExposeAllowed.allowed?(d.mac)) |> Map.put(:tags, Tunneld.Servers.DeviceTags.get_tags(d.mac)) |> Map.put(:online, online)
+        {[d | acc], cache}
       end)
 
+    devices = Enum.reverse(devices)
     new_data = Map.put(new_data, :devices, devices)
 
     socket =
       socket
       |> assign_new(:obfuscated, fn -> false end)
       |> assign(:obfuscated, obfuscated)
+      |> assign(:probe_cache, probe_cache)
 
     new_loading =
       case devices do
@@ -67,15 +78,15 @@ defmodule TunneldWeb.Live.Components.Devices do
             style="animation: fadeIn 0.5s ease-out forwards;"
           >
             <div class="flex flex-row gap-2">
-              <div class="flex-1 truncate ellipsis"><%= mask(@obfuscated, device.hostname) %></div>
+              <div class="flex-1 truncate ellipsis flex items-center gap-1.5"><%= mask(@obfuscated, device.hostname) %><span class={"status-dot shrink-0 #{if !@obfuscated && Map.get(device, :online, false), do: "status-dot--green", else: "status-dot--gray"}"} /></div>
               <div
                 phx-click="modal_open"
                 phx-value-modal_title={"Manage tags for #{device.hostname}"}
-                phx-value-modal_description={if device.tags != [], do: "Current tags: #{Enum.join(device.tags, ", ")}", else: "No tags yet. Add one below."}
+                phx-value-modal_description={if device.tags != [], do: "Current tags: #{Enum.join(device.tags, ", ")}. Enter a new tag below to append.", else: "No tags yet. Add one below."}
                 phx-value-modal_body={
                   Jason.encode!(%{
                     "type" => "schema",
-                    "data" => Tunneld.Schema.data(:device_tag, %{hostname: device.hostname}),
+                    "data" => Tunneld.Schema.data(:device_tag, %{hostname: device.hostname, current_tags: device.tags}),
                     "default_values" => %{
                       "mac" => device.mac
                     },
@@ -116,6 +127,16 @@ defmodule TunneldWeb.Live.Components.Devices do
                 class="cursor-pointer"
               >
                 <.icon name="hero-link" class={if device.expose_allowed, do: "h-4 w-4 text-green", else: "h-4 w-4 text-text-secondary"} />
+              </div>
+              <div
+                phx-click="trigger_action"
+                phx-value-action="wake_device"
+                phx-value-data={Jason.encode!(%{"mac" => device.mac})}
+                phx-click-loading="opacity-50 cursor-wait"
+                class="cursor-pointer"
+                title="Wake device"
+              >
+                <.icon name="hero-bolt" class="h-4 w-4 text-text-secondary" />
               </div>
               <div
                 phx-click="modal_open"
@@ -190,5 +211,19 @@ defmodule TunneldWeb.Live.Components.Devices do
     else
       "bg-surface-2 text-text-secondary border-border"
     end
+  end
+
+  defp probe_online(ip) do
+    mock? = Application.get_env(:tunneld, :mock_data, false)
+    if mock? do
+      true
+    else
+      case System.cmd("ping", ["-c", "1", "-W", "1", ip], stderr_to_stdout: true) do
+        {_, 0} -> true
+        _ -> false
+      end
+    end
+  rescue
+    _ -> false
   end
 end

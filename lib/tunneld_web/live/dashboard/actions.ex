@@ -55,6 +55,9 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
         tag = data["tag"]
         if mac && tag, do: Tunneld.Servers.DeviceTags.remove_tag(mac, tag)
 
+      "wake_device" ->
+        if mac = data["mac"], do: send_magic_packet(mac)
+
       # Wireless networking
       "connect_to_wireless_network" ->
         Wlan.connect_with_pass(data["ssid"], data["password"])
@@ -212,4 +215,16 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
   end
 
   defp decode_if_needed(_), do: %{}
+
+  defp send_magic_packet(mac) do
+    hex = String.replace(mac, ":", "")
+    if byte_size(hex) == 12 do
+      magic = :binary.list_to_bin(List.duplicate(0xFF, 6))
+      addr = hex |> Base.decode16!(case: :lower) |> List.duplicate(16) |> :binary.list_to_bin()
+      packet = magic <> addr
+      {:ok, sock} = :gen_udp.open(0, [:binary, {:broadcast, true}])
+      :gen_udp.send(sock, {255, 255, 255, 255}, 9, packet)
+      :gen_udp.close(sock)
+    end
+  end
 end

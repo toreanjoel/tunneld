@@ -112,10 +112,13 @@ defmodule Tunneld.Schema do
     }
   end
 
-  def data(:device_tag, %{hostname: hostname}) do
+  def data(:device_tag, %{hostname: hostname} = opts) do
+    current_tags = Map.get(opts, :current_tags, [])
+    tags_note = if current_tags != [], do: "Current tags: #{Enum.join(current_tags, ", ")}. Enter new tags to append.", else: "Enter a label or category for this device. Use commas to add multiple tags at once."
+
     %{
       "title" => "Add tag to #{hostname}",
-      "description" => "Enter a label or category for this device. Use commas to add multiple tags at once.",
+      "description" => tags_note,
       "type" => "object",
       "properties" => %{
         "tag" => %{
