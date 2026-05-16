@@ -164,7 +164,17 @@ defmodule TunneldWeb.Live.Components.Devices do
               <% end %>
             </div>
             <div class="mt-auto">
-              <div class="text-xs text-text-tertiary"><%= mask(@obfuscated, device.ip) %></div>
+              <div class="text-xs text-text-tertiary flex items-center gap-1.5 justify-between">
+                <span><%= mask(@obfuscated, device.ip) %></span>
+                <span
+                  phx-click="copy_to_clipboard"
+                  phx-value-text={device.ip}
+                  class="cursor-pointer text-text-secondary hover:text-accent transition-colors shrink-0"
+                  title="Copy IP"
+                >
+                  <.icon name="hero-link" class="h-3 w-3" />
+                </span>
+              </div>
               <div class="text-xs text-text-tertiary"><%= mask(@obfuscated, device.mac) %></div>
             </div>
           </div>

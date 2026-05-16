@@ -24,6 +24,10 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(:selection, selection)
       |> assign(:obfuscated, obfuscated)
 
+    if view == :wlan and map_size(data) == 0 do
+      Tunneld.Servers.Wlan.scan_networks()
+    end
+
     {:ok, socket}
   end
 
@@ -646,7 +650,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
       <div class={"flex flex-col #{if @count== 0, do: "items-center justify-center", else: ""}"}>
         <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">
-          No Wireless Networks Found
+          Scanning for networks…
         </h1>
 
         <div :if={@count > 0}>
@@ -857,6 +861,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     coordinator_url = Keyword.get(config, :coordinator_url, "")
     token = Keyword.get(config, :token, "")
     node_name = Keyword.get(config, :node_name, "")
+    peers = mesh_state[:peers] || %{}
 
     assigns =
       assigns
@@ -865,6 +870,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(:relay_endpoint, mesh_state[:relay_endpoint])
       |> assign(:relay_pubkey, mesh_state[:relay_pubkey])
       |> assign(:mesh_ip, mesh_state[:mesh_ip])
+      |> assign(:last_sync, mesh_state[:last_sync])
+      |> assign(:peer_count, map_size(peers))
       |> assign(:coordinator_url, coordinator_url)
       |> assign(:token, token)
       |> assign(:node_name, node_name)
@@ -886,13 +893,31 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             <span class="text-gray-400 font-semibold">Mesh IP</span>
             <span class="font-mono text-[10px]"><%= @mesh_ip %></span>
           </div>
+          <div :if={@peer_count > 0} class="flex items-center justify-between">
+            <span class="text-gray-400 font-semibold">Peers</span>
+            <span class="font-mono text-[10px]"><%= @peer_count %></span>
+          </div>
+          <div :if={@last_sync} class="flex items-center justify-between">
+            <span class="text-gray-400 font-semibold">Last Sync</span>
+            <span class="font-mono text-[10px]"><%= Calendar.strftime(@last_sync, "%H:%M:%S") %></span>
+          </div>
           <div :if={@relay_endpoint} class="flex items-center justify-between">
             <span class="text-gray-400 font-semibold">Relay Endpoint</span>
             <span class="font-mono text-[10px] break-all max-w-[200px]"><%= @relay_endpoint %></span>
           </div>
           <div :if={@relay_pubkey} class="flex items-center justify-between">
             <span class="text-gray-400 font-semibold">Relay Pubkey</span>
-            <span class="font-mono text-[10px] break-all max-w-[200px]"><%= String.slice(@relay_pubkey, 0, 20) <> "..." %></span>
+            <div class="flex items-center gap-1.5">
+              <span class="font-mono text-[10px]"><%= String.slice(@relay_pubkey, 0, 20) <> "..." %></span>
+              <span
+                phx-click="copy_to_clipboard"
+                phx-value-text={@relay_pubkey}
+                class="cursor-pointer text-text-secondary hover:text-accent transition-colors"
+                title="Copy public key"
+              >
+                <.icon name="hero-link" class="h-3 w-3" />
+              </span>
+            </div>
           </div>
         </div>
 
@@ -986,15 +1011,31 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
       <div :if={@peer_ip != "—"} class="space-y-3">
         <h3 class="text-[11px] tracking-[0.08em] uppercase text-text-secondary font-medium">Mesh IP</h3>
-        <div class="bg-surface rounded-lg p-3 border border-border">
+        <div class="bg-surface rounded-lg p-3 border border-border flex items-center justify-between">
           <span class="font-mono text-xs text-text-primary"><%= @peer_ip %>/32</span>
+          <span
+            phx-click="copy_to_clipboard"
+            phx-value-text={@peer_ip}
+            class="cursor-pointer text-text-secondary hover:text-accent transition-colors"
+            title="Copy IP"
+          >
+            <.icon name="hero-link" class="h-3.5 w-3.5" />
+          </span>
         </div>
       </div>
 
       <div :if={@shared_devices != []} class="space-y-3">
         <h3 class="text-[11px] tracking-[0.08em] uppercase text-text-secondary font-medium">Shared Devices</h3>
-        <div :for={device <- @shared_devices} class="bg-surface rounded-lg p-3 border border-border">
+        <div :for={device <- @shared_devices} class="bg-surface rounded-lg p-3 border border-border flex items-center justify-between">
           <span class="font-mono text-xs text-text-primary"><%= device %></span>
+          <span
+            phx-click="copy_to_clipboard"
+            phx-value-text={String.replace(device, "/32", "")}
+            class="cursor-pointer text-text-secondary hover:text-accent transition-colors"
+            title="Copy IP"
+          >
+            <.icon name="hero-link" class="h-3.5 w-3.5" />
+          </span>
         </div>
       </div>
 

@@ -62,7 +62,17 @@ defmodule TunneldWeb.Live.Components.DevicesSummary do
               <div :if={device_tags == []} class="grow" />
 
               <div>
-                <div class="font-mono text-sm text-text-primary"><%= mask(@obfuscated, device.ip) %></div>
+                <div class="font-mono text-sm text-text-primary flex items-center gap-1.5 justify-between">
+                  <span><%= mask(@obfuscated, device.ip) %></span>
+                  <span
+                    phx-click="copy_to_clipboard"
+                    phx-value-text={device.ip}
+                    class="cursor-pointer text-text-secondary hover:text-accent transition-colors shrink-0"
+                    title="Copy IP"
+                  >
+                    <.icons_link size={12} />
+                  </span>
+                </div>
                 <div class="font-mono text-xs text-text-tertiary mt-0.5"><%= mask(@obfuscated, device.mac) %></div>
               </div>
             </div>

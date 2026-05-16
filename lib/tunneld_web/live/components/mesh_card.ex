@@ -32,11 +32,6 @@ defmodule TunneldWeb.Live.Components.MeshCard do
         <div class="text-[11px] tracking-[0.08em] uppercase text-accent font-medium">
           MESH NETWORK
         </div>
-        <div :if={@connected} class="font-mono text-[11px] text-text-primary/75 leading-[1.7] text-right">
-          <div><span class="text-text-tertiary">peers </span><%= @peer_count %></div>
-          <div><span class="text-text-tertiary">mesh ip </span><%= @mesh_ip %></div>
-          <div><span class="text-text-tertiary">sync </span><%= @last_sync %></div>
-        </div>
       </div>
 
       <div class="relative flex-1 min-h-[200px]">
