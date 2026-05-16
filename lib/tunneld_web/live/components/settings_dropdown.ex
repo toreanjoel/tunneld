@@ -18,7 +18,7 @@ defmodule TunneldWeb.Live.Components.SettingsDropdown do
         <.settings size={14} /> Authentication
       </div>
       <div class="border-t border-border my-1" />
-      <div phx-click="logout" class="menu-item">
+      <div phx-click="confirm_logout" class="menu-item">
         <.log_out size={14} /> Log out
       </div>
       <div phx-click="restart_device" class="menu-item !text-red">

@@ -132,15 +132,16 @@ defmodule TunneldWeb.Live.Dashboard do
           <main class="max-w-[1280px] mx-auto px-8 pt-2 pb-16">
             <div class="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6">
               <% mesh_data = @mesh_state || %{} %>
+              <% connected? = Map.get(mesh_data, :status) == :connected %>
               <.mesh_card
-                connected={Map.get(mesh_data, :status) == :connected}
+                connected={connected?}
                 peer_count={mesh_data[:peers] |> Map.values() |> length()}
                 mesh_ip={Map.get(mesh_data, :mesh_ip)}
                 last_sync={if mesh_data[:last_sync], do: Calendar.strftime(mesh_data[:last_sync], "%H:%M:%S")}
                 relay={Map.get(mesh_data, :token)}
                 geo_location={@geo_location}
-                map_status={@map_status}
-                mesh_peers={mesh_data[:peers] |> Map.values()}
+                map_status={if connected?, do: @map_status, else: :unavailable}
+                mesh_peers={if connected?, do: mesh_data[:peers] |> Map.values(), else: []}
               />
 
               <div class="grid grid-rows-[1fr_3fr] gap-6">
@@ -336,9 +337,14 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, assign(socket, :sidebar, sidebar)}
   end
 
-  def handle_event("logout", _, socket) do
-    Session.delete(socket.assigns.client_id)
-    {:noreply, socket |> push_navigate(to: Routes.live_path(socket, TunneldWeb.Live.Login))}
+  def handle_event("confirm_logout", _params, socket) do
+    modal_data = modal_open(%{
+      title: "Log out?",
+      body: %{"type" => "string", "data" => "You will need to enter your credentials to access the dashboard again."},
+      actions: %{"title" => "Log out", "payload" => %{"type" => "logout", "data" => %{}}}
+    })
+
+    {:noreply, socket |> assign(:modal, modal_data) |> assign(:settings_menu_open, false)}
   end
 
   def handle_event("trigger_action", params, socket) do
@@ -490,6 +496,11 @@ defmodule TunneldWeb.Live.Dashboard do
   def handle_info(:delayed_scan, socket) do
     Tunneld.Servers.Wlan.scan_networks()
     {:noreply, socket}
+  end
+
+  def handle_info(:do_logout, socket) do
+    Session.delete(socket.assigns.client_id)
+    {:noreply, socket |> push_navigate(to: Routes.live_path(socket, TunneldWeb.Live.Login))}
   end
 
   def handle_info(:scan_for_wireless_networks, socket) do

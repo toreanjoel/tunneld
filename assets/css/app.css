@@ -203,6 +203,10 @@
   .status-dot--red {
     background: var(--red);
   }
+  .status-dot--yellow {
+    background: #F59E0B;
+    box-shadow: 0 0 8px rgba(245,158,11,0.5);
+  }
   .status-dot--gray {
     background: var(--text-3);
   }

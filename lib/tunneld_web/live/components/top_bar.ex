@@ -44,8 +44,8 @@ defmodule TunneldWeb.Live.Components.TopBar do
           <button class="services-chip" phx-click="toggle_services_popover">
             <% up_count = Enum.count(@services, & Map.get(&1, :up, true)) %>
             <% total = length(@services) %>
-            <% has_failing = Enum.any?(@services, fn s -> not Map.get(s, :up, true) end) %>
-            <span class={"status-dot #{if has_failing, do: "status-dot--red", else: "status-dot--green"}"} />
+            <% dot_class = services_dot_class(up_count, total) %>
+            <span class={"status-dot #{dot_class}"} />
             <span class="hidden sm:inline text-[11px] text-text-primary tracking-[0.06em] font-medium">
               Services <%= up_count %>/<%= total %>
             </span>
@@ -89,5 +89,13 @@ defmodule TunneldWeb.Live.Components.TopBar do
       </div>
     </div>
     """
+  end
+
+  defp services_dot_class(up_count, total) do
+    cond do
+      up_count == total -> "status-dot--green"
+      up_count == 0 -> "status-dot--red"
+      true -> "status-dot--yellow"
+    end
   end
 end

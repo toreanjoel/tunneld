@@ -88,6 +88,9 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
         File.rm(Auth.path())
         send(parent, :revoke_login_creds)
 
+      "logout" ->
+        send(parent, :do_logout)
+
       # DNS
       "set_dns_server" ->
         ip = data["server"]

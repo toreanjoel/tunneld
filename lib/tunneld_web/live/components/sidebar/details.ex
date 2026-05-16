@@ -677,9 +677,23 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                 <%!-- If we are connected to the network --%>
                 <div
                   :if={current_connected}
-                  phx-click="trigger_action"
-                  phx-value-action="disconnect_from_wireless_network"
-                  phx-value-data={Jason.encode!(%{})}
+                  phx-click="modal_open"
+                  phx-value-modal_title="Disconnect from Wi-Fi?"
+                  phx-value-modal_body={
+                    Jason.encode!(%{
+                      "type" => "string",
+                      "data" => "This will disconnect the device from the current wireless network."
+                    })
+                  }
+                  phx-value-modal_actions={
+                    Jason.encode!(%{
+                      "title" => "Disconnect",
+                      "payload" => %{
+                        "type" => "disconnect_from_wireless_network",
+                        "data" => %{}
+                      }
+                    })
+                  }
                   phx-click-loading="opacity-50 cursor-wait"
                   class="flex items-center justify-center gap-1 bg-secondary p-2 cursor-pointer rounded-md"
                 >
@@ -884,7 +898,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
         <div class="text-sm text-text-secondary">
           Set these values to connect to the relay.
-          A tunneld-relay instance is required — see documentation for deployment.
+          A tunneld-relay instance is required. See documentation for deployment.
         </div>
 
         <form phx-submit="save_mesh_config" class="space-y-3">
