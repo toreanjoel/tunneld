@@ -5,6 +5,7 @@ defmodule TunneldWeb.Live.Components.ResourcesSection do
   use Phoenix.Component
   import TunneldWeb.Icons
   import TunneldWeb.Live.Components.SectionHeader
+  import TunneldWeb.Live.Components.HelpIcon
 
   attr :resources, :list, default: []
 
@@ -12,7 +13,7 @@ defmodule TunneldWeb.Live.Components.ResourcesSection do
     ~H"""
     <section>
       <.section_header>
-        Resources
+        Resources<.help_icon text="Services and applications registered on your network. Each resource has a backend pool (IP addresses and ports), a public Zrok share for internet access, and optionally a private share with token-based access. Bind private resources from other nodes to access their services locally." />
         <:actions>
           <button class="ghost-btn" phx-click="modal_open" phx-value-modal_title="Quick Expose" phx-value-modal_body={
             Jason.encode!(%{"type" => "code_blocks", "data" => quick_expose_blocks()})

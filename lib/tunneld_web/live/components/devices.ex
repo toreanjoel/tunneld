@@ -4,6 +4,7 @@ defmodule TunneldWeb.Live.Components.Devices do
   """
   use TunneldWeb, :live_component
   import TunneldWeb.Live.Components.SectionHeader
+  import TunneldWeb.Live.Components.HelpIcon
 
   def mount(socket) do
     {:ok, socket |> assign(loading: true)}
@@ -59,7 +60,7 @@ defmodule TunneldWeb.Live.Components.Devices do
   def render(assigns) do
     ~H"""
     <div class="p-3 md:p-5">
-      <.section_header>Devices</.section_header>
+      <.section_header>Devices<.help_icon text="Devices discovered on your LAN subnet via DHCP leases. Each device automatically gets an IP from dnsmasq. Tag devices with 'wg' prefix (e.g. 'wg-office-printer') to advertise them to the mesh network. Use Quick Expose to let devices create public Zrok tunnels via a curl command. Revoke IP to release the DHCP lease." /></.section_header>
 
       <div :if={@loading} class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         <div class="p-4 flex flex-col bg-surface rounded-lg w-full h-[130px] opacity-10">

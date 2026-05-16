@@ -1,12 +1,14 @@
 import { HemisphereHook } from "./hemisphere.js"
 import GaugeHook from "./gauge_hook.js"
 import MapPinHover from "./map_pin_hover.js"
+import HelpTooltip from "./help_tooltip.js"
 
 let Hooks = {};
 
 Hooks.Hemisphere = HemisphereHook;
 Hooks.Gauge = GaugeHook;
 Hooks.MapPinHover = MapPinHover;
+Hooks.HelpTooltip = HelpTooltip;
 
 Hooks.CopyToClipboard = {
   mounted() {

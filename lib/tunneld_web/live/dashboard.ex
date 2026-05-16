@@ -20,6 +20,7 @@ defmodule TunneldWeb.Live.Dashboard do
   import TunneldWeb.Live.Components.DnsCard
   import TunneldWeb.Live.Components.GaugeGrid
   import TunneldWeb.Live.Components.MeshNodesSection
+  import TunneldWeb.Live.Components.HelpIcon
 
   @modal_default %{
     show: false,
@@ -174,7 +175,7 @@ defmodule TunneldWeb.Live.Dashboard do
             </div>
 
             <div class="mt-12">
-              <.section_header>Local devices</.section_header>
+              <.section_header>Local devices<.help_icon text="Devices connected to this Tunneld gateway's LAN port via Ethernet. Each device gets a DHCP lease and IP address from dnsmasq. Devices tagged with 'wg' prefix are advertised to the mesh network for remote access by other nodes." /></.section_header>
               <div class="bg-surface border border-border rounded-xl p-6 h-24 flex items-center justify-between">
                 <div class="flex items-center gap-5">
                   <span class="text-text-secondary inline-flex">

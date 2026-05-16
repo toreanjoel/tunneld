@@ -7,6 +7,7 @@ defmodule TunneldWeb.Live.Components.MeshNodesSection do
   alias Phoenix.LiveView.JS
   import TunneldWeb.Icons
   import TunneldWeb.Live.Components.SectionHeader
+  import TunneldWeb.Live.Components.HelpIcon
 
   attr :nodes, :list, default: []
   attr :highlight_id, :string, default: nil
@@ -15,7 +16,7 @@ defmodule TunneldWeb.Live.Components.MeshNodesSection do
     ~H"""
     <section class="mt-16">
       <.section_header>
-        Mesh nodes
+        Mesh nodes<.help_icon text="Remote Tunneld nodes connected to the same relay coordinator. Each node is a separate gateway device on a different network. Click a node to view its shared devices. The 'this node' badge marks your current device. Shared devices count shows how many LAN devices that node has tagged with 'wg' prefix for mesh access." />
         <:actions>
           <button class="ghost-btn" phx-click="trigger_action" phx-value-action="mesh_sync" phx-value-data="{}">
             <.refresh size={16} /> Sync now

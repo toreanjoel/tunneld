@@ -3,6 +3,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   The list of sidebar details to render
   """
   use TunneldWeb, :live_component
+  import TunneldWeb.Live.Components.HelpIcon
 
   def mount(socket) do
     {:ok, socket}
@@ -573,7 +574,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         }) %>
       </div>
 
-      <div class="flex flex-row gap-1 mt-2 justify-end">
+        <div class="flex flex-row gap-1 mt-2 justify-end">
         <button
           phx-click="trigger_action"
           phx-value-action="scan_for_wireless_networks"

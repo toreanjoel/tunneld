@@ -12,6 +12,7 @@ defmodule TunneldWeb.Live.Components.MeshCard do
   use Phoenix.Component
   import TunneldWeb.Icons
   import TunneldWeb.Live.Components.MapPin
+  import TunneldWeb.Live.Components.HelpIcon
 
   attr :connected, :boolean, default: false
   attr :peer_count, :integer, default: 0
@@ -29,8 +30,9 @@ defmodule TunneldWeb.Live.Components.MeshCard do
     ~H"""
     <div class="hero-card flex flex-col">
       <div class="px-7 pt-6 pb-4 flex justify-between items-start relative z-[2]">
-        <div class="text-[11px] tracking-[0.08em] uppercase text-accent font-medium">
+        <div class="text-[11px] tracking-[0.08em] uppercase text-accent font-medium flex items-center">
           MESH NETWORK
+          <.help_icon text="Secure mesh networking via a relay coordinator. Your node connects to a relay hub which routes encrypted WireGuard traffic between all connected nodes, enabling device access across different networks without exposing your LAN to the public internet." />
         </div>
       </div>
 
