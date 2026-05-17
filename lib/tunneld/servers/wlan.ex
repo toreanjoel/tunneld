@@ -53,6 +53,7 @@ defmodule Tunneld.Servers.Wlan do
 
       # scan for networks
       run_cmd("wpa_cli", ["scan"])
+      Process.sleep(3000)
       {output, _} = run_cmd("wpa_cli", ["scan_results"])
 
       networks =
@@ -168,14 +169,21 @@ defmodule Tunneld.Servers.Wlan do
   # parse the scan results that we get back from the network scanning
   defp parse_scan_result(line) do
     case String.split(line) do
-      [_bssid, _freq, signal, flags | rest] ->
-        ssid = Enum.join(rest, " ")
-
-        %{ssid: ssid, security: flags, signal: signal, open: is_open_network?(flags)}
+      [bssid, _freq, signal, flags | rest] ->
+        if valid_bssid?(bssid) do
+          ssid = Enum.join(rest, " ")
+          %{ssid: ssid, security: flags, signal: signal, open: is_open_network?(flags)}
+        else
+          nil
+        end
 
       _ ->
         nil
     end
+  end
+
+  defp valid_bssid?(bssid) do
+    Regex.match?(~r/^[0-9a-fA-F]{2}(:[0-9a-fA-F]{2}){5}$/, bssid)
   end
 
   # We check if the network is a open network or not
