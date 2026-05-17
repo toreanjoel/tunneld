@@ -7,9 +7,9 @@
 ![Zrok](https://img.shields.io/badge/zrok-enabled-blue)
 ![Platform](https://img.shields.io/badge/platform-debian-red)
 
-A wireless-first software-defined gateway for ARM single-board computers. Tunneld bridges Wi-Fi and Ethernet to create a private subnet, manages devices via DHCP, reverse-proxies local services, and optionally exposes them through Zrok overlay tunnels.
+A wireless-first software-defined gateway for ARM single-board computers. Tunneld bridges Wi-Fi and Ethernet to create a private subnet, manages devices via DHCP, reverse-proxies local services, exposes them through Zrok overlay tunnels, and connects to other Tunneld nodes via WireGuard mesh networking — all managed from a real-time LiveView dashboard.
 
-Designed to be lightweight and portable — run it at home as a smarter router, or take it anywhere as a self-contained network appliance.
+Each node is self-contained (no database — just JSON files) and runs on a $35 Raspberry Pi. Plug devices into Ethernet, tag them for mesh access, wake them remotely, and expose services publicly or privately.
 
 > **Prerequisites**
 >
@@ -28,17 +28,20 @@ Implements the CAKE algorithm to eliminate bufferbloat and reduce latency. Choos
 ### DNS Forwarding
 DNS queries on the subnet are intercepted via iptables and forwarded to a user-configured upstream DNS server. Select any resolver from the dashboard — Cloudflare (1.1.1.1), Google (8.8.8.8), or a local Pi-hole on your network. Same-subnet DNS servers are supported via automatic prerouting rules.
 
+### Device Management
+Track all devices on the subnet via DHCP leases with real-time online status indicators (ping probe, cached 30s). Tag devices for organization and mesh exposure. Wake devices on the local network or on a remote mesh peer via Wake-on-LAN magic packets. Revoke DHCP leases to force devices off the network.
+
 ### Resource Management & Health Monitoring
 Define resources that point to services running on your subnet. Each resource has a pool of backends that are health-checked via TCP probes. Nginx load-balances across healthy backends with auto-generated configs.
 
 ### Quick Expose
-Devices on the subnet can create, list, and remove public Zrok shares with a single `curl` — no credentials required. The gateway resolves the caller from its DHCP lease and immediately provisions a public URL. Enable per-device from the dashboard.
+Devices on the subnet can create, list, and remove public Zrok shares with a single `curl`. The gateway resolves the caller from its DHCP lease and provisions a public URL. Admin-controlled per-device allowlist grants or revokes this capability from the dashboard.
 
 ### Overlay Networking (Zrok/OpenZiti)
 Expose resources publicly or privately through Zrok tunnels without port forwarding. Share services across Tunneld instances — bind remote shares locally and add them to your nginx pool for distributed load balancing.
 
 ### Mesh Networking
-Connect multiple Tunneld nodes into a single mesh through a relay coordinator. Each node registers outbound-only over WireGuard, receives a mesh IP, and syncs peers automatically. Tag LAN devices with `wg::` prefixes to expose them to the mesh — no port forwarding required.
+Connect multiple Tunneld nodes into a single mesh through a relay coordinator. Each node registers outbound-only over WireGuard, receives a mesh IP, and syncs peers automatically. Tag LAN devices with `wg` prefix (e.g. `wg-printer`) to expose them to the mesh — no port forwarding required. The relay assigns virtual IPs via DNAT to avoid subnet collisions between nodes.
 
 ### World Map & Geolocation
 The dashboard renders an offline 2D world map showing peer locations by country. Device geolocation is determined from the public IP and displayed as a pin on the map.
