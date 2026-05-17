@@ -1005,9 +1005,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
     name = if peer, do: Map.get(peer, "name", Map.get(peer, :name, "—")), else: "—"
     ip = if peer, do: Map.get(peer, "mesh_ip", Map.get(peer, :mesh_ip, "—")), else: "—"
-    allowed_ips = if peer, do: Map.get(peer, "allowed_ips", Map.get(peer, :allowed_ips, [])), else: []
-    mesh_ip_entry = Enum.find(allowed_ips, &String.starts_with?(&1, ip <> "/"))
-    shared_devices = if mesh_ip_entry, do: allowed_ips -- [mesh_ip_entry], else: allowed_ips
+    shared_devices = if peer, do: Map.get(peer, "devices", Map.get(peer, :devices, [])), else: []
+    peer_node_id = if peer, do: Map.get(peer, "node_id", Map.get(peer, :node_id, "")), else: ""
     country = if peer, do: Map.get(peer, "country_name", Map.get(peer, :country_name, "")), else: ""
 
     assigns =
@@ -1015,6 +1014,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(:peer_name, name)
       |> assign(:peer_ip, ip)
       |> assign(:peer_country, country)
+      |> assign(:peer_node_id, peer_node_id)
       |> assign(:shared_devices, shared_devices)
 
     ~H"""
@@ -1041,16 +1041,30 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
       <div :if={@shared_devices != []} class="space-y-3">
         <h3 class="text-[11px] tracking-[0.08em] uppercase text-text-secondary font-medium">Shared Devices</h3>
-        <div :for={device <- @shared_devices} class="bg-surface rounded-lg p-3 border border-border flex items-center justify-between">
-          <span class="font-mono text-xs text-text-primary"><%= device %></span>
-          <span
-            phx-click="copy_to_clipboard"
-            phx-value-text={String.replace(device, "/32", "")}
-            class="cursor-pointer text-text-secondary hover:text-accent transition-colors"
-            title="Copy IP"
-          >
-            <.icon name="hero-link" class="h-3.5 w-3.5" />
-          </span>
+        <div :for={device <- @shared_devices} class="bg-surface rounded-lg p-3 border border-border flex items-center justify-between gap-2">
+          <div class="flex flex-col min-w-0">
+            <span class="font-mono text-xs text-text-primary"><%= device["real_ip"] %></span>
+            <span class="font-mono text-[10px] text-text-tertiary">via <%= device["mapped_ip"] %></span>
+          </div>
+          <div class="flex items-center gap-1 shrink-0">
+            <span
+              phx-click="copy_to_clipboard"
+              phx-value-text={device["real_ip"]}
+              class="cursor-pointer text-text-secondary hover:text-accent transition-colors"
+              title="Copy IP"
+            >
+              <.icon name="hero-link" class="h-3.5 w-3.5" />
+            </span>
+            <span
+              phx-click="trigger_action"
+              phx-value-action="wake_mesh_device"
+              phx-value-data={Jason.encode!(%{"target_node_id" => @peer_node_id, "device_ip" => device["real_ip"]})}
+              class="cursor-pointer text-text-secondary hover:text-accent transition-colors"
+              title="Wake device"
+            >
+              <.icon name="hero-bolt" class="h-3.5 w-3.5" />
+            </span>
+          </div>
         </div>
       </div>
 

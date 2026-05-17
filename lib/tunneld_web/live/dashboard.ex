@@ -696,6 +696,7 @@ defmodule TunneldWeb.Live.Dashboard do
       "add_device_tag" -> "Adding tag..."
       "remove_device_tag" -> "Removing tag..."
       "wake_device" -> "Sending wake signal..."
+      "wake_mesh_device" -> "Sending wake signal..."
       "connect_to_wireless_network" -> "Connecting to Wi‑Fi..."
       "disconnect_from_wireless_network" -> "Disconnecting Wi‑Fi..."
       "scan_for_wireless_networks" -> "Scanning Wi‑Fi..."

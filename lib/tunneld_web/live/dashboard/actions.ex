@@ -58,6 +58,17 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       "wake_device" ->
         if mac = data["mac"], do: send_magic_packet(mac)
 
+      "wake_mesh_device" ->
+        if parent do
+          mesh = Application.get_env(:tunneld, :mesh, [])
+          url = "#{Keyword.get(mesh, :coordinator_url)}/wake"
+          token = Keyword.get(mesh, :token)
+          node_id = Keyword.get(mesh, :node_name)
+          body = Jason.encode!(%{target_node_id: data["target_node_id"], device_ip: data["device_ip"]})
+          headers = [{"Authorization", "Bearer #{token}"}, {"Content-Type", "application/json"}, {"X-Node-ID", node_id}]
+          HTTPoison.post(url, body, headers)
+        end
+
       # Wireless networking
       "connect_to_wireless_network" ->
         Wlan.connect_with_pass(data["ssid"], data["password"])

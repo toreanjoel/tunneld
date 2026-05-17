@@ -44,9 +44,8 @@ defmodule TunneldWeb.Live.Components.MeshNodesSection do
     node_id = Map.get(node, "node_id", "") |> to_string()
     safe_id = if node_id == "", do: nil, else: node_id
     is_self = Map.get(node, "self", false)
-    allowed_ips = Map.get(node, "allowed_ips", [])
+    devices = Map.get(node, "devices", [])
     mesh_ip = Map.get(node, "mesh_ip", "—")
-    devices = Enum.reject(allowed_ips, &String.starts_with?(&1, mesh_ip <> "/"))
     has_devices = is_list(devices) and length(devices) > 0
     online = Map.get(node, "online", true)
     last_seen_raw = Map.get(node, "last_seen", "—")
