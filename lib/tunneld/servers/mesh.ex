@@ -42,6 +42,7 @@ defmodule Tunneld.Servers.Mesh do
       mesh_ip: nil,
       peers: %{},
       last_sync: nil,
+      last_geo: %{},
       status: if(enabled, do: :connecting, else: :disabled),
       allowed_ips: [],
       backoff: 5000,
@@ -115,7 +116,8 @@ defmodule Tunneld.Servers.Mesh do
         peers: %{},
         allowed_ips: [],
         backoff: 5000,
-        last_sync: nil
+        last_sync: nil,
+        last_geo: %{}
     }
 
     if should_enable do
@@ -259,13 +261,21 @@ defmodule Tunneld.Servers.Mesh do
   defp maybe_reregister(state, new_allowed_ips) do
     current = state.allowed_ips -- [state.mesh_ip <> "/32"]
 
-    if new_allowed_ips != current do
+    geo =
+      case Tunneld.Geolocation.get_location() do
+        {:ok, loc} -> Map.take(loc, [:country_code, :country_name, :latitude, :longitude])
+        _ -> %{}
+      end
+
+    geo_changed = geo != Map.get(state, :last_geo, %{})
+
+    if new_allowed_ips != current or geo_changed do
       pubkey = Wireguard.get_public_key()
 
       case register_with_relay(state, pubkey, state.node_name, new_allowed_ips) do
         {:ok, _} ->
           all = [state.mesh_ip <> "/32" | new_allowed_ips]
-          %{state | allowed_ips: all}
+          %{state | allowed_ips: all, last_geo: geo}
 
         {:error, reason} ->
           Logger.warning("Mesh re-registration failed: #{inspect(reason)}")
