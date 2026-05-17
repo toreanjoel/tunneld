@@ -266,6 +266,23 @@ defmodule TunneldWeb.Live.Dashboard do
     end
   end
 
+  def handle_event("disable_tunneld", _params, socket) do
+    modal_data = modal_open(%{
+      title: "Disable Tunneld?",
+      description: "This will stop the gateway, DHCP, and DNS services. All LAN devices will lose connectivity.",
+      body: %{"type" => "code_blocks", "data" => [
+        %{"title" => "To re-enable, SSH into the device and run", "code" => "sudo systemctl start dnsmasq\nsudo systemctl start tunneld"}
+      ]},
+      actions: %{"title" => "Disable", "payload" => %{"type" => "disable_tunneld_service", "data" => %{}}}
+    })
+
+    {:noreply, socket |> assign(:modal, modal_data) |> assign(:settings_menu_open, false)}
+  end
+
+  def handle_event("enable_tunneld", _params, socket) do
+    {:noreply, start_action("enable_tunneld_service", %{}, socket) |> assign(:settings_menu_open, false)}
+  end
+
   def handle_event("restart_device", _params, socket) do
     modal_data = modal_open(%{
       title: "Restart Device?",
@@ -312,9 +329,10 @@ defmodule TunneldWeb.Live.Dashboard do
     url = String.trim(params["coordinator_url"] || "")
     token = String.trim(params["token"] || "")
     node_name = String.trim(params["node_name"] || "")
+    wg_mtu = String.to_integer(params["wg_mtu"] || "1280")
     enabled = url != "" and token != ""
 
-    config = %{"coordinator_url" => url, "token" => token, "node_name" => node_name, "enabled" => enabled}
+    config = %{"coordinator_url" => url, "token" => token, "node_name" => node_name, "enabled" => enabled, "wg_mtu" => wg_mtu}
 
     path = Path.join(Tunneld.Config.fs_root(), "mesh_config.json")
     Tunneld.Persistence.write_json(path, config)

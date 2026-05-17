@@ -133,14 +133,14 @@ defmodule Tunneld.Servers.Wireguard do
     end
   end
 
-  def bring_up_mesh do
+  def bring_up_mesh(mtu \\ 1280) do
     state = get_state()
     private_key = state["private_key"]
 
     if is_nil(private_key) do
       {:error, :no_keypair}
     else
-      do_bring_up_mesh(private_key)
+      do_bring_up_mesh(private_key, mtu)
     end
   end
 
@@ -152,9 +152,9 @@ defmodule Tunneld.Servers.Wireguard do
     GenServer.call(__MODULE__, {:assign_mesh_ip, mesh_ip}, 15_000)
   end
 
-  defp do_bring_up_mesh(private_key) do
+  defp do_bring_up_mesh(private_key, mtu) do
     if mock?() do
-      Logger.debug("[WireGuard MOCK] Bringing up #{@interface}")
+      Logger.debug("[WireGuard MOCK] Bringing up #{@interface} with mtu #{mtu}")
       :ok
     else
       exec("ip", ["link", "del", @interface])
@@ -163,7 +163,7 @@ defmodule Tunneld.Servers.Wireguard do
       result =
         with {_, 0} <- exec("ip", ["link", "add", @interface, "type", "wireguard"]),
              {_, 0} <- exec("wg", ["set", @interface, "private-key", key_path]),
-             {_, 0} <- exec("ip", ["link", "set", @interface, "mtu", "1280"]),
+             {_, 0} <- exec("ip", ["link", "set", @interface, "mtu", to_string(mtu)]),
              {_, 0} <- exec("ip", ["link", "set", @interface, "up"]) do
           :ok
         else

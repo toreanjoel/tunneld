@@ -25,6 +25,13 @@ defmodule Tunneld.Servers.Updater do
   end
 
   @doc """
+  Trigger an immediate update check instead of waiting for the interval.
+  """
+  def check_now() do
+    GenServer.cast(__MODULE__, :check_now)
+  end
+
+  @doc """
   Init Updater
   """
   @impl true
@@ -62,6 +69,12 @@ defmodule Tunneld.Servers.Updater do
   @impl true
   def handle_call(:get_status, _from, state) do
     {:reply, state, state}
+  end
+
+  @impl true
+  def handle_cast(:check_now, state) do
+    send(self(), :check_updates)
+    {:noreply, state}
   end
 
   # The job that will start interval sync

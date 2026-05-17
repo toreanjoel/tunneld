@@ -35,6 +35,7 @@ defmodule Tunneld.Servers.Mesh do
       token: token,
       node_name: node_name,
       poll_interval: poll_interval,
+      wg_mtu: Keyword.get(config, :wg_mtu, 1280),
       node_id: nil,
       relay_pubkey: nil,
       relay_endpoint: nil,
@@ -95,6 +96,8 @@ defmodule Tunneld.Servers.Mesh do
     node_name = Keyword.get(config, :node_name, "")
     poll_interval = Keyword.get(config, :poll_interval, 25_000)
 
+    wg_mtu = Keyword.get(config, :wg_mtu, 1280)
+
     should_enable = enabled and is_binary(coordinator_url) and is_binary(token)
 
     new_state = %{
@@ -104,6 +107,7 @@ defmodule Tunneld.Servers.Mesh do
         token: token,
         node_name: node_name,
         poll_interval: poll_interval,
+        wg_mtu: wg_mtu,
         status: if(should_enable, do: :connecting, else: :disabled),
         relay_pubkey: nil,
         relay_endpoint: nil,
@@ -188,7 +192,7 @@ defmodule Tunneld.Servers.Mesh do
     if is_nil(pubkey) do
       {:error, :no_public_key}
     else
-      with :ok <- Wireguard.bring_up_mesh(),
+      with :ok <- Wireguard.bring_up_mesh(state.wg_mtu),
            {:ok, mesh_ip} <- register_with_relay(state, pubkey, state.node_name, state.allowed_ips),
            :ok <- Wireguard.assign_mesh_ip(mesh_ip),
            {:ok, hub} <- fetch_hub(state),
@@ -418,7 +422,8 @@ defmodule Tunneld.Servers.Mesh do
           token: data["token"] || Keyword.get(base, :token),
           node_name: data["node_name"] || Keyword.get(base, :node_name, ""),
           enabled: Map.get(data, "enabled", Keyword.get(base, :enabled, false)),
-          poll_interval: Keyword.get(base, :poll_interval, 25_000)
+          poll_interval: Keyword.get(base, :poll_interval, 25_000),
+          wg_mtu: Map.get(data, "wg_mtu", 1280)
         ]
 
       _ ->

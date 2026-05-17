@@ -24,6 +24,13 @@ defmodule TunneldWeb.Live.Components.SettingsDropdown do
       <div phx-click="restart_device" class="menu-item !text-red">
         <.refresh size={14} /> Restart Device
       </div>
+      <div class="border-t border-border my-1" />
+      <div phx-click="disable_tunneld" class="menu-item !text-amber-400">
+        <.power size={14} /> Disable Tunneld
+      </div>
+      <div phx-click="enable_tunneld" class="menu-item">
+        <.power size={14} /> Enable Tunneld
+      </div>
     </div>
     """
   end

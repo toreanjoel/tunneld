@@ -197,6 +197,27 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
           System.cmd("sudo", ["systemctl", "restart", "tunneld"])
         end
 
+      "disable_tunneld_service" ->
+        if @mock do
+          require Logger
+          Logger.info("Mock mode: would disable tunneld services")
+        else
+          System.cmd("sudo", ["systemctl", "stop", "tunneld"])
+          System.cmd("sudo", ["systemctl", "stop", "dnsmasq"])
+        end
+
+      "enable_tunneld_service" ->
+        if @mock do
+          require Logger
+          Logger.info("Mock mode: would enable tunneld services")
+        else
+          System.cmd("sudo", ["systemctl", "start", "dnsmasq"])
+          System.cmd("sudo", ["systemctl", "start", "tunneld"])
+        end
+
+      "check_updates" ->
+        Tunneld.Servers.Updater.check_now()
+
       _ ->
         Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
           type: :error,

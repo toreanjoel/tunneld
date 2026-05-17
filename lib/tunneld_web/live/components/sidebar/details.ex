@@ -862,7 +862,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     coordinator_url = Keyword.get(config, :coordinator_url, "")
     token = Keyword.get(config, :token, "")
     node_name = Keyword.get(config, :node_name, "")
-    peers = mesh_state[:peers] || %{}
+    wg_mtu = mesh_state[:wg_mtu] || 1280
+    peers = mesh_state[:peers] || {}
 
     assigns =
       assigns
@@ -876,6 +877,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(:coordinator_url, coordinator_url)
       |> assign(:token, token)
       |> assign(:node_name, node_name)
+      |> assign(:wg_mtu, wg_mtu)
 
     ~H"""
     <div class="p-4 space-y-6 min-h-full">
@@ -955,6 +957,18 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               name="node_name"
               value={@node_name}
               placeholder="living-room-gateway"
+              class="tunl-input"
+            />
+          </div>
+          <div>
+            <label class="text-xs text-text-secondary mb-1 block">WireGuard MTU<.help_icon text="Maximum transmission unit for the WireGuard mesh interface. Default 1280 is safe for all network types including mobile data and CGNAT. Increase to 1420 for Ethernet/Wi-Fi links where the 1500 byte link MTU minus 80 bytes of WireGuard overhead fits cleanly. Setting too high causes packet loss and jitter." /></label>
+            <input
+              type="number"
+              name="wg_mtu"
+              value={@wg_mtu}
+              min="1280"
+              max="1500"
+              placeholder="1280"
               class="tunl-input"
             />
           </div>
