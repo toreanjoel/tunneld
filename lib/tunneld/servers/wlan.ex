@@ -17,6 +17,7 @@ defmodule Tunneld.Servers.Wlan do
 
   @impl true
   def init(_) do
+    ensure_wlan_up()
     send(self(), :check_connection)
     {:ok, %{}}
   end
@@ -51,10 +52,11 @@ defmodule Tunneld.Servers.Wlan do
     else
       Logger.info("Scanning for Wi-Fi networks...")
 
-      # scan for networks
-      run_cmd("wpa_cli", ["scan"])
+      wlan = Application.get_env(:tunneld, :network)[:wlan]
+
+      run_cmd("wpa_cli", ["-i", wlan, "scan"])
       Process.sleep(3000)
-      {output, _} = run_cmd("wpa_cli", ["scan_results"])
+      {output, _} = run_cmd("wpa_cli", ["-i", wlan, "scan_results"])
 
       networks =
         output
@@ -63,9 +65,8 @@ defmodule Tunneld.Servers.Wlan do
         |> Enum.reject(&is_nil/1)
         |> Enum.filter(fn i -> i.security !== "/" end)
 
-      # attempt to get current network details
-      run_cmd("wpa_cli", ["status"])
-      {status_output, _} = run_cmd("wpa_cli", ["status"])
+      run_cmd("wpa_cli", ["-i", wlan, "status"])
+      {status_output, _} = run_cmd("wpa_cli", ["-i", wlan, "status"])
 
       # Broadcast to the live view (or parent) so it can update the Devices component.
       # Use an id that matches the one used in your live_component render.
@@ -135,7 +136,7 @@ defmodule Tunneld.Servers.Wlan do
     {:noreply, state}
   end
 
-  @doc "Scans for available Wi-Fi networks"
+
   def scan_networks() do
     GenServer.cast(__MODULE__, :scan)
   end
@@ -269,6 +270,28 @@ defmodule Tunneld.Servers.Wlan do
       timeout ->
         Process.exit(pid, :kill)
         {"", 1}
+    end
+  end
+
+  @doc """
+  Lightweight restart of wpa_supplicant@wlan0. Heavy recover (driver reset, PCI rescan)
+  is intentionally NOT done here — it belongs in a systemd preflight/oneshot script before
+  the BEAM VM starts, so tunneld never starts against a stuck driver in the first place.
+  """
+  def ensure_wlan_up do
+    wlan = Application.get_env(:tunneld, :network)[:wlan]
+    run_cmd("systemctl", ["unmask", "wpa_supplicant@#{wlan}"])
+    run_cmd("systemctl", ["restart", "wpa_supplicant@#{wlan}"])
+    Process.sleep(2_000)
+
+    {sup_check, _} = run_cmd("systemctl", ["is-active", "wpa_supplicant@#{wlan}"])
+
+    if String.trim(sup_check) == "active" do
+      Logger.info("wpa_supplicant@#{wlan} is active.")
+      :ok
+    else
+      Logger.error("wpa_supplicant@#{wlan} did not start cleanly.")
+      {:error, :wpa_supplicant_not_active}
     end
   end
 
