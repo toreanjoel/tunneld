@@ -977,6 +977,69 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     """
   end
 
+  @spec render(%{:view => :mesh_node, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
+  def render(%{view: :mesh_node} = assigns) do
+    peer_id = Map.get(assigns.selection || %{}, :id, "")
+    mesh_state =
+      try do
+        if _pid = GenServer.whereis(Tunneld.Servers.Mesh) do
+          Tunneld.Servers.Mesh.get_state()
+        else
+          %{status: :disabled, peers: %{}}
+        end
+      catch
+        :exit, _ -> %{status: :connecting, peers: %{}}
+      end
+
+    peer = mesh_state[:peers] |> Map.values() |> Enum.find(fn p ->
+      Map.get(p, "node_id", Map.get(p, :node_id, "")) == peer_id
+    end)
+
+    name = if peer, do: Map.get(peer, "name", Map.get(peer, :name, "—")), else: "—"
+    ip = if peer, do: Map.get(peer, "mesh_ip", Map.get(peer, :mesh_ip, "—")), else: "—"
+    shared_devices = if peer, do: Map.get(peer, "devices", Map.get(peer, :devices, [])), else: []
+    peer_node_id = if peer, do: Map.get(peer, "node_id", Map.get(peer, :node_id, "")), else: ""
+    country = if peer, do: Map.get(peer, "country_name", Map.get(peer, :country_name, "")), else: ""
+
+    assigns =
+      assigns
+      |> assign(:peer_name, name)
+      |> assign(:peer_ip, ip)
+      |> assign(:peer_country, country)
+      |> assign(:peer_node_id, peer_node_id)
+      |> assign(:shared_devices, shared_devices)
+
+    ~H"""
+    <div class="p-4 space-y-6 min-h-full">
+      <%= sidebar_header(assigns, %{
+        header: @peer_name,
+        body: "Mesh peer #{@peer_ip} · #{@peer_country}"
+      }) %>
+
+      <div :if={@peer_ip != "—"} class="space-y-3">
+        <h3 class="text-[11px] tracking-[0.08em] uppercase text-text-secondary font-medium">Mesh IP</h3>
+        <div class="bg-surface rounded-lg p-3 border border-border flex items-center justify-between">
+          <span class="font-mono text-xs text-text-primary"><%= @peer_ip %>/32</span>
+        </div>
+      </div>
+
+      <div :if={@shared_devices != []} class="space-y-3">
+        <h3 class="text-[11px] tracking-[0.08em] uppercase text-text-secondary font-medium">Shared Devices</h3>
+        <div :for={device <- @shared_devices} class="bg-surface rounded-lg p-3 border border-border flex items-center justify-between gap-2">
+          <div class="flex flex-col min-w-0">
+            <span class="font-mono text-xs text-text-primary"><%= device["mapped_ip"] %></span>
+            <span class="font-mono text-[10px] text-text-tertiary">via <%= device["real_ip"] %></span>
+          </div>
+        </div>
+      </div>
+
+      <div :if={@peer_ip == "—" and @shared_devices == []} class="text-sm text-text-secondary italic">
+        No shared devices
+      </div>
+    </div>
+    """
+  end
+
   def handle_event("set_sqm", %{"mode" => mode} = params, socket) do
     # Prepare params for the server
     sqm_params = %{

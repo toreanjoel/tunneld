@@ -438,6 +438,17 @@ defmodule Tunneld.Iptables do
           ])
 
           append_unique("iptables", [
+            "-t",
+            "nat",
+            "-A",
+            "POSTROUTING",
+            "-o",
+            iface,
+            "-j",
+            "MASQUERADE"
+          ])
+
+          append_unique("iptables", [
             "-A",
             "INPUT",
             "-i",
@@ -493,6 +504,17 @@ defmodule Tunneld.Iptables do
       end
 
       del("iptables", [
+        "-t",
+        "nat",
+        "-D",
+        "POSTROUTING",
+        "-o",
+        iface,
+        "-j",
+        "MASQUERADE"
+      ])
+
+      del("iptables", [
         "-D",
         "INPUT",
         "-i",
@@ -510,10 +532,6 @@ defmodule Tunneld.Iptables do
         "INPUT",
         "-i",
         iface,
-        "-m",
-        "state",
-        "--state",
-        "ESTABLISHED,RELATED",
         "-j",
         "ACCEPT"
       ])
