@@ -321,10 +321,6 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, start_action("toggle_share_access", params, socket)}
   end
 
-  def handle_event("copy_to_clipboard", %{"text" => text}, socket) do
-    {:noreply, push_event(socket, "copy_to_clipboard", %{text: text})}
-  end
-
   def handle_event("save_mesh_config", params, socket) do
     url = String.trim(params["coordinator_url"] || "")
     token = String.trim(params["token"] || "")
@@ -695,8 +691,6 @@ defmodule TunneldWeb.Live.Dashboard do
       "revoke_device_expose" -> "Revoking Quick Expose..."
       "add_device_tag" -> "Adding tag..."
       "remove_device_tag" -> "Removing tag..."
-      "wake_device" -> "Sending wake signal..."
-      "wake_mesh_device" -> "Sending wake signal..."
       "connect_to_wireless_network" -> "Connecting to Wi‑Fi..."
       "disconnect_from_wireless_network" -> "Disconnecting Wi‑Fi..."
       "scan_for_wireless_networks" -> "Scanning Wi‑Fi..."

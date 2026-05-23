@@ -912,165 +912,67 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             <span class="text-gray-400 font-semibold">Relay Pubkey</span>
             <div class="flex items-center gap-1.5">
               <span class="font-mono text-[10px]"><%= String.slice(@relay_pubkey, 0, 20) <> "..." %></span>
-              <span
-                phx-click="copy_to_clipboard"
-                phx-value-text={@relay_pubkey}
-                class="cursor-pointer text-text-secondary hover:text-accent transition-colors"
-                title="Copy public key"
-              >
-                <.icon name="hero-link" class="h-3 w-3" />
-              </span>
             </div>
           </div>
         </div>
+      </div>
 
-        <div class="text-sm text-text-secondary">
-          Set these values to connect to the relay.
-          A tunneld-relay instance is required. See documentation for deployment.
+      <div class="text-sm text-text-secondary">
+        Set these values to connect to the relay.
+        A tunneld-relay instance is required. See documentation for deployment.
+      </div>
+
+      <form phx-submit="save_mesh_config" class="space-y-3">
+        <div>
+          <label class="text-xs text-text-secondary mb-1 block">Relay URL</label>
+          <input
+            type="url"
+            name="coordinator_url"
+            value={@coordinator_url}
+            placeholder="http://relay.example.com:4000"
+            class="tunl-input"
+          />
         </div>
-
-        <form phx-submit="save_mesh_config" class="space-y-3">
-          <div>
-            <label class="text-xs text-text-secondary mb-1 block">Relay URL</label>
-            <input
-              type="url"
-              name="coordinator_url"
-              value={@coordinator_url}
-              placeholder="http://relay.example.com:4000"
-              class="tunl-input"
-            />
-          </div>
-          <div>
-            <label class="text-xs text-text-secondary mb-1 block">Token</label>
-            <input
-              type="password"
-              name="token"
-              value={@token}
-              placeholder="shared-secret"
-              class="tunl-input"
-            />
-          </div>
-          <div>
-            <label class="text-xs text-text-secondary mb-1 block">Node Name</label>
-            <input
-              type="text"
-              name="node_name"
-              value={@node_name}
-              placeholder="living-room-gateway"
-              class="tunl-input"
-            />
-          </div>
-          <div>
-            <label class="text-xs text-text-secondary mb-1 block">WireGuard MTU<.help_icon text="Maximum transmission unit for the WireGuard mesh interface. Default 1280 is safe for all network types including mobile data and CGNAT. Increase to 1420 for Ethernet/Wi-Fi links where the 1500 byte link MTU minus 80 bytes of WireGuard overhead fits cleanly. Setting too high causes packet loss and jitter." /></label>
-            <input
-              type="number"
-              name="wg_mtu"
-              value={@wg_mtu}
-              min="1280"
-              max="1500"
-              placeholder="1280"
-              class="tunl-input"
-            />
-          </div>
-          <button
-            type="submit"
-            class="w-full p-3 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 bg-accent hover:bg-accent-light"
-          >
-            <.icon class="w-4 h-4" name="hero-check" />
-            Save Mesh Config
-          </button>
-        </form>
-      </div>
-    </div>
-    """
-  end
-
-  @spec render(%{:view => :mesh_node, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
-  def render(%{view: :mesh_node} = assigns) do
-    peer_id = Map.get(assigns.selection || %{}, :id, "")
-    mesh_state =
-      try do
-        if _pid = GenServer.whereis(Tunneld.Servers.Mesh) do
-          Tunneld.Servers.Mesh.get_state()
-        else
-          %{status: :disabled, peers: %{}}
-        end
-      catch
-        :exit, _ -> %{status: :connecting, peers: %{}}
-      end
-
-    peer = mesh_state[:peers] |> Map.values() |> Enum.find(fn p ->
-      Map.get(p, "node_id", Map.get(p, :node_id, "")) == peer_id
-    end)
-
-    name = if peer, do: Map.get(peer, "name", Map.get(peer, :name, "—")), else: "—"
-    ip = if peer, do: Map.get(peer, "mesh_ip", Map.get(peer, :mesh_ip, "—")), else: "—"
-    shared_devices = if peer, do: Map.get(peer, "devices", Map.get(peer, :devices, [])), else: []
-    peer_node_id = if peer, do: Map.get(peer, "node_id", Map.get(peer, :node_id, "")), else: ""
-    country = if peer, do: Map.get(peer, "country_name", Map.get(peer, :country_name, "")), else: ""
-
-    assigns =
-      assigns
-      |> assign(:peer_name, name)
-      |> assign(:peer_ip, ip)
-      |> assign(:peer_country, country)
-      |> assign(:peer_node_id, peer_node_id)
-      |> assign(:shared_devices, shared_devices)
-
-    ~H"""
-    <div class="p-4 space-y-6 min-h-full">
-      <%= sidebar_header(assigns, %{
-        header: @peer_name,
-        body: "Mesh peer #{@peer_ip} · #{@peer_country}"
-      }) %>
-
-      <div :if={@peer_ip != "—"} class="space-y-3">
-        <h3 class="text-[11px] tracking-[0.08em] uppercase text-text-secondary font-medium">Mesh IP</h3>
-        <div class="bg-surface rounded-lg p-3 border border-border flex items-center justify-between">
-          <span class="font-mono text-xs text-text-primary"><%= @peer_ip %>/32</span>
-          <span
-            phx-click="copy_to_clipboard"
-            phx-value-text={@peer_ip}
-            class="cursor-pointer text-text-secondary hover:text-accent transition-colors"
-            title="Copy IP"
-          >
-            <.icon name="hero-link" class="h-3.5 w-3.5" />
-          </span>
+        <div>
+          <label class="text-xs text-text-secondary mb-1 block">Token</label>
+          <input
+            type="password"
+            name="token"
+            value={@token}
+            placeholder="shared-secret"
+            class="tunl-input"
+          />
         </div>
-      </div>
-
-      <div :if={@shared_devices != []} class="space-y-3">
-        <h3 class="text-[11px] tracking-[0.08em] uppercase text-text-secondary font-medium">Shared Devices</h3>
-        <div :for={device <- @shared_devices} class="bg-surface rounded-lg p-3 border border-border flex items-center justify-between gap-2">
-          <div class="flex flex-col min-w-0">
-            <span class="font-mono text-xs text-text-primary"><%= device["real_ip"] %></span>
-            <span class="font-mono text-[10px] text-text-tertiary">via <%= device["mapped_ip"] %></span>
-          </div>
-          <div class="flex items-center gap-1 shrink-0">
-            <span
-              phx-click="copy_to_clipboard"
-              phx-value-text={device["real_ip"]}
-              class="cursor-pointer text-text-secondary hover:text-accent transition-colors"
-              title="Copy IP"
-            >
-              <.icon name="hero-link" class="h-3.5 w-3.5" />
-            </span>
-            <span
-              phx-click="trigger_action"
-              phx-value-action="wake_mesh_device"
-              phx-value-data={Jason.encode!(%{"target_node_id" => @peer_node_id, "device_ip" => device["real_ip"]})}
-              class="cursor-pointer text-text-secondary hover:text-accent transition-colors"
-              title="Wake device"
-            >
-              <.icon name="hero-bolt" class="h-3.5 w-3.5" />
-            </span>
-          </div>
+        <div>
+          <label class="text-xs text-text-secondary mb-1 block">Node Name</label>
+          <input
+            type="text"
+            name="node_name"
+            value={@node_name}
+            placeholder="living-room-gateway"
+            class="tunl-input"
+          />
         </div>
-      </div>
-
-      <div :if={@peer_ip == "—" and @shared_devices == []} class="text-sm text-text-secondary italic">
-        No shared devices
-      </div>
+        <div>
+          <label class="text-xs text-text-secondary mb-1 block">WireGuard MTU<.help_icon text="Maximum transmission unit for the WireGuard mesh interface. Default 1280 is safe for all network types including mobile data and CGNAT. Increase to 1420 for Ethernet/Wi-Fi links where the 1500 byte link MTU minus 80 bytes of WireGuard overhead fits cleanly. Setting too high causes packet loss and jitter." /></label>
+          <input
+            type="number"
+            name="wg_mtu"
+            value={@wg_mtu}
+            min="1280"
+            max="1500"
+            placeholder="1280"
+            class="tunl-input"
+          />
+        </div>
+        <button
+          type="submit"
+          class="w-full p-3 rounded-lg text-sm font-medium transition flex items-center justify-center gap-2 bg-accent hover:bg-accent-light"
+        >
+          <.icon class="w-4 h-4" name="hero-check" />
+          Save Mesh Config
+        </button>
+      </form>
     </div>
     """
   end

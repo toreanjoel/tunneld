@@ -129,16 +129,7 @@ defmodule TunneldWeb.Live.Components.Devices do
               >
                 <.icon name="hero-link" class={if device.expose_allowed, do: "h-4 w-4 text-green", else: "h-4 w-4 text-text-secondary"} />
               </div>
-              <div
-                phx-click="trigger_action"
-                phx-value-action="wake_device"
-                phx-value-data={Jason.encode!(%{"mac" => device.mac})}
-                phx-click-loading="opacity-50 cursor-wait"
-                class="cursor-pointer"
-                title="Wake device"
-              >
-                <.icon name="hero-bolt" class="h-4 w-4 text-text-secondary" />
-              </div>
+
               <div
                 phx-click="modal_open"
                 phx-value-modal_title="Revoke devices IP address?"
@@ -188,14 +179,6 @@ defmodule TunneldWeb.Live.Components.Devices do
             <div class="mt-auto">
               <div class="text-xs text-text-tertiary flex items-center gap-1.5 justify-between">
                 <span><%= mask(@obfuscated, device.ip) %></span>
-                <span
-                  phx-click="copy_to_clipboard"
-                  phx-value-text={device.ip}
-                  class="cursor-pointer text-text-secondary hover:text-accent transition-colors shrink-0"
-                  title="Copy IP"
-                >
-                  <.icon name="hero-link" class="h-3 w-3" />
-                </span>
               </div>
               <div class="text-xs text-text-tertiary"><%= mask(@obfuscated, device.mac) %></div>
             </div>

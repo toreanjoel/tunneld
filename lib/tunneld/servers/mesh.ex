@@ -231,43 +231,12 @@ defmodule Tunneld.Servers.Mesh do
     url = "#{state.coordinator_url}/heartbeat"
 
     case HTTPoison.post(url, Jason.encode!(%{node_id: state.node_id}), headers(state)) do
-      {:ok, %{status_code: 200, body: body}} ->
-        resp = Jason.decode!(body)
-        wake_requests = resp["wake_requests"] || []
-        for device_ip <- wake_requests do
-          send_magic_packet(device_ip)
-        end
-        :ok
-
+      {:ok, %{status_code: 200}} -> :ok
       {:ok, %{status_code: 404}} -> {:error, :node_not_found}
       {:ok, %{status_code: 401}} -> {:error, :unauthorized}
       {:error, err} -> {:error, err}
       _ -> {:error, :heartbeat_failed}
     end
-  end
-
-  defp send_magic_packet(ip) do
-    mac = resolve_ip_to_mac(ip)
-    if mac do
-      hex = String.replace(mac, ":", "")
-      if byte_size(hex) == 12 do
-        magic = :binary.list_to_bin(List.duplicate(0xFF, 6))
-        addr = hex |> Base.decode16!(case: :lower) |> List.duplicate(16) |> :binary.list_to_bin()
-        packet = magic <> addr
-        {:ok, sock} = :gen_udp.open(0, [:binary, {:broadcast, true}])
-        :gen_udp.send(sock, {255, 255, 255, 255}, 9, packet)
-        :gen_udp.close(sock)
-        Logger.info("Sent magic packet for #{ip} (#{mac})")
-      end
-    else
-      Logger.warning("No MAC found for #{ip}, skipping wake")
-    end
-  end
-
-  defp resolve_ip_to_mac(ip) do
-    devices = Devices.fetch_devices()
-    device = Enum.find(devices, fn d -> d.ip == ip end)
-    if device, do: device.mac, else: nil
   end
 
   defp recalculate_allowed_ips(_state) do

@@ -55,20 +55,6 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
         tag = data["tag"]
         if mac && tag, do: Tunneld.Servers.DeviceTags.remove_tag(mac, tag)
 
-      "wake_device" ->
-        if mac = data["mac"], do: send_magic_packet(mac)
-
-      "wake_mesh_device" ->
-        if parent do
-          mesh = Application.get_env(:tunneld, :mesh, [])
-          url = "#{Keyword.get(mesh, :coordinator_url)}/wake"
-          token = Keyword.get(mesh, :token)
-          node_id = Keyword.get(mesh, :node_name)
-          body = Jason.encode!(%{target_node_id: data["target_node_id"], device_ip: data["device_ip"]})
-          headers = [{"Authorization", "Bearer #{token}"}, {"Content-Type", "application/json"}, {"X-Node-ID", node_id}]
-          HTTPoison.post(url, body, headers)
-        end
-
       # Wireless networking
       "connect_to_wireless_network" ->
         Wlan.connect_with_pass(data["ssid"], data["password"])
@@ -248,15 +234,5 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
 
   defp decode_if_needed(_), do: %{}
 
-  defp send_magic_packet(mac) do
-    hex = String.replace(mac, ":", "")
-    if byte_size(hex) == 12 do
-      magic = :binary.list_to_bin(List.duplicate(0xFF, 6))
-      addr = hex |> Base.decode16!(case: :lower) |> List.duplicate(16) |> :binary.list_to_bin()
-      packet = magic <> addr
-      {:ok, sock} = :gen_udp.open(0, [:binary, {:broadcast, true}])
-      :gen_udp.send(sock, {255, 255, 255, 255}, 9, packet)
-      :gen_udp.close(sock)
-    end
-  end
+
 end
