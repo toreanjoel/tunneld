@@ -30,10 +30,6 @@ defmodule Tunneld.Application do
       TunneldWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:tunneld, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Tunneld.PubSub},
-      # Start a worker by calling: Tunneld.Worker.start_link(arg)
-      # {Tunneld.Worker, arg},
-      # Start to serve requests, typically the last entry
-      TunneldWeb.Endpoint,
       {Wlan, []},
       {Zrok, []},
       {Session, []},
@@ -47,7 +43,9 @@ defmodule Tunneld.Application do
       {Sqm, []},
       {Wireguard, []},
       {Tunneld.Geolocation, []},
-      {Tunneld.Servers.Mesh, []}
+      {Tunneld.Servers.Mesh, []},
+      # Start to serve requests, typically the last entry
+      TunneldWeb.Endpoint
     ]
 
     if not Application.get_env(:tunneld, :mock_data, false) do
