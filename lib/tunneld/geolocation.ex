@@ -4,11 +4,11 @@ defmodule Tunneld.Geolocation do
   result, and broadcasts updates via Phoenix.PubSub on topic "geolocation:device".
 
   State:
-    - `location` — the last successful location result, or nil
-    - `status` — `:ok`, `:stale`, or `:unavailable`
-    - `last_updated` — monotonic time of last successful fetch
-    - `error_count` — consecutive failure count for backoff
-    - `refresh_timer` — reference for the scheduled refresh timer
+    - `location` - the last successful location result, or nil
+    - `status` - `:ok`, `:stale`, or `:unavailable`
+    - `last_updated` - monotonic time of last successful fetch
+    - `error_count` - consecutive failure count for backoff
+    - `refresh_timer` - reference for the scheduled refresh timer
 
   On start, the first fetch runs asynchronously (fire and forget via Task)
   so it doesn't block app boot.
@@ -38,9 +38,9 @@ defmodule Tunneld.Geolocation do
   Returns the current location status.
 
   ## Return values
-    - `{:ok, location}` — location is available and fresh
-    - `:stale` — location is cached but hasn't been refreshed recently
-    - `:unavailable` — no location data was ever obtained
+    - `{:ok, location}` - location is available and fresh
+    - `:stale` - location is cached but hasn't been refreshed recently
+    - `:unavailable` - no location data was ever obtained
   """
   def get_location do
     GenServer.call(__MODULE__, :get_location)

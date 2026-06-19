@@ -18,9 +18,9 @@ defmodule Tunneld.Schema.Resource do
         "name" => %{
           "type" => "string",
           "description" =>
-            "Name of the resource (bucket) that groups its public and private references.",
+            "Name of the resource. Used as the local DNS hostname (<name>.tunneld.lan).",
           "ui:help" =>
-            "This label appears in the dashboard and groups the related access references.",
+            "This label appears in the dashboard and is the hostname subnet devices use to reach the resource.",
           "minLength" => 1
         },
         "description" => %{
@@ -33,7 +33,7 @@ defmodule Tunneld.Schema.Resource do
         "pool" => %{
           "type" => "array",
           "description" =>
-            "Backend servers for this resource (IP:PORT per line). Both public and private use the same pool.",
+            "Backend servers for this resource (IP:PORT per line). All entries share the same upstream pool.",
           "ui:help" =>
             "Example: 10.0.10.44:8001. Add each backend on its own line; leave blank lines out.",
           "items" => %{
@@ -57,71 +57,6 @@ defmodule Tunneld.Schema.Resource do
         }
       },
       "required" => ["ip", "port", "name", "pool"]
-    }
-  end
-
-  @spec data(atom()) :: map()
-  def data(:add_private) do
-    %{
-      "title" => "Private Access",
-      "description" =>
-        "Connect this gateway to a private reserved resource (you were given its name).",
-      "type" => "object",
-      "ui:order" => ["name", "description", "port"],
-      "properties" => %{
-        "name" => %{
-          "type" => "string",
-          "description" =>
-            "Exact name of the private resource you are accessing (from the resource’s owner).",
-          "ui:help" => "Must match the owner’s private resource name exactly.",
-          "minLength" => 1
-        },
-        "description" => %{
-          "type" => "string",
-          "description" => "Internal note about what this private access is for.",
-          "ui:help" =>
-            "Helps you distinguish multiple private accesses (e.g., device/user/purpose).",
-          "ui:widget" => "textarea"
-        },
-        "port" => %{
-          "type" => "string",
-          "description" =>
-            "Gateway port that devices on the subnet will use to reach this private resource.",
-          "ui:help" => "Devices will connect via gateway_ip:PORT. Choose a free port (1–65535).",
-          "pattern" => "^[0-9]{1,5}$"
-        }
-      },
-      "required" => ["name", "port"]
-    }
-  end
-
-  @spec data(atom()) :: map()
-  def data(:basic_auth) do
-    %{
-      "title" => "Basic Authentication",
-      "description" => "Secure your public resource with a username and password.",
-      "type" => "object",
-      "ui:order" => ["username", "password", "resource_id"],
-      "properties" => %{
-        "username" => %{
-          "type" => "string",
-          "description" => "Username required to access the resource.",
-          "minLength" => 1
-        },
-        "password" => %{
-          "type" => "string",
-          "description" => "Password required to access the resource.",
-          "minLength" => 1,
-          "format" => "password"
-        },
-        "resource_id" => %{
-          "type" => "string",
-          "description" => "The associated resource id",
-          "readOnly" => true,
-          "ui:widget" => "hidden"
-        }
-      },
-      "required" => ["username", "password", "resource_id"]
     }
   end
 end

@@ -1,14 +1,12 @@
 # Distributed Load Balancing
 
-How Tunneld distributes traffic across local and remote backends using nginx upstream pools.
+How Tunneld distributes traffic across local backends using nginx upstream pools.
 
 ## Overview
 
-Each resource has a **pool** — a list of `ip:port` backends. These can be:
-- Local services on the subnet (e.g., `192.168.50.10:8080`)
-- Remote services bound via Zrok access (e.g., `127.0.0.1:29182`)
-
-Nginx load balances across all pool entries for the resource.
+Each resource has a **pool** - a list of `ip:port` backends on the subnet
+(e.g., `192.168.50.10:8080`). Nginx load balances across all pool entries for
+the resource.
 
 ```mermaid
 graph LR
@@ -17,56 +15,59 @@ graph LR
     end
 
     subgraph Tunneld Gateway
-        DNS[DNS Resolver]
+        DNS[dnsmasq Resolver]
         NG[nginx upstream pool]
     end
 
     subgraph Pool Backends
         L1[Local: 192.168.50.10:8080]
         L2[Local: 192.168.50.11:8080]
-        R1[Remote via Zrok: 127.0.0.1:29182]
+        L3[Local: 192.168.50.12:8080]
     end
 
-    C -->|https://myapp.tunneld.sh| DNS
-    DNS -->|hairpin to gateway| NG
+    C -->|http://myapp.tunneld.lan:18000| DNS
+    DNS -->|resolve to gateway IP| NG
     NG --> L1
     NG --> L2
-    NG --> R1
+    NG --> L3
 
     style NG fill:#7c3aed,color:#fff
     style L1 fill:#10b981,color:#fff
     style L2 fill:#10b981,color:#fff
-    style R1 fill:#3b82f6,color:#fff
+    style L3 fill:#10b981,color:#fff
 ```
 
 ## How It Works
 
 1. **Resource created** with a pool of backends (`ip:port` entries)
-2. **Nginx config generated** with an `upstream` block listing all pool members
-3. **Health checking** — the Resources server periodically probes each backend via TCP
-4. **DNS resolution** — dnsmasq resolves `resource.tunneld.sh` to the gateway IP
-5. **SSL termination** — nginx handles TLS using a per-resource cert signed by the local Root CA
-6. **Traffic distributed** across healthy backends
+2. **Nginx config generated** with an `upstream` block listing all pool members,
+   listening on `0.0.0.0:18000` with `server_name <name>.tunneld.lan`
+3. **Health checking** - the Resources server periodically probes each backend via TCP
+4. **DNS resolution** - dnsmasq resolves `<name>.tunneld.lan` to the gateway IP
+5. **Traffic distributed** across all pool members (round-robin via nginx default)
 
-## Combining Local + Remote
+## Combining Backends Across the Subnet
+
+A single resource can front multiple backend instances of the same service
+running on different subnet devices. Adding a backend to the pool is just
+appending another `IP:port` entry - nginx handles the rest.
 
 ```mermaid
 sequenceDiagram
-    participant A as Tunneld A (Host)
-    participant Z as Zrok Overlay
-    participant B as Tunneld B (Peer)
+    participant User as Dashboard
+    participant Res as Resources Server
+    participant Nginx as Nginx
+    participant B1 as Backend 1
+    participant B2 as Backend 2
 
-    Note over A: Has myapp running on local device
-    A->>Z: zrok2 share private --share-token myapp-share
-    Z-->>A: Share token: myapp-share
-
-    Note over B: Wants to access myapp
-    B->>Z: zrok2 access private myapp-share
-    Z-->>B: Local port 29182
-
-    Note over B: Add to pool alongside local backends
-    B->>B: Pool: [192.168.50.5:8080, 127.0.0.1:29182]
-    B->>B: Nginx load balances across both
+    User->>Res: Update resource pool: [10.0.0.10:8080, 10.0.0.11:8080]
+    Res->>Nginx: Regenerate upstream block
+    Nginx-->>Res: :ok
+    Note over Nginx: Round-robin between B1 and B2
+    Nginx->>B1: request 1
+    Nginx->>B2: request 2
+    Nginx->>B1: request 3
 ```
 
-This enables distributed deployments where the same service runs on multiple Tunneld networks, and each gateway balances across all instances — both local and remote.
+Remote backends (across the mesh/relay) are planned for a later phase; today
+the pool is limited to backends reachable from the gateway itself.

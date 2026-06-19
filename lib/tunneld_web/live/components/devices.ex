@@ -60,7 +60,7 @@ defmodule TunneldWeb.Live.Components.Devices do
   def render(assigns) do
     ~H"""
     <div class="p-3 md:p-5">
-      <.section_header>Devices<.help_icon text="Devices discovered on your LAN subnet via DHCP leases. Each device automatically gets an IP from dnsmasq. Tag devices with 'wg' prefix (e.g. 'wg-office-printer') to advertise them to the mesh network. Use Quick Expose to let devices create public Zrok tunnels via a curl command. Revoke IP to release the DHCP lease." /></.section_header>
+      <.section_header>Devices<.help_icon text="Devices discovered on your LAN subnet via DHCP leases. Each device automatically gets an IP from dnsmasq. Tag devices with 'wg' prefix (e.g. 'wg-office-printer') to advertise them to the mesh network for remote access by other nodes. Use Quick Expose to let devices create local resources via a curl command. Revoke IP to release the DHCP lease." /></.section_header>
 
       <div :if={@loading} class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         <div class="p-4 flex flex-col bg-surface rounded-lg w-full h-[130px] opacity-10">
@@ -107,9 +107,9 @@ defmodule TunneldWeb.Live.Components.Devices do
                     "type" => "string",
                     "data" =>
                       if device.expose_allowed do
-                        "This device will no longer be able to create public shares via Quick Expose."
+                        "This device will no longer be able to create resources via Quick Expose."
                       else
-                        "This device will be able to run curl commands to create public shares via Quick Expose."
+                        "This device will be able to run curl commands to create resources via Quick Expose."
                       end
                   })
                 }

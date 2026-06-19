@@ -3,12 +3,15 @@ defmodule Tunneld.Iptables do
   Configures iptables firewall rules for the Tunneld gateway.
 
   On startup (production only), flushes all existing rules and sets up:
-  - IP forwarding between ethernet and WiFi interfaces
-  - NAT masquerading for internet access via WiFi and VPN
+  - IP forwarding between the downstream (LAN) and upstream (internet) interfaces
+  - NAT masquerading for internet access via the upstream interface
   - DNS redirection: all port-53 traffic is redirected to port 5336
     (where dnsmasq listens) for consistent subnet DNS resolution
   - Gateway access rules allowing devices to reach the Tunneld host
   - Mesh WireGuard interface forwarding when mesh is enabled
+
+  Interface names are read from app config (`:tunneld, :network` -> `:upstream`,
+  `:downstream`) and are never hardcoded in this module.
 
   This module is called once at application start and is not a GenServer.
   """
@@ -60,7 +63,7 @@ defmodule Tunneld.Iptables do
       "-A",
       "INPUT",
       "-i",
-      get_env(:eth),
+      get_env(:downstream),
       "-p",
       "udp",
       "--dport",
@@ -74,7 +77,6 @@ defmodule Tunneld.Iptables do
 
     gateway_access()
     internet_forwarding()
-    vpn_forwarding()
     internet_passthrough()
     dns_forwarding()
     set_dns_server(Tunneld.Servers.DnsConfig.get_dns_server())
@@ -86,9 +88,8 @@ defmodule Tunneld.Iptables do
   end
 
   def get_env(:gateway), do: Application.get_env(:tunneld, :network)[:gateway]
-  def get_env(:wlan), do: Application.get_env(:tunneld, :network)[:wlan]
-  def get_env(:eth), do: Application.get_env(:tunneld, :network)[:eth]
-  def get_env(:vpn), do: Application.get_env(:tunneld, :network)[:mullvad]
+  def get_env(:upstream), do: Application.get_env(:tunneld, :network)[:upstream]
+  def get_env(:downstream), do: Application.get_env(:tunneld, :network)[:downstream]
 
   @doc """
   Flush all iptables rules.
@@ -163,7 +164,7 @@ defmodule Tunneld.Iptables do
       ])
     end
 
-    # Add new exemptions — INSERT before the REDIRECT rules
+    # Add new exemptions - INSERT before the REDIRECT rules
     for proto <- ["udp", "tcp"] do
       System.cmd("iptables", [
         "-t",
@@ -211,7 +212,7 @@ defmodule Tunneld.Iptables do
       "-A",
       "FORWARD",
       "-i",
-      get_env(:eth),
+      get_env(:downstream),
       "-d",
       get_env(:gateway),
       "-j",
@@ -223,7 +224,7 @@ defmodule Tunneld.Iptables do
         "-A",
         "INPUT",
         "-i",
-        get_env(:eth),
+        get_env(:downstream),
         "-p",
         proto,
         "--dport",
@@ -239,9 +240,9 @@ defmodule Tunneld.Iptables do
       "-A",
       "FORWARD",
       "-i",
-      get_env(:eth),
+      get_env(:downstream),
       "-o",
-      get_env(:wlan),
+      get_env(:upstream),
       "-m",
       "state",
       "--state",
@@ -254,9 +255,9 @@ defmodule Tunneld.Iptables do
       "-A",
       "FORWARD",
       "-i",
-      get_env(:wlan),
+      get_env(:upstream),
       "-o",
-      get_env(:eth),
+      get_env(:downstream),
       "-m",
       "state",
       "--state",
@@ -273,25 +274,10 @@ defmodule Tunneld.Iptables do
       "-A",
       "POSTROUTING",
       "-o",
-      get_env(:wlan),
+      get_env(:upstream),
       "-j",
       "MASQUERADE"
     ])
-
-    vpn_iface = get_env(:vpn)
-
-    if vpn_iface != nil and vpn_iface != "" do
-      System.cmd("iptables", [
-        "-t",
-        "nat",
-        "-A",
-        "POSTROUTING",
-        "-o",
-        vpn_iface,
-        "-j",
-        "MASQUERADE"
-      ])
-    end
   end
 
   defp dns_forwarding() do
@@ -362,47 +348,11 @@ defmodule Tunneld.Iptables do
     end
   end
 
-  defp vpn_forwarding() do
-    vpn = get_env(:vpn)
-
-    if vpn && vpn != "" do
-      System.cmd("iptables", [
-        "-A",
-        "FORWARD",
-        "-i",
-        get_env(:eth),
-        "-o",
-        vpn,
-        "-m",
-        "state",
-        "--state",
-        "NEW,ESTABLISHED,RELATED",
-        "-j",
-        "ACCEPT"
-      ])
-
-      System.cmd("iptables", [
-        "-A",
-        "FORWARD",
-        "-i",
-        vpn,
-        "-o",
-        get_env(:eth),
-        "-m",
-        "state",
-        "--state",
-        "ESTABLISHED,RELATED",
-        "-j",
-        "ACCEPT"
-      ])
-    end
-  end
-
   def add_mesh_forwarding do
     iface = "wg-mesh"
-    eth = get_env(:eth)
+    downstream = get_env(:downstream)
 
-    if eth == nil or eth == "" do
+    if downstream == nil or downstream == "" do
       :noop
     else
       case System.cmd("ip", ["link", "show", iface], stderr_to_stdout: true) do
@@ -413,7 +363,7 @@ defmodule Tunneld.Iptables do
             "-i",
             iface,
             "-o",
-            eth,
+            downstream,
             "-m",
             "state",
             "--state",
@@ -426,7 +376,7 @@ defmodule Tunneld.Iptables do
             "-A",
             "FORWARD",
             "-i",
-            eth,
+            downstream,
             "-o",
             iface,
             "-m",
@@ -480,12 +430,12 @@ defmodule Tunneld.Iptables do
 
   def remove_mesh_forwarding do
     iface = "wg-mesh"
-    eth = get_env(:eth)
+    downstream = get_env(:downstream)
 
-    if eth != nil and eth != "" do
+    if downstream != nil and downstream != "" do
       for {in_if, out_if, states} <- [
-            {iface, eth, "NEW,ESTABLISHED,RELATED"},
-            {eth, iface, "NEW,ESTABLISHED,RELATED"}
+            {iface, downstream, "NEW,ESTABLISHED,RELATED"},
+            {downstream, iface, "NEW,ESTABLISHED,RELATED"}
           ] do
         del("iptables", [
           "-D",

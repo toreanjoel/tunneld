@@ -1,10 +1,12 @@
 defmodule TunneldWeb.ExposeController do
   @moduledoc """
-  Quick Expose API — zero-credential endpoint for subnet devices to create,
-  list, and remove public Zrok shares.
+  Quick Expose API - zero-credential endpoint for subnet devices to create,
+  list, and remove local resources.
 
   The gateway resolves the caller from `conn.remote_ip`, validates it against
-  an allowlist, and manages the full share lifecycle.
+  an allowlist, and manages the full resource lifecycle. Each exposed service
+  is reachable on the subnet at `http://<name>.tunneld.lan:18000` via dnsmasq.
+  There is no public-internet exposure - relay/mesh exposure is future work.
   """
 
   use TunneldWeb, :controller
@@ -16,10 +18,7 @@ defmodule TunneldWeb.ExposeController do
     with {:ok, device_ip, mac} <- resolve_device(conn),
          :ok <- check_allowed(mac),
          {:ok, port, name} <- validate_body(params),
-         :ok <- check_name_conflict(name),
-         :ok <- check_zrok_config(),
-         :ok <- check_zrok_enabled(),
-         :ok <- check_connectivity() do
+         :ok <- check_name_conflict(name) do
       create_and_enable_share(conn, device_ip, mac, port, name)
     else
       {:error, status, body} ->
@@ -54,9 +53,8 @@ defmodule TunneldWeb.ExposeController do
         |> Enum.map(fn r ->
           %{
             name: r.name,
-            public_url: public_url(r),
-            port: extract_port(r),
-            active: get_in(r.tunneld, ["enabled", "public"]) || false
+            lan_url: r.lan_url,
+            port: extract_port(r)
           }
         end)
 
@@ -83,7 +81,7 @@ defmodule TunneldWeb.ExposeController do
         {:error, 403,
          %{
            error:
-             "device not recognised on subnet — ensure it has a DHCP lease from this gateway"
+             "device not recognised on subnet - ensure it has a DHCP lease from this gateway"
          }}
 
       %{mac: mac} ->
@@ -98,7 +96,7 @@ defmodule TunneldWeb.ExposeController do
       {:error, 403,
        %{
          error:
-           "device not allowed — enable Quick Expose for this device from the gateway dashboard"
+           "device not allowed - enable Quick Expose for this device from the gateway dashboard"
        }}
     end
   end
@@ -149,77 +147,12 @@ defmodule TunneldWeb.ExposeController do
     end
   end
 
-  defp check_zrok_config do
-    case Tunneld.Servers.Zrok.get_api_endpoint() do
-      nil ->
-        {:error, 503,
-         %{
-           error:
-             "no Zrok control plane configured — set it from the gateway dashboard"
-         }}
-
-      "<unset>" ->
-        {:error, 503,
-         %{
-           error:
-             "no Zrok control plane configured — set it from the gateway dashboard"
-         }}
-
-      _ ->
-        :ok
-    end
-  end
-
-  defp check_zrok_enabled do
-    if Tunneld.Servers.Zrok.enabled?() do
-      :ok
-    else
-      {:error, 503,
-       %{
-         error:
-           "Zrok environment not enabled — enable it from the gateway dashboard"
-       }}
-    end
-  end
-
-  defp check_connectivity do
-    if mock?() do
-      :ok
-    else
-      case Tunneld.Servers.Zrok.get_api_endpoint() do
-        nil ->
-          :ok
-
-        ep ->
-          case URI.parse(ep).host do
-            nil ->
-              :ok
-
-            host ->
-              case :gen_tcp.connect(String.to_charlist(host), 443, [:binary, active: false], 3000) do
-                {:ok, sock} ->
-                  :gen_tcp.close(sock)
-                  :ok
-
-                _ ->
-                  {:error, 503,
-                   %{
-                     error:
-                       "gateway cannot reach the Zrok control plane — check internet connectivity"
-                   }}
-              end
-          end
-      end
-    end
-  end
-
   defp create_and_enable_share(conn, device_ip, mac, port, name) do
     _result =
       Tunneld.Servers.Resources.add_share(%{
         "name" => name,
         "description" => "Quick Expose from #{device_ip}",
         "pool" => ["#{device_ip}:#{port}"],
-        "tunneld" => %{},
         "expose_source" => "device",
         "expose_device_mac" => mac,
         "expose_device_ip" => device_ip
@@ -232,35 +165,16 @@ defmodule TunneldWeb.ExposeController do
     if is_nil(resource) do
       conn
       |> put_status(500)
-      |> json(%{error: "share was not created — please retry"})
+      |> json(%{error: "share was not created - please retry"})
     else
-      pub_unit_id = get_in(resource.tunneld, ["units", "public", "id"])
-
-      enabled? =
-        if pub_unit_id do
-          Tunneld.Servers.Resources.toggle_share(pub_unit_id, true)
-          true
-        else
-          false
-        end
-
-      public_url = public_url(resource)
-      lan_url = "http://#{name}.tunneld.lan"
-
-      note =
-        if enabled? do
-          "Share is live — start your server on port #{port} to serve traffic"
-        else
-          "Share was created but not yet active — check the gateway dashboard"
-        end
+      lan_url = resource.lan_url || "http://#{Tunneld.Servers.Nginx.lan_hostname(name)}:#{Tunneld.Servers.Nginx.public_port()}"
 
       json(conn, %{
         name: name,
-        public_url: public_url,
         lan_url: lan_url,
         device_ip: device_ip,
         port: port,
-        note: note
+        note: "Resource is live - start your server on port #{port} to serve traffic"
       })
     end
   end
@@ -284,28 +198,16 @@ defmodule TunneldWeb.ExposeController do
     end
   end
 
-  defp public_url(resource) do
-    share_name = get_in(resource.tunneld, ["share_names", "public"])
-
-    case {share_name, Tunneld.Servers.Zrok.get_root_domain()} do
-      {nil, _} -> nil
-      {_, {:ok, domain}} -> "https://#{share_name}.#{domain}"
-      _ -> nil
-    end
-  end
-
   defp extract_port(resource) do
     case resource.pool do
-      [%{"port" => port} | _] when is_binary(port) -> String.to_integer(port)
-      [%{"port" => port} | _] when is_integer(port) -> port
       [port_str | _] when is_binary(port_str) ->
         case String.split(port_str, ":", parts: 2) do
           [_, port] -> String.to_integer(port)
           _ -> nil
         end
-      _ -> nil
+
+      _ ->
+        nil
     end
   end
-
-  defp mock?(), do: Application.get_env(:tunneld, :mock_data, false)
 end

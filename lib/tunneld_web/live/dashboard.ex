@@ -37,6 +37,8 @@ defmodule TunneldWeb.Live.Dashboard do
     selection: nil
   }
 
+  @link_poll_interval 15_000
+
   on_mount TunneldWeb.Hooks.CheckAuth
 
   def mount(_params, %{"client_id" => client_id} = _session, socket) do
@@ -58,7 +60,6 @@ defmodule TunneldWeb.Live.Dashboard do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "notifications")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "show_details")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "modal:form:action:#{client_id}")
-      Phoenix.PubSub.subscribe(Tunneld.PubSub, "status:internet")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:details")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:devices")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:resources")
@@ -73,7 +74,7 @@ defmodule TunneldWeb.Live.Dashboard do
 
     internet_status =
       try do
-        Tunneld.Servers.Wlan.connected?()
+        Tunneld.NetLink.upstream_up?()
       rescue
         _ -> false
       end
@@ -103,6 +104,10 @@ defmodule TunneldWeb.Live.Dashboard do
         :stale -> assign(socket, :map_status, :stale)
         :unavailable -> assign(socket, :map_status, :unavailable)
       end
+
+    if connected?(socket) do
+      :timer.send_after(@link_poll_interval, :poll_link_state)
+    end
 
     {:ok, socket}
   end
@@ -446,8 +451,23 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, socket}
   end
 
-  def handle_info(%{type: :internet, status: status}, socket) do
+  def handle_info(:poll_link_state, socket) do
+    :timer.send_after(@link_poll_interval, :poll_link_state)
+
+    status =
+      try do
+        Tunneld.NetLink.upstream_up?()
+      rescue
+        _ -> false
+      end
+
     {:noreply, assign(socket, status: %{internet: status})}
+  end
+
+  def handle_info(%{type: :internet, status: _status}, socket) do
+    # Link state is polled locally via :poll_link_state; ignore any stray
+    # legacy broadcasts on this topic.
+    {:noreply, socket}
   end
 
   def handle_info(%{type: type, message: message}, socket) do
@@ -508,19 +528,9 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, socket}
   end
 
-  def handle_info(:delayed_scan, socket) do
-    Tunneld.Servers.Wlan.scan_networks()
-    {:noreply, socket}
-  end
-
   def handle_info(:do_logout, socket) do
     Session.delete(socket.assigns.client_id)
     {:noreply, socket |> push_navigate(to: Routes.live_path(socket, TunneldWeb.Live.Login))}
-  end
-
-  def handle_info(:scan_for_wireless_networks, socket) do
-    Task.start(fn -> Tunneld.Servers.Wlan.scan_networks() end)
-    {:noreply, put_flash(socket, :info, "Scanning for wireless networks")}
   end
 
   def handle_info(:revoke_login_creds, socket) do
@@ -576,13 +586,8 @@ defmodule TunneldWeb.Live.Dashboard do
       "service" ->
         :system_overview
 
-      "wlan" ->
-        Tunneld.Servers.Wlan.scan_networks()
-        :wlan
-
-      "zrok" ->
-        Tunneld.Servers.Zrok.get_details()
-        :zrok
+      "ethernet" ->
+        :ethernet
 
       "dns_server" ->
         :dns_server
@@ -680,7 +685,6 @@ defmodule TunneldWeb.Live.Dashboard do
   defp start_message(action) do
     case action do
       "add_share" -> "Adding resource..."
-      "add_private_share" -> "Binding private resource..."
       "remove_share" -> "Removing resource..."
       "toggle_share_access" -> "Updating resource access..."
       "tunneld_settings" -> "Updating resource settings..."
@@ -691,18 +695,8 @@ defmodule TunneldWeb.Live.Dashboard do
       "revoke_device_expose" -> "Revoking Quick Expose..."
       "add_device_tag" -> "Adding tag..."
       "remove_device_tag" -> "Removing tag..."
-      "connect_to_wireless_network" -> "Connecting to Wi‑Fi..."
-      "disconnect_from_wireless_network" -> "Disconnecting Wi‑Fi..."
-      "scan_for_wireless_networks" -> "Scanning Wi‑Fi..."
       "set_dns_server" -> "Updating DNS server..."
-      "configure_enable_control_plane" -> "Configuring control plane..."
-      "configure_disable_control_plane" -> "Disconnecting control plane..."
-      "configure_enable_environment" -> "Enabling device..."
-      "configure_disable_environment" -> "Disabling device..."
       "revoke_login_creds" -> "Resetting login..."
-      "configure_basic_auth" -> "Configuring Basic Auth..."
-      "disable_basic_auth" -> "Disabling Basic Auth..."
-      "get_private_token" -> "Fetching private token..."
       "mesh_sync" -> "Syncing mesh..."
       "disconnect_mesh" -> "Disconnecting mesh..."
       "restart_device" -> "Restarting device..."

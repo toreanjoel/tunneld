@@ -41,9 +41,6 @@ defmodule TunneldWeb.Live.Components.Resources do
           <button phx-click="modal_open" phx-value-modal_title="Quick Expose" phx-value-modal_body={Jason.encode!(%{"type" => "code_blocks", "data" => quick_expose_blocks()})} class="ghost-btn">
             Quick Expose
           </button>
-          <button phx-click="modal_open" phx-value-modal_title="Add Private Resource" phx-value-modal_body={Jason.encode!(%{"type" => "schema", "data" => Tunneld.Schema.Resource.data(:add_private), "default_values" => %{"ip" => "0.0.0.0", "port" => "", "pool" => []}, "action" => "add_private_share"})} class="ghost-btn">
-            Bind Private
-          </button>
           <button phx-click="modal_open" phx-value-modal_title="Add Resource" phx-value-modal_body={Jason.encode!(%{"type" => "schema", "data" => Tunneld.Schema.Resource.data(:add_public), "default_values" => %{"ip" => "127.0.0.1", "port" => "18000", "pool" => []}, "action" => "add_share"})} class="ghost-btn">
             Add Resource
           </button>
@@ -79,7 +76,7 @@ defmodule TunneldWeb.Live.Components.Resources do
                   <% health = Map.get(resource, :health) || Map.get(resource, "health") || %{} %>
                   <span class={"w-[13px] h-[13px] rounded-full inline-block #{pool_health_dot(health[:status])}"}></span>
                 <% end %>
-                <%= if get_in(resource.tunneld, ["expose_source"]) == "device" do %>
+                <%= if Map.get(resource, :expose_source) == "device" do %>
                   <span class="px-2 py-0.5 rounded-full bg-text-primary/10 text-text-secondary uppercase text-[10px] font-medium">QE</span>
                 <% end %>
               </div>
@@ -91,7 +88,6 @@ defmodule TunneldWeb.Live.Components.Resources do
     """
   end
 
-  defp kind_icon("access"), do: "hero-arrows-right-left"
   defp kind_icon("host"), do: "hero-server-stack"
   defp kind_icon(_), do: "hero-question-mark-circle"
 

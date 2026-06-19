@@ -2,29 +2,48 @@ defmodule Tunneld.Servers.Nginx do
   @moduledoc """
   Generates and manages per-resource nginx reverse proxy configurations.
 
-  Each resource gets an nginx config file with:
-  - An upstream block pointing to the resource's backend pool (IP:port entries)
-  - A public server block (port 18000) matched by the Zrok public share name
-  - A private server block (deterministic port via `phash2`) for Zrok private shares
+  Each resource gets one nginx server block that:
+
+  - Listens on `0.0.0.0:18000` so LAN devices can reach it via the
+    local DNS name (`<name>.tunneld.lan`) resolved by dnsmasq to the gateway.
+  - Matches `server_name` against the resource's local DNS name.
+  - Proxies to an upstream block that load-balances the resource's backend
+    pool (one or more `IP:port` entries).
 
   Config files follow the sites-available/sites-enabled symlink pattern.
-  In mock mode, files are written under the local data directory instead of `/etc/nginx/`.
+  In mock mode, files are written under the local data directory instead of
+  `/etc/nginx/`.
 
-  This is a plain module (not a GenServer) — all functions are called synchronously
-  by the Resources server.
+  This is a plain module (not a GenServer) - all functions are called
+  synchronously by the Resources server.
   """
+
   require Logger
+
   @service_name "nginx"
   @public_port 18000
-  @private_port_base 20000
-  @private_port_range 10000
+  @lan_domain "tunneld.lan"
 
   defp mock_mode?, do: Application.get_env(:tunneld, :mock_data, false) in [true, "true"]
 
+  @doc "The LAN domain used for resource DNS names."
+  def lan_domain, do: @lan_domain
+
+  @doc "The port nginx listens on for resource traffic."
+  def public_port, do: @public_port
+
   @doc """
-  Create or update the nginx config for a resource (shared for public/private)
+  Build the local DNS hostname for a resource name (e.g. `"printer"` -> `"printer.tunneld.lan"`).
   """
-  def upsert_resource_config(%{"id" => id, "pool" => pool} = resource) when is_list(pool) do
+  def lan_hostname(name) when is_binary(name) do
+    "#{name}.#{@lan_domain}"
+  end
+
+  @doc """
+  Create or update the nginx config for a resource.
+  """
+  def upsert_resource_config(%{"id" => id, "name" => name, "pool" => pool} = resource)
+      when is_binary(id) and is_binary(name) and is_list(pool) do
     mock? = mock_mode?()
     available_path = available_path(id, mock?)
     enabled_path = enabled_path(id, mock?)
@@ -60,47 +79,13 @@ defmodule Tunneld.Servers.Nginx do
 
   def remove_resource_config(_), do: {:error, :invalid_resource}
 
-  @doc """
-  Calculate a deterministic private port based on the Identifier (Name or ID).
-  """
-  def get_private_port(identifier) when is_binary(identifier) do
-    offset = :erlang.phash2(identifier, @private_port_range)
-    @private_port_base + offset
-  end
-
   defp render_config(resource) do
     id = resource["id"]
-    listen_ip = Map.get(resource, "ip", "127.0.0.1")
-
-    # Determine names first
-    reserved = get_in(resource, ["tunneld", "share_names"]) || %{}
-    public_name = Map.get(reserved, "public", "#{id}-public")
-    private_name = Map.get(reserved, "private", "#{id}-private")
-
-    public_port = @public_port
-    private_port = get_private_port(private_name)
+    name = resource["name"]
+    server_name = lan_hostname(name)
 
     upstream_name = "tunneld_#{id}_pool"
     pool = Map.get(resource, "pool", [])
-
-    root_domain =
-      case Tunneld.Servers.Zrok.get_root_domain() do
-        {:ok, domain} -> domain
-        _ -> nil
-      end
-
-    # Logic to determine the Host header for private access:
-    spoofed_host =
-      cond do
-        String.contains?(public_name, ".") ->
-          public_name
-
-        root_domain ->
-          public_name <> "." <> root_domain
-
-        true ->
-          public_name
-      end
 
     servers =
       pool
@@ -114,8 +99,8 @@ defmodule Tunneld.Servers.Nginx do
     }
 
     server {
-        listen #{listen_ip}:#{public_port};
-        server_name #{public_name} ~^#{public_name}\\..+$;
+        listen 0.0.0.0:#{@public_port};
+        server_name #{server_name};
 
         location / {
             proxy_pass http://#{upstream_name};
@@ -129,33 +114,8 @@ defmodule Tunneld.Servers.Nginx do
             proxy_set_header Host $host;
             proxy_set_header X-Real-IP $remote_addr;
             proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-
-            # Hardcoded to HTTPS for zrok/tunnel compatibility
-            proxy_set_header X-Forwarded-Proto https;
-            proxy_set_header X-Forwarded-Port 443;
-        }
-    }
-
-    server {
-        listen #{listen_ip}:#{private_port};
-        server_name _ #{private_name};
-
-        location / {
-            proxy_pass http://#{upstream_name};
-
-            client_max_body_size 0;
-            proxy_request_buffering off;
-
-            proxy_http_version 1.1;
-            proxy_set_header Upgrade $http_upgrade;
-            proxy_set_header Connection "upgrade";
-            proxy_set_header Host #{spoofed_host};
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-
-            # Hardcoded to HTTPS for zrok/tunnel compatibility
-            proxy_set_header X-Forwarded-Proto https;
-            proxy_set_header X-Forwarded-Port 443;
+            proxy_set_header X-Forwarded-Proto $scheme;
+            proxy_set_header X-Forwarded-Port #{@public_port};
         }
     }
     """

@@ -8,15 +8,7 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
   the LiveView process.
   """
 
-  alias Tunneld.Servers.{
-    Devices,
-    Wlan,
-    Zrok,
-    Resources,
-    Services,
-    Auth,
-    Sqm
-  }
+  alias Tunneld.Servers.{Devices, Resources, Auth}
 
   @mock Application.compile_env(:tunneld, :mock_data, false)
 
@@ -55,34 +47,6 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
         tag = data["tag"]
         if mac && tag, do: Tunneld.Servers.DeviceTags.remove_tag(mac, tag)
 
-      # Wireless networking
-      "connect_to_wireless_network" ->
-        Wlan.connect_with_pass(data["ssid"], data["password"])
-
-      "disconnect_from_wireless_network" ->
-        Wlan.disconnect()
-        Process.send_after(parent, :delayed_scan, 3000)
-
-      "scan_for_wireless_networks" ->
-        send(parent, :scan_for_wireless_networks)
-
-      # Zrok control plane
-      "configure_disable_control_plane" ->
-        Zrok.unset_api_endpoint()
-        Resources.try_hibernate_shares()
-
-      "configure_enable_control_plane" ->
-        Zrok.set_api_endpoint(data["url"])
-
-      # Zrok environment
-      "configure_enable_environment" ->
-        Zrok.enable_env(data["account_token"])
-        Resources.try_init_local_shares()
-
-      "configure_disable_environment" ->
-        Zrok.disable_env()
-        Resources.try_hibernate_shares()
-
       # Auth
       "revoke_login_creds" ->
         File.rm(Auth.path())
@@ -103,45 +67,13 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       "update_share" ->
         Resources.update_share(data, :resource)
 
-      "configure_basic_auth" ->
-        Resources.configure_basic_auth(data)
-
-      "disable_basic_auth" ->
-        Resources.disable_basic_auth(data["resource_id"])
-
-      "get_private_token" ->
-        Resources.get_private_token(data["resource_id"])
-
-      "add_private_share" ->
-        Resources.add_access(data)
-
-      "toggle_share_access" ->
-        payload = data |> Map.get("payload") |> decode_if_needed()
-        %{"id" => id, "enable" => enable, "kind" => kind} = payload
-
-        case kind do
-          "host" -> Resources.toggle_share(id, enable)
-          "access" -> Resources.toggle_access(id, enable)
-          _ -> raise "Kind not found, make sure resource is setup with correct kind"
-        end
-
       "remove_share" ->
-        %{"id" => id, "kind" => kind} = data
-
-        case kind do
-          "host" -> Resources.remove_share(id)
-          "access" -> Resources.remove_access(id)
-          _ -> raise "Kind not found, make sure resource is setup with correct kind"
-        end
-
+        %{"id" => id} = data
+        Resources.remove_share(id)
         send(parent, :close_details)
 
       "tunneld_settings" ->
-        Resources.update_share(data, :tunneld)
-
-      # SQM
-      "set_sqm" ->
-        Sqm.set_sqm(data)
+        Resources.update_share(data, :resource)
 
       # Mesh
       "mesh_sync" ->
@@ -233,6 +165,4 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
   end
 
   defp decode_if_needed(_), do: %{}
-
-
 end

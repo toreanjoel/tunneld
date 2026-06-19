@@ -3,7 +3,7 @@ defmodule TunneldWeb.Live.Components.MeshCard do
   Mesh network hero card with 2D world map visualization, device pin,
   connection status, peer count, mesh IP, last sync time, and configure button.
 
-  The map is entirely offline — country paths are compiled directly into
+  The map is entirely offline - country paths are compiled directly into
   Tunneld.GeoData.WorldMap from Natural Earth 110m TopoJSON.
 
   Peer pins are grouped by country code; multiple peers in the same country

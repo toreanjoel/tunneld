@@ -10,7 +10,7 @@ if mock_data? do
   config :tunneld, mock_data: true
 end
 
-# Data paths (overrideable via ENV) — skip in test, config/test.exs handles it
+# Data paths (overrideable via ENV) - skip in test, config/test.exs handles it
 unless config_env() == :test do
   default_root = if mock_data?, do: "data", else: "/var/lib/tunneld"
 
@@ -18,7 +18,6 @@ unless config_env() == :test do
     root: System.get_env("TUNNELD_DATA", default_root),
     auth: System.get_env("TUNNELD_AUTH_FILE", "auth.json"),
     resources: System.get_env("TUNNELD_SHARES_FILE", "resources.json"),
-    sqm: System.get_env("TUNNELD_SQM_FILE", "sqm.json"),
     wireguard: System.get_env("TUNNELD_WIREGUARD_FILE", "wireguard.json")
 end
 
@@ -26,20 +25,17 @@ end
 if config_env() == :prod do
   # Required network envs (prod only)
   gateway = System.get_env("GATEWAY") || raise "Missing ENV: GATEWAY"
-  wlan = System.get_env("WIFI_INTERFACE") || raise "Missing ENV: WIFI_INTERFACE"
-  lan = System.get_env("LAN_INTERFACE") || raise "Missing ENV: LAN_INTERFACE"
+  upstream = System.get_env("UPSTREAM_INTERFACE") || raise "Missing ENV: UPSTREAM_INTERFACE"
+  downstream = System.get_env("DOWNSTREAM_INTERFACE") || raise "Missing ENV: DOWNSTREAM_INTERFACE"
   device_id = System.get_env("DEVICE_ID") || raise "Missing ENV: DEVICE_ID"
 
-  wifi_country = System.get_env("WIFI_COUNTRY")
   config :tunneld, :metadata,
     device_id: device_id
 
   config :tunneld, :network,
     gateway: gateway,
-    wlan: wlan,
-    eth: lan,
-    mullvad: System.get_env("MULLVAD_INTERFACE", ""),
-    country: wifi_country
+    upstream: upstream,
+    downstream: downstream
 
   secret_key_base =
     System.get_env("SECRET_KEY_BASE") ||

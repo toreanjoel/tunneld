@@ -8,7 +8,7 @@ defmodule Tunneld.Config do
   """
 
   @doc """
-  Retrieve a filesystem config value (e.g., `:root`, `:auth`, `:resources`, `:sqm`).
+  Retrieve a filesystem config value (e.g., `:root`, `:auth`, `:resources`).
   """
   def fs(key) do
     case Application.get_env(:tunneld, :fs) do

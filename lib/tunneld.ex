@@ -2,13 +2,13 @@ defmodule Tunneld do
   @moduledoc """
   Root module for the Tunneld application.
 
-  Contains the `Tunneld.Template` submodule which ensures the Zrok error
+  Contains the `Tunneld.Template` submodule which ensures the gateway error
   page template (`error.gohtml`) exists in the data directory on startup.
   """
 
   defmodule Template do
     @moduledoc """
-    Ensures the Zrok error page template exists in the data directory.
+    Ensures the gateway error page template exists in the data directory.
 
     Copies from priv/templates/error.gohtml if the file doesn't already exist.
     """

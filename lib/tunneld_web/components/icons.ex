@@ -1,7 +1,7 @@
 defmodule TunneldWeb.Icons do
   @moduledoc """
   Inline SVG icons matching the React prototype's Lucide-style set.
-  Self-hosted — no CDN dependency.
+  Self-hosted - no CDN dependency.
   """
   use Phoenix.Component
 

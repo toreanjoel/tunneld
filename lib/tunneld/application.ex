@@ -3,6 +3,10 @@ defmodule Tunneld.Application do
   OTP Application entry point. Starts the supervision tree with all
   GenServers, PubSub, and the Phoenix endpoint. In production, also
   resets iptables firewall rules on startup.
+
+  Supervision tree (after Zrok/Wi-Fi/SQM removal):
+    Session, SystemResources, Services, Resources, Devices, Auth,
+    DnsConfig, Updater, Wireguard, Geolocation, Mesh, Endpoint.
   """
 
   use Application
@@ -10,15 +14,12 @@ defmodule Tunneld.Application do
   alias Tunneld.Servers.{
     Auth,
     Session,
-    Zrok,
     Services,
     Devices,
     SystemResources,
-    Wlan,
     Resources,
     DnsConfig,
     Updater,
-    Sqm,
     Wireguard
   }
 
@@ -30,8 +31,6 @@ defmodule Tunneld.Application do
       TunneldWeb.Telemetry,
       {DNSCluster, query: Application.get_env(:tunneld, :dns_cluster_query) || :ignore},
       {Phoenix.PubSub, name: Tunneld.PubSub},
-      {Wlan, []},
-      {Zrok, []},
       {Session, []},
       {SystemResources, []},
       {Services, []},
@@ -40,7 +39,6 @@ defmodule Tunneld.Application do
       {Auth, []},
       {DnsConfig, []},
       {Updater, []},
-      {Sqm, []},
       {Wireguard, []},
       {Tunneld.Geolocation, []},
       {Tunneld.Servers.Mesh, []},

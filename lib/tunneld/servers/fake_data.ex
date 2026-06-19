@@ -50,28 +50,15 @@ defmodule Tunneld.Servers.FakeData do
     }
   end
 
-  @doc "Fake Wi-Fi scan results."
-  def wlan do
-    [
-      %{
-        open: false,
-        security: "[WPA2-PSK-CCMP][WPS][ESS]",
-        signal: "-58",
-        ssid: "JS_5G"
-      },
-      %{open: false, security: "[WPA2-PSK-CCMP][ESS]", signal: "-32", ssid: ""},
-      %{
-        open: false,
-        security: "[WPA2-PSK-CCMP][ESS]",
-        signal: "-33",
-        ssid: "tunneld.local_5G"
-      },
-      %{
-        open: false,
-        security: "[WPA2-PSK-CCMP][WPS][ESS]",
-        signal: "-58",
-        ssid: "JS"
-      }
-    ]
+  @doc """
+  Fake ethernet link state for development when `MOCK_DATA=true`.
+
+  Keys are atoms matching the `:tunneld, :network` config (`:upstream`,
+  `:downstream`) and values are the operstate string (`"up"`/`"down"`).
+  `:speed` is informational and matches the `/sys/class/net/<iface>/speed`
+  field where present.
+  """
+  def ethernet do
+    %{upstream: "up", downstream: "up", speed: 1000}
   end
 end

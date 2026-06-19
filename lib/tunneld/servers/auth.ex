@@ -5,7 +5,7 @@ defmodule Tunneld.Servers.Auth do
   The auth file stores a single admin credential set (username + bcrypt hash).
   All reads and writes go through this module to keep the file format consistent.
 
-  This GenServer currently holds no state — it exists as a named process so
+  This GenServer currently holds no state - it exists as a named process so
   the supervision tree can track it, but all operations read/write directly
   to disk.
   """

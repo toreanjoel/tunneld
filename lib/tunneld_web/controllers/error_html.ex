@@ -7,12 +7,12 @@ defmodule TunneldWeb.ErrorHTML do
 
   # minimal 404
   def render("404.html", _assigns) do
-    "404 — Not Found"
+    "404 - Not Found"
   end
 
   # minimal 500
   def render("500.html", _assigns) do
-    "500 — Internal Server Error"
+    "500 - Internal Server Error"
   end
 
   # fallback

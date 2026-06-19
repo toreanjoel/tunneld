@@ -1,7 +1,19 @@
 defmodule TunneldWeb.Live.Components.Sidebar.Details do
   @moduledoc """
-  The list of sidebar details to render
+  The list of sidebar details to render.
+
+  Renders one of several views selected by the parent LiveView:
+
+  - `:system_overview` - default "all good" panel
+  - `:resource`        - a single resource's details and actions
+  - `:ethernet`        - upstream/downstream interface link state
+  - `:dns_server`      - upstream DNS server configuration
+  - `:authentication`  - login reset
+  - `:service`         - system service logs and restart
+  - `:mesh`            - mesh relay configuration form
+  - `:mesh_node`       - a single mesh peer's details
   """
+
   use TunneldWeb, :live_component
   import TunneldWeb.Live.Components.HelpIcon
 
@@ -13,21 +25,15 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     view = Map.get(assigns, :view, socket.assigns[:view] || :system_overview)
     data = Map.get(assigns, :data, %{})
     selection = Map.get(assigns, :selection, socket.assigns[:selection] || nil)
-    sqm = Tunneld.Servers.Sqm.get_state()
     obfuscated = Map.get(assigns, :obfuscated, false)
 
     socket =
       socket
       |> assign_new(:obfuscated, fn -> false end)
       |> assign(:view, view)
-      |> assign(:sqm, sqm)
       |> assign(:data, data)
       |> assign(:selection, selection)
       |> assign(:obfuscated, obfuscated)
-
-    if view == :wlan and map_size(data) == 0 do
-      Tunneld.Servers.Wlan.scan_networks()
-    end
 
     {:ok, socket}
   end
@@ -102,7 +108,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           header: mask(@obfuscated, @data.name),
           body:
             @data.description ||
-              "A reference to a running service accessible from this device over the network. This tracks availability and allows exposure to the internet"
+              "A reference to a running service accessible from this device over the network. Tracks availability and load-balances its backend pool."
         }) %>
       </div>
 
@@ -115,12 +121,10 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             "ui:widget" => "hidden",
             "readOnly" => true
           })
-          |> put_in(["properties", "name", "readOnly"], true)
-
-           any_enabled? = Enum.any?(Map.values(get_in(@data.tunneld || %{}, ["enabled"]) || %{}), &(&1 == true)) %>
+          |> put_in(["properties", "name", "readOnly"], true) %>
 
         <div
-          :if={@data.kind == "host" and not any_enabled?}
+          :if={@data.kind == "host"}
           phx-click="modal_open"
           phx-value-modal_title="Edit Resource"
           phx-value-modal_body={
@@ -145,16 +149,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <div class="truncate text-xs">Edit</div>
         </div>
 
-        <div
-          :if={@data.kind == "host" and any_enabled?}
-          class="flex items-center justify-center gap-1 bg-surface p-2 cursor-not-allowed rounded-md opacity-50"
-          title="Disable shares to edit"
-        >
-          <.icon name="hero-pencil-square" class="h-5 w-5" />
-          <div class="truncate text-xs">Edit</div>
-        </div>
-
-        <%!-- Actions: Remove Resource only --%>
         <div
           phx-click="modal_open"
           phx-value-modal_title="Remove Resource?"
@@ -201,6 +195,10 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                 <span class="ml-1 text-xs text-gray-300">(<%= health[:up] %>/<%= health[:total] %> up)</span>
               <% end %>
             </div>
+            <div :if={@data[:lan_url]} class="text-sm truncate">
+              <span class="font-bold">LAN URL:</span>
+              <span class="ml-1 font-mono text-xs"><%= @data[:lan_url] %></span>
+            </div>
           </div>
 
           <% pool_details = Map.get(@data, :pool_details, []) %>
@@ -222,289 +220,50 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               </div>
             </div>
           <% end %>
-
-          <%= if @data.kind == "access" and @has_data do %>
-            <div class="mt-3 border-t border-gray-700 pt-3">
-              <h2 class="text-sm font-semibold mb-2">Pool Backends</h2>
-              <div class="bg-surface rounded-lg p-2 space-y-1.5">
-                <%= if Enum.empty?(pool_details) do %>
-                  <div class="text-xs text-gray-400">No backends configured</div>
-                <% else %>
-                  <%= for {entry, up?} <- pool_details do %>
-                    <div class="flex items-center gap-2">
-                      <span class={"w-2 h-2 rounded-full inline-block #{if up?, do: "bg-green", else: "bg-yellow"}"}></span>
-                      <span class="font-mono text-xs text-gray-300"><%= mask(@obfuscated, entry) %></span>
-                    </div>
-                  <% end %>
-                <% end %>
-              </div>
-            </div>
-          <% end %>
-
-          <% tunneld = @data.tunneld || %{} %>
-          <div :if={!Enum.empty?(tunneld)} class="mt-3">
-            <div class="py-2">
-              <h2 class="text-sm font-semibold">Resources</h2>
-            </div>
-
-            <div class="grid grid-cols-1 gap-2">
-              <% available_kinds =
-                ~w(public private access)
-                |> Enum.filter(fn k -> not is_nil(get_in(tunneld, ["units", k])) end) %>
-
-              <%= for kind <- available_kinds do %>
-                <% reserved =
-                  case kind do
-                    "access" -> get_in(tunneld, ["share_names", "private"])
-                    _ -> get_in(tunneld, ["share_names", kind])
-                  end %>
-                <% enabled? = get_in(tunneld, ["enabled", kind]) == true %>
-                <% unit = get_in(tunneld, ["units", kind, "unit"]) %>
-                <% unit_id = get_in(tunneld, ["units", kind, "id"]) %>
-                <% indicator_class = status_class(@data, kind) %>
-
-                <div class="bg-surface rounded-lg p-3">
-                  <div class="flex items-center justify-between">
-                    <div class="text-sm font-medium capitalize"><%= kind %> instance</div>
-                    <label
-                      phx-click="toggle_share_access"
-                      phx-value-payload={
-                        Jason.encode!(%{"id" => unit_id, "enable" => !enabled?, "kind" => @data.kind})
-                      }
-                      class="relative inline-flex items-center cursor-pointer"
-                    >
-                      <input type="checkbox" class="sr-only peer" checked={enabled?} />
-                      <div class="w-9 h-5 bg-light_purple rounded-full peer-checked:bg-accent relative after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-light_purple after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:after:translate-x-4">
-                      </div>
-                    </label>
-                  </div>
-
-                  <%= if kind == "public" do %>
-                    <% auth_config = get_in(tunneld, ["auth", "basic"]) || %{} %>
-                    <% has_auth? = Map.get(auth_config, "enabled", false) %>
-                    <div class="mt-2 border-t border-gray-700 pt-2">
-                       <div class="flex items-center justify-between">
-                         <span class="text-xs font-semibold">Basic Auth</span>
-                         <div class="flex gap-2 items-center">
-                           <%= if enabled? do %>
-                             <div class="text-xs text-gray-400 cursor-not-allowed" title="Disable share to configure">
-                               <%= if has_auth?, do: "Edit", else: "Configure" %>
-                             </div>
-                           <% else %>
-                             <div
-                               phx-click="modal_open"
-                               phx-value-modal_title="Configure Basic Auth"
-                               phx-value-modal_description="Basic auth for public resources, for APIs make sure to use basic auth header details to access"
-                               phx-value-modal_body={Jason.encode!(%{
-                                 "type" => "schema",
-                                 "data" => Tunneld.Schema.Resource.data(:basic_auth),
-                                 "default_values" => Map.put(auth_config, "resource_id", @data.id),
-                                 "action" => "configure_basic_auth"
-                               })}
-                               class="cursor-pointer text-xs underline text-blue-400 hover:text-blue-300"
-                             >
-                               <%= if has_auth?, do: "Edit", else: "Configure" %>
-                             </div>
-
-                             <%= if has_auth? do %>
-                               <div
-                                 phx-click="modal_open"
-                                 phx-value-modal_title="Disable Basic Auth?"
-                                 phx-value-modal_body={Jason.encode!(%{
-                                   "type" => "string",
-                                   "data" => "Are you sure you want to disable Basic Auth for this resource?"
-                                 })}
-                                 phx-value-modal_actions={Jason.encode!(%{
-                                   "title" => "Disable",
-                                   "payload" => %{
-                                     "type" => "disable_basic_auth",
-                                     "data" => %{"resource_id" => @data.id}
-                                   }
-                                 })}
-                                 class="cursor-pointer text-xs text-red hover:text-red-400 ml-2"
-                               >
-                                 Disable
-                               </div>
-                             <% end %>
-                           <% end %>
-                         </div>
-                       </div>
-                    </div>
-                  <% end %>
-
-                  <%= if kind == "private" and enabled? do %>
-                    <% # Check if we have a real token (not the placeholder name like "adminapriv")
-                      has_token? = is_binary(reserved) and reserved != "" and not String.ends_with?(reserved, "priv") %>
-                    <div class="mt-2 border-t border-gray-700 pt-2">
-                      <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold">Private Token</span>
-                        <div
-                          phx-click="trigger_action"
-                          phx-value-action="get_private_token"
-                          phx-value-data={Jason.encode!(%{"resource_id" => @data.id})}
-                          class="cursor-pointer text-xs underline text-blue-400 hover:text-blue-300"
-                        >
-                          <%= if has_token?, do: "Refresh", else: "Get Token" %>
-                        </div>
-                      </div>
-                      <%= if has_token? do %>
-                        <div class="mt-1 bg-gray-800 rounded px-2 py-1">
-                          <code class="text-xs text-green-400 break-all"><%= mask(@obfuscated, reserved) %></code>
-                        </div>
-                        <p class="text-[10px] text-gray-400 mt-1">Use this token to access this resource from another device</p>
-                      <% end %>
-                    </div>
-                  <% end %>
-
-                  <div class="mt-2 grid grid-rows-1 md:grid-rows-3 gap-2 text-xs">
-                    <%= if kind != "private" do %>
-                    <div class="truncate">
-                      <span class="font-semibold">Reserved:</span>
-                      <span class="ml-1"><%= reserved || "—" %></span>
-                    </div>
-                    <% end %>
-                    <div class="truncate flex items-center gap-2">
-                      <span class="font-semibold">Status:</span>
-                      <span class={["w-3 h-3 rounded-full inline-block", indicator_class]} />
-                      <span class="capitalize"><%= human_health_text(enabled?, @data) %></span>
-                    </div>
-                    <div class="truncate">
-                      <span class="font-semibold">Systemd Unit:</span>
-                      <span class="ml-1"><%= unit || "—" %></span>
-                    </div>
-                    <div class="truncate">
-                      <span class="font-semibold">Unit ID:</span>
-                      <span class="ml-1"><%= unit_id || "—" %></span>
-                    </div>
-                  </div>
-                </div>
-              <% end %>
-            </div>
-          </div>
         </div>
       </div>
     </div>
     """
   end
 
-  @spec render(%{:view => :zrok, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
-  def render(%{view: :zrok} = assigns) do
-    data = Map.get(assigns, :data, %{})
-
-    # unset check
-    unset_check = Map.get(data, :api_endpoint, "") |> to_string() |> String.contains?("unset")
-    default_endpoint = if unset_check or not is_binary(Map.get(data, :api_endpoint)), do: nil, else: Map.get(data, :api_endpoint)
+  @spec render(%{:view => :ethernet, optional(any()) => any()}) ::
+          Phoenix.LiveView.Rendered.t()
+  def render(%{view: :ethernet} = assigns) do
+    status = Tunneld.NetLink.status()
 
     assigns =
       assigns
-      |> assign(enabled: Map.get(data, :enabled?, nil))
-      |> assign(endpoint: default_endpoint)
-      |> assign(is_unset: unset_check)
-      |> assign(has_data: not Enum.empty?(data))
+      |> assign(upstream: status.upstream)
+      |> assign(downstream: status.downstream)
 
     ~H"""
     <div class="p-4 space-y-6 min-h-full">
-      <%!-- Sidebar header that will house metadat?  --%>
       <%= sidebar_header(assigns, %{
-        header: "Overlay Network Settings",
-        body: "Set up this device to operate within your overlay control plane environment"
+        header: "Network Interfaces",
+        body: "Upstream and downstream ethernet link state for this gateway."
       }) %>
 
-      <div :if={@has_data} class="flex flex-row gap-1 justify-end my-2">
-        <%!-- Setup endpoint  --%>
-        <div
-          :if={not @is_unset}
-          phx-click="modal_open"
-          phx-value-modal_title="Disconnect from Control Plane?"
-          phx-value-modal_body={
-            Jason.encode!(%{
-              "type" => "string",
-              "data" =>
-                "This will disconnect the gateway from the current network. All resources and private access will stop working. You will need to enable them once you connect to a network again."
-            })
-          }
-          phx-value-modal_actions={
-            Jason.encode!(%{
-              "title" => "Disconnect Control Plane",
-              "payload" => %{
-                "type" => "configure_disable_control_plane",
-                "data" => %{}
-              }
-            })
-          }
-          phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
-        >
-          <.icon name="hero-no-symbol" class="h-5 w-5" />
-          <div class="truncate text-xs">Disconnect Control Plane</div>
+      <div class="space-y-3">
+        <div class="bg-surface rounded-lg p-3 flex items-center justify-between">
+          <div class="flex flex-col">
+            <span class="text-sm font-semibold">Upstream</span>
+            <span class="text-xs text-gray-400 font-mono"><%= @upstream.iface || "—" %></span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class={"w-3 h-3 rounded-full inline-block #{if @upstream.up, do: "bg-green", else: "bg-red"}"} />
+            <span class="text-xs capitalize"><%= if @upstream.up, do: "up", else: "down" %></span>
+          </div>
         </div>
 
-        <div
-          :if={@is_unset}
-          phx-click="modal_open"
-          phx-value-modal_title="Configure Network Endpoint"
-          phx-value-modal_body={
-            Jason.encode!(%{
-              "type" => "schema",
-              "data" => Tunneld.Schema.data(:zrok, :endpoint),
-              "default_values" => %{
-                url: @endpoint
-              },
-              "action" => "configure_enable_control_plane"
-            })
-          }
-          phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-surface p-2 cursor-pointer rounded-md"
-        >
-          <.icon class="w-4 h-4" name="hero-globe-alt" />
-          <div class="truncate text-xs text-text-secondary">Configure Control Plane</div>
-        </div>
-
-        <%!-- enabled options --%>
-        <div
-          :if={@enabled}
-          phx-click="modal_open"
-          phx-value-modal_title="Disable and disconnect device?"
-          phx-value-modal_body={
-            Jason.encode!(%{
-              "type" => "string",
-              "data" =>
-                "This will disable your device and disconnect it from the current account as an environment"
-            })
-          }
-          phx-value-modal_actions={
-            Jason.encode!(%{
-              "title" => "Disable Environment",
-              "payload" => %{
-                "type" => "configure_disable_environment",
-                "data" => %{}
-              }
-            })
-          }
-          phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
-        >
-          <.icon name="hero-no-symbol" class="h-5 w-5" />
-          <div class="truncate text-xs">Disable Device</div>
-        </div>
-
-        <div
-          :if={not @is_unset and not @enabled}
-          phx-click="modal_open"
-          phx-value-modal_title="Configure device"
-          phx-value-modal_body={
-            Jason.encode!(%{
-              "type" => "schema",
-              "data" => Tunneld.Schema.data(:zrok, :conf_device),
-              "default_values" => %{},
-              "action" => "configure_enable_environment"
-            })
-          }
-          phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-surface p-2 cursor-pointer rounded-md"
-        >
-          <.icon class="w-4 h-4" name="hero-link" />
-          <div class="truncate text-xs text-text-secondary">Enable Device</div>
+        <div class="bg-surface rounded-lg p-3 flex items-center justify-between">
+          <div class="flex flex-col">
+            <span class="text-sm font-semibold">Downstream</span>
+            <span class="text-xs text-gray-400 font-mono"><%= @downstream.iface || "—" %></span>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class={"w-3 h-3 rounded-full inline-block #{if @downstream.up, do: "bg-green", else: "bg-red"}"} />
+            <span class="text-xs capitalize"><%= if @downstream.up, do: "up", else: "down" %></span>
+          </div>
         </div>
       </div>
     </div>
@@ -547,187 +306,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         >
           <.icon class="w-4 h-4" name="hero-pencil-square" />
           Change DNS Server
-        </div>
-      </div>
-    </div>
-    """
-  end
-
-  @spec render(%{:view => :wlan, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
-  def render(%{view: :wlan} = assigns) do
-    data = Map.get(assigns, :data)
-
-    networks = Map.get(data, :networks, [])
-
-    assigns =
-      assigns
-      |> assign(networks: networks)
-      |> assign(info: Map.get(data, :info, %{}))
-      |> assign(count: length(networks))
-
-    ~H"""
-    <div class="p-4 space-y-6 min-h-full">
-      <div class="relative">
-        <%= sidebar_header(assigns, %{
-          header: "Wireless Access",
-          body: "Connect to access points for internet connectivity and optimize traffic using the CAKE algorithm to reduce bufferbloat and latency."
-        }) %>
-      </div>
-
-        <div class="flex flex-row gap-1 mt-2 justify-end">
-        <button
-          phx-click="trigger_action"
-          phx-value-action="scan_for_wireless_networks"
-          phx-value-data={Jason.encode!(%{})}
-          phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-surface p-2 cursor-pointer rounded-md"
-          title="Scan for networks"
-        >
-          <.icon class="w-4 h-4" name="hero-arrow-path" />
-          <div class="truncate text-xs text-text-secondary">Refresh</div>
-        </button>
-      </div>
-
-      <div>
-        <div class="flex flex-cols gap-3">
-          <button
-            phx-click="set_sqm"
-            phx-target={@myself}
-            phx-value-mode="latency"
-            phx-value-up="5mbit"
-            phx-value-down="15mbit"
-            class={[
-              "grow flex flex-col items-center justify-center rounded-xl border-2 transition-all p-2 text-center",
-              if(@sqm["mode"] == "latency",
-                do: "bg-accent border-accent text-white shadow-lg shadow-accent/20",
-                else: "bg-surface border-transparent text-text-secondary"
-              )
-            ]}
-          >
-            <span class="font-bold text-sm">Latency</span>
-            <span class="text-[10px] opacity-80 mt-1">15/5 mbit</span>
-          </button>
-
-          <button
-            phx-click="set_sqm"
-            phx-target={@myself}
-            phx-value-mode="balanced"
-            phx-value-up="20mbit"
-            phx-value-down="40mbit"
-            class={[
-              "grow flex flex-col items-center justify-center rounded-xl border-2 transition-all p-2 text-center",
-              if(@sqm["mode"] == "balanced",
-                do: "bg-accent border-accent text-white shadow-lg shadow-accent/20",
-                else: "bg-surface border-transparent text-text-secondary"
-              )
-            ]}
-          >
-            <span class="font-bold text-sm">Balanced</span>
-            <span class="text-[10px] opacity-80 mt-1">40/20 mbit</span>
-          </button>
-
-          <button
-            phx-click="set_sqm"
-            phx-target={@myself}
-            phx-value-mode="off"
-            class={[
-              "grow flex flex-col items-center justify-center rounded-xl border-2 transition-all p-2 text-center",
-              if(@sqm["mode"] == "off",
-                do: "bg-red border-red text-white shadow-lg shadow-red/20",
-                else: "bg-surface border-transparent text-text-secondary"
-              )
-            ]}
-          >
-            <span class="font-bold text-sm">Off</span>
-            <span class="text-[10px] opacity-80 mt-1">No shaping</span>
-          </button>
-        </div>
-      </div>
-
-      <pre
-        :if={@info["wpa_state"] !== "COMPLETED" and not Enum.empty?(@info)}
-        class="bg-bg text-text-secondary00 text-xs p-3 rounded-md overflow-auto"
-      ><%= Jason.encode!(@info, pretty: true) %></pre>
-
-      <div class={"flex flex-col #{if @count== 0, do: "items-center justify-center", else: ""}"}>
-        <h1 :if={@count == 0} class="text-2xl font-light text-gray-2 my-4 text-center">
-          Scanning for networks…
-        </h1>
-
-        <div :if={@count > 0}>
-          <%= for %{ open: open, security: security, signal: signal, ssid: ssid } <- @networks do %>
-            <% current_connected = @info["ssid"] === ssid %>
-
-            <div class={"flex flex-col p-3 mb-2 #{if current_connected, do: "bg-accent", else: "bg-surface"} rounded-lg font-light"}>
-              <div class="text-md truncate"><span class="font-bold">SSID:</span> <%= ssid %></div>
-              <div class="text-sm truncate">
-                <span class="font-bold">Security:</span> <%= security %>
-              </div>
-              <div class="text-sm truncate">
-                <span class="font-bold">Signal:</span> <%= signal %>
-              </div>
-              <div class="text-sm truncate">
-                <span class="font-bold">Open Network:</span> <%= open %>
-              </div>
-
-              <div class="py-2">
-                <pre
-                  :if={current_connected}
-                  class="bg-bg text-text-secondary00 text-xs p-3 rounded-md overflow-auto"
-                ><%= Jason.encode!(@info, pretty: true) %></pre>
-              </div>
-
-              <div class="divider" />
-              <div class="flex justify-end mt-2">
-                <%!-- If we are connected to the network --%>
-                <div
-                  :if={current_connected}
-                  phx-click="modal_open"
-                  phx-value-modal_title="Disconnect from Wi-Fi?"
-                  phx-value-modal_body={
-                    Jason.encode!(%{
-                      "type" => "string",
-                      "data" => "This will disconnect the device from the current wireless network."
-                    })
-                  }
-                  phx-value-modal_actions={
-                    Jason.encode!(%{
-                      "title" => "Disconnect",
-                      "payload" => %{
-                        "type" => "disconnect_from_wireless_network",
-                        "data" => %{}
-                      }
-                    })
-                  }
-                  phx-click-loading="opacity-50 cursor-wait"
-                  class="flex items-center justify-center gap-1 bg-secondary p-2 cursor-pointer rounded-md"
-                >
-                  <div class="truncate text-xs text-text-secondary">disconnect</div>
-                </div>
-
-                <%!-- If we are not connected to the network --%>
-                <div
-                  :if={not current_connected}
-                  phx-click="modal_open"
-                  phx-value-modal_title="Connect to wireless network"
-                  phx-value-modal_body={
-                    Jason.encode!(%{
-                      "type" => "schema",
-                      "data" => Tunneld.Schema.data(:wlan, %{title: ssid}),
-                      "default_values" => %{
-                        ssid: [ssid]
-                      },
-                      "action" => "connect_to_wireless_network"
-                    })
-                  }
-                  phx-click-loading="opacity-50 cursor-wait"
-                  class="flex items-center justify-center gap-1 bg-secondary p-2 cursor-pointer rounded-md"
-                >
-                  <div class="truncate text-xs text-text-secondary">connect</div>
-                </div>
-              </div>
-            </div>
-          <% end %>
         </div>
       </div>
     </div>
@@ -1040,32 +618,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     """
   end
 
-  def handle_event("set_sqm", %{"mode" => mode} = params, socket) do
-    # Prepare params for the server
-    sqm_params = %{
-      "mode" => mode,
-      "up_limit" => Map.get(params, "up", "25mbit"),
-      "down_limit" => Map.get(params, "down", "25mbit")
-    }
-
-    Tunneld.Servers.Sqm.set_sqm(sqm_params)
-    {:noreply, assign(socket, :sqm, Tunneld.Servers.Sqm.get_state())}
-  end
-
-  defp status_class(resource, kind) do
-    enabled = get_in(resource.tunneld || %{}, ["enabled", kind]) == true
-    health = Map.get(resource, :health) || Map.get(resource, "health") || %{}
-
-    case {enabled, health[:status]} do
-      {false, _} -> "bg-gray-400"
-      {true, :all_up} -> "bg-green"
-      {true, :none} -> "bg-red"
-      {true, :partial} -> "bg-yellow-500"
-      {true, :mock} -> "bg-blue-400"
-      _ -> "bg-gray-500"
-    end
-  end
-
   defp human_health(:all_up), do: "healthy"
   defp human_health(:none), do: "down"
   defp human_health(:partial), do: "degraded"
@@ -1078,13 +630,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   defp pool_health_dot(:none), do: "bg-red"
   defp pool_health_dot(:partial), do: "bg-yellow"
   defp pool_health_dot(_), do: "bg-gray-500"
-
-  defp human_health_text(false, _resource), do: "disabled"
-
-  defp human_health_text(true, resource) do
-    health = Map.get(resource, :health) || Map.get(resource, "health") || %{}
-    human_health(health[:status])
-  end
 
   #
   # Sidebar header componen

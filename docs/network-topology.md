@@ -1,6 +1,6 @@
 # Network Topology
 
-How Tunneld bridges wireless upstream and wired downstream to form a private subnet.
+How Tunneld bridges an upstream internet link and a wired downstream to form a private subnet.
 
 ```mermaid
 graph TB
@@ -9,8 +9,8 @@ graph TB
     end
 
     subgraph Tunneld Device
-        WLAN[wlan0 - Wi-Fi Client]
-        ETH[eth0 - Subnet Gateway]
+        UP[upstream - Internet-facing NIC]
+        DOWN[downstream - Subnet Gateway NIC]
         FW[iptables NAT + Forwarding]
         DHCP[dnsmasq - DHCP Server]
         DNS[dnsmasq - DNS Forwarder]
@@ -24,12 +24,12 @@ graph TB
         D3[Device C]
     end
 
-    ISP -->|Wi-Fi| WLAN
-    WLAN --> FW
-    FW --> ETH
-    ETH --> D1
-    ETH --> D2
-    ETH --> D3
+    ISP -->|Ethernet| UP
+    UP --> FW
+    FW --> DOWN
+    DOWN --> D1
+    DOWN --> D2
+    DOWN --> D3
     D1 -->|DHCP Request| DHCP
     D2 -->|DHCP Request| DHCP
     D3 -->|DHCP Request| DHCP
@@ -41,8 +41,8 @@ graph TB
     APP --> DHCP
     APP --> FW
 
-    style WLAN fill:#7c3aed,color:#fff
-    style ETH fill:#7c3aed,color:#fff
+    style UP fill:#7c3aed,color:#fff
+    style DOWN fill:#7c3aed,color:#fff
     style FW fill:#374151,color:#fff
     style DHCP fill:#374151,color:#fff
     style DNS fill:#374151,color:#fff
@@ -50,10 +50,23 @@ graph TB
     style APP fill:#7c3aed,color:#fff
 ```
 
+## Interface Naming
+
+Interface names come from app config (`:tunneld, :network`) and are never
+hardcoded in Elixir code:
+
+- `:upstream`   - internet-facing NIC (was `:wlan`)
+- `:downstream` - subnet-facing NIC (was `:eth`)
+
+In production these are supplied via the `UPSTREAM_INTERFACE` and
+`DOWNSTREAM_INTERFACE` environment variables. In dev/test they default to
+`eth0` / `eth1`.
+
 ## Data Flow
 
-1. **Upstream**: Tunneld connects to the internet via Wi-Fi (`wlan0`)
-2. **Downstream**: Devices plug into the ethernet port (`eth0`) and receive IPs via DHCP
-3. **NAT**: iptables forwards traffic from eth0 through wlan0 with masquerading
+1. **Upstream**: Tunneld reaches the internet via the upstream NIC
+2. **Downstream**: Devices plug into the downstream NIC and receive IPs via DHCP
+3. **NAT**: iptables forwards traffic from downstream through upstream with masquerading
 4. **DNS**: All DNS queries are intercepted via iptables and routed through dnsmasq to the user-configured upstream DNS server
-5. **Management**: The Phoenix LiveView dashboard controls all components
+5. **Resources**: nginx listens on `0.0.0.0:18000` and reverse-proxies `<name>.tunneld.lan` to the resource's backend pool
+6. **Management**: The Phoenix LiveView dashboard controls all components

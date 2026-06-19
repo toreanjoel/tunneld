@@ -76,7 +76,7 @@ defmodule Tunneld.Servers.Services do
     end
   end
 
-  # Restart a service — only allows services in the @services allowlist
+  # Restart a service - only allows services in the @services allowlist
   def handle_cast({:restart_service, service, :no_notify}, state) do
     if service in @services do
       service_name = to_string(service)

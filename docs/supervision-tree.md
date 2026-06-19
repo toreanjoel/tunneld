@@ -11,8 +11,6 @@ graph TD
         DNS_C[DNSCluster]
         PS[Phoenix.PubSub]
         EP[TunneldWeb.Endpoint]
-        WLAN[Wlan Server]
-        ZROK[Zrok Server]
         SESS[Session Server]
         SRES[SystemResources]
         SVC[Services Server]
@@ -21,8 +19,8 @@ graph TD
         AUTH[Auth Server]
         DNS_CFG[DnsConfig]
         UPD[Updater Server]
-        SQM[Sqm Server]
-        CERT[CertManager]
+        WG[Wireguard]
+        GEO[Geolocation]
         MESH[Mesh Server]
     end
 
@@ -32,23 +30,21 @@ graph TD
 
     subgraph Plain Modules - No Process
         NGX[Nginx]
-        DNSM[Dnsmasq]
+        NETLINK[NetLink]
         PERSIST[Persistence]
         CFG[Config]
     end
 
     RES --> NGX
-    RES --> DNSM
-    RES --> ZROK
     RES --> PERSIST
     AUTH --> PERSIST
-    SQM --> PERSIST
-    CERT --> NGX
+    MESH --> IPTABLES
+    NETLINK -.reads.-> SYSFS[/sys/class/net/]
 
     style EP fill:#7c3aed,color:#fff
     style PS fill:#7c3aed,color:#fff
     style RES fill:#ef4444,color:#fff
-    style ZROK fill:#3b82f6,color:#fff
+    style MESH fill:#3b82f6,color:#fff
 ```
 
 ## Polling Intervals
@@ -60,24 +56,26 @@ graph TD
 | Services | 10s | Check systemd service statuses |
 | SystemResources | 10s | Read CPU, memory, disk via :os_mon |
 | Resources | 10s | Broadcast resource list + health |
-| Wlan | 15s | Check Wi-Fi connection status |
 | Mesh | 25s | Poll coordinator for peers, heartbeat, and mesh sync |
 | Updater | 5min | Check GitHub for new version |
-| CertManager | 6h | Check SSL cert expiry |
+
+Link state for the upstream/downstream interfaces is read on demand from
+`/sys/class/net/<iface>/operstate` by `Tunneld.NetLink` (no GenServer, no
+polling) - the dashboard LiveView queries it directly.
 
 ## PubSub Topics
 
 ```mermaid
 graph LR
-    subgraph GenServers
+    subgraph GenServers / Modules
         DEV[Devices]
         SVC[Services]
         RES[Resources]
         SR[SystemResources]
-        WLAN[Wlan]
         UPD[Updater]
         DNS_CFG[DnsConfig]
-        ZROK[Zrok]
+        NETLINK[NetLink]
+        MESH[Mesh]
     end
 
     subgraph PubSub Topics
@@ -100,11 +98,9 @@ graph LR
     SVC --> CS --> DLV
     RES --> CR --> DLV
     SR --> CSR --> DLV
-    WLAN --> CDT --> DLV
-    WLAN --> SI --> DLV
     UPD --> CW --> DLV
     DNS_CFG --> CDT
-    ZROK --> CDT
+    NETLINK -.broadcast.-> SI --> DLV
     RES --> NT --> DLV
     MESH --> CM --> DLV
 

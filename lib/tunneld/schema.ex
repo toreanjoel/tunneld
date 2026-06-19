@@ -4,8 +4,8 @@ defmodule Tunneld.Schema do
 
   Each clause returns a JSON Schema map consumed by `JsonSchemaRenderer`.
 
-  ## Arity-1: `data(:login)`, `data(:signup)`
-  ## Arity-2: `data(:wlan, %{title: t})`, `data(:zrok, :endpoint)`, `data(:zrok, :conf_device)`
+  ## Arity-1: `data(:login)`, `data(:signup)`, `data(:dns_server)`
+  ## Arity-2: `data(:device_tag, %{hostname: h})`
   """
 
   @doc "Returns a JSON Schema map for the given form type."
@@ -74,44 +74,6 @@ defmodule Tunneld.Schema do
 
   # --- Arity-2 schemas ---
 
-  def data(:wlan, %{title: title}) do
-    %{
-      "title" => "Connect to network: " <> title,
-      "description" => "Enter the password required to connect to this network.",
-      "type" => "object",
-      "properties" => %{
-        "ssid" => %{
-          "type" => "string",
-          "description" => "SSID or network name that will be connected to",
-          "ui:widget" => "hidden"
-        },
-        "password" => %{
-          "type" => "string",
-          "format" => "password",
-          "description" => "Password associated with the wireless public network",
-        }
-      },
-      "required" => ["ssid", "password"]
-    }
-  end
-
-  def data(:zrok, :endpoint) do
-    %{
-      "title" => "Set the endpoint network to connect to",
-      "description" => "The network endpoint (control plane) that you will have this device connected under",
-      "type" => "object",
-      "properties" => %{
-        "url" => %{
-          "type" => "string",
-          "format" => "uri",
-          "minLength" => 1,
-          "description" => "The URL endpoint of the control plane"
-        }
-      },
-      "required" => ["url"]
-    }
-  end
-
   def data(:device_tag, %{hostname: hostname} = opts) do
     current_tags = Map.get(opts, :current_tags, [])
     tags_note = if current_tags != [], do: "Current tags: #{Enum.join(current_tags, ", ")}. Enter new tags to append.", else: "Enter a label or category for this device. Use commas to add multiple tags at once."
@@ -133,23 +95,6 @@ defmodule Tunneld.Schema do
         }
       },
       "required" => ["tag", "mac"]
-    }
-  end
-
-  def data(:zrok, :conf_device) do
-    %{
-      "title" => "Enable device on an account",
-      "description" => "Connect this device as an environment on an account for the control plane you are connected to",
-      "type" => "object",
-      "properties" => %{
-        "account_token" => %{
-          "type" => "string",
-          "format" => "password",
-          "minLength" => 1,
-          "description" => "The account token to enable this device against"
-        }
-      },
-      "required" => ["account_token"]
     }
   end
 

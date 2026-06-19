@@ -57,7 +57,7 @@ defmodule Tunneld.Servers.Mesh do
       {:ok, state}
     else
       if enabled and (not is_binary(coordinator_url) or not is_binary(token)) do
-        Logger.warning("Mesh enabled but coordinator_url or token missing — mesh idle")
+        Logger.warning("Mesh enabled but coordinator_url or token missing - mesh idle")
       else
         Logger.info("Mesh disabled")
       end
@@ -129,7 +129,7 @@ defmodule Tunneld.Servers.Mesh do
       {:noreply, new_state}
     else
       if enabled and (not is_binary(coordinator_url) or not is_binary(token)) do
-        Logger.warning("Mesh enabled but coordinator_url or token missing — mesh idle")
+        Logger.warning("Mesh enabled but coordinator_url or token missing - mesh idle")
       end
 
       disabled_state = %{new_state | node_id: nil}
@@ -153,7 +153,7 @@ defmodule Tunneld.Servers.Mesh do
         {:noreply, connected_state}
 
       {:error, reason} ->
-        Logger.warning("Mesh setup failed: #{inspect(reason)} — retrying in #{state.backoff}ms")
+        Logger.warning("Mesh setup failed: #{inspect(reason)} - retrying in #{state.backoff}ms")
         ref = Process.send_after(self(), :init_mesh, state.backoff)
         new_backoff = min(state.backoff * 2, 60_000)
         error_state = %{state | timer_ref: ref, status: :relay_unreachable, backoff: new_backoff}
@@ -176,7 +176,7 @@ defmodule Tunneld.Servers.Mesh do
             %{s | timer_ref: ref, status: :connected, backoff: 5000}
 
           {:error, reason, s} ->
-            Logger.warning("Mesh poll failed: #{inspect(reason)} — retrying in #{s.backoff}ms")
+            Logger.warning("Mesh poll failed: #{inspect(reason)} - retrying in #{s.backoff}ms")
             cancel_timer(s.timer_ref)
             ref = Process.send_after(self(), :do_poll, s.backoff)
             new_backoff = min(s.backoff * 2, 60_000)

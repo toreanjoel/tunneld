@@ -1,7 +1,7 @@
 defmodule TunneldWeb.Live.Components.InternetCard do
   @moduledoc """
-  Internet access status card with animated ring indicator.
-  Clicking opens the wireless sidebar.
+  Upstream link status card with animated ring indicator.
+  Clicking opens the ethernet sidebar.
   """
   use Phoenix.Component
   import TunneldWeb.CoreComponents, only: [icon: 1]
@@ -18,7 +18,7 @@ defmodule TunneldWeb.Live.Components.InternetCard do
     assigns = assign(assigns, ring_color: ring_color, label_color: label_color, box_shadow: box_shadow, animation: animation)
 
     ~H"""
-    <div class="hero-card px-6 py-5 flex flex-col gap-3.5 cursor-pointer" phx-click="show_details" phx-value-type="wlan" phx-value-id="_">
+    <div class="hero-card px-6 py-5 flex flex-col gap-3.5 cursor-pointer" phx-click="show_details" phx-value-type="ethernet" phx-value-id="_">
       <div class="flex justify-between items-center">
         <div class="text-[11px] tracking-[0.08em] uppercase text-text-secondary font-medium">
           INTERNET ACCESS
@@ -32,7 +32,7 @@ defmodule TunneldWeb.Live.Components.InternetCard do
           class="w-16 h-16 rounded-full border-[3px] flex items-center justify-center flex-shrink-0"
           style={"border-color: #{@ring_color}; box-shadow: #{@box_shadow}; animation: #{@animation}"}
         >
-          <.icon name="hero-wifi" class={"w-6 h-6 #{if @on, do: "text-green", else: "text-red"}"} />
+          <.icon name="hero-signal" class={"w-6 h-6 #{if @on, do: "text-green", else: "text-red"}"} />
         </div>
       </div>
     </div>

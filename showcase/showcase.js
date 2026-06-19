@@ -16,14 +16,14 @@ const MAX_TURNS = 15;
 
 // App Knowledge (baked in from codebase)
 const APP_CONTEXT = `
-You are controlling a browser to take screenshots of "Tunneld" — a wireless-first, zero-trust programmable gateway for single-board computers (Raspberry Pi, NanoPi). It runs Elixir/Phoenix LiveView.
+You are controlling a browser to take screenshots of "Tunneld" - an ethernet-first programmable edge relay for single-board computers (Raspberry Pi, NanoPi). It runs Elixir/Phoenix LiveView.
 
 The app is running in MOCK_DATA mode with fake but realistic data.
 
 ## Routes
-- / — Login page (username + password form)
-- /setup — First-run setup wizard (WiFi → Zrok, 2 steps)
-- /dashboard — Main dashboard (requires login)
+- / - Login page (username + password form)
+- /setup - First-run setup wizard (mesh relay, 1 step)
+- /dashboard - Main dashboard (requires login)
 
 ## Login
 - Form fields: input name="form[name]", input name="form[password]"
@@ -32,46 +32,43 @@ The app is running in MOCK_DATA mode with fake but realistic data.
 
 ## Dashboard Layout
 Top bar has 3 buttons:
-- "Configure Network" (opens Zrok/overlay sidebar)
-- "Internet Access" (opens WiFi sidebar)
+- "Network" (opens ethernet interface status sidebar)
+- "Internet Access" (opens ethernet link state sidebar)
 - Settings gear icon (dropdown: Authentication, DNS Server, Restart Device)
 
 Main content sections (top to bottom):
-1. Welcome banner — version info, "Update Now" button
-2. System Resources — CPU, Memory, Storage gauge charts
-3. Services — dnsmasq, dhcpcd, nginx (status dots green/red)
-4. Resources — public/private tunneled services cards with toggle switches
-5. Devices — connected network devices with hostname, IP, MAC
+1. Mesh card - connection status, mesh IP, peer count, relay endpoint, world map
+2. Internet card + DNS card - upstream link state, configured DNS server
+3. System Resources - CPU, Memory, Storage gauge charts
+4. Mesh Nodes - list of connected peers (when mesh is connected)
+5. Resources - local services with pool health, reachable at <name>.tunneld.lan
+6. Devices - connected network devices with hostname, IP, MAC
 
 ## Sidebar (right overlay, 35% width)
 Opened by clicking dashboard buttons. Types:
-- "wlan" — WiFi config: connected network, scan button, SQM bandwidth modes
-- "zrok" — Overlay network: control plane URL, environment status, connect/disconnect
-- "resource" — Individual resource details
-- "service" — Service logs, restart button
-- "dns_server" — Configure upstream DNS server IP
-- "authentication" — Reset login, WebAuthn setup, download Root CA
+- "ethernet" - upstream/downstream interface link state
+- "resource" - Individual resource details (pool backends, edit, remove)
+- "service" - Service logs, restart button
+- "dns_server" - Configure upstream DNS server IP
+- "authentication" - Reset login
+- "mesh" - Mesh relay configuration form
+- "mesh_node" - Mesh peer details (mesh IP, shared devices)
 
 Close sidebar: click the X button or the overlay backdrop.
 
 ## Modals
-- Triggered by various actions (add resource, connect WiFi, confirm delete)
+- Triggered by various actions (add resource, confirm delete)
 - Have a title, description, form fields, and action buttons
 - Close: X button top-right or backdrop click
 
 ## Key Selectors
 - Logout: button/div with phx-click="logout"
-- WiFi panel: element with text "Internet Access"
-- Zrok panel: element with text "Configure Network"
+- Ethernet panel: element with text "Internet Access"
+- Network panel: button with text "Network"
 - Settings menu: cog/gear icon button
 - Add Resource: button with text "Add Resource"
 - Close sidebar: X icon with phx-click="close_details"
 - Modal close: X icon with phx-click="modal_close"
-- Services: cards in #services section
-- Devices: cards in #devices section
-- Resources: cards in #resources section
-- System resources: gauges in #system_resources section
-- Welcome: #welcome section
 
 ## Visual Style
 Dark theme. Primary dark background with lighter secondary panels.
@@ -79,9 +76,9 @@ Green dots = healthy/running. Red dots = stopped/error.
 Cards have rounded corners, subtle borders.
 
 ## Important Notes
-- This is Phoenix LiveView — page transitions are SPA-style, no full reloads
+- This is Phoenix LiveView - page transitions are SPA-style, no full reloads
 - After clicking something, wait for the UI to settle (animations, data loading)
-- Screenshots should capture the feature clearly — crop to relevant area when possible
+- Screenshots should capture the feature clearly - crop to relevant area when possible
 - Take multiple screenshots showing different states (before/after, expanded/collapsed)
 - The app uses Tailwind CSS classes
 `;
@@ -91,10 +88,9 @@ const TWEET_STYLE = `
 
 Tone: Professional but approachable. Like a senior engineer sharing real setups over coffee.
 Length: 3-8 lines. Short and scannable.
-Structure: Feature name → problem/context → what was done → benefit/result
+Structure: Feature name -> problem/context -> what was done -> benefit/result
 Emojis: Sparingly and meaningfully (🔄 🛠️ ⚡ ⏩ 🌐 📡 🔒)
-Hashtags: 2-4 max. Usually: #Tunneld #ElixirLang #PhoenixLiveView #SelfHosted #zrok #ZeroTrust
-Mentions: Only when relevant (@zaborowska, @zrok, etc.)
+Hashtags: 2-4 max. Usually: #Tunneld #ElixirLang #PhoenixLiveView #SelfHosted #EdgeComputing
 
 ## Main Template
 [Feature Name] [emoji]
@@ -109,7 +105,7 @@ Mentions: Only when relevant (@zaborowska, @zrok, etc.)
 
 [Benefit or how it feels now]
 
-#Tunneld #zrok #ZeroTrust #SelfHosted
+#Tunneld #ElixirLang #SelfHosted #EdgeComputing
 
 ## Alternative: Quick Feature Drop
 [Feature Name] [emoji]
@@ -412,7 +408,7 @@ ${history.length === 0 ? "None yet — this is the first turn." : history.map((h
 Return a JSON array of actions to execute this turn. Example:
 [
   { "type": "click_text", "params": { "text": "Internet Access" } },
-  { "type": "screenshot", "params": { "name": "wifi-panel", "description": "WiFi sidebar showing connected network and options" } }
+  { "type": "screenshot", "params": { "name": "ethernet-panel", "description": "Ethernet sidebar showing upstream/downstream link state" } }
 ]
 
 If you have taken enough screenshots (2-4) and are done, return: { "done": true }

@@ -69,14 +69,12 @@ config :tunneld, :fs,
   root: Path.expand("../data/", __DIR__),
   auth: "auth.json",
   resources: "resources.json",
-  sqm: "sqm.json",
   wireguard: "wireguard.json"
 
 config :tunneld, :network,
   gateway: "192.168.1.1",
-  wlan: "wlan0",
-  eth: "eth0",
-  country: "ZA"
+  upstream: "eth0",
+  downstream: "eth1"
 
 config :phoenix_live_view,
   # Include HEEx debug annotations as HTML comments in rendered markup

@@ -1,7 +1,7 @@
 defmodule TunneldWeb.Live.Components.ServicesChip do
   @moduledoc """
   Services chip that shows service count with a popover on click.
-  Deprecated — functionality moved into TopBar component for proper positioning.
+  Deprecated - functionality moved into TopBar component for proper positioning.
   """
   use Phoenix.Component
   import TunneldWeb.Icons

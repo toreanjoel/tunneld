@@ -8,8 +8,6 @@ defmodule TunneldWeb.Live.Components.TopBar do
   import TunneldWeb.Icons
   import TunneldWeb.Live.Components.SettingsDropdown
 
-  alias Phoenix.LiveView.JS
-
   attr :services, :list, default: []
   attr :version, :string, default: nil
   attr :update_available, :boolean, default: false
@@ -70,8 +68,8 @@ defmodule TunneldWeb.Live.Components.TopBar do
           </div>
         </div>
 
-        <button class="btn-primary text-xs sm:text-[13px] px-2 sm:px-4" phx-click="show_details" phx-value-type="zrok" phx-value-id="_">
-          <span class="hidden sm:inline">Configure network</span>
+        <button class="btn-primary text-xs sm:text-[13px] px-2 sm:px-4" phx-click="show_details" phx-value-type="ethernet" phx-value-id="_">
+          <span class="hidden sm:inline">Network</span>
           <span class="inline sm:hidden">Network</span>
         </button>
         <button

@@ -6,14 +6,12 @@ config :tunneld, :fs,
   root: Path.expand("../data/", __DIR__),
   auth: "auth.json",
   resources: "resources.json",
-  sqm: "sqm.json",
   wireguard: "wireguard.json"
 
 config :tunneld, :network,
   gateway: "192.168.1.1",
-  wlan: "wlan0",
-  eth: "eth0",
-  country: "US"
+  upstream: "eth0",
+  downstream: "eth1"
 
 config :tunneld, :mesh,
   coordinator_url: "http://localhost:4000",
