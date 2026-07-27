@@ -18,7 +18,7 @@ defmodule TunneldWeb.MachineController do
   use TunneldWeb, :controller
   require Logger
 
-  plug :require_admin when action in [:create, :probe, :delete]
+  plug :require_admin when action in [:create, :probe, :delete, :create_container, :start_container, :stop_container, :delete_container]
 
   def index(conn, _params) do
     json(conn, %{machines: Tunneld.Machines.list()})
@@ -62,6 +62,47 @@ defmodule TunneldWeb.MachineController do
       {:ok, containers} -> json(conn, %{containers: containers})
       {:error, :not_found} -> conn |> put_status(404) |> json(%{error: "not found"})
       {:error, reason} -> conn |> put_status(502) |> json(%{error: "list failed", detail: inspect(reason)})
+    end
+  end
+
+  def create_container(conn, %{"id" => id} = params) do
+    spec = %{
+      "name" => params["name"],
+      "image" => params["image"],
+      "type" => params["type"] || "container",
+      "cpu" => params["cpu"],
+      "memory" => params["memory"],
+      "ports" => params["ports"] || []
+    }
+
+    case Tunneld.Machines.create_container(id, spec) do
+      {:ok, container} -> conn |> put_status(201) |> json(%{container: container})
+      {:error, :not_found} -> conn |> put_status(404) |> json(%{error: "machine not found"})
+      {:error, reason} -> conn |> put_status(422) |> json(%{error: reason})
+    end
+  end
+
+  def start_container(conn, %{"id" => id, "name" => name}) do
+    case Tunneld.Machines.start_container(id, name) do
+      {:ok, c} -> json(conn, %{container: c})
+      {:error, :not_found} -> conn |> put_status(404) |> json(%{error: "not found"})
+      {:error, reason} -> conn |> put_status(502) |> json(%{error: "start failed", detail: inspect(reason)})
+    end
+  end
+
+  def stop_container(conn, %{"id" => id, "name" => name}) do
+    case Tunneld.Machines.stop_container(id, name) do
+      {:ok, c} -> json(conn, %{container: c})
+      {:error, :not_found} -> conn |> put_status(404) |> json(%{error: "not found"})
+      {:error, reason} -> conn |> put_status(502) |> json(%{error: "stop failed", detail: inspect(reason)})
+    end
+  end
+
+  def delete_container(conn, %{"id" => id, "name" => name}) do
+    case Tunneld.Machines.delete_container(id, name) do
+      {:ok, c} -> json(conn, %{container: c})
+      {:error, :not_found} -> conn |> put_status(404) |> json(%{error: "not found"})
+      {:error, reason} -> conn |> put_status(502) |> json(%{error: "delete failed", detail: inspect(reason)})
     end
   end
 

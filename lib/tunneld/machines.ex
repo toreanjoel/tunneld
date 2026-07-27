@@ -65,6 +65,18 @@ defmodule Tunneld.Machines do
   @doc "List containers/VMs on a machine (live, over SSH or mock)."
   def list_containers(id), do: GenServer.call(__MODULE__, {:list_containers, id}, 30_000)
 
+  @doc "Create a container/VM on a machine. `spec` is a map with name, image, type, cpu, memory, ports."
+  def create_container(id, spec), do: GenServer.call(__MODULE__, {:create_container, id, spec}, 60_000)
+
+  @doc "Start a container/VM on a machine."
+  def start_container(id, name), do: GenServer.call(__MODULE__, {:start_container, id, name}, 30_000)
+
+  @doc "Stop a container/VM on a machine."
+  def stop_container(id, name), do: GenServer.call(__MODULE__, {:stop_container, id, name}, 30_000)
+
+  @doc "Delete a container/VM on a machine."
+  def delete_container(id, name), do: GenServer.call(__MODULE__, {:delete_container, id, name}, 30_000)
+
   @doc "Remove a machine from the registry and delete its keypair."
   def remove(id), do: GenServer.call(__MODULE__, {:remove, id})
 
@@ -76,6 +88,39 @@ defmodule Tunneld.Machines do
   defp broadcast(event, payload) do
     Phoenix.PubSub.broadcast(Tunneld.PubSub, @pubsub_topic, %{id: "machines", event: event, data: payload})
   end
+
+  defp validate_spec(%{"name" => name, "image" => image} = spec) do
+    cond do
+      not is_binary(name) or String.trim(name) == "" ->
+        {:error, "name is required"}
+
+      not Regex.match?(~r/^[a-zA-Z0-9\-]{1,63}$/, name) ->
+        {:error, "name must be alphanumeric/hyphens, max 63 chars"}
+
+      not is_binary(image) or String.trim(image) == "" ->
+        {:error, "image is required"}
+
+      spec["type"] not in [nil, "container", "vm"] ->
+        {:error, "type must be container or vm"}
+
+      spec["cpu"] != nil and (not is_integer(spec["cpu"]) or spec["cpu"] < 1) ->
+        {:error, "cpu must be a positive integer"}
+
+      spec["memory"] != nil and (not is_integer(spec["memory"]) or spec["memory"] < 1) ->
+        {:error, "memory must be a positive integer (MiB)"}
+
+      true ->
+        :ok
+    end
+  end
+
+  defp validate_spec(%{"image" => _} = spec) when not is_map_key(spec, "name"),
+    do: {:error, "name is required"}
+
+  defp validate_spec(%{"name" => _} = spec) when not is_map_key(spec, "image"),
+    do: {:error, "image is required"}
+
+  defp validate_spec(_), do: {:error, "name and image are required"}
 
   # --- GenServer ---
 
@@ -157,6 +202,55 @@ defmodule Tunneld.Machines do
       with {:ok, machine} <- Store.get(id),
            {:ok, containers} <- Provider.list_containers(machine) do
         {:ok, containers}
+      end
+
+    {:reply, reply, state}
+  end
+
+  @impl true
+  def handle_call({:create_container, id, spec}, _from, state) do
+    reply =
+      with {:ok, machine} <- Store.get(id),
+           :ok <- validate_spec(spec),
+           {:ok, container} <- Provider.create_container(machine, spec) do
+        broadcast(:container_added, %{"machine_id" => id, "container" => container})
+        {:ok, container}
+      end
+
+    {:reply, reply, state}
+  end
+
+  @impl true
+  def handle_call({:start_container, id, name}, _from, state) do
+    reply =
+      with {:ok, machine} <- Store.get(id),
+           {:ok, result} <- Provider.start_container(machine, name) do
+        broadcast(:container_updated, %{"machine_id" => id, "container" => result})
+        {:ok, result}
+      end
+
+    {:reply, reply, state}
+  end
+
+  @impl true
+  def handle_call({:stop_container, id, name}, _from, state) do
+    reply =
+      with {:ok, machine} <- Store.get(id),
+           {:ok, result} <- Provider.stop_container(machine, name) do
+        broadcast(:container_updated, %{"machine_id" => id, "container" => result})
+        {:ok, result}
+      end
+
+    {:reply, reply, state}
+  end
+
+  @impl true
+  def handle_call({:delete_container, id, name}, _from, state) do
+    reply =
+      with {:ok, machine} <- Store.get(id),
+           {:ok, result} <- Provider.delete_container(machine, name) do
+        broadcast(:container_removed, %{"machine_id" => id, "name" => name})
+        {:ok, result}
       end
 
     {:reply, reply, state}

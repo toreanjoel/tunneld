@@ -28,23 +28,26 @@ defmodule Tunneld.Application do
   def start(_type, _args) do
     Tunneld.Template.ensure_template()
 
-    children = [
-      TunneldWeb.Telemetry,
-      {DNSCluster, query: Application.get_env(:tunneld, :dns_cluster_query) || :ignore},
-      {Phoenix.PubSub, name: Tunneld.PubSub},
-      {Session, []},
-      {SystemResources, []},
-      {Services, []},
-      {Resources, []},
-      {Devices, []},
-      {Auth, []},
-      {DnsConfig, []},
-      {Updater, []},
-      {Machines, []},
-      {Tunneld.Geolocation, []},
-      # Start to serve requests, typically the last entry
-      TunneldWeb.Endpoint
-    ]
+    children =
+      [
+        TunneldWeb.Telemetry,
+        {DNSCluster, query: Application.get_env(:tunneld, :dns_cluster_query) || :ignore},
+        {Phoenix.PubSub, name: Tunneld.PubSub}
+      ] ++
+        mock_children() ++
+        [
+          {Session, []},
+          {SystemResources, []},
+          {Services, []},
+          {Resources, []},
+          {Devices, []},
+          {Auth, []},
+          {DnsConfig, []},
+          {Updater, []},
+          {Machines, []},
+          {Tunneld.Geolocation, []},
+          TunneldWeb.Endpoint
+        ]
 
     if not Application.get_env(:tunneld, :mock_data, false) do
       Tunneld.Iptables.reset()
@@ -53,6 +56,14 @@ defmodule Tunneld.Application do
     opts = [strategy: :one_for_one, name: Tunneld.Supervisor]
 
     Supervisor.start_link(children, opts)
+  end
+
+  defp mock_children do
+    if Application.get_env(:tunneld, :mock_data, false) do
+      [{Tunneld.Machines.SSH.Mock.MockState, []}]
+    else
+      []
+    end
   end
 
   # Tell Phoenix to update the endpoint configuration

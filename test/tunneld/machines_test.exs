@@ -84,4 +84,70 @@ defmodule Tunneld.MachinesTest do
   test "probe on unknown id returns not_found" do
     assert {:error, :not_found} = Machines.probe("does-not-exist")
   end
+
+  describe "container provisioning (mock)" do
+    test "create_container provisions a new container visible in list" do
+      {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "prov1", "address" => "10.0.0.10"})
+
+      spec = %{
+        "name" => "my-app",
+        "image" => "ubuntu/24.04",
+        "type" => "container",
+        "cpu" => 2,
+        "memory" => 1024,
+        "ports" => [%{"host" => 8080, "container" => 80}]
+      }
+
+      {:ok, container} = Machines.create_container(id, spec)
+      assert container["name"] == "my-app"
+      assert container["status"] == "Running"
+
+      {:ok, list} = Machines.list_containers(id)
+      names = Enum.map(list, & &1["name"])
+      assert "my-app" in names
+    end
+
+    test "create_container with vm type" do
+      {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "prov2", "address" => "10.0.0.11"})
+
+      {:ok, container} =
+        Machines.create_container(id, %{
+          "name" => "my-vm",
+          "image" => "ubuntu/24.04",
+          "type" => "vm"
+        })
+
+      assert container["type"] == "vm"
+    end
+
+    test "create_container validates spec" do
+      {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "prov3", "address" => "10.0.0.12"})
+
+      assert {:error, "name is required"} = Machines.create_container(id, %{"image" => "x"})
+      assert {:error, "image is required"} = Machines.create_container(id, %{"name" => "x"})
+      assert {:error, "type must be container or vm"} = Machines.create_container(id, %{"name" => "x", "image" => "y", "type" => "hyper-v"})
+      assert {:error, "cpu must be a positive integer"} = Machines.create_container(id, %{"name" => "x", "image" => "y", "cpu" => 0})
+    end
+
+    test "start/stop/delete container lifecycle" do
+      {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "prov4", "address" => "10.0.0.13"})
+      {:ok, _} = Machines.create_container(id, %{"name" => "lifecycle", "image" => "ubuntu/24.04"})
+
+      {:ok, stopped} = Machines.stop_container(id, "lifecycle")
+      assert stopped["status"] == "Stopped"
+
+      {:ok, started} = Machines.start_container(id, "lifecycle")
+      assert started["status"] == "Running"
+
+      {:ok, deleted} = Machines.delete_container(id, "lifecycle")
+      assert deleted["status"] == "deleted"
+
+      {:ok, list} = Machines.list_containers(id)
+      refute Enum.any?(list, &(&1["name"] == "lifecycle"))
+    end
+
+    test "create_container on unknown machine returns not_found" do
+      assert {:error, :not_found} = Machines.create_container("nope", %{"name" => "x", "image" => "y"})
+    end
+  end
 end

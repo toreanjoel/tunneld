@@ -26,6 +26,30 @@ defmodule Tunneld.Machines.Provider do
     dispatch(kind, :list_containers, machine)
   end
 
+  @doc "Create a container or VM on a machine. `spec` is a map with name, image, type, cpu, memory, ports."
+  def create_container(machine, spec) do
+    kind = machine["kind"] || "incus"
+    dispatch(kind, :create_container, machine, spec)
+  end
+
+  @doc "Start a container/VM on a machine."
+  def start_container(machine, name) do
+    kind = machine["kind"] || "incus"
+    dispatch(kind, :start_container, machine, name)
+  end
+
+  @doc "Stop a container/VM on a machine."
+  def stop_container(machine, name) do
+    kind = machine["kind"] || "incus"
+    dispatch(kind, :stop_container, machine, name)
+  end
+
+  @doc "Delete a container/VM on a machine."
+  def delete_container(machine, name) do
+    kind = machine["kind"] || "incus"
+    dispatch(kind, :delete_container, machine, name)
+  end
+
   @doc "Check whether the provider binary is installed on the machine."
   def installed?(machine) do
     kind = machine["kind"] || "incus"
@@ -75,7 +99,47 @@ defmodule Tunneld.Machines.Provider do
     end
   end
 
+  defp dispatch("incus", :create_container, machine, spec) do
+    name = spec["name"]
+    image = spec["image"]
+    type = spec["type"] || "container"
+    cpu = spec["cpu"]
+    memory = spec["memory"]
+    ports = spec["ports"] || []
+    vm_flag = if type == "vm", do: " --vm", else: ""
+
+    with {:ok, _} <- run(machine, "incus init #{sh(image)} #{sh(name)}#{vm_flag}"),
+         :ok <- maybe_config(machine, name, cpu, memory),
+         :ok <- add_proxy_devices(machine, name, ports),
+         {:ok, _} <- run(machine, "incus config set #{sh(name)} boot.autostart true"),
+         {:ok, _} <- run(machine, "incus start #{sh(name)}") do
+      {:ok, %{"name" => name, "status" => "Running", "type" => type}}
+    end
+  end
+
+  defp dispatch("incus", :start_container, machine, name) do
+    case run(machine, "incus start #{sh(name)}") do
+      {:ok, _} -> {:ok, %{"name" => name, "status" => "Running"}}
+      err -> err
+    end
+  end
+
+  defp dispatch("incus", :stop_container, machine, name) do
+    case run(machine, "incus stop #{sh(name)}") do
+      {:ok, _} -> {:ok, %{"name" => name, "status" => "Stopped"}}
+      err -> err
+    end
+  end
+
+  defp dispatch("incus", :delete_container, machine, name) do
+    with {:ok, _} <- run(machine, "incus stop #{sh(name)} 2>/dev/null || true"),
+         {:ok, _} <- run(machine, "incus delete --force #{sh(name)}") do
+      {:ok, %{"name" => name, "status" => "deleted"}}
+    end
+  end
+
   defp dispatch(kind, _op, _machine), do: {:error, {:unsupported_provider, kind}}
+  defp dispatch(kind, _op, _machine, _spec), do: {:error, {:unsupported_provider, kind}}
 
   defp incus_installed?(machine) do
     case dispatch("incus", :installed?, machine) do
@@ -87,6 +151,43 @@ defmodule Tunneld.Machines.Provider do
 
   defp run(machine, command) do
     SSH.run(machine, command)
+  end
+
+  # Shell-quote a value for safe interpolation into an ssh command string.
+  # Wraps in single quotes and escapes embedded single quotes.
+  defp sh(nil), do: "''"
+  defp sh(s) when is_binary(s) do
+    "'" <> String.replace(s, "'", "'\\''") <> "'"
+  end
+  defp sh(n) when is_integer(n), do: Integer.to_string(n)
+
+  defp maybe_config(_machine, _name, nil, nil), do: :ok
+  defp maybe_config(machine, name, cpu, memory) when is_nil(cpu) and is_nil(memory), do: :ok
+  defp maybe_config(machine, name, cpu, memory) do
+    cpu_cmd = if cpu, do: "incus config set #{sh(name)} limits.cpu #{sh(cpu)}", else: "true"
+    mem_str = if is_integer(memory), do: "#{memory}MiB", else: nil
+    mem_cmd = if mem_str, do: "incus config set #{sh(name)} limits.memory #{sh(mem_str)}", else: "true"
+
+    case run(machine, "#{cpu_cmd} && #{mem_cmd}") do
+      {:ok, _} -> :ok
+      err -> err
+    end
+  end
+
+  # Each port: %{"host" => 8080, "container" => 80}
+  # Incus proxy device: incus config device add <c> <name> proxy listen=0.0.0.0:<host> connect=0.0.0.0:<container>
+  defp add_proxy_devices(machine, name, []), do: :ok
+  defp add_proxy_devices(machine, name, ports) do
+    ports
+    |> Enum.reduce_while(:ok, fn %{"host" => host, "container" => container}, _acc ->
+      dev_name = "proxy_#{host}"
+      cmd = "incus config device add #{sh(name)} #{sh(dev_name)} proxy listen=0.0.0.0:#{host} connect=0.0.0.0:#{container}"
+
+      case run(machine, cmd) do
+        {:ok, _} -> {:cont, :ok}
+        err -> {:halt, err}
+      end
+    end)
   end
 
   defp parse_storage(raw) do

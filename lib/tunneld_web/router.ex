@@ -33,6 +33,10 @@ defmodule TunneldWeb.Router do
       get "/machines/:id", MachineController, :show
       post "/machines/:id/probe", MachineController, :probe
       get "/machines/:id/containers", MachineController, :containers
+      post "/machines/:id/containers", MachineController, :create_container
+      post "/machines/:id/containers/:name/start", MachineController, :start_container
+      post "/machines/:id/containers/:name/stop", MachineController, :stop_container
+      delete "/machines/:id/containers/:name", MachineController, :delete_container
       delete "/machines/:id", MachineController, :delete
     end
   end
