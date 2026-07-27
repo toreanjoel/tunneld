@@ -22,6 +22,8 @@ defmodule Tunneld.Application do
     Updater
   }
 
+  alias Tunneld.Machines
+
   @impl true
   def start(_type, _args) do
     Tunneld.Template.ensure_template()
@@ -38,6 +40,7 @@ defmodule Tunneld.Application do
       {Auth, []},
       {DnsConfig, []},
       {Updater, []},
+      {Machines, []},
       {Tunneld.Geolocation, []},
       # Start to serve requests, typically the last entry
       TunneldWeb.Endpoint

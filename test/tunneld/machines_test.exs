@@ -1,0 +1,87 @@
+defmodule Tunneld.MachinesTest do
+  use ExUnit.Case, async: false
+
+  alias Tunneld.Machines
+  alias Tunneld.Machines.Store
+
+  setup do
+    # mock_data is on in test.exs, so SSH and Incus are simulated
+    tmp = Path.join(System.tmp_dir!(), "tunneld_test_#{System.unique_integer([:positive])}")
+    File.mkdir_p!(tmp)
+    prev_root = Application.get_env(:tunneld, :fs, []) |> Keyword.get(:root)
+    Application.put_env(:tunneld, :fs, root: tmp, auth: "auth.json", resources: "resources.json")
+
+    on_exit(fn ->
+      File.rm_rf!(tmp)
+      Application.put_env(:tunneld, :fs, root: prev_root)
+    end)
+
+    :ok
+  end
+
+  test "enroll creates a record, generates a keypair, and returns the public key" do
+    {:ok, %{"id" => id, "public_key" => pub, "machine" => machine}} =
+      Machines.enroll(%{"name" => "box1", "address" => "10.0.0.5"})
+
+    assert String.starts_with?(pub, "ssh-ed25519 ")
+    assert machine["name"] == "box1"
+    assert machine["address"] == "10.0.0.5"
+    assert machine["kind"] == "incus"
+    assert machine["status"] == "enrolled"
+    assert is_nil(machine["capabilities"])
+
+    assert {:ok, fetched} = Machines.get(id)
+    assert fetched["id"] == id
+  end
+
+  test "enroll validates name and address" do
+    assert {:error, "name is required"} = Machines.enroll(%{"address" => "10.0.0.5"})
+    assert {:error, "address is required"} = Machines.enroll(%{"name" => "x"})
+  end
+
+  test "probe fills capabilities and sets status ready (mock mode)" do
+    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "box2", "address" => "10.0.0.6"})
+    {:ok, machine} = Machines.probe(id)
+
+    caps = machine["capabilities"]
+    assert caps["provider"] == "incus"
+    assert caps["incus_version"] == "Incus 6.0.0"
+    assert caps["cpu_count"] == 4
+    assert caps["memory_mb"] == 8192
+    assert caps["kvm"] == true
+    assert caps["gpu"] == false
+    assert machine["status"] == "ready"
+    assert machine["last_seen"] != nil
+  end
+
+  test "list_containers returns live state (mock mode)" do
+    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "box3", "address" => "10.0.0.7"})
+    {:ok, containers} = Machines.list_containers(id)
+
+    names = Enum.map(containers, & &1["name"])
+    assert "mock-app" in names
+    assert "mock-vm" in names
+
+    [app] = Enum.filter(containers, &(&1["name"] == "mock-app"))
+    assert app["status"] == "Running"
+    assert app["type"] == "container"
+  end
+
+  test "remove deletes the record and key" do
+    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "box4", "address" => "10.0.0.8"})
+    assert :ok = Machines.remove(id)
+    assert {:error, :not_found} = Machines.get(id)
+  end
+
+  test "Store round-trips records through atomic JSON" do
+    :ok = Store.put(%{"id" => "x", "name" => "test", "address" => "1.2.3.4", "kind" => "incus"})
+    {:ok, fetched} = Store.get("x")
+    assert fetched["name"] == "test"
+    :ok = Store.delete("x")
+    assert {:error, :not_found} = Store.get("x")
+  end
+
+  test "probe on unknown id returns not_found" do
+    assert {:error, :not_found} = Machines.probe("does-not-exist")
+  end
+end
