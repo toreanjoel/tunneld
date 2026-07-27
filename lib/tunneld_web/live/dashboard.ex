@@ -15,11 +15,9 @@ defmodule TunneldWeb.Live.Dashboard do
   alias TunneldWeb.Live.Dashboard.Actions
 
   import TunneldWeb.Live.Components.TopBar
-  import TunneldWeb.Live.Components.MeshCard
   import TunneldWeb.Live.Components.InternetCard
   import TunneldWeb.Live.Components.DnsCard
   import TunneldWeb.Live.Components.GaugeGrid
-  import TunneldWeb.Live.Components.MeshNodesSection
   import TunneldWeb.Live.Components.HelpIcon
 
   @modal_default %{
@@ -65,7 +63,6 @@ defmodule TunneldWeb.Live.Dashboard do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:resources")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:system_resources")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "geolocation:device")
-      Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:mesh")
     end
 
     uri_info = get_connect_info(socket, :uri)
@@ -88,7 +85,6 @@ defmodule TunneldWeb.Live.Dashboard do
       |> assign(status: %{internet: internet_status})
       |> assign(:devices, devices)
       |> assign(:pending_actions, %{})
-      |> assign(:mesh_state, mesh_state())
       |> assign(:settings_menu_open, false)
       |> assign(:obfuscated, false)
       |> assign(:services_popover_open, false)
@@ -137,19 +133,6 @@ defmodule TunneldWeb.Live.Dashboard do
         <%= if !@devices_expanded do %>
           <main class="max-w-[1280px] mx-auto px-8 pt-2 pb-16">
             <div class="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6">
-              <% mesh_data = @mesh_state || %{} %>
-              <% connected? = Map.get(mesh_data, :status) == :connected %>
-              <.mesh_card
-                connected={connected?}
-                peer_count={mesh_data[:peers] |> Map.values() |> length()}
-                mesh_ip={Map.get(mesh_data, :mesh_ip)}
-                last_sync={if mesh_data[:last_sync], do: Calendar.strftime(mesh_data[:last_sync], "%H:%M:%S")}
-                relay={Map.get(mesh_data, :token)}
-                geo_location={@geo_location}
-                map_status={if connected?, do: @map_status, else: :unavailable}
-                mesh_peers={if connected?, do: mesh_data[:peers] |> Map.values(), else: []}
-              />
-
               <div class="grid grid-rows-[1fr_3fr] gap-6">
                 <div class="grid grid-cols-2 gap-6">
                   <.internet_card on={@status.internet} />
@@ -169,18 +152,12 @@ defmodule TunneldWeb.Live.Dashboard do
               </div>
             </div>
 
-            <%= if Map.get(@mesh_state || %{}, :status) == :connected do %>
-              <.mesh_nodes_section
-                nodes={Map.get(@mesh_state, :peers, %{}) |> Map.values()}
-              />
-            <% end %>
-
             <div class="mt-6">
               <.live_component id="resources" module={TunneldWeb.Live.Components.Resources} obfuscated={@obfuscated} />
             </div>
 
             <div class="mt-12">
-              <.section_header>Local devices<.help_icon text="Devices connected to this Tunneld gateway's LAN port via Ethernet. Each device gets a DHCP lease and IP address from dnsmasq. Devices tagged with 'wg' prefix are advertised to the mesh network for remote access by other nodes." /></.section_header>
+              <.section_header>Local devices<.help_icon text="Devices connected to this Tunneld gateway's LAN port via Ethernet. Each device gets a DHCP lease and IP address from dnsmasq. Use Quick Expose to let devices create local resources via a curl command. Revoke IP to release the DHCP lease." /></.section_header>
               <div class="bg-surface border border-border rounded-xl p-6 h-24 flex items-center justify-between">
                 <div class="flex items-center gap-5">
                   <span class="text-text-secondary inline-flex">
@@ -326,32 +303,6 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, start_action("toggle_share_access", params, socket)}
   end
 
-  def handle_event("save_mesh_config", params, socket) do
-    url = String.trim(params["coordinator_url"] || "")
-    token = String.trim(params["token"] || "")
-    node_name = String.trim(params["node_name"] || "")
-    wg_mtu = String.to_integer(params["wg_mtu"] || "1280")
-    enabled = url != "" and token != ""
-
-    config = %{"coordinator_url" => url, "token" => token, "node_name" => node_name, "enabled" => enabled, "wg_mtu" => wg_mtu}
-
-    path = Path.join(Tunneld.Config.fs_root(), "mesh_config.json")
-    Tunneld.Persistence.write_json(path, config)
-
-    current_interval = Application.get_env(:tunneld, :mesh, []) |> Keyword.get(:poll_interval, 25_000)
-
-    Application.put_env(:tunneld, :mesh,
-      coordinator_url: if(url != "", do: url, else: nil),
-      token: if(token != "", do: token, else: nil),
-      node_name: if(node_name != "", do: node_name, else: nil),
-      enabled: enabled,
-      poll_interval: current_interval
-    )
-
-    Tunneld.Servers.Mesh.reconfigure()
-    {:noreply, put_flash(socket, :info, "Mesh configuration saved")}
-  end
-
   def handle_event("close_details", _, socket) do
     sidebar = sidebar_close(socket.assigns.sidebar)
     {:noreply, assign(socket, :sidebar, sidebar)}
@@ -416,15 +367,6 @@ defmodule TunneldWeb.Live.Dashboard do
   def handle_info(%{id: "resources", module: TunneldWeb.Live.Components.Resources, data: data} = message, socket) do
     send_update(message.module, id: message.id, data: message.data, obfuscated: socket.assigns.obfuscated)
     socket = maybe_refresh_sidebar_details(socket, data)
-    {:noreply, socket}
-  end
-
-  def handle_info(%{id: "mesh_server", module: _module, data: mesh_data}, socket) do
-    socket =
-      socket
-      |> assign(:mesh_state, mesh_data)
-      |> maybe_refresh_mesh_sidebar()
-
     {:noreply, socket}
   end
 
@@ -594,17 +536,10 @@ defmodule TunneldWeb.Live.Dashboard do
 
       "authentication" ->
         :authentication
-
-      "mesh" ->
-        :mesh
-
-      "mesh_node" ->
-        :mesh_node
     end
   end
 
   defp sidebar_selection("resource", id) when is_binary(id), do: %{type: :resource, id: id}
-  defp sidebar_selection("mesh_node", id), do: %{type: :mesh_node, id: id}
   defp sidebar_selection(_, _), do: nil
 
   defp maybe_refresh_sidebar_details(socket, resources) do
@@ -697,8 +632,6 @@ defmodule TunneldWeb.Live.Dashboard do
       "remove_device_tag" -> "Removing tag..."
       "set_dns_server" -> "Updating DNS server..."
       "revoke_login_creds" -> "Resetting login..."
-      "mesh_sync" -> "Syncing mesh..."
-      "disconnect_mesh" -> "Disconnecting mesh..."
       "restart_device" -> "Restarting device..."
       _ -> "Working on request..."
     end
@@ -724,34 +657,5 @@ defmodule TunneldWeb.Live.Dashboard do
 
   defp sidebar_close(sidebar) when is_map(sidebar) do
     %{is_open: false, view: Map.get(sidebar, :view), selection: nil}
-  end
-
-  defp mesh_state do
-    if Application.get_env(:tunneld, :mock_data, false) do
-      Tunneld.Servers.FakeData.mesh()
-    else
-      try do
-        if _pid = GenServer.whereis(Tunneld.Servers.Mesh) do
-          Tunneld.Servers.Mesh.get_state()
-        else
-          %{status: :disabled, peers: %{}}
-        end
-      catch
-        :exit, _ -> %{status: :connecting, peers: %{}}
-      end
-    end
-  end
-
-  defp maybe_refresh_mesh_sidebar(socket) do
-    sidebar = Map.get(socket.assigns, :sidebar, %{})
-
-    if Map.get(sidebar, :is_open, false) and Map.get(sidebar, :view) == :mesh do
-      assign(socket, :sidebar, %{
-        sidebar
-        | selection: %{updated_at: System.monotonic_time()}
-      })
-    else
-      socket
-    end
   end
 end

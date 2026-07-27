@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tunneld — Architecture Summary</title>
+<style>
+:root{--text:#2d3748;--muted:#64748b;--accent:#0ea5e9;--accent-dark:#0369a1;--border:#e2e8f0;--bg:#ffffff;--code-bg:#f1f5f9;--green-bg:#f0fdf4;--green-border:#22c55e;--green-text:#166534;--amber-bg:#fffbeb;--amber-border:#f59e0b;--amber-text:#92400e;--neutral-bg:#f8fafc;--neutral-border:#cbd5e1}
+*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
+body{margin:0;padding:0;background:#f7f8fa;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";font-size:17px;line-height:1.65}
+.container{max-width:860px;margin:0 auto;padding:0 24px}
+header.hero{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#f8fafc;padding:64px 24px 56px;text-align:center}
+header.hero .container{padding:0}
+header.hero h1{margin:0 0 12px;font-size:3rem;letter-spacing:-0.02em;font-weight:700}
+header.hero h1 .accent{color:var(--accent)}
+header.hero p.tagline{margin:0 auto;max-width:720px;font-size:1.15rem;line-height:1.6;color:#cbd5e1;font-weight:400}
+main{padding:40px 0 24px}
+nav.toc{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:24px 28px;margin-bottom:40px;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+nav.toc h2{margin-top:0;margin-bottom:16px;font-size:1.15rem;color:var(--accent-dark)}
+nav.toc ol{margin:0;padding-left:22px;columns:2;column-gap:32px}
+nav.toc li{margin-bottom:6px;break-inside:avoid}
+nav.toc a{color:var(--text);text-decoration:none;border-bottom:1px dotted var(--border)}
+nav.toc a:hover{color:var(--accent-dark);border-bottom-color:var(--accent)}
+section{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:28px 32px;margin-bottom:28px;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
+h2{margin:0 0 20px;padding-bottom:12px;font-size:1.5rem;font-weight:600;color:var(--text);border-bottom:2px solid var(--border)}
+h2 .num{color:var(--accent);font-weight:700;margin-right:8px}
+h3{font-size:1.1rem;margin:24px 0 10px;color:var(--accent-dark)}
+p{margin:0 0 14px}
+ul,ol{margin:0 0 14px;padding-left:24px}
+li{margin-bottom:8px}
+a{color:var(--accent-dark)}
+code{font-family:ui-monospace,SFMono-Regular,"SF Mono",Menlo,Consolas,"Liberation Mono",monospace;background:var(--code-bg);color:#1e293b;padding:2px 6px;border-radius:4px;font-size:0.9em}
+.callout{border-radius:8px;padding:16px 20px;margin:0 0 18px;border-left:4px solid}
+.callout .callout-label{font-weight:700;font-size:0.8rem;letter-spacing:0.06em;text-transform:uppercase;display:block;margin-bottom:8px}
+.callout p:last-child,.callout ul:last-child,.callout ol:last-child{margin-bottom:0}
+.callout-green{background:var(--green-bg);border-left-color:var(--green-border)}
+.callout-green .callout-label{color:var(--green-text)}
+.callout-amber{background:var(--amber-bg);border-left-color:var(--amber-border)}
+.callout-amber .callout-label{color:var(--amber-text)}
+.callout-neutral{background:var(--neutral-bg);border-left-color:var(--neutral-border)}
+.callout-neutral .callout-label{color:var(--muted)}
+table{width:100%;border-collapse:collapse;margin:0 0 16px;font-size:0.95rem}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--border);vertical-align:top}
+thead th{background:#f1f5f9;font-weight:600;color:#334155;border-bottom:2px solid var(--border)}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover{background:#f8fafc}
+dl{margin:0 0 16px}
+dt{font-weight:600;color:#334155;margin-top:14px}
+dt:first-child{margin-top:0}
+dd{margin:4px 0 0 0;padding-left:0}
+.lead{font-size:1.05rem;color:#475569}
+footer{text-align:center;padding:32px 24px 48px;color:var(--muted);font-size:0.9rem;border-top:1px solid var(--border);margin-top:24px}
+footer .container{padding:0}
+@media(max-width:640px){body{font-size:16px}header.hero h1{font-size:2.2rem}nav.toc ol{columns:1}section{padding:22px 18px}}
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="container">
+    <h1><span class="accent">tunneld</span></h1>
+    <p class="tagline">An ethernet-first private network edge relay for ARM single-board computers (Raspberry Pi, NanoPi) — being redesigned from a LAN gateway + WireGuard mesh node into a control plane that SSH-provisions Incus containers on remote machines and exposes them through one dashboard.</p>
+  </div>
+</header>
+
+<main>
+  <div class="container">
+
+    <nav class="toc" aria-label="Table of contents">
+      <h2>Table of contents</h2>
+      <ol>
+        <li><a href="#sec-1">What it is today (verified from the codebase)</a></li>
+        <li><a href="#sec-2">What was removed (verified from git history)</a></li>
+        <li><a href="#sec-3">The redesign: Gateway / subnet role (kept, separated)</a></li>
+        <li><a href="#sec-4">The redesign: External DNS — a new first-class concept</a></li>
+        <li><a href="#sec-5">The redesign: WireGuard mesh — slated for removal</a></li>
+        <li><a href="#sec-6">The redesign: Machine management via SSH — greenfield</a></li>
+        <li><a href="#sec-7">The redesign: Container provisioning — greenfield</a></li>
+        <li><a href="#sec-8">The redesign: Reverse proxy (redesigned)</a></li>
+        <li><a href="#sec-9">The redesign: Dashboard (redesigned)</a></li>
+        <li><a href="#sec-10">The redesign: Off-LAN access (optional, deferred)</a></li>
+        <li><a href="#sec-11">Deliberate non-goals / things cut</a></li>
+        <li><a href="#sec-12">Open design questions</a></li>
+        <li><a href="#sec-13">Architecture at a glance (current)</a></li>
+        <li><a href="#sec-14">Project layout (current, lib/)</a></li>
+        <li><a href="#sec-15">How to read this document</a></li>
+      </ol>
+    </nav>
+
+    <section id="sec-1">
+      <h2><span class="num">1</span>What it is today (verified from the codebase)</h2>
+      <div class="callout callout-green">
+        <span class="callout-label">Current state</span>
+        <p>The facts below describe what exists in the tunneld codebase today, verified directly from the source.</p>
+      </div>
+      <ul>
+        <li>An Elixir/Phoenix 1.7 application (Elixir 1.18+, OTP 26+), built as a Mix release, no database — all state is atomic JSON files under a data dir.</li>
+        <li>Runs on ARM64 SBCs with <strong>two ethernet NICs</strong>: one <code>upstream</code> (internet) and one <code>downstream</code> (private subnet). Interface names are selected at install time and read from app config at runtime; never hardcoded. No Wi-Fi.</li>
+        <li>Acts as the LAN gateway for whatever plugs into the downstream port: <code>dnsmasq</code> for DHCP + DNS, <code>iptables</code> for NAT/forwarding/DNS interception, <code>nginx</code> as a reverse proxy listening on <code>0.0.0.0:18000</code>.</li>
+        <li><strong>Internal DNS</strong> is authoritative on the subnet via dnsmasq, resolving names in the <code>.tunneld.lan</code> style. The gateway is the DNS resolver for its subnet.</li>
+        <li><strong>Reverse proxy (nginx)</strong> runs on the gateway itself. It serves a static <strong>resource registry</strong> (<code>resources.json</code>): each resource has a name, a pool of <code>IP:port</code> backends, and is health-checked via TCP probes every 10 seconds. nginx load-balances across healthy backends and each resource is reachable from the subnet at <code>http://&lt;name&gt;.tunneld.lan:18000</code>. There is no public-internet exposure and no per-resource auth.</li>
+        <li><strong>Quick Expose</strong>: devices on the subnet can create/list/remove local resources with a single <code>curl</code>. The gateway resolves the caller from its DHCP lease, validates against a per-device allowlist, and provisions a <code>&lt;name&gt;.tunneld.lan</code> hostname.</li>
+        <li><strong>Device management</strong>: tracks DHCP leases with online status (ping probe, cached 30s), tagging (tags with the <code>wg</code> prefix advertise a device to the mesh), and lease revocation.</li>
+        <li><strong>LiveView dashboard</strong>: real-time, single admin (bcrypt + WebAuthn), first-run setup wizard, offline 2D world map showing peer geolocation by country (inline SVG, no CDN).</li>
+        <li><strong>Supervision tree</strong> (current, in <code>Tunneld.Application</code>): Session, SystemResources, Services, Resources, Devices, Auth, DnsConfig, Updater, Wireguard, Geolocation, Mesh, Endpoint.</li>
+        <li><strong>Persistent state files</strong>: <code>auth.json</code>, <code>resources.json</code>, <code>mesh_config.json</code>, <code>mesh_node_id.json</code>, <code>wireguard.json</code>, <code>dns_config.json</code>. Writes are atomic (temp + rename) with <code>.bak</code> recovery.</li>
+      </ul>
+    </section>
+
+    <section id="sec-2">
+      <h2><span class="num">2</span>What was removed (verified from git history)</h2>
+      <div class="callout callout-green">
+        <span class="callout-label">Current state</span>
+        <p>These features were already removed from the codebase in a prior commit.</p>
+      </div>
+      <ul>
+        <li><strong>Zrok / OpenZiti</strong> overlay tunnels — the original public/private exposure mechanism. Already removed in commit <code>67666c9</code> ("feat: remove zrok, wifi, sqm, mullvad, rebrand as ethernet-first edge relay, rename interface config to upstream/downstream, add netlink helper, consolidate installer, docs, landing").</li>
+        <li>Wi-Fi configuration, SQM, Mullvad VPN — removed in the same commit.</li>
+      </ul>
+    </section>
+
+    <section id="sec-3">
+      <h2><span class="num">3</span>The redesign: Gateway / subnet role (kept, separated)</h2>
+      <div class="callout callout-amber">
+        <span class="callout-label">Planned / in-progress</span>
+        <p>This is design intent for the redesign, not yet implemented.</p>
+      </div>
+      <ul>
+        <li>The networking role (DHCP, routing) stays as a <strong>separate concern</strong> from the new control-plane role (SSH provisioning, dashboard). One process handles routing/DHCP; another handles orchestration. They share a box, not state — if the control plane crashes, routing keeps working. This separation is a design goal for the redesign; today they live in one OTP app.</li>
+      </ul>
+    </section>
+
+    <section id="sec-4">
+      <h2><span class="num">4</span>The redesign: External DNS — a new first-class concept</h2>
+      <div class="callout callout-amber">
+        <span class="callout-label">Planned / in-progress</span>
+        <p>External DNS is a new concept introduced by the redesign.</p>
+      </div>
+      <ul>
+        <li><code>tunneld.io</code> is the real project/product domain (it does <strong>not</strong> currently appear anywhere in the repo — the internal domain is <code>tunneld.lan</code>). Under the redesign, external DNS under <code>tunneld.io</code> is how the outside world would find a gateway or its exposed services (e.g. subdomains per gateway or per exposed container). This must be treated as first-class in the new design, not an afterthought config field.</li>
+        <li>Internal DNS (dnsmasq, <code>.tunneld.lan</code>) and external DNS (<code>tunneld.io</code>) are <strong>separate systems solving separate problems</strong> and must not be collapsed into one "DNS config" concept.</li>
+      </ul>
+    </section>
+
+    <section id="sec-5">
+      <h2><span class="num">5</span>The redesign: WireGuard mesh — slated for removal</h2>
+      <div class="callout callout-amber">
+        <span class="callout-label">Planned / in-progress</span>
+        <p>Removal is intended but not yet done — the mesh is still active today.</p>
+      </div>
+      <ul>
+        <li>The prompt's claim that the mesh "is now being removed" is <strong>aspirational</strong>: <code>mesh.ex</code>, <code>wireguard.ex</code>, the <code>wg-mesh</code> interface, relay coordinator client, and iptables mesh forwarding are all still active in the supervision tree right now. The redesign intends to remove them (coordinator, relay, per-peer AllowedIPs, hole-punching) but that work has not been done.</li>
+      </ul>
+    </section>
+
+    <section id="sec-6">
+      <h2><span class="num">6</span>The redesign: Machine management via SSH — greenfield</h2>
+      <div class="callout callout-amber">
+        <span class="callout-label">Planned / in-progress</span>
+        <p>Greenfield — no corresponding code exists yet.</p>
+      </div>
+      <ul>
+        <li>tunneld would hold or broker SSH access to any number of remote Linux machines — not just one VM, no special-cased "local" machine. Every managed machine is structurally the same: SSH in, provision, register, proxy.</li>
+        <li>Each managed machine should have a <strong>dedicated, scoped credential</strong> — not a general-purpose root SSH key (ideally restricted to Incus operations via forced command, or Incus's own API/client-cert auth carried over SSH rather than shelling out to <code>incus</code> interactively).</li>
+        <li>On first contact, a <strong>capability probe</strong> (Incus version, storage, GPU presence) is stored against the machine's record. Capabilities are never assumed.</li>
+        <li>Machine state is treated as <strong>remote and authoritative</strong>, not cached: tunneld queries live state rather than trusting a local record, because SSH-managed machines drift outside tunneld's view.</li>
+      </ul>
+    </section>
+
+    <section id="sec-7">
+      <h2><span class="num">7</span>The redesign: Container provisioning — greenfield</h2>
+      <div class="callout callout-amber">
+        <span class="callout-label">Planned / in-progress</span>
+        <p>Greenfield — no corresponding code exists yet.</p>
+      </div>
+      <ul>
+        <li>tunneld would provision "slices" of containers (Incus containers) on managed machines on request.</li>
+        <li>Default target: <strong>slim app containers</strong> — CPU/memory/port, no special hardware.</li>
+        <li><strong>GPU-backed / streaming workloads</strong> (GPU passthrough, Moonlight/Sunshine-style remote desktop) are a structurally different case — different provisioning (device passthrough, driver matching) and a different access path (low-latency direct/LAN, not routed through the same reverse proxy, since tunneling adds latency streaming can't tolerate). Explicitly <strong>out of scope for v1</strong>.</li>
+      </ul>
+    </section>
+
+    <section id="sec-8">
+      <h2><span class="num">8</span>The redesign: Reverse proxy (redesigned)</h2>
+      <div class="callout callout-amber">
+        <span class="callout-label">Planned / in-progress</span>
+        <p>Redesign of the existing proxy — not yet implemented.</p>
+      </div>
+      <ul>
+        <li>Still runs <strong>on the gateway</strong> — the only thing that needs to be externally reachable. Managed machines stay unreachable except through tunneld's SSH connection.</li>
+        <li>The proxy's routing table becomes <code>container ID -&gt; (machine address, port)</code>, <strong>rebuilt from live state</strong> rather than hand-maintained config. (Today the proxy uses a static <code>resources.json</code> registry, not containers.)</li>
+      </ul>
+    </section>
+
+    <section id="sec-9">
+      <h2><span class="num">9</span>The redesign: Dashboard (redesigned)</h2>
+      <div class="callout callout-amber">
+        <span class="callout-label">Planned / in-progress</span>
+        <p>Redesign of the existing dashboard — not yet implemented.</p>
+      </div>
+      <ul>
+        <li>A single flat view: machines -&gt; containers per machine -&gt; status -&gt; access link.</li>
+        <li>Resist grouping/tagging/environments until there's a real need.</li>
+        <li>"Access" links resolve <strong>live at click-time</strong> (ask the machine if the container is actually still up, what port it's on) rather than serving a potentially-stale URL.</li>
+        <li>The dashboard is effectively the product: since tunneld owns no compute itself, its value is "one place to see and reach every container across every machine you've handed it SSH access to."</li>
+      </ul>
+    </section>
+
+    <section id="sec-10">
+      <h2><span class="num">10</span>The redesign: Off-LAN access (optional, deferred)</h2>
+      <div class="callout callout-amber">
+        <span class="callout-label">Planned / in-progress</span>
+        <p>Optional and deferred — not a v1 requirement.</p>
+      </div>
+      <ul>
+        <li>No relay, no mesh, no zrok. If external reachability is wanted without exposing the home connection directly, a <strong>single outbound reverse tunnel</strong> (e.g. one SSH connection) from the gateway to one VPS you control. Optional, not core. No peer discovery, no coordinator.</li>
+      </ul>
+    </section>
+
+    <section id="sec-11">
+      <h2><span class="num">11</span>Deliberate non-goals / things cut</h2>
+      <div class="callout callout-neutral">
+        <span class="callout-label">Non-goals</span>
+        <p>Explicitly excluded from scope — present or future.</p>
+      </div>
+      <ul>
+        <li>No Zrok/OpenZiti overlay tunnels (original exposure mechanism — already gone).</li>
+        <li>No WireGuard mesh, coordinator, relay, per-peer key exchange (intended to be removed — still in tree today).</li>
+        <li>No "local VM" special case — nothing managed differently because it's physically closer to the gateway. (Note: there was never a VM in the codebase; current scope is DHCP devices on a subnet.)</li>
+        <li>No GPU/streaming support in v1.</li>
+        <li>No control-plane accounts/tokens for third parties — this is a personal/small-group orchestrator, not a multi-tenant hosted service.</li>
+      </ul>
+    </section>
+
+    <section id="sec-12">
+      <h2><span class="num">12</span>Open design questions</h2>
+      <p class="lead">To be resolved explicitly:</p>
+      <ol>
+        <li><strong>Credential model</strong> — does the per-machine SSH key grant shell access with Incus commands run as a normal user, or is it scoped to Incus's own API/cert auth carried over SSH? This determines blast radius if a key leaks.</li>
+        <li><strong>Adding a machine</strong> is the single highest-trust action in the system (a total grant, not partial) — should this step in the UI/CLI be made deliberately heavyweight/confirmatory, similar to how a manifest-freeze step is a deliberate, hard-to-miss commitment?</li>
+        <li><strong>Off-LAN access</strong> — is the single reverse tunnel to one VPS a v1 requirement, or purely optional/deferred?</li>
+        <li><strong>Relationship to other tools</strong> — does tunneld's job end at "machine provisioned, container running, reachable via proxy," handing off to a separate tool for what actually runs inside a given container, keeping the two cleanly separated by responsibility?</li>
+      </ol>
+    </section>
+
+    <section id="sec-13">
+      <h2><span class="num">13</span>Architecture at a glance (current)</h2>
+      <div class="callout callout-green">
+        <span class="callout-label">Current state</span>
+        <p>The components that make up tunneld as it exists today.</p>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Component</th><th>Role</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><code>dnsmasq</code></td><td>DHCP server + DNS resolver forwarding to user-configured upstream</td></tr>
+          <tr><td><code>nginx</code></td><td>Reverse proxy with per-resource upstream load balancing (<code>0.0.0.0:18000</code>)</td></tr>
+          <tr><td><code>iptables</code></td><td>NAT, packet forwarding, DNS interception, mesh forwarding</td></tr>
+          <tr><td><code>WireGuard</code></td><td>Mesh interface <code>wg-mesh</code> for node-to-node connectivity via relay (slated for removal)</td></tr>
+          <tr><td><code>Elixir/Phoenix</code></td><td>Application server, LiveView dashboard, GenServer process management</td></tr>
+        </tbody>
+      </table>
+    </section>
+
+    <section id="sec-14">
+      <h2><span class="num">14</span>Project layout (current, lib/)</h2>
+      <div class="callout callout-green">
+        <span class="callout-label">Current state</span>
+        <p>The current structure of the <code>lib/</code> directory.</p>
+      </div>
+      <dl>
+        <dt><code>tunneld/application.ex</code></dt>
+        <dd>OTP supervision tree</dd>
+        <dt><code>tunneld/net_link.ex</code></dt>
+        <dd>Ethernet link state (reads <code>/sys/class/net/&lt;iface&gt;/operstate</code> on demand, no GenServer, no polling)</dd>
+        <dt><code>tunneld/iptables.ex</code></dt>
+        <dd>Firewall rule management</dd>
+        <dt><code>tunneld/geolocation.ex</code> + <code>geo_data/</code></dt>
+        <dd>IP geolocation with offline SVG world map</dd>
+        <dt><code>tunneld/servers/</code></dt>
+        <dd><code>auth</code>, <code>session</code>, <code>services</code>, <code>resources</code>, <code>devices</code>, <code>dns_config</code>, <code>nginx</code>, <code>wireguard</code>, <code>mesh</code>, <code>updater</code>, <code>system_resources</code>, <code>fake_data</code>, <code>expose_allowed</code>, <code>device_tags</code></dd>
+        <dt><code>tunneld_web/</code></dt>
+        <dd>LiveView dashboard, setup wizard, login, expose controller, components</dd>
+      </dl>
+    </section>
+
+    <section id="sec-15">
+      <h2><span class="num">15</span>How to read this document</h2>
+      <p>The sections above distinguish <strong>what exists in the codebase today</strong> from <strong>what the redesign proposes</strong>. Anything marked "Planned" or described under "greenfield" / "NOT yet implemented" has no corresponding code and is design intent only.</p>
+    </section>
+
+  </div>
+</main>
+
+<footer>
+  <div class="container">
+    Generated from a codebase review on 2026-07-28.
+  </div>
+</footer>
+
+</body>
+</html>

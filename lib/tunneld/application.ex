@@ -4,9 +4,9 @@ defmodule Tunneld.Application do
   GenServers, PubSub, and the Phoenix endpoint. In production, also
   resets iptables firewall rules on startup.
 
-  Supervision tree (after Zrok/Wi-Fi/SQM removal):
+  Supervision tree (after WireGuard mesh removal):
     Session, SystemResources, Services, Resources, Devices, Auth,
-    DnsConfig, Updater, Wireguard, Geolocation, Mesh, Endpoint.
+    DnsConfig, Updater, Geolocation, Endpoint.
   """
 
   use Application
@@ -19,8 +19,7 @@ defmodule Tunneld.Application do
     SystemResources,
     Resources,
     DnsConfig,
-    Updater,
-    Wireguard
+    Updater
   }
 
   @impl true
@@ -39,9 +38,7 @@ defmodule Tunneld.Application do
       {Auth, []},
       {DnsConfig, []},
       {Updater, []},
-      {Wireguard, []},
       {Tunneld.Geolocation, []},
-      {Tunneld.Servers.Mesh, []},
       # Start to serve requests, typically the last entry
       TunneldWeb.Endpoint
     ]

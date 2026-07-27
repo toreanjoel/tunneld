@@ -5,20 +5,12 @@ config :tunneld, :mock_data, true
 config :tunneld, :fs,
   root: Path.expand("../data/", __DIR__),
   auth: "auth.json",
-  resources: "resources.json",
-  wireguard: "wireguard.json"
+  resources: "resources.json"
 
 config :tunneld, :network,
   gateway: "192.168.1.1",
   upstream: "eth0",
   downstream: "eth1"
-
-config :tunneld, :mesh,
-  coordinator_url: "http://localhost:4000",
-  token: "test-token",
-  node_name: "test-node",
-  enabled: false,
-  poll_interval: 25000
 
 # We don't run a server during test. If one is required,
 # you can enable the server option below.

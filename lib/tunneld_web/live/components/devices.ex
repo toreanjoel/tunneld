@@ -60,7 +60,7 @@ defmodule TunneldWeb.Live.Components.Devices do
   def render(assigns) do
     ~H"""
     <div class="p-3 md:p-5">
-      <.section_header>Devices<.help_icon text="Devices discovered on your LAN subnet via DHCP leases. Each device automatically gets an IP from dnsmasq. Tag devices with 'wg' prefix (e.g. 'wg-office-printer') to advertise them to the mesh network for remote access by other nodes. Use Quick Expose to let devices create local resources via a curl command. Revoke IP to release the DHCP lease." /></.section_header>
+      <.section_header>Devices<.help_icon text="Devices discovered on your LAN subnet via DHCP leases. Each device automatically gets an IP from dnsmasq. Use Quick Expose to let devices create local resources via a curl command. Revoke IP to release the DHCP lease." /></.section_header>
 
       <div :if={@loading} class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         <div class="p-4 flex flex-col bg-surface rounded-lg w-full h-[130px] opacity-10">
@@ -159,7 +159,7 @@ defmodule TunneldWeb.Live.Components.Devices do
             </div>
             <div class={if device.tags != [], do: "grow-0 h-1", else: "grow"} />
             <div :if={device.tags != []} class="flex flex-wrap gap-1 mb-1 pt-1">
-              <%= for tag <- device.tags |> Enum.sort_by(fn t -> if String.starts_with?(t, "wg"), do: 0, else: 1 end) |> Enum.take(2) do %>
+              <%= for tag <- device.tags |> Enum.sort_by(& &1) |> Enum.take(2) do %>
                 <span class={"group px-1.5 py-0.5 text-[10px] rounded border flex items-center gap-1 shrink-0 " <> tag_classes(tag)} title={tag}>
                   <span class="truncate max-w-[90px]"><%= tag %></span>
                   <span
@@ -189,13 +189,7 @@ defmodule TunneldWeb.Live.Components.Devices do
     """
   end
 
-  defp tag_classes(tag) when is_binary(tag) do
-    if String.starts_with?(tag, "wg") do
-      "bg-blue-900/60 text-blue-200 border-blue-700/40"
-    else
-      "bg-surface-2 text-text-secondary border-border"
-    end
-  end
+  defp tag_classes(_tag), do: "bg-surface-2 text-text-secondary border-border"
 
   defp probe_online(ip) do
     mock? = Application.get_env(:tunneld, :mock_data, false)

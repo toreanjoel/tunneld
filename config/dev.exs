@@ -68,8 +68,7 @@ config :phoenix, :plug_init_mode, :runtime
 config :tunneld, :fs,
   root: Path.expand("../data/", __DIR__),
   auth: "auth.json",
-  resources: "resources.json",
-  wireguard: "wireguard.json"
+  resources: "resources.json"
 
 config :tunneld, :network,
   gateway: "192.168.1.1",

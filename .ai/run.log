@@ -1,0 +1,142 @@
+===== RUN 2026-07-27T23:06:18Z | exit=0 | mix test
+--- stdout ---
+Running ExUnit with seed: 91307, max_cases: 16
+
+.........01:06:21.268 [warning] Mesh setup failed: %HTTPoison.Error{reason: :nxdomain, id: nil} - retrying in 5000ms
+01:06:21.289 [error] GenServer Tunneld.Servers.Mesh terminating
+** (stop) :enoent
+    (elixir 1.18.3) lib/system.ex:1114: System.cmd("iptables", ["-D", "FORWARD", "-i", "wg-mesh", "-o", "eth1", "-m", "state", "--state", "NEW,ESTABLISHED,RELATED", "-j", "ACCEPT"], [stderr_to_stdout: true])
+    (tunneld 0.18.15) lib/tunneld/iptables.ex:121: Tunneld.Iptables.del/2
+    (tunneld 0.18.15) lib/tunneld/iptables.ex:440: anonymous fn/2 in Tunneld.Iptables.remove_mesh_forwarding/0
+    (elixir 1.18.3) lib/enum.ex:2546: Enum."-reduce/3-lists^foldl/2-0-"/3
+    (tunneld 0.18.15) lib/tunneld/iptables.ex:436: Tunneld.Iptables.remove_mesh_forwarding/0
+    (tunneld 0.18.15) lib/tunneld/servers/mesh.ex:88: Tunneld.Servers.Mesh.handle_cast/2
+    (stdlib 5.2.3) gen_server.erl:1121: :gen_server.try_handle_cast/3
+    (stdlib 5.2.3) gen_server.erl:1183: :gen_server.handle_msg/6
+    (stdlib 5.2.3) proc_lib.erl:241: :proc_lib.init_p_do_apply/3
+Last message: {:"$gen_cast", :reconfigure}
+..01:06:24.330 [warning] Mesh setup failed: %HTTPoison.Error{reason: :nxdomain, id: nil} - retrying in 5000ms
+01:06:24.392 [error] GenServer Tunneld.Servers.Mesh terminating
+** (stop) :enoent
+    (elixir 1.18.3) lib/system.ex:1114: System.cmd("iptables", ["-D", "FORWARD", "-i", "wg-mesh", "-o", "eth1", "-m", "state", "--state", "NEW,ESTABLISHED,RELATED", "-j", "ACCEPT"], [stderr_to_stdout: true])
+    (tunneld 0.18.15) lib/tunneld/iptables.ex:121: Tunneld.Iptables.del/2
+    (tunneld 0.18.15) lib/tunneld/iptables.ex:440: anonymous fn/2 in Tunneld.Iptables.remove_mesh_forwarding/0
+    (elixir 1.18.3) lib/enum.ex:2546: Enum."-reduce/3-lists^foldl/2-0-"/3
+    (tunneld 0.18.15) lib/tunneld/iptables.ex:436: Tunneld.Iptables.remove_mesh_forwarding/0
+    (tunneld 0.18.15) lib/tunneld/servers/mesh.ex:88: Tunneld.Servers.Mesh.handle_cast/2
+    (stdlib 5.2.3) gen_server.erl:1121: :gen_server.try_handle_cast/3
+    (stdlib 5.2.3) gen_server.erl:1183: :gen_server.handle_msg/6
+    (stdlib 5.2.3) proc_lib.erl:241: :proc_lib.init_p_do_apply/3
+Last message: {:"$gen_cast", :reconfigure}
+.
+Finished in 5.8 seconds (0.07s async, 5.8s sync)
+12 tests, 0 failures
+--- stderr ---
+    warning: unused alias Icons
+    │
+  9 │   alias TunneldWeb.Icons
+    │   ~
+    │
+    └─ lib/tunneld_web/live/components/json_schema_renderer.ex:9:3
+
+    warning: unused import TunneldWeb.Icons
+    │
+  7 │   import TunneldWeb.Icons
+    │   ~
+    │
+    └─ lib/tunneld_web/live/components/services_chip.ex:7:3
+
+[os_mon] cpu supervisor port (cpu_sup): Erlang has closed
+[os_mon] memory supervisor port (memsup): Erlang has closed
+===== RUN 2026-07-27T23:17:24Z | exit=0 | mix compile
+--- stdout ---
+Compiling 61 files (.ex)
+Generated tunneld app
+--- stderr ---
+    warning: unused alias Icons
+    │
+  9 │   alias TunneldWeb.Icons
+    │   ~
+    │
+    └─ lib/tunneld_web/live/components/json_schema_renderer.ex:9:3
+
+    warning: unused import TunneldWeb.Icons
+    │
+  7 │   import TunneldWeb.Icons
+    │   ~
+    │
+    └─ lib/tunneld_web/live/components/services_chip.ex:7:3
+
+    warning: unused import TunneldWeb.Live.Components.HelpIcon
+    │
+ 16 │   import TunneldWeb.Live.Components.HelpIcon
+    │   ~
+    │
+    └─ lib/tunneld_web/live/components/sidebar/details.ex:16:3
+
+===== RUN 2026-07-27T23:17:30Z | exit=0 | mix test
+--- stdout ---
+Compiling 62 files (.ex)
+Generated tunneld app
+Running ExUnit with seed: 60614, max_cases: 16
+
+.......
+Finished in 0.03 seconds (0.03s async, 0.00s sync)
+7 tests, 0 failures
+--- stderr ---
+    warning: unused alias Icons
+    │
+  9 │   alias TunneldWeb.Icons
+    │   ~
+    │
+    └─ lib/tunneld_web/live/components/json_schema_renderer.ex:9:3
+
+    warning: unused import TunneldWeb.Icons
+    │
+  7 │   import TunneldWeb.Icons
+    │   ~
+    │
+    └─ lib/tunneld_web/live/components/services_chip.ex:7:3
+
+    warning: unused import TunneldWeb.Live.Components.HelpIcon
+    │
+ 16 │   import TunneldWeb.Live.Components.HelpIcon
+    │   ~
+    │
+    └─ lib/tunneld_web/live/components/sidebar/details.ex:16:3
+
+[os_mon] cpu supervisor port (cpu_sup): Erlang has closed
+[os_mon] memory supervisor port (memsup): Erlang has closed
+===== RUN 2026-07-27T23:18:16Z | exit=0 | mix test
+--- stdout ---
+Compiling 3 files (.ex)
+Generated tunneld app
+Running ExUnit with seed: 404310, max_cases: 16
+
+.......
+Finished in 0.04 seconds (0.04s async, 0.00s sync)
+7 tests, 0 failures
+--- stderr ---
+    warning: unused alias Icons
+    │
+  9 │   alias TunneldWeb.Icons
+    │   ~
+    │
+    └─ lib/tunneld_web/live/components/json_schema_renderer.ex:9:3
+
+    warning: unused import TunneldWeb.Icons
+    │
+  7 │   import TunneldWeb.Icons
+    │   ~
+    │
+    └─ lib/tunneld_web/live/components/services_chip.ex:7:3
+
+    warning: unused import TunneldWeb.Live.Components.HelpIcon
+    │
+ 16 │   import TunneldWeb.Live.Components.HelpIcon
+    │   ~
+    │
+    └─ lib/tunneld_web/live/components/sidebar/details.ex:16:3
+
+[os_mon] cpu supervisor port (cpu_sup): Erlang has closed
+[os_mon] memory supervisor port (memsup): Erlang has closed

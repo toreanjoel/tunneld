@@ -13,7 +13,7 @@ defmodule Tunneld.Servers.Resources do
 
   Resources are persisted to `resources.json` and synced to nginx configs.
   There is no public-internet exposure and no per-resource auth - access is
-  limited to the local subnet (and, later, the relay/mesh).
+  limited to the local subnet.
 
   State is periodically broadcast to the dashboard via PubSub.
   """

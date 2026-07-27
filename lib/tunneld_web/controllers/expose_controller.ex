@@ -6,7 +6,7 @@ defmodule TunneldWeb.ExposeController do
   The gateway resolves the caller from `conn.remote_ip`, validates it against
   an allowlist, and manages the full resource lifecycle. Each exposed service
   is reachable on the subnet at `http://<name>.tunneld.lan:18000` via dnsmasq.
-  There is no public-internet exposure - relay/mesh exposure is future work.
+  There is no public-internet exposure - off-LAN access is the operator's responsibility.
   """
 
   use TunneldWeb, :controller
