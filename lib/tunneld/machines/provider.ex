@@ -99,6 +99,8 @@ defmodule Tunneld.Machines.Provider do
     end
   end
 
+  defp dispatch(kind, _op, _machine), do: {:error, {:unsupported_provider, kind}}
+
   defp dispatch("incus", :create_container, machine, spec) do
     name = spec["name"]
     image = spec["image"]
@@ -138,7 +140,6 @@ defmodule Tunneld.Machines.Provider do
     end
   end
 
-  defp dispatch(kind, _op, _machine), do: {:error, {:unsupported_provider, kind}}
   defp dispatch(kind, _op, _machine, _spec), do: {:error, {:unsupported_provider, kind}}
 
   defp incus_installed?(machine) do
@@ -161,8 +162,7 @@ defmodule Tunneld.Machines.Provider do
   end
   defp sh(n) when is_integer(n), do: Integer.to_string(n)
 
-  defp maybe_config(_machine, _name, nil, nil), do: :ok
-  defp maybe_config(machine, name, cpu, memory) when is_nil(cpu) and is_nil(memory), do: :ok
+  defp maybe_config(_machine, _name, cpu, memory) when is_nil(cpu) and is_nil(memory), do: :ok
   defp maybe_config(machine, name, cpu, memory) do
     cpu_cmd = if cpu, do: "incus config set #{sh(name)} limits.cpu #{sh(cpu)}", else: "true"
     mem_str = if is_integer(memory), do: "#{memory}MiB", else: nil

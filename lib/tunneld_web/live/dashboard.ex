@@ -63,6 +63,7 @@ defmodule TunneldWeb.Live.Dashboard do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:resources")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:system_resources")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "geolocation:device")
+      Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:machines")
     end
 
     uri_info = get_connect_info(socket, :uri)
@@ -154,6 +155,10 @@ defmodule TunneldWeb.Live.Dashboard do
 
             <div class="mt-6">
               <.live_component id="resources" module={TunneldWeb.Live.Components.Resources} obfuscated={@obfuscated} />
+            </div>
+
+            <div class="mt-12">
+              <.live_component id="machines" module={TunneldWeb.Live.Components.Machines} obfuscated={@obfuscated} />
             </div>
 
             <div class="mt-12">
@@ -351,6 +356,106 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, assign(socket, :devices_expanded, !socket.assigns.devices_expanded)}
   end
 
+  # --- Machines ---
+
+  def handle_event("toggle_enroll", _params, socket) do
+    {:noreply, push_event(socket, "toggle_enroll", %{})}
+  end
+
+  def handle_event("enroll_machine", params, socket) do
+    case Tunneld.Machines.enroll(params) do
+      {:ok, %{"id" => _id, "public_key" => pub, "machine" => _machine}} ->
+        socket =
+          socket
+          |> put_flash(:info, "Machine enrolled. Install this public key on the target:")
+          |> put_flash(:info_raw, pub)
+
+        send(self(), {:machines_changed})
+        {:noreply, socket}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Enrollment failed: #{reason}")}
+    end
+  end
+
+  def handle_event("select_machine", %{"id" => id}, socket) do
+    containers =
+      case Tunneld.Machines.list_containers(id) do
+        {:ok, c} -> c
+        _ -> []
+      end
+
+    {:ok, machine} = Tunneld.Machines.get(id)
+    {:noreply, push_event(socket, "machine_selected", %{"machine" => machine, "containers" => containers})}
+  end
+
+  def handle_event("probe_machine", %{"id" => id}, socket) do
+    case Tunneld.Machines.probe(id) do
+      {:ok, _} ->
+        send(self(), {:machines_changed})
+        {:noreply, put_flash(socket, :info, "Probe complete")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Probe failed: #{inspect(reason)}")}
+    end
+  end
+
+  def handle_event("remove_machine", %{"id" => id}, socket) do
+    case Tunneld.Machines.remove(id) do
+      :ok ->
+        send(self(), {:machines_changed})
+        {:noreply, put_flash(socket, :info, "Machine removed")}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Could not remove machine")}
+    end
+  end
+
+  def handle_event("toggle_create", _params, socket) do
+    {:noreply, push_event(socket, "toggle_create", %{})}
+  end
+
+  def handle_event("create_container", %{"id" => id} = params, socket) do
+    spec = %{
+      "name" => params["name"],
+      "image" => params["image"],
+      "type" => params["type"] || "container",
+      "cpu" => parse_int(params["cpu"]),
+      "memory" => parse_int(params["memory"]),
+      "ports" => []
+    }
+
+    case Tunneld.Machines.create_container(id, spec) do
+      {:ok, _} ->
+        send(self(), {:machines_changed})
+        {:noreply, put_flash(socket, :info, "Container created")}
+
+      {:error, reason} ->
+        {:noreply, put_flash(socket, :error, "Create failed: #{reason}")}
+    end
+  end
+
+  def handle_event("start_container", %{"id" => id, "name" => name}, socket) do
+    case Tunneld.Machines.start_container(id, name) do
+      {:ok, _} -> {:noreply, put_flash(socket, :info, "#{name} started")}
+      {:error, _} -> {:noreply, put_flash(socket, :error, "Could not start #{name}")}
+    end
+  end
+
+  def handle_event("stop_container", %{"id" => id, "name" => name}, socket) do
+    case Tunneld.Machines.stop_container(id, name) do
+      {:ok, _} -> {:noreply, put_flash(socket, :info, "#{name} stopped")}
+      {:error, _} -> {:noreply, put_flash(socket, :error, "Could not stop #{name}")}
+    end
+  end
+
+  def handle_event("delete_container", %{"id" => id, "name" => name}, socket) do
+    case Tunneld.Machines.delete_container(id, name) do
+      {:ok, _} -> {:noreply, put_flash(socket, :info, "#{name} deleted")}
+      {:error, _} -> {:noreply, put_flash(socket, :error, "Could not delete #{name}")}
+    end
+  end
+
   def handle_info(
         %{id: "devices", module: TunneldWeb.Live.Components.Devices, data: data} = message,
         socket
@@ -390,6 +495,16 @@ defmodule TunneldWeb.Live.Dashboard do
       send_update(module, id: id, data: data, obfuscated: socket.assigns.obfuscated)
     end
 
+    {:noreply, socket}
+  end
+
+  def handle_info(%{id: "machines", event: _, data: _}, socket) do
+    send_update(TunneldWeb.Live.Components.Machines, id: "machines", data: %{})
+    {:noreply, socket}
+  end
+
+  def handle_info({:machines_changed}, socket) do
+    send_update(TunneldWeb.Live.Components.Machines, id: "machines", data: %{})
     {:noreply, socket}
   end
 
@@ -658,4 +773,13 @@ defmodule TunneldWeb.Live.Dashboard do
   defp sidebar_close(sidebar) when is_map(sidebar) do
     %{is_open: false, view: Map.get(sidebar, :view), selection: nil}
   end
+
+  defp parse_int(""), do: nil
+  defp parse_int(s) when is_binary(s) do
+    case Integer.parse(s) do
+      {n, _} -> n
+      _ -> nil
+    end
+  end
+  defp parse_int(_), do: nil
 end
