@@ -2,6 +2,7 @@ import { HemisphereHook } from "./hemisphere.js"
 import GaugeHook from "./gauge_hook.js"
 import MapPinHover from "./map_pin_hover.js"
 import HelpTooltip from "./help_tooltip.js"
+import TerminalHook from "./terminal_hook.js"
 
 let Hooks = {};
 
@@ -9,6 +10,7 @@ Hooks.Hemisphere = HemisphereHook;
 Hooks.Gauge = GaugeHook;
 Hooks.MapPinHover = MapPinHover;
 Hooks.HelpTooltip = HelpTooltip;
+Hooks.Terminal = TerminalHook;
 
 /**
  * Obfuscation toggle — reads/writes localStorage and broadcasts to live view.

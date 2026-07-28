@@ -94,6 +94,9 @@ defmodule TunneldWeb.Live.Dashboard do
       |> assign(:system_resources, %{})
       |> assign(:map_status, :loading)
       |> assign(:geo_location, nil)
+      |> assign(:terminal_open, false)
+      |> assign(:terminal_machine_id, nil)
+      |> assign(:terminal_container, nil)
 
     socket =
       case Tunneld.Geolocation.get_location() do
@@ -208,6 +211,36 @@ defmodule TunneldWeb.Live.Dashboard do
         client_id={@client_id}
         pending_actions={@pending_actions}
       />
+
+      <%= if @terminal_open do %>
+        <.terminal_modal machine_id={@terminal_machine_id} container={@terminal_container} client_id={@client_id} />
+      <% end %>
+    </div>
+    """
+  end
+
+  defp terminal_modal(assigns) do
+    ~H"""
+    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" phx-click="close_terminal" phx-window-keydown="close_terminal" phx-key="escape">
+      <div class="bg-bg border border-border rounded-lg w-[90%] max-w-3xl h-[80%] flex flex-col" phx-click="ignore">
+        <div class="flex items-center justify-between p-3 border-b border-border">
+          <div class="text-sm font-medium">
+            <.icon name="hero-command-line" class="w-4 h-4 inline mr-1" />
+            shell: <%= @container %>
+          </div>
+          <button phx-click="close_terminal" class="ghost-btn text-xs">close</button>
+        </div>
+        <div
+          id={"terminal-#{@machine_id}-#{@container}"}
+          phx-hook="Terminal"
+          data-topic={"exec:#{@machine_id}:#{@container}"}
+          data-client-id={@client_id}
+          class="flex-1 bg-black overflow-hidden p-2 cursor-text"
+        >
+          <pre class="text-xs font-mono text-green-400 whitespace-pre-wrap h-full overflow-auto m-0"></pre>
+          <input type="text" class="terminal-input opacity-0 absolute -z-10 w-0 h-0" autocomplete="off" autofocus />
+        </div>
+      </div>
     </div>
     """
   end
@@ -454,6 +487,26 @@ defmodule TunneldWeb.Live.Dashboard do
       {:ok, _} -> {:noreply, put_flash(socket, :info, "#{name} deleted")}
       {:error, _} -> {:noreply, put_flash(socket, :error, "Could not delete #{name}")}
     end
+  end
+
+  def handle_event("open_terminal", %{"id" => id, "name" => name}, socket) do
+    socket =
+      socket
+      |> assign(:terminal_open, true)
+      |> assign(:terminal_machine_id, id)
+      |> assign(:terminal_container, name)
+
+    {:noreply, socket}
+  end
+
+  def handle_event("close_terminal", _params, socket) do
+    socket =
+      socket
+      |> assign(:terminal_open, false)
+      |> assign(:terminal_machine_id, nil)
+      |> assign(:terminal_container, nil)
+
+    {:noreply, socket}
   end
 
   def handle_info(

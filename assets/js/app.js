@@ -30,6 +30,9 @@ let liveSocket = new LiveSocket("/live", Socket, {
   hooks: Hooks
 })
 
+// Expose Phoenix + session for the terminal hook (which opens its own socket)
+window.Phoenix = { Socket: Socket }
+
 // Show progress bar on live navigation and form submits
 topbar.config({barColors: {0: "#29d"}, shadowColor: "rgba(0, 0, 0, .3)"})
 window.addEventListener("phx:page-loading-start", _info => topbar.show(300))
@@ -43,4 +46,7 @@ liveSocket.connect()
 // >> liveSocket.enableLatencySim(1000)  // enabled for duration of browser session
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
+
+// Read client_id from cookie for the terminal hook's separate socket
+window.__clientId = (document.cookie.match(/_tunneld_key=([^;]+)/) || [])[1] || ""
 

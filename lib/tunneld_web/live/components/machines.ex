@@ -160,6 +160,7 @@ defmodule TunneldWeb.Live.Components.Machines do
                     <% end %>
                   </div>
                   <div class="flex gap-1">
+                    <button phx-click="open_terminal" phx-value-id={@machine["id"]} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">shell</button>
                     <button phx-click="start_container" phx-value-id={@machine["id"]} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">start</button>
                     <button phx-click="stop_container" phx-value-id={@machine["id"]} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">stop</button>
                     <button phx-click="delete_container" phx-value-id={@machine["id"]} phx-value-name={c["name"]} class="ghost-btn !text-red !px-2 !py-0.5 text-[10px]">delete</button>
