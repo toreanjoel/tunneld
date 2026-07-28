@@ -18,6 +18,20 @@ Behaviors that must keep working after the redesign. A change breaking any entry
 - `Tunneld.Machines.remove(id)` => record gone, key deleted
 - POST /api/v1/machines without admin session => 401
 
+## Provisioning (M3)
+- `Tunneld.Machines.create_container(id, spec)` in mock => container appears in list_containers
+- `start_container/stop_container/delete_container` lifecycle works in mock
+- `validate_spec` rejects bad names/images/types/cpu/memory
+- Dashboard renders Machines component with Add Machine button
+- Container rows have shell/start/stop/delete buttons
+
+## Exec (M4)
+- `Tunneld.Machines.Exec.start(machine, container, channel_pid)` in mock => `{:ok, pid}`, welcome message sent
+- `Exec.send_input(pid, "whoami\r")` => `:exec_output` with "root"
+- `Exec.stop(pid)` => `:exec_exit` sent to channel
+- Phoenix channel at `exec:<machine>:<container>` rejects without auth
+- Terminal modal renders in dashboard with `<pre>` + hidden input + Terminal hook
+
 ## Compile
 - `bash .ai/run-capture.sh mix compile` => exit 0, no warnings about undefined modules
 
