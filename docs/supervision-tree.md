@@ -43,7 +43,6 @@ graph TD
     style EP fill:#7c3aed,color:#fff
     style PS fill:#7c3aed,color:#fff
     style RES fill:#ef4444,color:#fff
-    style MESH fill:#3b82f6,color:#fff
 ```
 
 ## Polling Intervals

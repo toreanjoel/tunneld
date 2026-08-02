@@ -55,8 +55,8 @@ graph TB
 Interface names come from app config (`:tunneld, :network`) and are never
 hardcoded in Elixir code:
 
-- `:upstream`   - internet-facing NIC (was `:wlan`)
-- `:downstream` - subnet-facing NIC (was `:eth`)
+- `:upstream`   - internet-facing NIC
+- `:downstream` - subnet-facing NIC
 
 In production these are supplied via the `UPSTREAM_INTERFACE` and
 `DOWNSTREAM_INTERFACE` environment variables. In dev/test they default to
@@ -69,4 +69,5 @@ In production these are supplied via the `UPSTREAM_INTERFACE` and
 3. **NAT**: iptables forwards traffic from downstream through upstream with masquerading
 4. **DNS**: All DNS queries are intercepted via iptables and routed through dnsmasq to the user-configured upstream DNS server
 5. **Resources**: nginx listens on `0.0.0.0:18000` and reverse-proxies `<name>.tunneld.lan` to the resource's backend pool
-6. **Management**: The Phoenix LiveView dashboard controls all components
+6. **Named resolution**: dnsmasq resolves any `*.tunneld.lan` name to the gateway so resources and exposed container services are reachable by name across the subnet
+7. **Management**: The Phoenix LiveView dashboard controls all components

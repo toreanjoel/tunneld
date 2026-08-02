@@ -122,7 +122,7 @@ Tunneld is designed for Debian-based SBCs such as Raspberry Pi, NanoPi, or any c
 curl -sSf https://raw.githubusercontent.com/toreanjoel/tunneld-installer/main/install.sh | sudo bash
 ```
 
-The installer handles all dependencies: `dnsmasq`, `dhcpcd`, `nginx`, `iptables`, and `wireguard-tools`. It prompts you to select your upstream and downstream interfaces from a list of detected NICs, then writes a systemd unit that passes `UPSTREAM_INTERFACE` and `DOWNSTREAM_INTERFACE` to the app. No Wi-Fi or Zrok setup steps.
+The installer handles all dependencies: `dnsmasq`, `dhcpcd`, `nginx`, `iptables`, and `openssl`. It prompts you to select your upstream and downstream interfaces from a list of detected NICs, then writes a systemd unit that passes `UPSTREAM_INTERFACE` and `DOWNSTREAM_INTERFACE` to the app. It also wires dnsmasq to resolve `*.tunneld.lan` names to the gateway so named resources are reachable across the subnet. No Wi-Fi, Zrok, or VPN setup steps.
 
 > **Note**: The installer lives in a separate repo ([tunneld-installer](https://github.com/toreanjoel/tunneld-installer)) and has been updated alongside this rework.
 

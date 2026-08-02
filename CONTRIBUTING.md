@@ -24,7 +24,7 @@ mix assets.setup
 PORT=4000 MOCK_DATA=true mix phx.server
 ```
 
-The `MOCK_DATA=true` flag stubs all hardware/OS interactions (systemctl, wpa_cli, iptables, etc.) with fake data. This lets you develop and test on any machine - no SBC, no root access required.
+The `MOCK_DATA=true` flag stubs all hardware/OS interactions (systemctl, iptables, dnsmasq, SSH, etc.) with fake data. This lets you develop and test on any machine - no SBC, no root access required.
 
 Visit `http://localhost:4000` to see the dashboard. The default port is 80 (used in production), but that requires root - set `PORT=4000` (or any unprivileged port) for local development.
 
@@ -44,7 +44,7 @@ MOCK_DATA=true mix compile --warnings-as-errors
 
 ### Architecture
 
-Tunneld follows a GenServer-per-concern pattern. Each server in `lib/tunneld/servers/` manages one domain (devices, services, resources, mesh, etc.) and communicates with the LiveView dashboard through Phoenix PubSub.
+Tunneld follows a GenServer-per-concern pattern. Each server in `lib/tunneld/servers/` manages one domain (devices, services, resources, machines, DNS, etc.) and communicates with the LiveView dashboard through Phoenix PubSub.
 
 Key patterns:
 - **PubSub topics** follow `component:<name>` for UI updates and `notifications` for flash messages
