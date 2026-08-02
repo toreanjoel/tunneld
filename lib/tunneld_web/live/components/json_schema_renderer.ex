@@ -6,8 +6,6 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
   alias ExJsonSchema.Validator
   alias ExJsonSchema.Schema
 
-  alias TunneldWeb.Icons
-
   @spec update(map(), Phoenix.LiveView.Socket.t()) :: {:ok, Phoenix.LiveView.Socket.t()}
   def update(assigns, socket) do
     schema = Schema.resolve(assigns.schema)
@@ -32,7 +30,7 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
           enum:
             if(props["type"] == "array",
               do: nil,
-              else: Map.get(values, key, props["enum"])
+              else: props["enum"]
             ),
           format: props["format"],
           default: props["default"],
@@ -200,6 +198,12 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
                     []
                 end
 
+              "integer" ->
+                parse_int(Map.get(raw_params, field.name))
+
+              "number" ->
+                parse_float(Map.get(raw_params, field.name))
+
               _ ->
                 Map.get(raw_params, field.name)
             end
@@ -225,6 +229,30 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
   defp array_to_text(value) when is_list(value), do: Enum.join(value, "\n")
   defp array_to_text(value) when is_binary(value), do: value
   defp array_to_text(_), do: ""
+
+  defp parse_int(nil), do: nil
+  defp parse_int(s) when is_integer(s), do: s
+
+  defp parse_int(s) when is_binary(s) do
+    case Integer.parse(s) do
+      {n, ""} -> n
+      _ -> s
+    end
+  end
+
+  defp parse_int(_), do: nil
+
+  defp parse_float(nil), do: nil
+  defp parse_float(s) when is_number(s), do: s
+
+  defp parse_float(s) when is_binary(s) do
+    case Float.parse(s) do
+      {n, ""} -> n
+      _ -> s
+    end
+  end
+
+  defp parse_float(_), do: nil
 
   defp clean_errors(errors) do
     Enum.map(errors, fn {field, msg} ->

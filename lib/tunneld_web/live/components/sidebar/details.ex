@@ -13,7 +13,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   """
 
   use TunneldWeb, :live_component
-  import TunneldWeb.Live.Components.HelpIcon
 
   def mount(socket) do
     {:ok, socket}

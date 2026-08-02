@@ -108,14 +108,16 @@ defmodule Tunneld.Machines.Provider do
     cpu = spec["cpu"]
     memory = spec["memory"]
     ports = spec["ports"] || []
+    network = spec["network"] || "bridge"
     vm_flag = if type == "vm", do: " --vm", else: ""
 
     with {:ok, _} <- run(machine, "incus init #{sh(image)} #{sh(name)}#{vm_flag}"),
          :ok <- maybe_config(machine, name, cpu, memory),
+         :ok <- maybe_network(machine, name, network),
          :ok <- add_proxy_devices(machine, name, ports),
          {:ok, _} <- run(machine, "incus config set #{sh(name)} boot.autostart true"),
          {:ok, _} <- run(machine, "incus start #{sh(name)}") do
-      {:ok, %{"name" => name, "status" => "Running", "type" => type}}
+      {:ok, %{"name" => name, "status" => "Running", "type" => type, "network" => network}}
     end
   end
 
@@ -174,9 +176,26 @@ defmodule Tunneld.Machines.Provider do
     end
   end
 
+  # Attach the container to a network.
+  #
+  # macvlan: the container gets its own MAC + DHCP lease straight from the
+  # gateway's dnsmasq, appearing on the subnet as an independent device. Only
+  # valid for containers (not VMs) on local targets.
+  #
+  # bridge (default): NAT'd behind the target host; services are reached via
+  # Incus proxy devices on the host's IP.
+  defp maybe_network(_machine, _name, "bridge"), do: :ok
+  defp maybe_network(machine, name, "macvlan") do
+    case run(machine, "incus config device add #{sh(name)} eth0 nic network=lxdbr0 nictype=macvlan") do
+      {:ok, _} -> :ok
+      err -> err
+    end
+  end
+  defp maybe_network(_machine, _name, _), do: :ok
+
   # Each port: %{"host" => 8080, "container" => 80}
   # Incus proxy device: incus config device add <c> <name> proxy listen=0.0.0.0:<host> connect=0.0.0.0:<container>
-  defp add_proxy_devices(machine, name, []), do: :ok
+  defp add_proxy_devices(_machine, _name, []), do: :ok
   defp add_proxy_devices(machine, name, ports) do
     ports
     |> Enum.reduce_while(:ok, fn %{"host" => host, "container" => container}, _acc ->

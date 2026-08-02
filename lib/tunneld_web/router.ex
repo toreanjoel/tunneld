@@ -27,6 +27,12 @@ defmodule TunneldWeb.Router do
       get "/expose", ExposeController, :index
       delete "/expose/:name", ExposeController, :delete
 
+      get "/device/machines", DeviceController, :machines
+      get "/device/machines/:id", DeviceController, :machine
+      get "/device/machines/:id/containers", DeviceController, :containers
+      get "/device/resources", DeviceController, :resources
+      get "/device/health", DeviceController, :health
+
       pipe_through [:fetch_session]
       get "/machines", MachineController, :index
       post "/machines", MachineController, :create

@@ -89,16 +89,10 @@ defmodule Tunneld.Machines.SSH.Mock do
     ""
   end
 
-  # Strip single-quote wrapping from a sh-quoted argument: 'foo' -> foo
-  defp unquote_name("'" <> rest), do: String.trim_trailing(rest, "'")
-  defp unquote_name(other), do: other
-
-  # config set: best-effort, no-op in mock
   defp mock_output("incus config set " <> _rest) do
     ""
   end
 
-  # config device add: no-op in mock
   defp mock_output("incus config device add " <> _rest) do
     ""
   end
@@ -106,6 +100,10 @@ defmodule Tunneld.Machines.SSH.Mock do
   defp mock_output(_other) do
     ""
   end
+
+  # Strip single-quote wrapping from a sh-quoted argument: 'foo' -> foo
+  defp unquote_name("'" <> rest), do: String.trim_trailing(rest, "'")
+  defp unquote_name(other), do: other
 
   # --- In-memory mock Incus state ---
 

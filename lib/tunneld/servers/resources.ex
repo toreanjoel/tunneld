@@ -280,7 +280,11 @@ defmodule Tunneld.Servers.Resources do
         lan_url: lan_url(s["name"]),
         expose_source: s["expose_source"],
         expose_device_mac: s["expose_device_mac"],
-        expose_device_ip: s["expose_device_ip"]
+        expose_device_ip: s["expose_device_ip"],
+        expose_machine_id: s["expose_machine_id"],
+        expose_container: s["expose_container"],
+        expose_remote_port: s["expose_remote_port"],
+        expose_local_port: s["expose_local_port"]
       }
     end)
   end

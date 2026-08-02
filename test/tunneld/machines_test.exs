@@ -39,6 +39,30 @@ defmodule Tunneld.MachinesTest do
     assert {:error, "address is required"} = Machines.enroll(%{"name" => "x"})
   end
 
+  test "enroll infers location from the subnet and accepts explicit remote" do
+    # Test gateway is 192.168.1.1, so 192.168.1.x is local, other ranges are remote.
+    {:ok, %{"machine" => local}} = Machines.enroll(%{"name" => "loc1", "address" => "192.168.1.50"})
+    assert local["location"] == "local"
+
+    {:ok, %{"machine" => inferred_remote}} = Machines.enroll(%{"name" => "loc2", "address" => "10.0.0.5"})
+    assert inferred_remote["location"] == "remote"
+
+    {:ok, %{"machine" => explicit}} =
+      Machines.enroll(%{"name" => "loc3", "address" => "192.168.1.60", "location" => "remote"})
+
+    assert explicit["location"] == "remote"
+  end
+
+  test "infer_location returns local or remote based on the gateway subnet" do
+    assert Machines.infer_location("192.168.1.42") == "local"
+    assert Machines.infer_location("203.0.113.5") == "remote"
+  end
+
+  test "enroll rejects an invalid location" do
+    assert {:error, "location must be local or remote"} =
+             Machines.enroll(%{"name" => "x", "address" => "10.0.0.5", "location" => "cloud"})
+  end
+
   test "probe fills capabilities and sets status ready (mock mode)" do
     {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "box2", "address" => "10.0.0.6"})
     {:ok, machine} = Machines.probe(id)
@@ -144,6 +168,36 @@ defmodule Tunneld.MachinesTest do
 
       {:ok, list} = Machines.list_containers(id)
       refute Enum.any?(list, &(&1["name"] == "lifecycle"))
+    end
+
+    test "create_container with macvlan network" do
+      {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "prov5", "address" => "10.0.0.14"})
+
+      {:ok, container} =
+        Machines.create_container(id, %{
+          "name" => "macvlan-app",
+          "image" => "ubuntu/24.04",
+          "network" => "macvlan"
+        })
+
+      assert container["network"] == "macvlan"
+
+      {:ok, list} = Machines.list_containers(id)
+      assert Enum.any?(list, &(&1["name"] == "macvlan-app"))
+    end
+
+    test "create_container rejects macvlan for VMs" do
+      {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "prov6", "address" => "10.0.0.15"})
+
+      assert {:error, "macvlan networking is not supported for VMs"} =
+               Machines.create_container(id, %{"name" => "vm", "image" => "x", "type" => "vm", "network" => "macvlan"})
+    end
+
+    test "create_container validates network" do
+      {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "prov7", "address" => "10.0.0.16"})
+
+      assert {:error, "network must be bridge or macvlan"} =
+               Machines.create_container(id, %{"name" => "x", "image" => "y", "network" => "host"})
     end
 
     test "create_container on unknown machine returns not_found" do

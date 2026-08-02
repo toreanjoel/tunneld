@@ -18,7 +18,7 @@ defmodule TunneldWeb.Live.Components.GaugeGrid do
 
   def gauge_grid(assigns) do
     ~H"""
-    <div class="hero-card p-0 overflow-hidden grid grid-cols-2 grid-rows-2 h-full">
+    <div class="hero-card p-4 overflow-hidden grid grid-cols-2 grid-rows-2 h-full">
       <div class="border-r border-b border-border">
         <.gauge_cell icon={:cpu} label="CPU" value={@cpu} max={100} suffix="%" />
       </div>
@@ -58,8 +58,8 @@ defmodule TunneldWeb.Live.Components.GaugeGrid do
     assigns = assign(assigns, val: val, shown: shown, id: id, danger_class: danger_class)
 
     ~H"""
-    <div class="h-full flex flex-col items-center justify-center relative">
-      <div class="absolute top-3.5 left-3.5 flex items-center gap-1.5 text-text-secondary">
+    <div class="h-full flex flex-col items-stretch justify-center gap-2 p-4">
+      <div class="flex items-center gap-1.5 text-text-secondary">
         <%= case @icon do %>
           <% :cpu -> %><.cpu size={12} />
           <% :hard_drive -> %><.hard_drive size={12} />
@@ -71,7 +71,7 @@ defmodule TunneldWeb.Live.Components.GaugeGrid do
 
       <div
         id={@id}
-        class="relative"
+        class="self-center relative"
         phx-hook="Gauge"
         data-value={@val}
         data-max={@max}

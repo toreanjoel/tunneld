@@ -19,9 +19,9 @@ graph TD
         AUTH[Auth Server]
         DNS_CFG[DnsConfig]
         UPD[Updater Server]
-        WG[Wireguard]
+        MACH[Machines Server]
+        EXPO[Expose Server]
         GEO[Geolocation]
-        MESH[Mesh Server]
     end
 
     subgraph Not Supervised - Called at Startup
@@ -38,7 +38,6 @@ graph TD
     RES --> NGX
     RES --> PERSIST
     AUTH --> PERSIST
-    MESH --> IPTABLES
     NETLINK -.reads.-> SYSFS[/sys/class/net/]
 
     style EP fill:#7c3aed,color:#fff
@@ -56,7 +55,6 @@ graph TD
 | Services | 10s | Check systemd service statuses |
 | SystemResources | 10s | Read CPU, memory, disk via :os_mon |
 | Resources | 10s | Broadcast resource list + health |
-| Mesh | 25s | Poll coordinator for peers, heartbeat, and mesh sync |
 | Updater | 5min | Check GitHub for new version |
 
 Link state for the upstream/downstream interfaces is read on demand from
@@ -75,7 +73,7 @@ graph LR
         UPD[Updater]
         DNS_CFG[DnsConfig]
         NETLINK[NetLink]
-        MESH[Mesh]
+        MACH[Machines]
     end
 
     subgraph PubSub Topics
@@ -87,7 +85,7 @@ graph LR
         CW[component:welcome]
         SI[status:internet]
         NT[notifications]
-        CM[component:mesh]
+        CM[component:machines]
     end
 
     subgraph Dashboard LiveView
@@ -102,7 +100,7 @@ graph LR
     DNS_CFG --> CDT
     NETLINK -.broadcast.-> SI --> DLV
     RES --> NT --> DLV
-    MESH --> CM --> DLV
+    MACH --> CM --> DLV
 
     style DLV fill:#7c3aed,color:#fff
 ```

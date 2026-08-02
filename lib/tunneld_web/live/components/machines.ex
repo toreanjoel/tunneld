@@ -12,36 +12,66 @@ defmodule TunneldWeb.Live.Components.Machines do
 
   alias Tunneld.Machines
 
+  @impl true
   def mount(socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:machines")
     end
 
-    {:ok, assign(socket, machines: Machines.list(), selected: nil, containers: [], loading: false, show_enroll: false, show_create: false)}
+    {:ok, assign(socket, machines: Machines.list(), selected: nil, containers: [], loading: false)}
   end
 
+  @impl true
   def update(assigns, socket) do
+    selected_id = socket.assigns[:selected] && socket.assigns[:selected]["id"]
+
+    containers =
+      if selected_id do
+        case Machines.list_containers(selected_id) do
+          {:ok, c} -> c
+          _ -> []
+        end
+      else
+        Map.get(assigns, :containers, [])
+      end
+
     socket =
       socket
       |> assign(:obfuscated, Map.get(assigns, :obfuscated, false))
       |> assign(:machines, Machines.list())
+      |> assign(:containers, containers)
 
     {:ok, socket}
   end
 
+  @impl true
+  def handle_event("select_machine", %{"id" => id}, socket) do
+    containers =
+      case Machines.list_containers(id) do
+        {:ok, c} -> c
+        _ -> []
+      end
+
+    case Machines.get(id) do
+      {:ok, machine} -> {:noreply, assign(socket, selected: machine, containers: containers)}
+      _ -> {:noreply, socket}
+    end
+  end
+
+  @impl true
   def render(assigns) do
     ~H"""
     <div>
       <.section_header>
         Machines
         <:actions>
-          <button phx-click="toggle_enroll" class="ghost-btn">
+          <button phx-click="enroll_machine_modal" class="ghost-btn">
             Add Machine
           </button>
         </:actions>
       </.section_header>
 
-      <div :if={Enum.empty?(@machines) and not @show_enroll} class="w-[60px] h-[60px] bg-surface flex items-center justify-center rounded-md opacity-10">
+      <div :if={Enum.empty?(@machines)} class="w-[60px] h-[60px] bg-surface flex items-center justify-center rounded-md opacity-10">
         <.icon class="w-8 h-8 text-text-primary" name="hero-server-stack" />
       </div>
 
@@ -49,6 +79,7 @@ defmodule TunneldWeb.Live.Components.Machines do
         <%= for machine <- @machines do %>
           <div
             phx-click="select_machine"
+            phx-target={@myself}
             phx-value-id={machine["id"]}
             class="p-3 gap-2 flex flex-col rounded-lg w-full cursor-pointer bg-surface border border-border transition-colors duration-150 hover:bg-[#17161F] hover:border-[#2A2838]"
           >
@@ -60,47 +91,23 @@ defmodule TunneldWeb.Live.Components.Machines do
               </div>
             </div>
             <div class="flex items-center justify-between text-xs">
-              <span class="px-2 py-0.5 rounded-full bg-text-primary/10 text-text-secondary uppercase text-[10px] font-medium">
-                <%= machine["kind"] %>
+              <span class="flex items-center gap-1.5">
+                <span class={"w-[9px] h-[9px] rounded-full inline-block #{status_dot(machine["status"])}"}></span>
+                <span class="px-2 py-0.5 rounded-full bg-text-primary/10 text-text-secondary uppercase text-[10px] font-medium">
+                  <%= machine["kind"] %>
+                </span>
               </span>
-              <span class={"w-[13px] h-[13px] rounded-full inline-block #{status_dot(machine["status"])}"}></span>
+              <span class={"px-2 py-0.5 rounded-full uppercase text-[10px] font-medium #{location_chip(machine["location"])}"}>
+                <%= location_label(machine["location"]) %>
+              </span>
             </div>
           </div>
         <% end %>
       </div>
 
-      <%= if @show_enroll do %>
-        <.enroll_form />
-      <% end %>
-
       <%= if @selected do %>
-        <.machine_detail machine={@selected} containers={@containers} loading={@loading} show_create={@show_create} />
+        <.machine_detail machine={@selected} containers={@containers} loading={@loading} />
       <% end %>
-    </div>
-    """
-  end
-
-  defp enroll_form(assigns) do
-    ~H"""
-    <div class="mt-4 bg-surface border border-border rounded-lg p-4">
-      <div class="text-sm font-medium mb-3">Add a machine</div>
-      <form phx-submit="enroll_machine" class="space-y-3">
-        <div>
-          <label class="text-xs text-text-secondary mb-1 block">Name</label>
-          <input type="text" name="name" placeholder="office-box" class="tunl-input" />
-        </div>
-        <div>
-          <label class="text-xs text-text-secondary mb-1 block">Address (host or IP)</label>
-          <input type="text" name="address" placeholder="10.0.0.5" class="tunl-input" />
-        </div>
-        <div>
-          <label class="text-xs text-text-secondary mb-1 block">SSH port</label>
-          <input type="number" name="ssh_port" value="22" class="tunl-input" />
-        </div>
-        <button type="submit" class="w-full p-3 rounded-lg text-sm font-medium transition bg-accent hover:bg-accent-light">
-          Generate Key & Enroll
-        </button>
-      </form>
     </div>
     """
   end
@@ -111,11 +118,11 @@ defmodule TunneldWeb.Live.Components.Machines do
       <div class="flex items-center justify-between">
         <div>
           <div class="text-sm font-medium"><%= @machine["name"] %></div>
-          <div class="text-xs text-text-tertiary"><%= @machine["address"] %> · <%= @machine["kind"] %></div>
+          <div class="text-xs text-text-tertiary"><%= @machine["address"] %> · <%= @machine["kind"] %> · <%= location_label(@machine["location"]) %></div>
         </div>
         <div class="flex gap-2">
           <button phx-click="probe_machine" phx-value-id={@machine["id"]} class="ghost-btn text-xs">Probe</button>
-          <button phx-click="toggle_create" phx-value-id={@machine["id"]} class="ghost-btn text-xs">New Container</button>
+          <button phx-click="create_container_modal" phx-value-id={@machine["id"]} class="ghost-btn text-xs">New Container</button>
           <button phx-click="remove_machine" phx-value-id={@machine["id"]} class="ghost-btn !text-red text-xs">Remove</button>
         </div>
       </div>
@@ -135,10 +142,6 @@ defmodule TunneldWeb.Live.Components.Machines do
         Status: <%= @machine["status"] %>
         <%= if @machine["last_seen"], do: " · last seen #{String.slice(@machine["last_seen"], 0, 19)}" %>
       </div>
-
-      <%= if @show_create do %>
-        <.create_form machine_id={@machine["id"]} />
-      <% end %>
 
       <div>
         <div class="text-xs text-text-secondary mb-2">Containers</div>
@@ -163,6 +166,9 @@ defmodule TunneldWeb.Live.Components.Machines do
                     <button phx-click="open_terminal" phx-value-id={@machine["id"]} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">shell</button>
                     <button phx-click="start_container" phx-value-id={@machine["id"]} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">start</button>
                     <button phx-click="stop_container" phx-value-id={@machine["id"]} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">stop</button>
+                    <%= if @machine["location"] == "remote" do %>
+                      <button phx-click="expose_container_modal" phx-value-id={@machine["id"]} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">expose</button>
+                    <% end %>
                     <button phx-click="delete_container" phx-value-id={@machine["id"]} phx-value-name={c["name"]} class="ghost-btn !text-red !px-2 !py-0.5 text-[10px]">delete</button>
                   </div>
                 </div>
@@ -175,28 +181,17 @@ defmodule TunneldWeb.Live.Components.Machines do
     """
   end
 
-  defp create_form(assigns) do
-    ~H"""
-    <form phx-submit="create_container" phx-value-id={@machine_id} class="bg-surface-2 rounded p-3 space-y-2">
-      <div class="text-xs font-medium">New container/VM</div>
-      <input type="text" name="name" placeholder="my-app" class="tunl-input" />
-      <input type="text" name="image" placeholder="ubuntu/24.04" class="tunl-input" />
-      <select name="type" class="tunl-input">
-        <option value="container">container</option>
-        <option value="vm">vm</option>
-      </select>
-      <input type="number" name="cpu" placeholder="cpu (optional)" class="tunl-input" />
-      <input type="number" name="memory" placeholder="memory MiB (optional)" class="tunl-input" />
-      <button type="submit" class="w-full p-2 rounded text-xs font-medium bg-accent hover:bg-accent-light">Create</button>
-    </form>
-    """
-  end
-
   defp status_dot("ready"), do: "bg-green"
   defp status_dot("enrolled"), do: "bg-yellow"
   defp status_dot("probing"), do: "bg-yellow"
   defp status_dot("unreachable"), do: "bg-red"
   defp status_dot(_), do: "bg-gray-500"
+
+  defp location_chip("remote"), do: "bg-blue-500/15 text-blue-400"
+  defp location_chip(_), do: "bg-emerald-500/15 text-emerald-400"
+
+  defp location_label("remote"), do: "remote"
+  defp location_label(_), do: "local"
 
   defp container_dot("Running"), do: "bg-green"
   defp container_dot("Stopped"), do: "bg-red"

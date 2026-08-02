@@ -136,8 +136,11 @@ defmodule TunneldWeb.Live.Dashboard do
 
         <%= if !@devices_expanded do %>
           <main class="max-w-[1280px] mx-auto px-8 pt-2 pb-16">
-            <div class="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-6">
-              <div class="grid grid-rows-[1fr_3fr] gap-6">
+            <div class="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
+              <div class="h-full">
+                <.live_component id="map_card" module={TunneldWeb.Live.Components.MapCard} geo_location={@geo_location} map_status={@map_status} />
+              </div>
+              <div class="grid grid-rows-[auto_1fr] gap-6 h-full">
                 <div class="grid grid-cols-2 gap-6">
                   <.internet_card on={@status.internet} />
                   <.dns_card server={@dns_server} />
@@ -391,35 +394,73 @@ defmodule TunneldWeb.Live.Dashboard do
 
   # --- Machines ---
 
-  def handle_event("toggle_enroll", _params, socket) do
-    {:noreply, push_event(socket, "toggle_enroll", %{})}
+  def handle_event("enroll_machine_modal", _params, socket) do
+    modal_data = %{
+      show: true,
+      title: "Add Machine",
+      description: nil,
+      body: %{
+        "type" => "schema",
+        "data" => Tunneld.Schema.Machine.data(),
+        "default_values" => %{"ssh_port" => 22, "location" => "local"},
+        "action" => "enroll_machine"
+      },
+      actions: nil,
+      type: :default
+    }
+
+    {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal_data))}
   end
 
-  def handle_event("enroll_machine", params, socket) do
-    case Tunneld.Machines.enroll(params) do
-      {:ok, %{"id" => _id, "public_key" => pub, "machine" => _machine}} ->
-        socket =
-          socket
-          |> put_flash(:info, "Machine enrolled. Install this public key on the target:")
-          |> put_flash(:info_raw, pub)
+  def handle_event("create_container_modal", %{"id" => id}, socket) do
+    case Tunneld.Machines.get(id) do
+      {:ok, machine} ->
+        caps = machine["capabilities"] || %{}
 
-        send(self(), {:machines_changed})
-        {:noreply, socket}
+        modal_data = %{
+          show: true,
+          title: "New Container/VM",
+          description: "Provision an Incus container or VM on #{machine["name"]}.",
+          body: %{
+            "type" => "schema",
+            "data" =>
+              Tunneld.Schema.Container.data(%{
+                machine_id: id,
+                kvm: caps["kvm"] == true,
+                location: machine["location"],
+                cpu_count: caps["cpu_count"],
+                memory_mb: caps["memory_mb"]
+              }),
+            "default_values" => %{"type" => "container", "network" => "bridge"},
+            "action" => "create_container"
+          },
+          actions: nil,
+          type: :default
+        }
 
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Enrollment failed: #{reason}")}
+        {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal_data))}
+
+      {:error, :not_found} ->
+        {:noreply, put_flash(socket, :error, "Machine not found")}
     end
   end
 
-  def handle_event("select_machine", %{"id" => id}, socket) do
-    containers =
-      case Tunneld.Machines.list_containers(id) do
-        {:ok, c} -> c
-        _ -> []
-      end
+  def handle_event("expose_container_modal", %{"id" => id, "name" => name}, socket) do
+    modal_data = %{
+      show: true,
+      title: "Expose Container",
+      description: "Make #{name} reachable on the subnet via a reverse SSH tunnel.",
+      body: %{
+        "type" => "schema",
+        "data" => Tunneld.Schema.Expose.data(%{machine_id: id, container: name}),
+        "default_values" => %{"machine_id" => id, "container" => name},
+        "action" => "expose_container"
+      },
+      actions: nil,
+      type: :default
+    }
 
-    {:ok, machine} = Tunneld.Machines.get(id)
-    {:noreply, push_event(socket, "machine_selected", %{"machine" => machine, "containers" => containers})}
+    {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal_data))}
   end
 
   def handle_event("probe_machine", %{"id" => id}, socket) do
@@ -441,30 +482,6 @@ defmodule TunneldWeb.Live.Dashboard do
 
       _ ->
         {:noreply, put_flash(socket, :error, "Could not remove machine")}
-    end
-  end
-
-  def handle_event("toggle_create", _params, socket) do
-    {:noreply, push_event(socket, "toggle_create", %{})}
-  end
-
-  def handle_event("create_container", %{"id" => id} = params, socket) do
-    spec = %{
-      "name" => params["name"],
-      "image" => params["image"],
-      "type" => params["type"] || "container",
-      "cpu" => parse_int(params["cpu"]),
-      "memory" => parse_int(params["memory"]),
-      "ports" => []
-    }
-
-    case Tunneld.Machines.create_container(id, spec) do
-      {:ok, _} ->
-        send(self(), {:machines_changed})
-        {:noreply, put_flash(socket, :info, "Container created")}
-
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Create failed: #{reason}")}
     end
   end
 
@@ -624,6 +641,31 @@ defmodule TunneldWeb.Live.Dashboard do
       |> assign(:devices, devices)
       |> maybe_close_modal_after_success(pending)
 
+    {:noreply, socket}
+  end
+
+  def handle_info({:action_done, ref, action, result}, socket)
+      when action in ["enroll_machine", "create_container", "expose_container"] do
+    pending = Map.get(socket.assigns.pending_actions, ref, %{})
+
+    socket =
+      case unwrap_result(result) do
+        {:ok, data} ->
+          socket
+          |> assign(:pending_actions, Map.delete(socket.assigns.pending_actions, ref))
+          |> maybe_close_modal_after_success(pending)
+          |> machine_action_flash(action, data)
+
+        {:error, reason} ->
+          Logger.error("Machine action failed: #{inspect(reason)}")
+
+          socket
+          |> assign(:pending_actions, Map.delete(socket.assigns.pending_actions, ref))
+          |> maybe_keep_modal_open(pending)
+          |> put_flash(:error, "Action failed: #{machine_error(action, reason)}")
+      end
+
+    send(self(), {:machines_changed})
     {:noreply, socket}
   end
 
@@ -827,12 +869,46 @@ defmodule TunneldWeb.Live.Dashboard do
     %{is_open: false, view: Map.get(sidebar, :view), selection: nil}
   end
 
-  defp parse_int(""), do: nil
-  defp parse_int(s) when is_binary(s) do
-    case Integer.parse(s) do
-      {n, _} -> n
-      _ -> nil
-    end
+  defp machine_action_flash(socket, "enroll_machine", %{"public_key" => pub}) when is_binary(pub) do
+    socket =
+      put_flash(
+        socket,
+        :info,
+        "Machine enrolled. Install this public key on the target: #{pub}"
+      )
+
+    socket
   end
-  defp parse_int(_), do: nil
+
+  defp machine_action_flash(socket, "enroll_machine", %{"machine" => %{"name" => name}}) do
+    put_flash(socket, :info, "Machine #{name} enrolled. You can now install its key and probe it.")
+  end
+
+  defp machine_action_flash(socket, "create_container", %{"name" => name}) do
+    put_flash(socket, :info, "Container #{name} created")
+  end
+
+  defp machine_action_flash(socket, "expose_container", %{"lan_url" => lan_url})
+      when not is_nil(lan_url) do
+    put_flash(socket, :info, "Exposed on the subnet at #{lan_url}")
+  end
+
+  defp machine_action_flash(socket, "expose_container", _result) do
+    put_flash(socket, :info, "Exposed on the subnet")
+  end
+
+  defp machine_action_flash(socket, _action, _result), do: socket
+
+  # start_action wraps perform/3 as {:ok, perform(...)}. perform/3 itself returns
+  # {:ok, data} | {:error, reason} for machine actions, so we unwrap both layers.
+  defp unwrap_result({:ok, {:ok, data}}), do: {:ok, data}
+  defp unwrap_result({:ok, {:error, reason}}), do: {:error, reason}
+  defp unwrap_result({:ok, data}), do: {:ok, data}
+  defp unwrap_result({:error, reason}), do: {:error, reason}
+  defp unwrap_result(other), do: {:ok, other}
+
+  defp machine_error("enroll_machine", reason), do: "enrollment failed: #{inspect(reason)}"
+  defp machine_error("create_container", reason), do: "container creation failed: #{inspect(reason)}"
+  defp machine_error("expose_container", reason), do: "expose failed: #{inspect(reason)}"
+  defp machine_error(_action, reason), do: inspect(reason)
 end

@@ -25,7 +25,7 @@ defmodule TunneldWeb.ExecChannel do
     [machine_id, container] = String.split(rest, ":", parts: 2)
 
     case Store.get(machine_id) do
-      {:ok, machine} ->
+      {:ok, _machine} ->
         {:ok, assign(socket, machine_id: machine_id, container: container, exec_pid: nil)}
 
       {:error, :not_found} ->

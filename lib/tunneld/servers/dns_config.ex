@@ -19,7 +19,13 @@ defmodule Tunneld.Servers.DnsConfig do
   @impl true
   def init(_) do
     server = read_dns_server()
-    ensure_dnsmasq_config(server)
+
+    unless Application.get_env(:tunneld, :mock_data, false) do
+      write_dnsmasq_config(server)
+      write_lan_domain_config()
+      Tunneld.Servers.Services.restart_service(:dnsmasq, :no_notify)
+    end
+
     {:ok, %{"server" => server}}
   end
 
@@ -52,6 +58,16 @@ defmodule Tunneld.Servers.DnsConfig do
   end
 
   @impl true
+  def handle_call(:ensure_lan_domain, _from, state) do
+    unless Application.get_env(:tunneld, :mock_data, false) do
+      write_lan_domain_config()
+      Tunneld.Servers.Services.restart_service(:dnsmasq, :no_notify)
+    end
+
+    {:reply, :ok, state}
+  end
+
+  @impl true
   def handle_call({:set_dns_server, ip}, _from, _state) do
     path = dns_path()
     Tunneld.Persistence.write_json(path, %{"server" => ip})
@@ -71,17 +87,43 @@ defmodule Tunneld.Servers.DnsConfig do
     {:reply, :ok, %{"server" => ip}}
   end
 
-  defp ensure_dnsmasq_config(server) do
-    mock? = Application.get_env(:tunneld, :mock_data, false)
+  @doc """
+  Ensure the LAN domain (`*.tunneld.lan`) resolves to the gateway IP so named
+  resources and exposed services are reachable by name across the subnet.
+  No-op in mock mode.
+  """
+  def ensure_lan_domain do
+    if Process.whereis(__MODULE__) do
+      GenServer.call(__MODULE__, :ensure_lan_domain)
+    else
+      unless Application.get_env(:tunneld, :mock_data, false) do
+        write_lan_domain_config()
+        Tunneld.Servers.Services.restart_service(:dnsmasq, :no_notify)
+      end
 
-    unless mock? do
-      write_dnsmasq_config(server)
-      Tunneld.Servers.Services.restart_service(:dnsmasq, :no_notify)
+      :ok
     end
   end
 
   defp write_dnsmasq_config(server) do
     File.write!(@dnsmasq_conf, "server=#{server}\n")
+  end
+
+  @lan_domain_conf "/etc/dnsmasq.d/tunneld_resources.conf"
+
+  # Resolve any *.tunneld.lan name to the gateway so named resources and
+  # exposed container services are reachable across the subnet.
+  defp write_lan_domain_config do
+    gateway = gateway_ip()
+    File.write!(@lan_domain_conf, "address=/.tunneld.lan/#{gateway}\n")
+  end
+
+  defp gateway_ip do
+    case Application.get_env(:tunneld, :network, []) do
+      kw when is_list(kw) -> Keyword.get(kw, :gateway)
+      map when is_map(map) -> Map.get(map, :gateway) || Map.get(map, "gateway")
+      _ -> nil
+    end
   end
 
   defp read_dns_server do

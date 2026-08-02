@@ -10,11 +10,16 @@ defmodule Tunneld.Machines do
         "address" => "host or ip",
         "ssh_port" => 22,
         "kind" => "incus",
+        "location" => "local" | "remote",
         "added_at" => "ISO8601",
         "capabilities" => %{...} | nil,
         "last_seen" => "ISO8601" | nil,
         "status" => "enrolled" | "probing" | "ready" | "unreachable"
       }
+
+  `location` distinguishes machines reachable on the gateway's own subnet
+  (`"local"`, eligible for macvlan container networking) from machines reached
+  over the internet (`"remote"`, containers use a NAT bridge + proxy devices).
 
   State on disk is a hint. Live state (containers running, capabilities) is
   always queried from the machine over SSH, never trusted from the cache,
@@ -30,6 +35,7 @@ defmodule Tunneld.Machines do
   require Logger
 
   alias Tunneld.Machines.{Store, SSH, Provider}
+  alias Tunneld.Machines.Expose
 
   @pubsub_topic "component:machines"
 
@@ -42,6 +48,43 @@ defmodule Tunneld.Machines do
 
   @doc "Fetch a single machine by id."
   def get(id), do: Store.get(id)
+
+  @doc """
+  Infer whether a machine address is local (on the gateway's own subnet) or
+  remote, based on the configured gateway IP.
+  """
+  def infer_location(address) when is_binary(address) do
+    same_subnet?(address, gateway_ip())
+  end
+
+  defp gateway_ip do
+    case Application.get_env(:tunneld, :network, []) do
+      kw when is_list(kw) -> Keyword.get(kw, :gateway)
+      map when is_map(map) -> Map.get(map, :gateway) || Map.get(map, "gateway")
+      _ -> nil
+    end
+  end
+
+  # Same subnet heuristic: two IPv4 addresses share the /24 prefix of the
+  # gateway. Falls back to :remote when either address can't be parsed.
+  defp same_subnet?(address, gateway) do
+    with {:ok, a} <- parse_ip4(address),
+         {:ok, g} <- parse_ip4(gateway) do
+      {a, g} |> same_prefix?() && "local" || "remote"
+    else
+      _ -> "remote"
+    end
+  end
+
+  defp same_prefix?({[a, b, c, _], [a, b, c, _]}), do: true
+  defp same_prefix?(_), do: false
+
+  defp parse_ip4(str) do
+    case :inet.parse_address(String.to_charlist(str)) do
+      {:ok, {a, b, c, d}} -> {:ok, [a, b, c, d]}
+      _ -> :error
+    end
+  end
 
   @doc """
   Enroll a new machine. Generates an Ed25519 keypair, stores the private
@@ -103,11 +146,17 @@ defmodule Tunneld.Machines do
       spec["type"] not in [nil, "container", "vm"] ->
         {:error, "type must be container or vm"}
 
+      spec["network"] not in [nil, "bridge", "macvlan"] ->
+        {:error, "network must be bridge or macvlan"}
+
       spec["cpu"] != nil and (not is_integer(spec["cpu"]) or spec["cpu"] < 1) ->
         {:error, "cpu must be a positive integer"}
 
       spec["memory"] != nil and (not is_integer(spec["memory"]) or spec["memory"] < 1) ->
         {:error, "memory must be a positive integer (MiB)"}
+
+      spec["network"] == "macvlan" and spec["type"] == "vm" ->
+        {:error, "macvlan networking is not supported for VMs"}
 
       true ->
         :ok
@@ -135,6 +184,7 @@ defmodule Tunneld.Machines do
     address = String.trim(params["address"] || "")
     ssh_port = params["ssh_port"] || 22
     kind = params["kind"] || "incus"
+    location = params["location"] || infer_location(address)
 
     cond do
       name == "" ->
@@ -142,6 +192,9 @@ defmodule Tunneld.Machines do
 
       address == "" ->
         {:reply, {:error, "address is required"}, %{}}
+
+      location not in ["local", "remote"] ->
+        {:reply, {:error, "location must be local or remote"}, %{}}
 
       true ->
         id = UUID.uuid4()
@@ -154,6 +207,7 @@ defmodule Tunneld.Machines do
           "address" => address,
           "ssh_port" => ssh_port,
           "kind" => kind,
+          "location" => location,
           "added_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
           "capabilities" => nil,
           "last_seen" => nil,
@@ -170,8 +224,11 @@ defmodule Tunneld.Machines do
   def handle_call({:public_key, id}, _from, state) do
     reply =
       case Store.get(id) do
-        nil -> {:error, "not found"}
-        _ -> {:ok, SSH.public_key_string(id)}
+        {:ok, machine} ->
+          {:ok, SSH.public_key_string(machine["id"])}
+
+        {:error, :not_found} ->
+          {:error, "not found"}
       end
 
     {:reply, reply, state}
@@ -249,6 +306,7 @@ defmodule Tunneld.Machines do
     reply =
       with {:ok, machine} <- Store.get(id),
            {:ok, result} <- Provider.delete_container(machine, name) do
+        Expose.unexpose(id, name)
         broadcast(:container_removed, %{"machine_id" => id, "name" => name})
         {:ok, result}
       end
@@ -259,12 +317,13 @@ defmodule Tunneld.Machines do
   @impl true
   def handle_call({:remove, id}, _from, state) do
     case Store.get(id) do
-      nil ->
+      {:error, :not_found} ->
         {:reply, {:error, "not found"}, state}
 
-      _ ->
+      {:ok, _record} ->
         :ok = Store.delete(id)
         SSH.delete_key(id)
+        Expose.cleanup_machine(id)
         broadcast(:removed, %{"id" => id})
         {:reply, :ok, state}
     end

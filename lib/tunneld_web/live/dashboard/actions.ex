@@ -75,6 +75,28 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       "tunneld_settings" ->
         Resources.update_share(data, :resource)
 
+      # Machines
+      "enroll_machine" ->
+        Tunneld.Machines.enroll(data)
+
+      "create_container" ->
+        id = data["machine_id"]
+
+        spec = %{
+          "name" => data["name"],
+          "image" => data["image"],
+          "type" => data["type"] || "container",
+          "network" => data["network"] || "bridge",
+          "cpu" => data["cpu"],
+          "memory" => data["memory"],
+          "ports" => data["ports"] || []
+        }
+
+        Tunneld.Machines.create_container(id, spec)
+
+      "expose_container" ->
+        Tunneld.Machines.Expose.expose(data["machine_id"], data["container"], data["port"])
+
       # Device restart
       "restart_device" ->
         if @mock do
