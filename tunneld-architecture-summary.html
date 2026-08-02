@@ -3,193 +3,481 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>tunneld — Architecture Summary</title>
+<title>tunneld — Architecture</title>
 <style>
-:root{--text:#2d3748;--muted:#64748b;--accent:#0ea5e9;--accent-dark:#0369a1;--border:#e2e8f0;--bg:#ffffff;--code-bg:#f1f5f9;--green-bg:#f0fdf4;--green-border:#22c55e;--green-text:#166534;--neutral-bg:#f8fafc;--neutral-border:#cbd5e1}
-*{box-sizing:border-box}html{-webkit-text-size-adjust:100%}
-body{margin:0;padding:0;background:#f7f8fa;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif,"Apple Color Emoji","Segoe UI Emoji";font-size:17px;line-height:1.65}
-.container{max-width:860px;margin:0 auto;padding:0 24px}
-header.hero{background:linear-gradient(135deg,#0f172a 0%,#1e3a5f 100%);color:#f8fafc;padding:64px 24px 56px;text-align:center}
-header.hero .container{padding:0}
-header.hero h1{margin:0 0 12px;font-size:3rem;letter-spacing:-0.02em;font-weight:700}
-header.hero h1 .accent{color:var(--accent)}
-header.hero p.tagline{margin:0 auto;max-width:760px;font-size:1.15rem;line-height:1.6;color:#cbd5e1;font-weight:400}
-main{padding:40px 0 24px}
-nav.toc{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:24px 28px;margin-bottom:40px;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
-nav.toc h2{margin-top:0;margin-bottom:16px;font-size:1.15rem;color:var(--accent-dark)}
-nav.toc ol{margin:0;padding-left:22px;columns:2;column-gap:32px}
-nav.toc li{margin-bottom:6px;break-inside:avoid}
-nav.toc a{color:var(--text);text-decoration:none;border-bottom:1px dotted var(--border)}
-nav.toc a:hover{color:var(--accent-dark);border-bottom-color:var(--accent)}
-section{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:28px 32px;margin-bottom:28px;box-shadow:0 1px 3px rgba(0,0,0,0.04)}
-h2{margin:0 0 20px;padding-bottom:12px;font-size:1.5rem;font-weight:600;color:var(--text);border-bottom:2px solid var(--border)}
-h2 .num{color:var(--accent);font-weight:700;margin-right:8px}
-h3{font-size:1.1rem;margin:24px 0 10px;color:var(--accent-dark)}
-p{margin:0 0 14px}
-ul,ol{margin:0 0 14px;padding-left:24px}
-li{margin-bottom:8px}
-code{background:var(--code-bg);padding:2px 6px;border-radius:4px;font-size:0.9em}
-.callout{border:1px solid var(--border);border-radius:8px;padding:14px 16px;margin:16px 0;font-size:0.95rem}
-.callout-green{background:var(--green-bg);border-color:var(--green-border);color:var(--green-text)}
-.callout-neutral{background:var(--neutral-bg);border-color:var(--neutral-border)}
-.callout-label{font-weight:700;text-transform:uppercase;letter-spacing:0.04em;font-size:0.75rem;display:block;margin-bottom:4px}
-table{width:100%;border-collapse:collapse;margin:16px 0}
-th,td{text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top}
-th{background:var(--code-bg);font-weight:600}
-dl{margin:0 0 14px}
-dt{font-weight:600;margin-top:14px}
-dd{margin:0 0 6px 0;color:var(--muted)}
-footer{color:var(--muted);font-size:0.85rem;padding:24px 0 40px;text-align:center}
+  :root{
+    --bg:#0b0f17;
+    --bg-elev:#111827;
+    --bg-card:#151c2c;
+    --bg-card-hover:#1a2236;
+    --border:#1f2937;
+    --border-strong:#2d3748;
+    --text:#e5e7eb;
+    --text-strong:#f9fafb;
+    --muted:#94a3b8;
+    --muted-2:#64748b;
+    --accent:#38bdf8;
+    --accent-2:#818cf8;
+    --accent-soft:rgba(56,189,248,0.12);
+    --green:#34d399;
+    --green-soft:rgba(52,211,153,0.12);
+    --amber:#fbbf24;
+    --amber-soft:rgba(251,191,36,0.12);
+    --rose:#fb7185;
+    --rose-soft:rgba(251,113,133,0.12);
+    --violet:#a78bfa;
+    --violet-soft:rgba(167,139,250,0.12);
+    --code-bg:#0f1623;
+    --shadow:0 1px 0 rgba(255,255,255,0.03) inset, 0 8px 24px rgba(0,0,0,0.35);
+    --radius:14px;
+    --radius-sm:10px;
+  }
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth;scroll-padding-top:24px}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    font-size:15px;
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+  }
+  a{color:var(--accent);text-decoration:none}
+  a:hover{color:#7dd3fc}
+
+  /* Layout */
+  .app{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+  .sidebar{
+    position:sticky;top:0;height:100vh;overflow-y:auto;
+    background:linear-gradient(180deg,#0c1119 0%,#0a0e16 100%);
+    border-right:1px solid var(--border);
+    padding:28px 18px;
+  }
+  .brand{display:flex;align-items:center;gap:10px;padding:0 8px 22px;margin-bottom:8px;border-bottom:1px solid var(--border)}
+  .brand-mark{
+    width:34px;height:34px;border-radius:9px;
+    background:linear-gradient(135deg,var(--accent) 0%,var(--accent-2) 100%);
+    display:grid;place-items:center;color:#0b0f17;font-weight:800;font-size:1.05rem;
+    box-shadow:0 4px 14px rgba(56,189,248,0.35);
+  }
+  .brand-name{font-weight:700;font-size:1.1rem;letter-spacing:-0.01em;color:var(--text-strong)}
+  .brand-sub{font-size:0.72rem;color:var(--muted-2);text-transform:uppercase;letter-spacing:0.08em;margin-top:2px}
+
+  .nav-section{font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--muted-2);padding:18px 10px 8px;font-weight:600}
+  .nav a{
+    display:flex;align-items:center;gap:10px;
+    padding:8px 10px;border-radius:8px;
+    color:var(--muted);font-size:0.88rem;
+    border-left:2px solid transparent;
+    transition:background .15s,color .15s,border-color .15s;
+  }
+  .nav a .n{font-variant-numeric:tabular-nums;color:var(--muted-2);font-size:0.78rem;width:18px;text-align:right}
+  .nav a:hover{background:var(--bg-card);color:var(--text-strong)}
+  .nav a.active{background:var(--accent-soft);color:var(--accent);border-left-color:var(--accent)}
+  .nav a.active .n{color:var(--accent)}
+
+  .content{padding:0 48px 120px;max-width:980px}
+  @media(max-width:1024px){
+    .app{grid-template-columns:1fr}
+    .sidebar{position:fixed;left:-280px;width:260px;z-index:50;transition:left .25s ease}
+    .sidebar.open{left:0}
+    .menu-btn{display:inline-flex !important}
+    .content{padding:0 22px 80px}
+  }
+  .menu-btn{
+    display:none;position:fixed;top:16px;right:16px;z-index:60;
+    width:40px;height:40px;border-radius:10px;border:1px solid var(--border-strong);
+    background:var(--bg-elev);color:var(--text);align-items:center;justify-content:center;
+    cursor:pointer;font-size:1.1rem;
+  }
+
+  /* Hero */
+  .hero{
+    padding:72px 0 40px;
+    border-bottom:1px solid var(--border);
+    margin-bottom:40px;
+  }
+  .hero .eyebrow{
+    display:inline-flex;align-items:center;gap:8px;
+    font-size:0.72rem;text-transform:uppercase;letter-spacing:0.12em;
+    color:var(--accent);background:var(--accent-soft);
+    padding:5px 11px;border-radius:999px;border:1px solid rgba(56,189,248,0.25);
+    margin-bottom:18px;
+  }
+  .hero .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+  .hero h1{
+    margin:0 0 16px;font-size:2.6rem;line-height:1.1;letter-spacing:-0.025em;
+    color:var(--text-strong);font-weight:700;
+  }
+  .hero h1 .grad{background:linear-gradient(135deg,var(--accent) 0%,var(--accent-2) 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p.lead{font-size:1.08rem;color:var(--muted);max-width:720px;margin:0}
+  .hero .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+  .chip{
+    display:inline-flex;align-items:center;gap:6px;
+    font-size:0.78rem;color:var(--muted);
+    background:var(--bg-card);border:1px solid var(--border);
+    padding:5px 11px;border-radius:999px;
+  }
+  .chip .swatch{width:8px;height:8px;border-radius:50%}
+
+  /* Topology diagram */
+  .topology{
+    margin-top:28px;background:var(--bg-card);
+    border:1px solid var(--border);border-radius:var(--radius);
+    padding:24px;box-shadow:var(--shadow);overflow-x:auto;
+  }
+  .topo-svg{display:block;min-width:680px;width:100%;height:auto}
+  .topo-cap{font-size:0.78rem;color:var(--muted-2);margin-top:14px;text-align:center}
+
+  /* Section */
+  section{margin-bottom:44px;scroll-margin-top:24px}
+  .sec-head{display:flex;align-items:baseline;gap:14px;margin-bottom:18px}
+  .sec-num{
+    font-variant-numeric:tabular-nums;font-weight:700;font-size:0.95rem;
+    color:var(--accent);background:var(--accent-soft);
+    padding:4px 10px;border-radius:8px;border:1px solid rgba(56,189,248,0.25);
+    flex-shrink:0;
+  }
+  h2{margin:0;font-size:1.6rem;letter-spacing:-0.02em;color:var(--text-strong);font-weight:650}
+  h3{font-size:1.02rem;color:var(--text-strong);margin:22px 0 10px;font-weight:600;letter-spacing:-0.01em}
+  p{margin:0 0 14px;color:var(--text)}
+  p.muted{color:var(--muted)}
+
+  ul,ol{margin:0 0 14px;padding-left:22px}
+  li{margin-bottom:9px}
+  li::marker{color:var(--muted-2)}
+  strong{color:var(--text-strong);font-weight:600}
+  code{
+    background:var(--code-bg);color:#7dd3fc;
+    padding:2px 7px;border-radius:6px;font-size:0.86em;
+    font-family:"JetBrains Mono","SF Mono",ui-monospace,Menlo,monospace;
+    border:1px solid var(--border);
+  }
+  pre{
+    background:var(--code-bg);border:1px solid var(--border);
+    border-radius:var(--radius-sm);padding:16px 18px;overflow-x:auto;
+    margin:16px 0;
+  }
+  pre code{background:none;border:none;color:#cbd5e1;padding:0;font-size:0.85rem;line-height:1.6}
+
+  /* Cards grid */
+  .grid{display:grid;gap:14px;margin:18px 0}
+  .grid-2{grid-template-columns:repeat(2,1fr)}
+  .grid-3{grid-template-columns:repeat(3,1fr)}
+  @media(max-width:760px){.grid-2,.grid-3{grid-template-columns:1fr}}
+
+  .card{
+    background:var(--bg-card);border:1px solid var(--border);
+    border-radius:var(--radius-sm);padding:18px 18px 16px;
+    box-shadow:var(--shadow);transition:border-color .15s,background .15s;
+  }
+  .card:hover{border-color:var(--border-strong);background:var(--bg-card-hover)}
+  .card .ico{
+    width:32px;height:32px;border-radius:8px;display:grid;place-items:center;
+    font-size:1rem;margin-bottom:12px;
+  }
+  .card h4{margin:0 0 6px;font-size:0.98rem;color:var(--text-strong);font-weight:600}
+  .card p{margin:0;font-size:0.88rem;color:var(--muted);line-height:1.55}
+  .card .tag{display:inline-block;font-size:0.7rem;color:var(--muted-2);margin-top:10px;letter-spacing:0.04em;text-transform:uppercase}
+
+  .ico.green{background:var(--green-soft);color:var(--green)}
+  .ico.amber{background:var(--amber-soft);color:var(--amber)}
+  .ico.rose{background:var(--rose-soft);color:var(--rose)}
+  .ico.violet{background:var(--violet-soft);color:var(--violet)}
+  .ico.sky{background:var(--accent-soft);color:var(--accent)}
+
+  /* Callout */
+  .callout{
+    border:1px solid var(--border);border-left:3px solid var(--accent);
+    background:var(--bg-card);border-radius:var(--radius-sm);
+    padding:14px 16px;margin:16px 0;font-size:0.92rem;
+  }
+  .callout .label{
+    display:block;font-size:0.7rem;text-transform:uppercase;letter-spacing:0.1em;
+    color:var(--accent);font-weight:700;margin-bottom:6px;
+  }
+  .callout.green{border-left-color:var(--green)}
+  .callout.green .label{color:var(--green)}
+  .callout.amber{border-left-color:var(--amber)}
+  .callout.amber .label{color:var(--amber)}
+
+  /* Table */
+  .table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--bg-card);box-shadow:var(--shadow)}
+  table{width:100%;border-collapse:collapse;min-width:520px}
+  th,td{text-align:left;padding:13px 16px;border-bottom:1px solid var(--border);vertical-align:top;font-size:0.9rem}
+  th{background:var(--bg-elev);color:var(--muted);font-weight:600;font-size:0.74rem;text-transform:uppercase;letter-spacing:0.08em}
+  tr:last-child td{border-bottom:none}
+  td code{font-size:0.82rem}
+  tr:hover td{background:rgba(255,255,255,0.015)}
+
+  /* dl */
+  .filelist{display:grid;gap:10px;margin:16px 0}
+  .file-row{
+    display:grid;grid-template-columns:minmax(220px,1fr) 2fr;gap:18px;
+    padding:12px 14px;background:var(--bg-card);border:1px solid var(--border);
+    border-radius:var(--radius-sm);align-items:start;
+  }
+  .file-row dt{margin:0}
+  .file-row dt code{display:inline-block;background:var(--code-bg);color:#7dd3fc;border:1px solid var(--border);padding:4px 9px;border-radius:6px;font-size:0.82rem}
+  .file-row dd{margin:0;color:var(--muted);font-size:0.88rem;line-height:1.55}
+  @media(max-width:620px){.file-row{grid-template-columns:1fr;gap:6px}}
+
+  /* Out of scope list */
+  .scope{list-style:none;padding:0;margin:0;display:grid;gap:8px}
+  .scope li{
+    display:flex;align-items:flex-start;gap:10px;
+    padding:11px 14px;background:var(--bg-card);
+    border:1px solid var(--border);border-radius:var(--radius-sm);
+    color:var(--muted);font-size:0.9rem;
+  }
+  .scope li::before{
+    content:"";width:8px;height:8px;border-radius:50%;
+    background:var(--rose);opacity:0.7;margin-top:7px;flex-shrink:0;
+  }
+
+  /* Footer */
+  footer{
+    border-top:1px solid var(--border);margin-top:60px;padding-top:24px;
+    color:var(--muted-2);font-size:0.82rem;text-align:center;
+  }
+  footer .kpis{display:flex;flex-wrap:wrap;justify-content:center;gap:24px;margin-bottom:14px}
+  footer .kpi{display:flex;flex-direction:column;align-items:center}
+  footer .kpi b{color:var(--text-strong);font-size:1.1rem;font-weight:700}
+  footer .kpi span{font-size:0.72rem;text-transform:uppercase;letter-spacing:0.08em}
 </style>
 </head>
 <body>
-<header class="hero">
-  <div class="container">
-    <h1><span class="accent">tunneld</span></h1>
-    <p class="tagline">An ethernet-first private network edge relay for ARM single-board computers. The gateway owns the LAN; a fleet manager provisions Incus containers and VMs over SSH on machines it reaches locally or remotely — all from one LiveView dashboard.</p>
-  </div>
-</header>
 
-<main>
-  <div class="container">
+<button class="menu-btn" id="menuBtn" aria-label="Toggle navigation">&#9776;</button>
 
-    <nav class="toc" aria-label="Table of contents">
-      <h2>Table of contents</h2>
-      <ol>
-        <li><a href="#sec-1">Overview &amp; topology</a></li>
-        <li><a href="#sec-2">Gateway responsibilities</a></li>
-        <li><a href="#sec-3">Fleet management (Machines + Incus)</a></li>
-        <li><a href="#sec-4">Container networking (macvlan vs bridge)</a></li>
-        <li><a href="#sec-5">Exposing remote container services</a></li>
-        <li><a href="#sec-6">Resources &amp; reverse proxy</a></li>
-        <li><a href="#sec-7">Device-facing API &amp; Quick Expose</a></li>
-        <li><a href="#sec-8">Supervision tree &amp; persistence</a></li>
-        <li><a href="#sec-9">Architecture at a glance</a></li>
-        <li><a href="#sec-10">Project layout</a></li>
-        <li><a href="#sec-11">Explicitly out of scope</a></li>
-      </ol>
+<div class="app">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">T</div>
+      <div>
+        <div class="brand-name">tunneld</div>
+        <div class="brand-sub">Architecture</div>
+      </div>
+    </div>
+    <nav class="nav" id="nav">
+      <div class="nav-section">Reference</div>
+      <a href="#sec-1"><span class="n">01</span>Overview &amp; topology</a>
+      <a href="#sec-2"><span class="n">02</span>Gateway responsibilities</a>
+      <a href="#sec-3"><span class="n">03</span>Fleet management</a>
+      <a href="#sec-4"><span class="n">04</span>Container networking</a>
+      <a href="#sec-5"><span class="n">05</span>Exposing remote services</a>
+      <a href="#sec-6"><span class="n">06</span>Resources &amp; proxy</a>
+      <a href="#sec-7"><span class="n">07</span>Device API</a>
+      <a href="#sec-8"><span class="n">08</span>Supervision &amp; state</a>
+      <a href="#sec-9"><span class="n">09</span>Components at a glance</a>
+      <a href="#sec-10"><span class="n">10</span>Project layout</a>
+      <a href="#sec-11"><span class="n">11</span>Out of scope</a>
     </nav>
+  </aside>
+
+  <main class="content">
+
+    <header class="hero">
+      <span class="eyebrow"><span class="dot"></span>Edge relay &middot; Fleet manager</span>
+      <h1>The <span class="grad">tunneld</span> gateway</h1>
+      <p class="lead">An ethernet-first private network edge relay for ARM single-board computers. The gateway owns the LAN; a fleet manager provisions Incus containers and VMs over SSH on machines it reaches locally or remotely — all from one LiveView dashboard.</p>
+      <div class="meta">
+        <span class="chip"><span class="swatch" style="background:var(--accent)"></span>Elixir / Phoenix LiveView</span>
+        <span class="chip"><span class="swatch" style="background:var(--green)"></span>BEAM runtime</span>
+        <span class="chip"><span class="swatch" style="background:var(--amber)"></span>Atomic JSON state — no DB</span>
+        <span class="chip"><span class="swatch" style="background:var(--violet)"></span>ARM64 SBC</span>
+      </div>
+
+      <div class="topology">
+        <svg class="topo-svg" viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Network topology">
+          <defs>
+            <linearGradient id="g1" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0" stop-color="#38bdf8"/><stop offset="1" stop-color="#818cf8"/>
+            </linearGradient>
+            <linearGradient id="g2" x1="0" x2="1" y1="0" y2="1">
+              <stop offset="0" stop-color="#34d399"/><stop offset="1" stop-color="#10b981"/>
+            </linearGradient>
+            <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+            </marker>
+          </defs>
+
+          <!-- WAN -->
+          <g>
+            <rect x="20" y="70" width="120" height="60" rx="10" fill="#151c2c" stroke="#2d3748"/>
+            <text x="80" y="96" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="Inter,sans-serif" font-weight="600">WAN</text>
+            <text x="80" y="112" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter,sans-serif">upstream</text>
+          </g>
+          <line x1="140" y1="100" x2="195" y2="100" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+          <!-- Tunneld SBC -->
+          <g>
+            <rect x="200" y="55" width="150" height="90" rx="12" fill="url(#g1)" opacity="0.12" stroke="#38bdf8" stroke-width="1.5"/>
+            <text x="275" y="88" text-anchor="middle" fill="#f9fafb" font-size="13" font-family="Inter,sans-serif" font-weight="700">tunneld SBC</text>
+            <text x="275" y="106" text-anchor="middle" fill="#7dd3fc" font-size="9" font-family="Inter,sans-serif">dnsmasq · nginx · iptables</text>
+            <text x="275" y="120" text-anchor="middle" fill="#94a3b8" font-size="9" font-family="Inter,sans-serif">Phoenix LiveView</text>
+          </g>
+          <line x1="350" y1="100" x2="405" y2="100" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+          <!-- LAN -->
+          <g>
+            <rect x="410" y="70" width="110" height="60" rx="10" fill="#151c2c" stroke="#2d3748"/>
+            <text x="465" y="96" text-anchor="middle" fill="#94a3b8" font-size="11" font-family="Inter,sans-serif" font-weight="600">LAN switch</text>
+            <text x="465" y="112" text-anchor="middle" fill="#64748b" font-size="9" font-family="Inter,sans-serif">downstream</text>
+          </g>
+          <line x1="520" y1="100" x2="575" y2="100" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+          <!-- Devices -->
+          <g>
+            <rect x="580" y="60" width="120" height="34" rx="8" fill="#151c2c" stroke="#2d3748"/>
+            <text x="640" y="81" text-anchor="middle" fill="#cbd5e1" font-size="10" font-family="Inter,sans-serif">devices</text>
+            <rect x="580" y="106" width="120" height="34" rx="8" fill="#151c2c" stroke="#2d3748"/>
+            <text x="640" y="127" text-anchor="middle" fill="#cbd5e1" font-size="10" font-family="Inter,sans-serif">*.tunneld.lan</text>
+          </g>
+
+          <!-- SSH branch -->
+          <line x1="275" y1="145" x2="275" y2="170" stroke="#475569" stroke-width="1.5" marker-end="url(#arrow)"/>
+          <g>
+            <rect x="150" y="172" width="250" height="22" rx="8" fill="url(#g2)" opacity="0.1" stroke="#34d399" stroke-width="1"/>
+            <text x="275" y="187" text-anchor="middle" fill="#34d399" font-size="10" font-family="Inter,sans-serif" font-weight="600">SSH → targets · Incus containers &amp; VMs</text>
+          </g>
+        </svg>
+        <div class="topo-cap">Wired edge gateway on a dual-NIC ARM64 SBC. No Wi-Fi, no overlay, no control-plane dependency.</div>
+      </div>
+    </header>
 
     <section id="sec-1">
-      <h2><span class="num">1</span>Overview &amp; topology</h2>
+      <div class="sec-head"><span class="sec-num">01</span><h2>Overview &amp; topology</h2></div>
       <p>Tunneld is software installed on a dual-NIC ARM64 single-board computer that turns it into a wired edge gateway for a private subnet, plus a fleet manager for Incus containers and VMs running on machines it reaches over SSH. Two capabilities, one relationship: the gateway owns the network, and the instances it manages live on or are reachable from that network.</p>
       <p>Built on Elixir/Phoenix LiveView and the BEAM. No database — all state is atomic JSON files under a configurable data root.</p>
-      <pre><code>WAN (upstream) ── Tunneld SBC ── LAN (downstream) ── switch ── devices
-                        │
-                        └── SSH ──&gt; targets (local machines / remote VMs)
-                                       └── Incus ──&gt; containers &amp; VMs</code></pre>
-      <p>No Wi-Fi. No overlay network. No control-plane dependency.</p>
+      <div class="callout">
+        <span class="label">Design principle</span>
+        No Wi-Fi. No overlay network. No control-plane dependency. The gateway works fully offline — local networking, DHCP, and name resolution keep functioning without internet.
+      </div>
     </section>
 
     <section id="sec-2">
-      <h2><span class="num">2</span>Gateway responsibilities</h2>
-      <ul>
-        <li><strong>DHCP + DNS</strong> via dnsmasq on the LAN interface; user-configurable upstream DNS servers (Cloudflare, Pi-hole, or your own resolver).</li>
-        <li><strong>Lease/device visibility</strong> — every device on the subnet is listed with hostname, MAC, and IP.</li>
-        <li><strong>NAT / forwarding / DNS interception</strong> via iptables on the upstream↔downstream pair.</li>
-        <li><strong>Named resolution</strong> — dnsmasq resolves any <code>*.tunneld.lan</code> name to the gateway, so named resources and exposed services are reachable by name across the subnet.</li>
-        <li><strong>Service monitoring</strong> of the underlying systemd units (dnsmasq, dhcpcd, nginx).</li>
-        <li><strong>Auth</strong> — sessions, bcrypt + WebAuthn.</li>
-        <li><strong>Works offline</strong> — local networking, DHCP, and name resolution keep functioning without internet.</li>
-      </ul>
+      <div class="sec-head"><span class="sec-num">02</span><h2>Gateway responsibilities</h2></div>
+      <div class="grid grid-3">
+        <div class="card"><div class="ico sky">⌬</div><h4>DHCP + DNS</h4><p>dnsmasq on the LAN interface with user-configurable upstream DNS (Cloudflare, Pi-hole, or your own resolver).</p></div>
+        <div class="card"><div class="ico green">◍</div><h4>Lease visibility</h4><p>Every device on the subnet is listed with hostname, MAC, and IP.</p></div>
+        <div class="card"><div class="ico amber">⇄</div><h4>NAT &amp; forwarding</h4><p>iptables handles NAT, packet forwarding, and DNS interception between the upstream↔downstream pair.</p></div>
+        <div class="card"><div class="ico violet">∗</div><h4>Named resolution</h4><p>dnsmasq resolves any <code>*.tunneld.lan</code> name to the gateway, so named resources and exposed services are reachable by name across the subnet.</p></div>
+        <div class="card"><div class="ico sky">♡</div><h4>Service monitoring</h4><p>Watches the underlying systemd units: dnsmasq, dhcpcd, nginx.</p></div>
+        <div class="card"><div class="ico green">⚿</div><h4>Auth</h4><p>Sessions, bcrypt + WebAuthn for operator access.</p></div>
+      </div>
     </section>
 
     <section id="sec-3">
-      <h2><span class="num">3</span>Fleet management (Machines + Incus)</h2>
-      <ul>
-        <li><strong>Machines</strong> are targets tunneld manages. tunneld generates an Ed25519 keypair per machine and shows the public half to install on the target; it then probes capabilities over SSH and can provision Incus containers/VMs.</li>
-        <li>Targets may be <strong>local</strong> (on the gateway's subnet) or <strong>remote</strong> (a VM/VPS with a public address). The <code>location</code> field is inferred from the subnet and drives the networking model for containers.</li>
-        <li>Targets must present a Linux SSH endpoint. Non-Linux hosts are managed via a Linux VM on that host; tunneld talks to the VM, not the physical machine.</li>
-        <li>Once provisioned, tunneld can <strong>create, start, stop, list, and delete</strong> Incus instances, and open an interactive shell into a container over the browser.</li>
-        <li><strong>State is queried live over SSH</strong> (<code>incus list</code>, <code>incus info</code>) rather than persisted and reconciled. The target is the source of truth; tunneld persists only the target list and credentials.</li>
-        <li>Host specs (CPU, memory, storage, architecture, KVM, GPU) are surfaced per target from a capability probe.</li>
-      </ul>
+      <div class="sec-head"><span class="sec-num">03</span><h2>Fleet management (Machines + Incus)</h2></div>
+      <div class="grid grid-2">
+        <div class="card"><div class="ico sky">⬚</div><h4>Machines</h4><p>Targets tunneld manages. Generates an Ed25519 keypair per machine and shows the public half to install on the target; probes capabilities over SSH and can provision Incus containers/VMs.</p><span class="tag">Ed25519 keys</span></div>
+        <div class="card"><div class="ico violet">◉</div><h4>Local vs remote</h4><p>Targets may be <strong>local</strong> (on the gateway's subnet) or <strong>remote</strong> (a VM/VPS with a public address). The <code>location</code> field is inferred from the subnet and drives the networking model for containers.</p><span class="tag">location-aware</span></div>
+        <div class="card"><div class="ico amber">⌘</div><h4>Linux SSH endpoint</h4><p>Targets must present a Linux SSH endpoint. Non-Linux hosts are managed via a Linux VM on that host; tunneld talks to the VM, not the physical machine.</p><span class="tag">SSH transport</span></div>
+        <div class="card"><div class="ico green">▶</div><h4>Instance lifecycle</h4><p>Once provisioned, tunneld can <strong>create, start, stop, list, and delete</strong> Incus instances, and open an interactive shell into a container over the browser.</p><span class="tag">Incus</span></div>
+      </div>
+      <div class="callout">
+        <span class="label">Source of truth</span>
+        State is queried live over SSH (<code>incus list</code>, <code>incus info</code>) rather than persisted and reconciled. The target is the source of truth; tunneld persists only the target list and credentials. Host specs (CPU, memory, storage, architecture, KVM, GPU) are surfaced per target from a capability probe.
+      </div>
     </section>
 
     <section id="sec-4">
-      <h2><span class="num">4</span>Container networking (macvlan vs bridge)</h2>
-      <ul>
-        <li><strong>Local targets &rarr; macvlan</strong>: a macvlan container gets its own MAC address and DHCP lease straight from the gateway's dnsmasq, appearing on the subnet as an independent device. It is reachable by name and SSH-able with no proxying.</li>
-        <li><strong>Remote targets &rarr; NAT bridge</strong>: the container is behind the remote host. Reaching an app inside it requires an explicit exposure path (see below).</li>
-      </ul>
+      <div class="sec-head"><span class="sec-num">04</span><h2>Container networking (macvlan vs bridge)</h2></div>
+      <div class="grid grid-2">
+        <div class="card"><div class="ico green">⇀</div><h4>Local targets → macvlan</h4><p>A macvlan container gets its own MAC address and DHCP lease straight from the gateway's dnsmasq, appearing on the subnet as an independent device. Reachable by name and SSH-able with no proxying.</p><span class="tag">Layer-2 native</span></div>
+        <div class="card"><div class="ico amber">⇁</div><h4>Remote targets → NAT bridge</h4><p>The container is behind the remote host. Reaching an app inside it requires an explicit exposure path (see section 05).</p><span class="tag">Tunneled</span></div>
+      </div>
     </section>
 
     <section id="sec-5">
-      <h2><span class="num">5</span>Exposing remote container services</h2>
+      <div class="sec-head"><span class="sec-num">05</span><h2>Exposing remote container services</h2></div>
       <p>macvlan only spans a single Layer-2 segment, so a container on a remote machine cannot appear as a subnet device. For remote targets, tunneld instead:</p>
-      <ul>
+      <ol>
         <li>Opens a <strong>reverse SSH port-forward</strong> (<code>ssh -L</code>) from the gateway to the container's port on the remote host, and</li>
         <li>Registers an nginx resource pointing at the forwarded port.</li>
-      </ul>
-      <p>The container service becomes reachable subnet-wide at <code>http://&lt;name&gt;.tunneld.lan:18000</code>, indistinguishable from a local service. Exposures are persisted in <code>expose.json</code> and the tunnels are <strong>re-opened automatically on gateway startup</strong> so they survive reboots.</p>
+      </ol>
+      <div class="callout green">
+        <span class="label">Result</span>
+        The container service becomes reachable subnet-wide at <code>http://&lt;name&gt;.tunneld.lan:18000</code>, indistinguishable from a local service. Exposures are persisted in <code>expose.json</code> and the tunnels are <strong>re-opened automatically on gateway startup</strong> so they survive reboots.
+      </div>
     </section>
 
     <section id="sec-6">
-      <h2><span class="num">6</span>Resources &amp; reverse proxy</h2>
-      <ul>
-        <li>nginx runs on the gateway and fronts a <strong>resource registry</strong> (<code>resources.json</code>). Each resource has a name and a <strong>pool</strong> of <code>IP:port</code> backends, health-checked via TCP probes every 10 seconds.</li>
-        <li>nginx load-balances across healthy backends; each resource is reachable at <code>http://&lt;name&gt;.tunneld.lan:18000</code>. No public-internet exposure, no per-resource auth — access is limited to the subnet.</li>
-        <li>A resource is a named pointer to already-running backends. For containers, local macvlan and remote expose handle this automatically; <strong>Add Resource</strong> is mainly for non-container services running directly on devices.</li>
-      </ul>
+      <div class="sec-head"><span class="sec-num">06</span><h2>Resources &amp; reverse proxy</h2></div>
+      <div class="grid grid-3">
+        <div class="card"><div class="ico sky">⛁</div><h4>Resource registry</h4><p>nginx fronts <code>resources.json</code>. Each resource has a name and a <strong>pool</strong> of <code>IP:port</code> backends, health-checked via TCP probes every 10 seconds.</p></div>
+        <div class="card"><div class="ico green">⚖</div><h4>Load balancing</h4><p>nginx load-balances across healthy backends; each resource is reachable at <code>http://&lt;name&gt;.tunneld.lan:18000</code>. No public-internet exposure, no per-resource auth — access is limited to the subnet.</p></div>
+        <div class="card"><div class="ico violet">＋</div><h4>Add Resource</h4><p>A resource is a named pointer to already-running backends. For containers, local macvlan and remote expose handle this automatically; <strong>Add Resource</strong> is mainly for non-container services running directly on devices.</p></div>
+      </div>
     </section>
 
     <section id="sec-7">
-      <h2><span class="num">7</span>Device-facing API &amp; Quick Expose</h2>
-      <ul>
-        <li><strong>Quick Expose</strong>: a subnet device can create/list/remove a local resource with a single <code>curl</code>. The gateway resolves the caller from its DHCP lease and validates a per-device allowlist.</li>
-        <li><strong>Device read API</strong> (no-login, gated by DHCP lease): any device can query machines, containers, resources, and gateway health, e.g. <code>GET /api/v1/device/machines</code>.</li>
-      </ul>
+      <div class="sec-head"><span class="sec-num">07</span><h2>Device-facing API &amp; Quick Expose</h2></div>
+      <div class="grid grid-2">
+        <div class="card"><div class="ico amber">⚡</div><h4>Quick Expose</h4><p>A subnet device can create/list/remove a local resource with a single <code>curl</code>. The gateway resolves the caller from its DHCP lease and validates a per-device allowlist.</p><span class="tag">one-shot curl</span></div>
+        <div class="card"><div class="ico sky">⊕</div><h4>Device read API</h4><p>No-login, gated by DHCP lease. Any device can query machines, containers, resources, and gateway health, e.g. <code>GET /api/v1/device/machines</code>.</p><span class="tag">unauthenticated · lease-gated</span></div>
+      </div>
     </section>
 
     <section id="sec-8">
-      <h2><span class="num">8</span>Supervision tree &amp; persistence</h2>
+      <div class="sec-head"><span class="sec-num">08</span><h2>Supervision tree &amp; persistence</h2></div>
       <p>One <code>one_for_one</code> supervisor (<code>Tunneld.Supervisor</code>) starts Telemetry, DNSCluster, PubSub, the Endpoint, and the domain servers: Session, SystemResources, Services, Resources, Devices, Auth, DnsConfig, Updater, Machines, Expose, and Geolocation. In mock mode a fake Incus/SSH target is also started.</p>
-      <p>Persistent state (atomic temp-file + rename, with <code>.bak</code> recovery):</p>
-      <table>
-        <thead><tr><th>File</th><th>Purpose</th></tr></thead>
-        <tbody>
-          <tr><td><code>auth.json</code></td><td>bcrypt admin credentials + onboarding flag</td></tr>
-          <tr><td><code>resources.json</code></td><td>Resource registry (name, pool, kind)</td></tr>
-          <tr><td><code>machines.json</code></td><td>Enrolled machines (id, name, address, ssh_port, kind, location, capabilities)</td></tr>
-          <tr><td><code>expose.json</code></td><td>Active remote container exposures (tunnel + resource records)</td></tr>
-          <tr><td><code>dns.json</code></td><td>Upstream DNS server IP</td></tr>
-        </tbody>
-      </table>
-      <p>Machine SSH private keys are stored per-machine under the data root's <code>ssh/</code> directory (mode 0600).</p>
+      <div class="callout amber">
+        <span class="label">Atomic persistence</span>
+        Persistent state uses an atomic temp-file + rename pattern, with <code>.bak</code> recovery. Machine SSH private keys are stored per-machine under the data root's <code>ssh/</code> directory (mode 0600).
+      </div>
+      <h3>Persistent state files</h3>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>File</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>auth.json</code></td><td>bcrypt admin credentials + onboarding flag</td></tr>
+            <tr><td><code>resources.json</code></td><td>Resource registry (name, pool, kind)</td></tr>
+            <tr><td><code>machines.json</code></td><td>Enrolled machines (id, name, address, ssh_port, kind, location, capabilities)</td></tr>
+            <tr><td><code>expose.json</code></td><td>Active remote container exposures (tunnel + resource records)</td></tr>
+            <tr><td><code>dns.json</code></td><td>Upstream DNS server IP</td></tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
     <section id="sec-9">
-      <h2><span class="num">9</span>Architecture at a glance</h2>
-      <table>
-        <thead><tr><th>Component</th><th>Role</th></tr></thead>
-        <tbody>
-          <tr><td><code>dnsmasq</code></td><td>DHCP server + DNS resolver (forwarding + <code>*.tunneld.lan</code> named resolution)</td></tr>
-          <tr><td><code>nginx</code></td><td>Reverse proxy with per-resource upstream load balancing (<code>0.0.0.0:18000</code>)</td></tr>
-          <tr><td><code>iptables</code></td><td>NAT, packet forwarding, DNS interception between upstream/downstream</td></tr>
-          <tr><td><code>SSH</code></td><td>Transport to managed machines (ControlMaster multiplexing, per-machine Ed25519 keys)</td></tr>
-          <tr><td><code>Incus</code></td><td>Container/VM provider on managed machines</td></tr>
-          <tr><td><code>Elixir/Phoenix</code></td><td>Application server, LiveView dashboard, GenServer process management</td></tr>
-        </tbody>
-      </table>
+      <div class="sec-head"><span class="sec-num">09</span><h2>Components at a glance</h2></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Component</th><th>Role</th></tr></thead>
+          <tbody>
+            <tr><td><code>dnsmasq</code></td><td>DHCP server + DNS resolver (forwarding + <code>*.tunneld.lan</code> named resolution)</td></tr>
+            <tr><td><code>nginx</code></td><td>Reverse proxy with per-resource upstream load balancing (<code>0.0.0.0:18000</code>)</td></tr>
+            <tr><td><code>iptables</code></td><td>NAT, packet forwarding, DNS interception between upstream/downstream</td></tr>
+            <tr><td><code>SSH</code></td><td>Transport to managed machines (ControlMaster multiplexing, per-machine Ed25519 keys)</td></tr>
+            <tr><td><code>Incus</code></td><td>Container/VM provider on managed machines</td></tr>
+            <tr><td><code>Elixir/Phoenix</code></td><td>Application server, LiveView dashboard, GenServer process management</td></tr>
+          </tbody>
+        </table>
+      </div>
     </section>
 
     <section id="sec-10">
-      <h2><span class="num">10</span>Project layout</h2>
-      <dl>
-        <dt><code>tunneld/application.ex</code></dt><dd>OTP supervision tree</dd>
-        <dt><code>tunneld/net_link.ex</code></dt><dd>Ethernet link state (reads <code>/sys/class/net/&lt;iface&gt;/operstate</code> on demand)</dd>
-        <dt><code>tunneld/iptables.ex</code></dt><dd>Firewall rule management</dd>
-        <dt><code>tunneld/geolocation.ex</code> + <code>geo_data/</code></dt><dd>IP geolocation with offline SVG world map</dd>
-        <dt><code>tunneld/machines.ex</code> + <code>machines/</code></dt><dd>Machine registry + SSH/Incus control plane (store, ssh, provider, exec, expose)</dd>
-        <dt><code>tunneld/schema/</code></dt><dd>JSON Schema definitions driving dynamic modal forms</dd>
-        <dt><code>tunneld/servers/</code></dt><dd>auth, session, services, resources, devices, dns_config, nginx, updater, system_resources, fake_data, expose_allowed, device_tags</dd>
-        <dt><code>tunneld_web/</code></dt><dd>LiveView dashboard, setup wizard, login, controllers, exec channel, components</dd>
+      <div class="sec-head"><span class="sec-num">10</span><h2>Project layout</h2></div>
+      <dl class="filelist">
+        <div class="file-row"><dt><code>tunneld/application.ex</code></dt><dd>OTP supervision tree</dd></div>
+        <div class="file-row"><dt><code>tunneld/net_link.ex</code></dt><dd>Ethernet link state (reads <code>/sys/class/net/&lt;iface&gt;/operstate</code> on demand)</dd></div>
+        <div class="file-row"><dt><code>tunneld/iptables.ex</code></dt><dd>Firewall rule management</dd></div>
+        <div class="file-row"><dt><code>tunneld/geolocation.ex</code> + <code>geo_data/</code></dt><dd>IP geolocation with offline SVG world map</dd></div>
+        <div class="file-row"><dt><code>tunneld/machines.ex</code> + <code>machines/</code></dt><dd>Machine registry + SSH/Incus control plane (store, ssh, provider, exec, expose)</dd></div>
+        <div class="file-row"><dt><code>tunneld/schema/</code></dt><dd>JSON Schema definitions driving dynamic modal forms</dd></div>
+        <div class="file-row"><dt><code>tunneld/servers/</code></dt><dd>auth, session, services, resources, devices, dns_config, nginx, updater, system_resources, fake_data, expose_allowed, device_tags</dd></div>
+        <div class="file-row"><dt><code>tunneld_web/</code></dt><dd>LiveView dashboard, setup wizard, login, controllers, exec channel, components</dd></div>
       </dl>
     </section>
 
     <section id="sec-11">
-      <h2><span class="num">11</span>Explicitly out of scope</h2>
-      <ul>
+      <div class="sec-head"><span class="sec-num">11</span><h2>Explicitly out of scope</h2></div>
+      <ul class="scope">
         <li>Wi-Fi bridging and all wireless management.</li>
         <li>zrok / OpenZiti integration and public/private shares.</li>
         <li>WireGuard mesh, relay coordinator, and per-peer key exchange.</li>
@@ -200,14 +488,36 @@ footer{color:var(--muted);font-size:0.85rem;padding:24px 0 40px;text-align:cente
       </ul>
     </section>
 
-  </div>
-</main>
+    <footer>
+      <div class="kpis">
+        <div class="kpi"><b>11</b><span>sections</span></div>
+        <div class="kpi"><b>5</b><span>state files</span></div>
+        <div class="kpi"><b>6</b><span>core components</span></div>
+        <div class="kpi"><b>0</b><span>databases</span></div>
+      </div>
+      <div>Generated from a codebase review · tunneld architecture reference</div>
+    </footer>
 
-<footer>
-  <div class="container">
-    Generated from a codebase review.
-  </div>
-</footer>
+  </main>
+</div>
 
+<script>
+  // Sidebar toggle (mobile)
+  const btn = document.getElementById('menuBtn');
+  const sb = document.getElementById('sidebar');
+  btn.addEventListener('click', () => sb.classList.toggle('open'));
+
+  // Active link on scroll
+  const links = [...document.querySelectorAll('#nav a')];
+  const secs = links.map(a => document.querySelector(a.getAttribute('href')));
+  const setActive = () => {
+    let cur = secs[0];
+    const y = window.scrollY + 40;
+    for (const s of secs) if (s && s.offsetTop <= y) cur = s;
+    links.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + cur.id));
+  };
+  window.addEventListener('scroll', setActive, {passive:true});
+  setActive();
+</script>
 </body>
 </html>
