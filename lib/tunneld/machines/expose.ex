@@ -68,6 +68,7 @@ defmodule Tunneld.Machines.Expose do
 
   @impl true
   def init(_) do
+    reopen_exposures()
     {:ok, %{}}
   end
 
@@ -98,6 +99,32 @@ defmodule Tunneld.Machines.Expose do
   end
 
   # --- Implementation ---
+
+  # On gateway start, re-open the reverse SSH tunnels that were active before
+  # shutdown/reboot. The nginx resource already points at the saved local port,
+  # so we only need to re-establish the tunnel itself. In mock mode this is a
+  # no-op (no real SSH).
+  defp reopen_exposures do
+    if @mock do
+      :ok
+    else
+      for %{"machine_id" => machine_id, "container" => container} = exposure <- list() do
+        with {:ok, machine} <- Store.get(machine_id),
+             local_port <- exposure["local_port"],
+             remote_port <- exposure["remote_port"],
+             :ok <- open_tunnel(machine, container, remote_port, local_port) do
+          :ok
+        else
+          {:error, reason} ->
+            Logger.warning(
+              "Failed to re-open tunnel for #{inspect(machine_id)}/#{container}: #{inspect(reason)}"
+            )
+        end
+      end
+
+      :ok
+    end
+  end
 
   defp create_resource(machine, container, port) do
     name = resource_name(machine, container)

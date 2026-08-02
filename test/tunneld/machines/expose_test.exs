@@ -94,4 +94,31 @@ defmodule Tunneld.Machines.ExposeTest do
     assert wait_until(fn -> not Enum.any?(Resources.fetch_shares(), &(&1.name == name)) end)
     assert wait_until(fn -> not Enum.any?(Expose.list(), &(&1["container"] == "app")) end)
   end
+
+  test "persisted exposure records carry the ports needed for restart recovery" do
+    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "vps5", "address" => "203.0.113.13", "location" => "remote"})
+    {:ok, _} = Machines.create_container(id, %{"name" => "svc", "image" => "ubuntu/24.04"})
+
+    {:ok, %{"local_port" => local_port}} = Expose.expose(id, "svc", 5000)
+
+    assert [exposure] = Enum.filter(Expose.list(), &(&1["machine_id"] == id and &1["container"] == "svc"))
+    assert exposure["local_port"] == local_port
+    assert exposure["remote_port"] == 5000
+    assert exposure["machine_id"] == id
+  end
+
+  test "restarting the Expose server (mock) re-reads persisted exposures without crashing" do
+    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "vps6", "address" => "203.0.113.14", "location" => "remote"})
+    {:ok, _} = Machines.create_container(id, %{"name" => "web", "image" => "ubuntu/24.04"})
+
+    {:ok, _} = Expose.expose(id, "web", 6000)
+
+    # The Expose server is supervised, so stopping it triggers a restart where
+    # init/1 runs reopen_exposures (a no-op in mock). Give the supervisor a
+    # moment to bring it back, then verify the persisted records still load.
+    GenServer.stop(Expose)
+    assert wait_until(fn -> Process.whereis(Expose) != nil end)
+    assert Process.alive?(Process.whereis(Expose))
+    assert Enum.any?(Expose.list(), &(&1["machine_id"] == id and &1["container"] == "web"))
+  end
 end
