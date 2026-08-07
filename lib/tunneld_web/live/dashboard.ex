@@ -32,7 +32,9 @@ defmodule TunneldWeb.Live.Dashboard do
   @sidebar_default %{
     is_open: false,
     view: nil,
-    selection: nil
+    selection: nil,
+    data: nil,
+    containers: []
   }
 
   @link_poll_interval 15_000
@@ -225,7 +227,7 @@ defmodule TunneldWeb.Live.Dashboard do
   defp terminal_modal(assigns) do
     ~H"""
     <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" phx-click="close_terminal" phx-window-keydown="close_terminal" phx-key="escape">
-      <div class="bg-bg border border-border rounded-lg w-[90%] max-w-3xl h-[80%] flex flex-col" phx-click="ignore">
+      <div class="bg-bg border border-border rounded-lg w-[95%] max-w-6xl h-[90%] flex flex-col" phx-click="ignore">
         <div class="flex items-center justify-between p-3 border-b border-border">
           <div class="text-sm font-medium">
             <.icon name="hero-command-line" class="w-4 h-4 inline mr-1" />
@@ -273,6 +275,8 @@ defmodule TunneldWeb.Live.Dashboard do
           view={@sidebar.view}
           uri_info={@uri_info}
           selection={@sidebar.selection}
+          data={@sidebar.data}
+          containers={@sidebar.containers}
           obfuscated={@obfuscated}
         />
         </div>
@@ -333,6 +337,10 @@ defmodule TunneldWeb.Live.Dashboard do
   def handle_event("open_settings", %{"type" => type}, socket) do
     sidebar = sidebar_open(get_sidebar_details(type, "_"), sidebar_selection(type, "_"))
     {:noreply, socket |> assign(:sidebar, sidebar) |> assign(:settings_menu_open, false)}
+  end
+
+  def handle_event("show_details", %{"id" => id, "type" => "machine"}, socket) do
+    {:noreply, open_machine_sidebar(socket, id)}
   end
 
   def handle_event("show_details", %{"id" => id, "type" => type}, socket) do
@@ -693,6 +701,10 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, assign(socket, :sidebar, sidebar_close(socket.assigns.sidebar))}
   end
 
+  def handle_info({:show_details, %{"id" => id, "type" => "machine"}}, socket) do
+    {:noreply, open_machine_sidebar(socket, id)}
+  end
+
   def handle_info({:show_details, %{"id" => id, "type" => type}}, socket) do
     sidebar = sidebar_open(get_sidebar_details(type, id), sidebar_selection(type, id))
     {:noreply, assign(socket, :sidebar, sidebar)}
@@ -735,6 +747,12 @@ defmodule TunneldWeb.Live.Dashboard do
         Tunneld.Servers.Resources.get_resource(id)
         :resource
 
+      "machine" ->
+        case Tunneld.Machines.get(id) do
+          {:ok, machine} -> machine
+          _ -> %{}
+        end
+
       "service" ->
         :system_overview
 
@@ -750,6 +768,7 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   defp sidebar_selection("resource", id) when is_binary(id), do: %{type: :resource, id: id}
+  defp sidebar_selection("machine", id) when is_binary(id), do: %{type: :machine, id: id}
   defp sidebar_selection(_, _), do: nil
 
   defp maybe_refresh_sidebar_details(socket, resources) do
@@ -862,11 +881,35 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   defp sidebar_open(view, selection) when is_atom(view) do
-    %{is_open: true, view: view, selection: selection}
+    %{is_open: true, view: view, selection: selection, data: nil, containers: []}
+  end
+
+  defp open_machine_sidebar(socket, id) do
+    case Tunneld.Machines.get(id) do
+      {:ok, machine} ->
+        containers =
+          case Tunneld.Machines.list_containers(id) do
+            {:ok, c} -> c
+            _ -> []
+          end
+
+        sidebar = %{
+          is_open: true,
+          view: :machine,
+          selection: %{type: :machine, id: id},
+          data: machine,
+          containers: containers
+        }
+
+        assign(socket, :sidebar, sidebar)
+
+      _ ->
+        assign(socket, :sidebar, @sidebar_default)
+    end
   end
 
   defp sidebar_close(sidebar) when is_map(sidebar) do
-    %{is_open: false, view: Map.get(sidebar, :view), selection: nil}
+    %{is_open: false, view: Map.get(sidebar, :view), selection: nil, data: nil, containers: []}
   end
 
   defp machine_action_flash(socket, "enroll_machine", %{"public_key" => pub}) when is_binary(pub) do

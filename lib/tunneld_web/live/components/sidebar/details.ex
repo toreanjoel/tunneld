@@ -6,6 +6,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
   - `:system_overview` - default "all good" panel
   - `:resource`        - a single resource's details and actions
+  - `:machine`         - a single managed machine's details and containers
   - `:ethernet`        - upstream/downstream interface link state
   - `:dns_server`      - upstream DNS server configuration
   - `:authentication`  - login reset
@@ -21,6 +22,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   def update(assigns, socket) do
     view = Map.get(assigns, :view, socket.assigns[:view] || :system_overview)
     data = Map.get(assigns, :data, %{})
+    containers = Map.get(assigns, :containers, [])
     selection = Map.get(assigns, :selection, socket.assigns[:selection] || nil)
     obfuscated = Map.get(assigns, :obfuscated, false)
 
@@ -29,6 +31,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign_new(:obfuscated, fn -> false end)
       |> assign(:view, view)
       |> assign(:data, data)
+      |> assign(:containers, containers)
       |> assign(:selection, selection)
       |> assign(:obfuscated, obfuscated)
 
@@ -219,6 +222,114 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <% end %>
         </div>
       </div>
+    </div>
+    """
+  end
+
+  @spec render(%{:view => :machine, optional(any()) => any()}) ::
+          Phoenix.LiveView.Rendered.t()
+  def render(%{view: :machine} = assigns) do
+    machine = Map.get(assigns, :data, %{})
+    containers = Map.get(assigns, :containers, [])
+
+    assigns =
+      assigns
+      |> assign(:machine, machine)
+      |> assign(:containers, containers)
+
+    ~H"""
+    <div class="p-4 space-y-5 min-h-full">
+      <%= if @machine == %{} do %>
+        <div class="flex flex-col items-center justify-center p-5 h-full">
+          <h1 class="text-2xl font-light text-gray-2 my-4 text-center">Machine not found</h1>
+        </div>
+      <% else %>
+        <%= sidebar_header(assigns, %{
+          header: mask(@obfuscated, @machine["name"] || @machine.name),
+          body: "#{@machine["address"] || @machine.address} · #{@machine["kind"] || @machine.kind} · #{location_label(@machine["location"] || @machine.location)}"
+        }) %>
+
+        <div class="flex flex-row gap-1 justify-end my-2">
+          <div
+            phx-click="probe_machine"
+            phx-value-id={@machine["id"] || @machine.id}
+            phx-click-loading="opacity-50 cursor-wait"
+            class="flex items-center justify-center gap-1 bg-surface p-2 cursor-pointer rounded-md"
+          >
+            <.icon name="hero-arrow-path" class="h-5 w-5" />
+            <div class="truncate text-xs">Probe</div>
+          </div>
+
+          <div
+            phx-click="create_container_modal"
+            phx-value-id={@machine["id"] || @machine.id}
+            class="flex items-center justify-center gap-1 bg-surface p-2 cursor-pointer rounded-md"
+          >
+            <.icon name="hero-plus-circle" class="h-5 w-5" />
+            <div class="truncate text-xs">New Container</div>
+          </div>
+
+          <div
+            phx-click="remove_machine"
+            phx-value-id={@machine["id"] || @machine.id}
+            class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
+          >
+            <.icon name="hero-trash" class="h-5 w-5" />
+            <div class="truncate text-xs">Remove</div>
+          </div>
+        </div>
+
+        <div class="flex flex-col p-3 mb-1 bg-surface rounded-lg font-light space-y-1">
+          <div class="text-sm truncate">
+            <span class="font-bold">Status:</span>
+            <span class={"ml-1 w-[13px] h-[13px] rounded-full inline-block align-middle #{status_dot(@machine["status"] || @machine.status)}"}></span>
+            <span class="ml-1 capitalize"><%= @machine["status"] || @machine.status %></span>
+          </div>
+          <%= if @machine["capabilities"] || @machine.capabilities do %>
+            <% caps = @machine["capabilities"] || @machine.capabilities %>
+            <div class="text-sm truncate"><span class="font-bold">Incus:</span> <%= caps["incus_version"] %></div>
+            <div class="text-sm truncate"><span class="font-bold">OS:</span> <%= caps["os"] %></div>
+            <div class="text-sm truncate"><span class="font-bold">CPU:</span> <%= caps["cpu_count"] %></div>
+            <div class="text-sm truncate"><span class="font-bold">RAM:</span> <%= caps["memory_mb"] %> MB</div>
+            <div class="text-sm truncate"><span class="font-bold">KVM:</span> <%= caps["kvm"] %></div>
+            <div class="text-sm truncate"><span class="font-bold">GPU:</span> <%= caps["gpu"] %></div>
+          <% end %>
+          <%= if @machine["last_seen"] || @machine.last_seen do %>
+            <div class="text-sm truncate text-gray-400">last seen <%= String.slice(@machine["last_seen"] || @machine.last_seen, 0, 19) %></div>
+          <% end %>
+        </div>
+
+        <div>
+          <div class="text-sm font-semibold mb-2">Containers</div>
+          <%= if Enum.empty?(@containers) do %>
+            <div class="text-xs text-gray-400 italic">No containers</div>
+          <% else %>
+            <div class="space-y-1">
+              <%= for c <- @containers do %>
+                <div class="flex items-center justify-between bg-surface rounded p-2 text-xs">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class={"w-2 h-2 rounded-full #{container_dot(c["status"])}"}></span>
+                    <span class="font-mono truncate"><%= c["name"] %></span>
+                    <span class="text-gray-400"><%= c["type"] %></span>
+                    <%= if c["ipv4"] != "" and c["ipv4"] != nil do %>
+                      <span class="text-gray-400 truncate">· <%= c["ipv4"] %></span>
+                    <% end %>
+                  </div>
+                  <div class="flex gap-1 shrink-0">
+                    <button phx-click="open_terminal" phx-value-id={@machine["id"] || @machine.id} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">shell</button>
+                    <button phx-click="start_container" phx-value-id={@machine["id"] || @machine.id} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">start</button>
+                    <button phx-click="stop_container" phx-value-id={@machine["id"] || @machine.id} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">stop</button>
+                    <%= if (c["location"] == "remote") or ((@machine["location"] || @machine.location) == "remote") do %>
+                      <button phx-click="expose_container_modal" phx-value-id={@machine["id"] || @machine.id} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">expose</button>
+                    <% end %>
+                    <button phx-click="delete_container" phx-value-id={@machine["id"] || @machine.id} phx-value-name={c["name"]} class="ghost-btn !text-red !px-2 !py-0.5 text-[10px]">delete</button>
+                  </div>
+                </div>
+              <% end %>
+            </div>
+          <% end %>
+        </div>
+      <% end %>
     </div>
     """
   end
@@ -436,6 +547,19 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   # Sidebar header componen
   # Contains information around the sidebar context, will take params but this will be specific to sidebar
   #
+  defp status_dot("ready"), do: "bg-green"
+  defp status_dot("enrolled"), do: "bg-yellow"
+  defp status_dot("probing"), do: "bg-yellow"
+  defp status_dot("unreachable"), do: "bg-red"
+  defp status_dot(_), do: "bg-gray-500"
+
+  defp container_dot("Running"), do: "bg-green"
+  defp container_dot("Stopped"), do: "bg-red"
+  defp container_dot(_), do: "bg-gray-500"
+
+  defp location_label("remote"), do: "remote"
+  defp location_label(_), do: "local"
+
   defp sidebar_header(assigns, %{header: header, body: body}) do
     assigns =
       assigns

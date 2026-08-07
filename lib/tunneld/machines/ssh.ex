@@ -41,15 +41,33 @@ defmodule Tunneld.Machines.SSH do
     {pub, priv}
   end
 
-  @doc "Store a private key for a machine on disk (mode 0600)."
+  @doc "Store a private key (and its public half) for a machine on disk."
   def store_key(machine_id, priv_pem) do
     dir = ssh_dir()
     File.mkdir_p!(dir)
     path = key_path(machine_id)
 
+    # Derive the public half from the private key so public_key_string/1 can
+    # always read it back (previously the .pub was never written, so the key
+    # vanished from the UI after enrollment).
+    pub = public_from_private(priv_pem)
+
     :ok = File.write(path, priv_pem)
     :ok = File.chmod(path, 0o600)
+    :ok = File.write(path <> ".pub", pub)
+    :ok = File.chmod(path <> ".pub", 0o644)
     :ok
+  end
+
+  @doc "Derive an OpenSSH public key line from a PEM private key via ssh-keygen."
+  def public_from_private(priv_pem) do
+    tmp = Path.join(System.tmp_dir!(), "tunneld_key_#{System.unique_integer([:positive])}")
+    :ok = File.write(tmp, priv_pem)
+    File.chmod(tmp, 0o600)
+
+    {pub, 0} = System.cmd("ssh-keygen", ["-y", "-f", tmp, "-q"])
+    File.rm(tmp)
+    pub
   end
 
   @doc "Delete a machine's private key."

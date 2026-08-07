@@ -46,16 +46,10 @@ defmodule TunneldWeb.Live.Components.Machines do
 
   @impl true
   def handle_event("select_machine", %{"id" => id}, socket) do
-    containers =
-      case Machines.list_containers(id) do
-        {:ok, c} -> c
-        _ -> []
-      end
-
-    case Machines.get(id) do
-      {:ok, machine} -> {:noreply, assign(socket, selected: machine, containers: containers)}
-      _ -> {:noreply, socket}
-    end
+    # Route to the dashboard sidebar (like resources/settings) instead of
+    # rendering machine details inline. Send the event to the parent LiveView.
+    send(socket.parent_pid || self(), {:show_details, %{"id" => id, "type" => "machine"}})
+    {:noreply, socket}
   end
 
   @impl true
@@ -112,74 +106,7 @@ defmodule TunneldWeb.Live.Components.Machines do
     """
   end
 
-  defp machine_detail(assigns) do
-    ~H"""
-    <div class="mt-4 bg-surface border border-border rounded-lg p-4 space-y-4">
-      <div class="flex items-center justify-between">
-        <div>
-          <div class="text-sm font-medium"><%= @machine["name"] %></div>
-          <div class="text-xs text-text-tertiary"><%= @machine["address"] %> · <%= @machine["kind"] %> · <%= location_label(@machine["location"]) %></div>
-        </div>
-        <div class="flex gap-2">
-          <button phx-click="probe_machine" phx-value-id={@machine["id"]} class="ghost-btn text-xs">Probe</button>
-          <button phx-click="create_container_modal" phx-value-id={@machine["id"]} class="ghost-btn text-xs">New Container</button>
-          <button phx-click="remove_machine" phx-value-id={@machine["id"]} class="ghost-btn !text-red text-xs">Remove</button>
-        </div>
-      </div>
-
-      <%= if @machine["capabilities"] do %>
-        <div class="text-xs text-text-secondary grid grid-cols-2 gap-2">
-          <div>Incus: <%= @machine["capabilities"]["incus_version"] %></div>
-          <div>OS: <%= @machine["capabilities"]["os"] %></div>
-          <div>CPU: <%= @machine["capabilities"]["cpu_count"] %></div>
-          <div>RAM: <%= @machine["capabilities"]["memory_mb"] %> MB</div>
-          <div>KVM: <%= @machine["capabilities"]["kvm"] %></div>
-          <div>GPU: <%= @machine["capabilities"]["gpu"] %></div>
-        </div>
-      <% end %>
-
-      <div class="text-xs text-text-tertiary">
-        Status: <%= @machine["status"] %>
-        <%= if @machine["last_seen"], do: " · last seen #{String.slice(@machine["last_seen"], 0, 19)}" %>
-      </div>
-
-      <div>
-        <div class="text-xs text-text-secondary mb-2">Containers</div>
-        <%= if @loading do %>
-          <div class="text-xs text-text-tertiary">Loading...</div>
-        <% else %>
-          <%= if Enum.empty?(@containers) do %>
-            <div class="text-xs text-text-tertiary italic">No containers</div>
-          <% else %>
-            <div class="space-y-1">
-              <%= for c <- @containers do %>
-                <div class="flex items-center justify-between bg-surface-2 rounded p-2 text-xs">
-                  <div class="flex items-center gap-2">
-                    <span class={"w-2 h-2 rounded-full #{container_dot(c["status"])}"}></span>
-                    <span class="font-mono"><%= c["name"] %></span>
-                    <span class="text-text-tertiary"><%= c["type"] %></span>
-                    <%= if c["ipv4"] != "" and c["ipv4"] != nil do %>
-                      <span class="text-text-tertiary">· <%= c["ipv4"] %></span>
-                    <% end %>
-                  </div>
-                  <div class="flex gap-1">
-                    <button phx-click="open_terminal" phx-value-id={@machine["id"]} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">shell</button>
-                    <button phx-click="start_container" phx-value-id={@machine["id"]} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">start</button>
-                    <button phx-click="stop_container" phx-value-id={@machine["id"]} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">stop</button>
-                    <%= if @machine["location"] == "remote" do %>
-                      <button phx-click="expose_container_modal" phx-value-id={@machine["id"]} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">expose</button>
-                    <% end %>
-                    <button phx-click="delete_container" phx-value-id={@machine["id"]} phx-value-name={c["name"]} class="ghost-btn !text-red !px-2 !py-0.5 text-[10px]">delete</button>
-                  </div>
-                </div>
-              <% end %>
-            </div>
-          <% end %>
-        <% end %>
-      </div>
-    </div>
-    """
-  end
+  defp machine_detail(_assigns), do: nil
 
   defp status_dot("ready"), do: "bg-green"
   defp status_dot("enrolled"), do: "bg-yellow"
@@ -192,8 +119,4 @@ defmodule TunneldWeb.Live.Components.Machines do
 
   defp location_label("remote"), do: "remote"
   defp location_label(_), do: "local"
-
-  defp container_dot("Running"), do: "bg-green"
-  defp container_dot("Stopped"), do: "bg-red"
-  defp container_dot(_), do: "bg-gray-500"
 end
