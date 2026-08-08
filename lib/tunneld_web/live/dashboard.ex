@@ -570,21 +570,36 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   def handle_event("view_ssh_key", %{"id" => id}, socket) do
+    ssh_user =
+      case Tunneld.Machines.get(id) do
+        {:ok, machine} -> machine["ssh_user"] || "root"
+        _ -> "root"
+      end
+
     case Tunneld.Machines.SSH.public_key_string(id) do
       nil ->
         {:noreply, put_flash(socket, :error, "No SSH key found for this machine")}
 
       pub ->
+        blocks = [
+          %{
+            "title" => "1. Install the SSH key on the target",
+            "code" =>
+              "mkdir -p ~/.ssh && echo '#{String.trim(pub)}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+          },
+          %{
+            "title" => "2. Give #{ssh_user} passwordless sudo (required for Incus install)",
+            "code" =>
+              "echo '#{ssh_user} ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/#{ssh_user} && sudo chmod 440 /etc/sudoers.d/#{ssh_user}"
+          }
+        ]
+
         modal = %{
           show: true,
-          title: "SSH public key",
+          title: "SSH key & setup",
           description:
-            "Install this public key on the target machine so tunneld can connect over SSH.",
-          body: %{
-            "type" => "code",
-            "data" => pub,
-            "label" => "Add this key to the target's ~/.ssh/authorized_keys:"
-          },
+            "Run these on the target machine so tunneld can connect over SSH and install Incus.",
+          body: %{"type" => "code_blocks", "data" => blocks},
           actions: nil,
           type: :default
         }
@@ -1079,18 +1094,29 @@ defmodule TunneldWeb.Live.Dashboard do
     %{is_open: false, view: Map.get(sidebar, :view), selection: nil, data: nil, containers: []}
   end
 
-  defp machine_action_flash(socket, "enroll_machine", %{"public_key" => pub})
+  defp machine_action_flash(socket, "enroll_machine", %{"public_key" => pub} = result)
        when is_binary(pub) do
+    ssh_user = get_in(result, ["machine", "ssh_user"]) || "root"
+
+    blocks = [
+      %{
+        "title" => "1. Install the SSH key on the target",
+        "code" =>
+          "mkdir -p ~/.ssh && echo '#{String.trim(pub)}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
+      },
+      %{
+        "title" => "2. Give #{ssh_user} passwordless sudo (required for Incus install)",
+        "code" =>
+          "echo '#{ssh_user} ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/#{ssh_user} && sudo chmod 440 /etc/sudoers.d/#{ssh_user}"
+      }
+    ]
+
     modal = %{
       show: true,
       title: "Machine enrolled",
       description:
-        "Install this public key on the target machine so tunneld can connect over SSH.",
-      body: %{
-        "type" => "code",
-        "data" => pub,
-        "label" => "Add this key to the target's ~/.ssh/authorized_keys:"
-      },
+        "Run these on the target machine so tunneld can connect over SSH and install Incus.",
+      body: %{"type" => "code_blocks", "data" => blocks},
       actions: nil,
       type: :default
     }

@@ -9,7 +9,7 @@ defmodule Tunneld.Schema.Machine do
     %{
       "title" => "Enroll Machine",
       "description" =>
-        "Register a machine (local or remote) to manage Incus containers and VMs over SSH. A public key is generated for you to install on the target.",
+        "Register a machine (local or remote) to manage Incus containers and VMs over SSH. After enrolling, the modal shows the SSH key to install and the passwordless-sudo setup required for Incus install.",
       "type" => "object",
       "ui:order" => ["name", "address", "ssh_port", "ssh_user", "location"],
       "properties" => %{
@@ -39,7 +39,7 @@ defmodule Tunneld.Schema.Machine do
           "default" => "root",
           "description" => "SSH user to connect as on the target.",
           "ui:help" =>
-            "The user tunneld will SSH in as. It needs passwordless sudo and access to Incus (e.g. add it to the incus group)."
+            "The user tunneld will SSH in as. It needs passwordless sudo (for Incus install) and access to Incus (e.g. add it to the incus group)."
         },
         "location" => %{
           "type" => "string",
