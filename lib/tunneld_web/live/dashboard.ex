@@ -583,12 +583,17 @@ defmodule TunneldWeb.Live.Dashboard do
       pub ->
         blocks = [
           %{
-            "title" => "1. Install the SSH key on the target",
+            "title" => "1. Enable the SSH server (if not already running)",
+            "code" =>
+              "sudo apt update && sudo apt install -y openssh-server && sudo systemctl enable --now ssh"
+          },
+          %{
+            "title" => "2. Install the SSH key on the target",
             "code" =>
               "mkdir -p ~/.ssh && echo '#{String.trim(pub)}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
           },
           %{
-            "title" => "2. Give #{ssh_user} passwordless sudo (required for Incus install)",
+            "title" => "3. Give #{ssh_user} passwordless sudo (required for Incus install)",
             "code" =>
               "echo '#{ssh_user} ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/#{ssh_user} && sudo chmod 440 /etc/sudoers.d/#{ssh_user}"
           }
@@ -1100,12 +1105,17 @@ defmodule TunneldWeb.Live.Dashboard do
 
     blocks = [
       %{
-        "title" => "1. Install the SSH key on the target",
+        "title" => "1. Enable the SSH server (if not already running)",
+        "code" =>
+          "sudo apt update && sudo apt install -y openssh-server && sudo systemctl enable --now ssh"
+      },
+      %{
+        "title" => "2. Install the SSH key on the target",
         "code" =>
           "mkdir -p ~/.ssh && echo '#{String.trim(pub)}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
       },
       %{
-        "title" => "2. Give #{ssh_user} passwordless sudo (required for Incus install)",
+        "title" => "3. Give #{ssh_user} passwordless sudo (required for Incus install)",
         "code" =>
           "echo '#{ssh_user} ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/#{ssh_user} && sudo chmod 440 /etc/sudoers.d/#{ssh_user}"
       }
