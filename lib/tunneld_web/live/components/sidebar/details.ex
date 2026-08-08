@@ -415,16 +415,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                       >
                         stop
                       </button>
-                      <%= if (c["location"] == "remote") or ((mget(@machine, "location")) == "remote") do %>
-                        <button
-                          phx-click="expose_container_modal"
-                          phx-value-id={mget(@machine, "id")}
-                          phx-value-name={c["name"]}
-                          class="ghost-btn !px-2 !py-0.5 text-[10px]"
-                        >
-                          expose
-                        </button>
-                      <% end %>
                       <button
                         phx-click="delete_container"
                         phx-value-id={mget(@machine, "id")}

@@ -103,9 +103,6 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
 
         Tunneld.Machines.create_container(id, spec)
 
-      "expose_container" ->
-        Tunneld.Machines.Expose.expose(data["machine_id"], data["container"], data["port"])
-
       # Device restart
       "restart_device" ->
         if @mock do

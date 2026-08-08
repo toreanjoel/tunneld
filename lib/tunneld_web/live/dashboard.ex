@@ -525,23 +525,6 @@ defmodule TunneldWeb.Live.Dashboard do
     end
   end
 
-  def handle_event("expose_container_modal", %{"id" => id, "name" => name}, socket) do
-    modal_data = %{
-      show: true,
-      title: "Expose Container",
-      description: "Make #{name} reachable on the subnet via a reverse SSH tunnel.",
-      body: %{
-        "type" => "schema",
-        "data" => Tunneld.Schema.Expose.data(%{machine_id: id, container: name}),
-        "default_values" => %{"machine_id" => id, "container" => name},
-        "action" => "expose_container"
-      },
-      actions: nil,
-      type: :default
-    }
-
-    {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal_data))}
-  end
 
   def handle_event("probe_machine", %{"id" => id}, socket) do
     case Tunneld.Machines.probe(id) do
@@ -840,7 +823,7 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   def handle_info({:action_done, ref, action, result}, socket)
-      when action in ["enroll_machine", "create_container", "expose_container", "install_incus"] do
+      when action in ["enroll_machine", "create_container", "install_incus"] do
     pending = Map.get(socket.assigns.pending_actions, ref, %{})
 
     socket =
@@ -1212,15 +1195,6 @@ defmodule TunneldWeb.Live.Dashboard do
     put_flash(socket, :info, "Container #{name} created")
   end
 
-  defp machine_action_flash(socket, "expose_container", %{"lan_url" => lan_url})
-       when not is_nil(lan_url) do
-    put_flash(socket, :info, "Exposed on the subnet at #{lan_url}")
-  end
-
-  defp machine_action_flash(socket, "expose_container", _result) do
-    put_flash(socket, :info, "Exposed on the subnet")
-  end
-
   defp machine_action_flash(socket, _action, _result), do: socket
 
   # start_action wraps perform/3 as {:ok, perform(...)}. perform/3 itself returns
@@ -1235,8 +1209,6 @@ defmodule TunneldWeb.Live.Dashboard do
 
   defp machine_error("create_container", reason),
     do: "container creation failed: #{inspect(reason)}"
-
-  defp machine_error("expose_container", reason), do: "expose failed: #{inspect(reason)}"
 
   defp machine_error("install_incus", {:ssh_failed, _}) do
     "SSH connection failed. Make sure the public key is installed on the target and the SSH user is correct."

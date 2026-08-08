@@ -35,7 +35,6 @@ defmodule Tunneld.Machines do
   require Logger
 
   alias Tunneld.Machines.{Store, SSH, Provider, Runtime}
-  alias Tunneld.Machines.Expose
 
   @pubsub_topic "component:machines"
 
@@ -338,7 +337,6 @@ defmodule Tunneld.Machines do
     reply =
       with {:ok, machine} <- Store.get(id),
            {:ok, result} <- Provider.delete_container(machine, name) do
-        Expose.unexpose(id, name)
         broadcast(:container_removed, %{"machine_id" => id, "name" => name})
         {:ok, result}
       end
@@ -355,7 +353,6 @@ defmodule Tunneld.Machines do
       {:ok, _record} ->
         :ok = Store.delete(id)
         SSH.delete_key(id)
-        Expose.cleanup_machine(id)
         broadcast(:removed, %{"id" => id})
         {:reply, :ok, state}
     end
@@ -379,7 +376,7 @@ defmodule Tunneld.Machines do
   # missing, and mark unreachable machines so the dashboard reflects live state
   # without a manual probe. Container restart on a machine reboot is handled by
   # Incus itself (tunneld sets `boot.autostart true` on creation); reverse SSH
-  # expose tunnels are re-opened by `Tunneld.Machines.Expose` on its own init.
+
   defp recover_machines do
     for machine <- Store.all() do
       id = machine["id"]

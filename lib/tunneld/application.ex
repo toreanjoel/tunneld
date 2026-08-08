@@ -23,7 +23,6 @@ defmodule Tunneld.Application do
   }
 
   alias Tunneld.Machines
-  alias Tunneld.Machines.Expose
 
   @impl true
   def start(_type, _args) do
@@ -46,7 +45,6 @@ defmodule Tunneld.Application do
           {DnsConfig, []},
           {Updater, []},
           {Machines, []},
-          {Expose, []},
           {Tunneld.Geolocation, []},
           TunneldWeb.Endpoint
         ]
