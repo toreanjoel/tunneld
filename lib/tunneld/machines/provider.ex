@@ -123,8 +123,10 @@ defmodule Tunneld.Machines.Provider do
             {:error, :unsupported_distro}
 
           cmd ->
-            case run(machine, cmd) do
-              {:ok, _} -> {:ok, :installed}
+            with {:ok, _} <- run(machine, cmd),
+                 :ok <- post_install_incus(machine) do
+              {:ok, :installed}
+            else
               {:error, reason} -> {:error, {:install_failed, reason}}
             end
         end
@@ -187,6 +189,29 @@ defmodule Tunneld.Machines.Provider do
       sudo apt-get update -qq && sudo apt-get install -y -qq incus
     fi
     """
+  end
+
+  # After installing the incus package, start the daemon, add the SSH user to
+  # the incus-admin group (so it can talk to the socket), and run the first-time
+  # init (creates a storage pool + default bridge network with DHCP/NAT). Each
+  # step tolerates failure so a partially-working install still reports success.
+  defp post_install_incus(machine) do
+    user = machine["ssh_user"] || "root"
+
+    with {:ok, _} <-
+           run(
+             machine,
+             "sudo systemctl enable --now incus 2>/dev/null || sudo systemctl enable --now incusd 2>/dev/null || true"
+           ),
+         {:ok, _} <-
+           run(
+             machine,
+             "sudo usermod -aG incus-admin #{sh(user)} 2>/dev/null || sudo usermod -aG incus #{sh(user)} 2>/dev/null || true"
+           ),
+         {:ok, _} <-
+           run(machine, "sleep 2; sudo incus admin init --auto 2>/dev/null || true") do
+      :ok
+    end
   end
 
   defp dispatch("incus", :create_container, machine, spec) do
