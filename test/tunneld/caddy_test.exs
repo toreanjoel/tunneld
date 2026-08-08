@@ -89,6 +89,40 @@ defmodule Tunneld.CaddyTest do
     refute Map.has_key?(config["apps"]["http"]["servers"], "tunneld_#{r.id}_loop")
   end
 
+
+  test "build_public_config: plain port listen -> no host matcher, TLS disabled" do
+    config = Caddy.build_public_config([
+      %{"id" => "r9", "name" => "web", "listen" => "8080", "pool" => ["127.0.0.1:3000"]}
+    ])
+    server = config["apps"]["http"]["servers"]["tunneld_r9_public"]
+    assert server["listen"] == [":8080"]
+    [route] = server["routes"]
+    refute Map.has_key?(route, "match")
+    assert server["automatic_https"] == %{"disable" => true}
+  end
+
+  test "build_public_config: hostname listen -> host matcher + auto TLS (no disable)" do
+    config = Caddy.build_public_config([
+      %{"id" => "r10", "name" => "web", "listen" => "app.example.com", "pool" => ["127.0.0.1:3000"]}
+    ])
+    server = config["apps"]["http"]["servers"]["tunneld_r10_public"]
+    assert server["listen"] == [":80", ":443"]
+    [route] = server["routes"]
+    assert route["match"] == [%{"host" => ["app.example.com"]}]
+    refute Map.has_key?(server, "automatic_https")
+  end
+
+  test "sync_public writes a remote-machine config in mock mode" do
+    machine = %{"id" => "m1", "address" => "203.0.113.5", "location" => "remote"}
+    assert :ok = Caddy.sync_public(machine, [
+      %{"id" => "r11", "name" => "x", "listen" => "9090", "pool" => ["127.0.0.1:4000"]}
+    ])
+    path = Path.join(Application.get_env(:tunneld, :fs)[:root], "caddy/public_m1.json")
+    assert File.exists?(path)
+    config = Jason.decode!(File.read!(path))
+    assert config["apps"]["http"]["servers"]["tunneld_r11_public"]["listen"] == [":9090"]
+  end
+
   defp wait_until(fun, tries \\ 50) do
     cond do
       fun.() -> true

@@ -7,7 +7,7 @@ defmodule Tunneld.Caddy do
   template, no `sites-available` symlink dance, and no reload signal. Config
   changes are `PUT` against the admin endpoint and are atomic.
 
-  ## Two planes (kept distinct)
+  ## Three planes (kept distinct)
 
   * **LAN** — one server listens on `0.0.0.0:18000` and routes by Host header
     (`<name>.tunneld.lan`). This is the subnet plane: dnsmasq resolves
@@ -18,6 +18,13 @@ defmodule Tunneld.Caddy do
     not send the `tunneld.lan` Host header, so they would hit the wrong
     backend or none; the loopback listener lets them target a fixed local
     port instead.
+  * **Public (remote)** — for resources on a remote machine, tunneld drives
+    the **machine's own Caddy** admin API (at `http://<overlay_ip>:2019` over
+    WireGuard) to expose the service on the public internet. The resource's
+    `listen` field is a single object: `"8080"` (plain port, no domain/TLS)
+    or `"app.example.com"` (domain — Caddy auto-provisions TLS). Same object,
+    one field, no migration: pointing DNS and changing `listen` is all it
+    takes.
 
   Config is a single global JSON document, so the module exposes
   `sync/1` which reconciles the **entire** config from the full resource list
@@ -120,6 +127,48 @@ defmodule Tunneld.Caddy do
   """
   def loop_server_name(id), do: "tunneld_#{id}_loop"
 
+  @doc """
+  Build a Caddy config for a **remote machine's** public exposure. This drives
+  the machine's own Caddy admin API (over WireGuard) so a service is reachable
+  on the public internet without a tunneld-side tunnel.
+
+  `listen` is a single object: `"8080"` (plain port, no domain/TLS) or
+  `"app.example.com"` (domain — Caddy auto-provisions TLS). Returns a full
+  Caddy JSON document.
+  """
+  def build_public_config(resources) when is_list(resources) do
+    servers =
+      resources
+      |> Enum.reject(&(r_empty(&1["listen"])))
+      |> Map.new(fn r -> {public_server_name(r["id"]), public_server(r)} end)
+
+    %{
+      "admin" => %{"listen" => "127.0.0.1:2019"},
+      "apps" => %{"http" => %{"servers" => servers}}
+    }
+  end
+
+  @doc "Return the public server name for a resource id."
+  def public_server_name(id), do: "tunneld_#{id}_public"
+
+  @doc """
+  Drive a remote machine's Caddy admin API (at `http://<overlay_ip>:2019`,
+  reached over the WireGuard overlay) to apply a public-exposure config.
+  Returns `:ok` or `{:error, reason}`. In mock mode, writes to disk.
+  """
+  def sync_public(machine, resources) when is_list(resources) do
+    config = build_public_config(resources)
+
+    if mock?() do
+      dir = Path.join(Config.fs_root(), "caddy")
+      File.mkdir_p!(dir)
+      File.write(Path.join(dir, "public_#{machine["id"]}.json"), Jason.encode!(config, pretty: true))
+    else
+      overlay_ip = Tunneld.Overlay.address_for(machine)
+      push_config(config, "http://#{overlay_ip}:2019/")
+    end
+  end
+
   # --- config building ---
 
   defp reverse_proxy(pool) do
@@ -144,20 +193,47 @@ defmodule Tunneld.Caddy do
     }
   end
 
+  # Build the public server for a remote machine's Caddy.
+  #   listen == "8080"        -> :8080, no host matcher, TLS disabled
+  #   listen == "app.example" -> :80/:443, host matcher, TLS auto (default)
+  defp public_server(r) do
+    listen = r["listen"]
+
+    if Regex.match?(~r/^\d+$/, listen) do
+      %{
+        "listen" => [":#{listen}"],
+        "routes" => [%{"handle" => [reverse_proxy(r["pool"])]}],
+        "automatic_https" => %{"disable" => true}
+      }
+    else
+      %{
+        "listen" => [":80", ":443"],
+        "routes" => [
+          %{
+            "match" => [%{"host" => [String.trim(listen)]}],
+            "handle" => [reverse_proxy(r["pool"])]
+          }
+        ]
+      }
+    end
+  end
+
   defp r_empty(nil), do: true
   defp r_empty(""), do: true
   defp r_empty(_), do: false
 
   # --- apply ---
 
-  defp push_config(config) do
+  defp push_config(config), do: push_config(config, @admin_url)
+
+  defp push_config(config, base_url) do
     body = Jason.encode!(config)
 
     # POST /load atomically replaces the entire config (the recommended way to
     # load a full new config). PUT /config/ would 409 when a config already
     # exists.
     case HTTPoison.post(
-           @admin_url <> "load",
+           base_url <> "load",
            body,
            [{"content-type", "application/json"}],
            timeout: 10_000,
