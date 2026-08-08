@@ -654,10 +654,19 @@ defmodule TunneldWeb.Live.Dashboard do
   def handle_event("make_listener_resource", %{"machine_id" => id, "addr" => addr, "port" => port, "proc" => proc} = _params, socket) do
     name = sanitize_resource_name("#{proc}-#{port}")
 
+    # The pool should point at the address tunneld can actually route to: for
+    # a same-subnet machine that is the LAN IP, for a remote machine it is the
+    # overlay IP (WireGuard) - never the raw bind address (often 0.0.0.0).
+    backend_addr =
+      case Tunneld.Machines.get(id) do
+        {:ok, machine} -> Tunneld.Overlay.address_for(machine)
+        _ -> addr
+      end
+
     resource = %{
       "name" => name,
       "description" => "Listener #{addr}:#{port} on machine #{id} (#{proc})",
-      "pool" => ["#{addr}:#{port}"],
+      "pool" => ["#{backend_addr}:#{port}"],
       "expose_source" => "listener",
       "expose_machine_id" => id
     }
@@ -667,7 +676,7 @@ defmodule TunneldWeb.Live.Dashboard do
 
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
       type: :info,
-      message: "Resource '#{name}' created from listener #{addr}:#{port}"
+      message: "Resource '#{name}' created from listener #{backend_addr}:#{port}"
     })
 
     {:noreply, socket}
