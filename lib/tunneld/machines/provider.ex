@@ -56,25 +56,41 @@ defmodule Tunneld.Machines.Provider do
     dispatch(kind, :installed?, machine)
   end
 
+  @doc """
+  Install the Incus provider on the machine over SSH.
+
+  Detects the distro from `/etc/os-release` and runs the appropriate
+  `sudo` package-manager command. Requires the SSH user to have passwordless
+  sudo. Returns `{:ok, :installed}` or `{:error, reason}`.
+  """
+  def install_incus(machine) do
+    kind = machine["kind"] || "incus"
+    dispatch(kind, :install_incus, machine)
+  end
+
   defp dispatch("incus", :probe, machine) do
     with {:ok, _present} <- incus_installed?(machine),
          {:ok, version} <- run(machine, "incus version"),
          {:ok, storage} <- run(machine, "incus storage list --format json"),
          {:ok, cpus} <- run(machine, "nproc"),
          {:ok, mem} <- run(machine, "free -m | awk '/^Mem:/ {print $2}'"),
-         {:ok, kvm} <- run(machine, "lscpu | grep -i kvm"),
-         {:ok, gpu} <- run(machine, "lspci | grep -i vga"),
+         # grep exits 1 when no match is found (e.g. no KVM/VGA on a VM), which
+         # would fail the probe. `|| true` makes these always exit 0.
+         {:ok, kvm} <- run(machine, "lscpu | grep -i kvm || true"),
+         {:ok, gpu} <- run(machine, "lspci | grep -i vga || true"),
          {:ok, os} <- run(machine, "cat /etc/os-release | grep ^PRETTY_NAME") do
-      {:ok, %{
-        "provider" => "incus",
-        "incus_version" => String.trim(version),
-        "storage" => parse_storage(storage),
-        "cpu_count" => String.trim(cpus) |> String.to_integer(),
-        "memory_mb" => String.trim(mem) |> String.to_integer(),
-        "kvm" => String.contains?(kvm, "kvm") or String.contains?(kvm, "KVM"),
-        "gpu" => String.trim(gpu) != "",
-        "os" => os |> String.replace_prefix("PRETTY_NAME=", "") |> String.trim() |> String.trim("\"")
-      }}
+      {:ok,
+       %{
+         "provider" => "incus",
+         "incus_version" => String.trim(version),
+         "storage" => parse_storage(storage),
+         "cpu_count" => String.trim(cpus) |> String.to_integer(),
+         "memory_mb" => String.trim(mem) |> String.to_integer(),
+         "kvm" => String.contains?(kvm, "kvm") or String.contains?(kvm, "KVM"),
+         "gpu" => String.trim(gpu) != "",
+         "os" =>
+           os |> String.replace_prefix("PRETTY_NAME=", "") |> String.trim() |> String.trim("\"")
+       }}
     end
   end
 
@@ -99,7 +115,79 @@ defmodule Tunneld.Machines.Provider do
     end
   end
 
+  defp dispatch("incus", :install_incus, machine) do
+    case run(machine, "grep -E '^(ID|ID_LIKE)=' /etc/os-release") do
+      {:ok, os_info} ->
+        case install_command(parse_os_ids(os_info)) do
+          nil ->
+            {:error, :unsupported_distro}
+
+          cmd ->
+            case run(machine, cmd) do
+              {:ok, _} -> {:ok, :installed}
+              {:error, reason} -> {:error, {:install_failed, reason}}
+            end
+        end
+
+      # Distinguish a real SSH failure (e.g. key not installed) from an
+      # unsupported distro, so the dashboard shows the actual problem.
+      {:error, reason} ->
+        {:error, {:ssh_failed, reason}}
+    end
+  end
+
   defp dispatch(kind, _op, _machine), do: {:error, {:unsupported_provider, kind}}
+
+  # Read ID and ID_LIKE from /etc/os-release. Prefer ID, but fall back to
+  # ID_LIKE tokens so Debian/Ubuntu derivatives (e.g. Armbian reports
+  # ID=armbian, ID_LIKE=debian) still resolve to the apt install command.
+  defp parse_os_ids(raw) do
+    ids =
+      raw
+      |> String.split("\n")
+      |> Enum.reduce(%{}, fn line, acc ->
+        case String.split(line, "=", parts: 2) do
+          [k, v] -> Map.put(acc, k, v |> String.trim() |> String.trim("\""))
+          _ -> acc
+        end
+      end)
+
+    id = Map.get(ids, "ID")
+    id_like = Map.get(ids, "ID_LIKE", "")
+
+    candidates = [id | String.split(id_like, ~r/\s+/, trim: true)]
+    Enum.find(candidates, fn c -> install_command(c) != nil end)
+  end
+
+  # Map a distro ID to the sudo package-manager command that installs Incus.
+  # Ubuntu/Debian use apt, but `incus` is only in the default repos on newer
+  # releases (Ubuntu >= 23.10, Debian with backports). On older releases we
+  # fall back to the official Zabbly repo so the gateway can install Incus on
+  # e.g. Ubuntu 22.04 without manual steps.
+  defp install_command("ubuntu"), do: apt_install_command()
+  defp install_command("debian"), do: apt_install_command()
+  defp install_command("alpine"), do: "sudo apk add --no-cache incus"
+  defp install_command("fedora"), do: "sudo dnf install -y incus"
+  defp install_command(_), do: nil
+
+  defp apt_install_command do
+    """
+    if apt-cache show incus >/dev/null 2>&1; then
+      sudo apt-get update -qq && sudo apt-get install -y -qq incus
+    else
+      command -v curl >/dev/null 2>&1 || sudo apt-get install -y -qq curl
+      sudo mkdir -p /etc/apt/keyrings
+      curl -fsSL https://pkgs.zabbly.com/key.asc | sudo gpg --dearmor -o /etc/apt/keyrings/zabbly.gpg
+      echo "Types: deb
+    URIs: https://pkgs.zabbly.com/incus/stable
+    Suites: $(. /etc/os-release && echo ${VERSION_CODENAME})
+    Components: main
+    Architectures: $(dpkg --print-architecture)
+    Signed-By: /etc/apt/keyrings/zabbly.gpg" | sudo tee /etc/apt/sources.list.d/zabbly-incus-stable.sources >/dev/null
+      sudo apt-get update -qq && sudo apt-get install -y -qq incus
+    fi
+    """
+  end
 
   defp dispatch("incus", :create_container, machine, spec) do
     name = spec["name"]
@@ -159,16 +247,21 @@ defmodule Tunneld.Machines.Provider do
   # Shell-quote a value for safe interpolation into an ssh command string.
   # Wraps in single quotes and escapes embedded single quotes.
   defp sh(nil), do: "''"
+
   defp sh(s) when is_binary(s) do
     "'" <> String.replace(s, "'", "'\\''") <> "'"
   end
+
   defp sh(n) when is_integer(n), do: Integer.to_string(n)
 
   defp maybe_config(_machine, _name, cpu, memory) when is_nil(cpu) and is_nil(memory), do: :ok
+
   defp maybe_config(machine, name, cpu, memory) do
     cpu_cmd = if cpu, do: "incus config set #{sh(name)} limits.cpu #{sh(cpu)}", else: "true"
     mem_str = if is_integer(memory), do: "#{memory}MiB", else: nil
-    mem_cmd = if mem_str, do: "incus config set #{sh(name)} limits.memory #{sh(mem_str)}", else: "true"
+
+    mem_cmd =
+      if mem_str, do: "incus config set #{sh(name)} limits.memory #{sh(mem_str)}", else: "true"
 
     case run(machine, "#{cpu_cmd} && #{mem_cmd}") do
       {:ok, _} -> :ok
@@ -179,28 +272,52 @@ defmodule Tunneld.Machines.Provider do
   # Attach the container to a network.
   #
   # macvlan: the container gets its own MAC + DHCP lease straight from the
-  # gateway's dnsmasq, appearing on the subnet as an independent device. Only
-  # valid for containers (not VMs) on local targets.
+  # LAN's DHCP server, appearing on the subnet as an independent device. We
+  # attach to the target's physical NIC (the one carrying the default route)
+  # rather than a hardcoded bridge, so it works on any host. Only valid for
+  # containers (not VMs) on local targets.
   #
   # bridge (default): NAT'd behind the target host; services are reached via
   # Incus proxy devices on the host's IP.
   defp maybe_network(_machine, _name, "bridge"), do: :ok
+
   defp maybe_network(machine, name, "macvlan") do
-    case run(machine, "incus config device add #{sh(name)} eth0 nic network=lxdbr0 nictype=macvlan") do
-      {:ok, _} -> :ok
-      err -> err
+    with {:ok, route} <- run(machine, "ip route | awk '/^default/ {print $5; exit}'"),
+         parent when parent != "" <- String.trim(route) do
+      # Create a managed macvlan network on the physical NIC if it doesn't
+      # exist yet. Managed networks work in restricted Incus projects; raw
+      # macvlan devices do not.
+      net = "macvlan0"
+
+      _ =
+        run(
+          machine,
+          "sudo incus network show #{net} 2>/dev/null || sudo incus network create #{net} --type=macvlan parent=#{sh(parent)}"
+        )
+
+      # Override the profile's eth0 device to use the macvlan network.
+      case run(machine, "incus config device override #{sh(name)} eth0 network=#{net}") do
+        {:ok, _} -> :ok
+        err -> err
+      end
+    else
+      _ -> {:error, :no_physical_nic}
     end
   end
+
   defp maybe_network(_machine, _name, _), do: :ok
 
   # Each port: %{"host" => 8080, "container" => 80}
   # Incus proxy device: incus config device add <c> <name> proxy listen=0.0.0.0:<host> connect=0.0.0.0:<container>
   defp add_proxy_devices(_machine, _name, []), do: :ok
+
   defp add_proxy_devices(machine, name, ports) do
     ports
     |> Enum.reduce_while(:ok, fn %{"host" => host, "container" => container}, _acc ->
       dev_name = "proxy_#{host}"
-      cmd = "incus config device add #{sh(name)} #{sh(dev_name)} proxy listen=0.0.0.0:#{host} connect=0.0.0.0:#{container}"
+
+      cmd =
+        "incus config device add #{sh(name)} #{sh(dev_name)} proxy listen=tcp:0.0.0.0:#{host} connect=tcp:0.0.0.0:#{container}"
 
       case run(machine, cmd) do
         {:ok, _} -> {:cont, :ok}
@@ -214,13 +331,15 @@ defmodule Tunneld.Machines.Provider do
       {:ok, list} when is_list(list) ->
         Enum.map(list, fn s -> %{"name" => s["name"], "driver" => s["driver"]} end)
 
-      _ -> []
+      _ ->
+        []
     end
   end
 
   defp normalize_incus_list(list) do
     Enum.map(list, fn c ->
       ipv4 = c["ipv4"] || extract_ipv4(c["state"]) || ""
+
       %{
         "name" => c["name"],
         "status" => c["status"],
@@ -231,12 +350,30 @@ defmodule Tunneld.Machines.Provider do
   end
 
   defp extract_ipv4(nil), do: nil
+
   defp extract_ipv4(state) when is_list(state) do
     case Enum.find(state, &Map.has_key?(&1, "ipv4")) do
       nil -> nil
       entry -> entry["ipv4"]
     end
   end
+
   defp extract_ipv4(%{"ipv4" => ip}), do: ip
+
+  # incus list --format json nests addresses under state.network.<iface>.addresses
+  defp extract_ipv4(%{"network" => network}) when is_map(network) do
+    network
+    |> Map.values()
+    |> Enum.flat_map(fn
+      %{"addresses" => addrs} when is_list(addrs) ->
+        Enum.filter(addrs, &(&1["family"] == "inet"))
+      _ ->
+        []
+    end)
+    |> Enum.map(& &1["address"])
+    |> Enum.reject(&is_nil/1)
+    |> List.first()
+  end
+
   defp extract_ipv4(_), do: nil
 end

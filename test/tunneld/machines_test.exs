@@ -91,6 +91,17 @@ defmodule Tunneld.MachinesTest do
     assert app["type"] == "container"
   end
 
+  test "list_containers extracts IPv4 from the nested incus state.network structure" do
+    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "box3b", "address" => "10.0.0.7"})
+    {:ok, containers} = Machines.list_containers(id)
+
+    [app] = Enum.filter(containers, &(&1["name"] == "mock-app"))
+    assert app["ipv4"] == "10.10.0.42"
+
+    [vm] = Enum.filter(containers, &(&1["name"] == "mock-vm"))
+    assert vm["ipv4"] == ""
+  end
+
   test "remove deletes the record and key" do
     {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "box4", "address" => "10.0.0.8"})
     assert :ok = Machines.remove(id)
@@ -107,6 +118,40 @@ defmodule Tunneld.MachinesTest do
 
   test "probe on unknown id returns not_found" do
     assert {:error, :not_found} = Machines.probe("does-not-exist")
+  end
+
+  test "startup recovery probes enrolled machines to ready (mock mode)" do
+    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "recover1", "address" => "10.0.0.20"})
+
+    # Freshly enrolled: no capabilities yet, status enrolled.
+    {:ok, m} = Machines.get(id)
+    assert m["status"] == "enrolled"
+    assert is_nil(m["capabilities"])
+
+    # Starting a fresh Machines GenServer triggers the async startup recovery,
+    # which probes every enrolled machine and fills capabilities.
+    {:ok, _pid} = GenServer.start_link(Tunneld.Machines, %{}, name: :recovery_test)
+
+    # Poll until the async recovery Task has updated the record.
+    assert eventually(fn ->
+             case Machines.get(id) do
+               {:ok, %{"status" => "ready", "capabilities" => caps}} when not is_nil(caps) ->
+                 caps["incus_version"] == "Incus 6.0.0"
+
+               _ ->
+                 false
+             end
+           end)
+  end
+
+  defp eventually(fun, attempts \\ 50) do
+    cond do
+      fun.() -> true
+      attempts <= 0 -> false
+      true ->
+        Process.sleep(20)
+        eventually(fun, attempts - 1)
+    end
   end
 
   describe "container provisioning (mock)" do

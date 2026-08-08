@@ -39,11 +39,15 @@ defmodule Tunneld.Machines.SSH.Mock do
     "8192\n"
   end
 
-  defp mock_output("lscpu | grep -i kvm") do
+  defp mock_output("lscpu | grep -i kvm || true") do
     "Virtualization: kvm\n"
   end
 
-  defp mock_output("lspci | grep -i vga") do
+  defp mock_output("ip route | awk '/^default/ {print $5; exit}'") do
+    "eth0\n"
+  end
+
+  defp mock_output("lspci | grep -i vga || true") do
     ""
   end
 
@@ -53,6 +57,10 @@ defmodule Tunneld.Machines.SSH.Mock do
 
   defp mock_output("cat /etc/os-release | grep ^PRETTY_NAME") do
     "PRETTY_NAME=\"Ubuntu 24.04 LTS\"\n"
+  end
+
+  defp mock_output("grep -E '^(ID|ID_LIKE)=' /etc/os-release") do
+    "ID=ubuntu\nID_LIKE=debian\n"
   end
 
   # init: parse "incus init <image> <name> [--vm]"
@@ -67,7 +75,15 @@ defmodule Tunneld.Machines.SSH.Mock do
       end
 
     name = unquote_name(name)
-    :ok = __MODULE__.MockState.add(%{"name" => name, "status" => "Stopped", "type" => type, "ipv4" => ""})
+
+    :ok =
+      __MODULE__.MockState.add(%{
+        "name" => name,
+        "status" => "Stopped",
+        "type" => type,
+        "ipv4" => ""
+      })
+
     ""
   end
 
@@ -141,18 +157,32 @@ defmodule Tunneld.Machines.SSH.Mock do
     end
 
     defp default_state do
+      # Mirrors the real `incus list --format json` shape, where IPv4 addresses
+      # are nested under state.network.<iface>.addresses (not a top-level key).
       %{
         "mock-app" => %{
           "name" => "mock-app",
           "status" => "Running",
           "type" => "container",
-          "ipv4" => "10.10.0.42"
+          "state" => %{
+            "network" => %{
+              "eth0" => %{
+                "addresses" => [
+                  %{"family" => "inet", "address" => "10.10.0.42", "scope" => "global"}
+                ]
+              }
+            }
+          }
         },
         "mock-vm" => %{
           "name" => "mock-vm",
           "status" => "Stopped",
           "type" => "virtual-machine",
-          "ipv4" => ""
+          "state" => %{
+            "network" => %{
+              "eth0" => %{"addresses" => []}
+            }
+          }
         }
       }
     end

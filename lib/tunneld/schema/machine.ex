@@ -11,18 +11,20 @@ defmodule Tunneld.Schema.Machine do
       "description" =>
         "Register a machine (local or remote) to manage Incus containers and VMs over SSH. A public key is generated for you to install on the target.",
       "type" => "object",
-      "ui:order" => ["name", "address", "ssh_port", "location"],
+      "ui:order" => ["name", "address", "ssh_port", "ssh_user", "location"],
       "properties" => %{
         "name" => %{
           "type" => "string",
           "description" => "A human-friendly label for this machine.",
-          "ui:help" => "Used across the dashboard to identify this machine (e.g. office-box, vps-1).",
+          "ui:help" =>
+            "Used across the dashboard to identify this machine (e.g. office-box, vps-1).",
           "minLength" => 1
         },
         "address" => %{
           "type" => "string",
           "description" => "Hostname or IP address of the machine.",
-          "ui:help" => "A subnet IP (e.g. 10.0.0.5) for local machines, or a public address for a remote VPS.",
+          "ui:help" =>
+            "A subnet IP (e.g. 10.0.0.5) for local machines, or a public address for a remote VPS.",
           "minLength" => 1
         },
         "ssh_port" => %{
@@ -31,6 +33,13 @@ defmodule Tunneld.Schema.Machine do
           "description" => "SSH port on the target.",
           "minimum" => 1,
           "maximum" => 65535
+        },
+        "ssh_user" => %{
+          "type" => "string",
+          "default" => "root",
+          "description" => "SSH user to connect as on the target.",
+          "ui:help" =>
+            "The user tunneld will SSH in as. It needs passwordless sudo and access to Incus (e.g. add it to the incus group)."
         },
         "location" => %{
           "type" => "string",

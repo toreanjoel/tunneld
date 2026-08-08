@@ -143,7 +143,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             })
           }
           phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-surface p-2 cursor-pointer rounded-md"
+          class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
         >
           <.icon name="hero-pencil-square" class="h-5 w-5" />
           <div class="truncate text-xs">Edit</div>
@@ -168,7 +168,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             })
           }
           phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
+          class="flex items-center justify-center gap-1 w-full bg-red p-2 cursor-pointer rounded-md hover:opacity-80"
         >
           <.icon name="hero-no-symbol" class="h-5 w-5" />
           <div class="truncate text-xs">Remove Resource</div>
@@ -189,10 +189,13 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             <% health = Map.get(@data, :health) || Map.get(@data, "health") || %{} %>
             <div class="text-sm truncate">
               <span class="font-bold">Health:</span>
-              <span class={"ml-1 w-[13px] h-[13px] rounded-full inline-block align-middle #{pool_health_dot(health[:status])}"}></span>
+              <span class={"ml-1 w-[13px] h-[13px] rounded-full inline-block align-middle #{pool_health_dot(health[:status])}"}>
+              </span>
               <span class="ml-1 capitalize"><%= human_health(health[:status]) %></span>
               <%= if is_number(health[:up]) and is_number(health[:total]) do %>
-                <span class="ml-1 text-xs text-gray-300">(<%= health[:up] %>/<%= health[:total] %> up)</span>
+                <span class="ml-1 text-xs text-gray-300">
+                  (<%= health[:up] %>/<%= health[:total] %> up)
+                </span>
               <% end %>
             </div>
             <div :if={@data[:lan_url]} class="text-sm truncate">
@@ -212,8 +215,11 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                 <% else %>
                   <%= for {entry, up?} <- pool_details do %>
                     <div class="flex items-center gap-2">
-                      <span class={"w-2 h-2 rounded-full inline-block #{if up?, do: "bg-green", else: "bg-yellow"}"}></span>
-                      <span class="font-mono text-xs text-gray-300"><%= mask(@obfuscated, entry) %></span>
+                      <span class={"w-2 h-2 rounded-full inline-block #{if up?, do: "bg-green", else: "bg-yellow"}"}>
+                      </span>
+                      <span class="font-mono text-xs text-gray-300">
+                        <%= mask(@obfuscated, entry) %>
+                      </span>
                     </div>
                   <% end %>
                 <% end %>
@@ -245,25 +251,45 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         </div>
       <% else %>
         <%= sidebar_header(assigns, %{
-          header: mask(@obfuscated, @machine["name"] || @machine.name),
-          body: "#{@machine["address"] || @machine.address} · #{@machine["kind"] || @machine.kind} · #{location_label(@machine["location"] || @machine.location)}"
+          header: mask(@obfuscated, mget(@machine, "name")),
+          body:
+            "#{mget(@machine, "address")} · #{mget(@machine, "kind")} · #{location_label(mget(@machine, "location"))}"
         }) %>
 
-        <div class="flex flex-row gap-1 justify-end my-2">
+        <div class="grid grid-cols-2 gap-1 my-2">
           <div
             phx-click="probe_machine"
-            phx-value-id={@machine["id"] || @machine.id}
+            phx-value-id={mget(@machine, "id")}
             phx-click-loading="opacity-50 cursor-wait"
-            class="flex items-center justify-center gap-1 bg-surface p-2 cursor-pointer rounded-md"
+            class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
           >
             <.icon name="hero-arrow-path" class="h-5 w-5" />
             <div class="truncate text-xs">Probe</div>
           </div>
 
           <div
+            phx-click="view_ssh_key"
+            phx-value-id={mget(@machine, "id")}
+            class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
+          >
+            <.icon name="hero-key" class="h-5 w-5" />
+            <div class="truncate text-xs">SSH Key</div>
+          </div>
+
+          <div
+            phx-click="install_incus"
+            phx-value-id={mget(@machine, "id")}
+            phx-click-loading="opacity-50 cursor-wait"
+            class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
+          >
+            <.icon name="hero-cog-6-tooth" class="h-5 w-5" />
+            <div class="truncate text-xs">Install Incus</div>
+          </div>
+
+          <div
             phx-click="create_container_modal"
-            phx-value-id={@machine["id"] || @machine.id}
-            class="flex items-center justify-center gap-1 bg-surface p-2 cursor-pointer rounded-md"
+            phx-value-id={mget(@machine, "id")}
+            class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
           >
             <.icon name="hero-plus-circle" class="h-5 w-5" />
             <div class="truncate text-xs">New Container</div>
@@ -271,8 +297,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
           <div
             phx-click="remove_machine"
-            phx-value-id={@machine["id"] || @machine.id}
-            class="flex items-center justify-center gap-1 bg-red p-2 cursor-pointer rounded-md"
+            phx-value-id={mget(@machine, "id")}
+            class="flex items-center justify-center gap-1 w-full bg-red p-2 cursor-pointer rounded-md hover:opacity-80"
           >
             <.icon name="hero-trash" class="h-5 w-5" />
             <div class="truncate text-xs">Remove</div>
@@ -282,20 +308,29 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         <div class="flex flex-col p-3 mb-1 bg-surface rounded-lg font-light space-y-1">
           <div class="text-sm truncate">
             <span class="font-bold">Status:</span>
-            <span class={"ml-1 w-[13px] h-[13px] rounded-full inline-block align-middle #{status_dot(@machine["status"] || @machine.status)}"}></span>
-            <span class="ml-1 capitalize"><%= @machine["status"] || @machine.status %></span>
+            <span class={"ml-1 w-[13px] h-[13px] rounded-full inline-block align-middle #{status_dot(mget(@machine, "status"))}"}>
+            </span>
+            <span class="ml-1 capitalize"><%= mget(@machine, "status") %></span>
           </div>
-          <%= if @machine["capabilities"] || @machine.capabilities do %>
-            <% caps = @machine["capabilities"] || @machine.capabilities %>
-            <div class="text-sm truncate"><span class="font-bold">Incus:</span> <%= caps["incus_version"] %></div>
+          <%= if mget(@machine, "capabilities") do %>
+            <% caps = mget(@machine, "capabilities") %>
+            <div class="text-sm truncate">
+              <span class="font-bold">Incus:</span> <%= caps["incus_version"] %>
+            </div>
             <div class="text-sm truncate"><span class="font-bold">OS:</span> <%= caps["os"] %></div>
-            <div class="text-sm truncate"><span class="font-bold">CPU:</span> <%= caps["cpu_count"] %></div>
-            <div class="text-sm truncate"><span class="font-bold">RAM:</span> <%= caps["memory_mb"] %> MB</div>
+            <div class="text-sm truncate">
+              <span class="font-bold">CPU:</span> <%= caps["cpu_count"] %>
+            </div>
+            <div class="text-sm truncate">
+              <span class="font-bold">RAM:</span> <%= caps["memory_mb"] %> MB
+            </div>
             <div class="text-sm truncate"><span class="font-bold">KVM:</span> <%= caps["kvm"] %></div>
             <div class="text-sm truncate"><span class="font-bold">GPU:</span> <%= caps["gpu"] %></div>
           <% end %>
-          <%= if @machine["last_seen"] || @machine.last_seen do %>
-            <div class="text-sm truncate text-gray-400">last seen <%= String.slice(@machine["last_seen"] || @machine.last_seen, 0, 19) %></div>
+          <%= if mget(@machine, "last_seen") do %>
+            <div class="text-sm truncate text-gray-400">
+              last seen <%= String.slice(mget(@machine, "last_seen"), 0, 19) %>
+            </div>
           <% end %>
         </div>
 
@@ -306,24 +341,77 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <% else %>
             <div class="space-y-1">
               <%= for c <- @containers do %>
-                <div class="flex items-center justify-between bg-surface rounded p-2 text-xs">
-                  <div class="flex items-center gap-2 min-w-0">
-                    <span class={"w-2 h-2 rounded-full #{container_dot(c["status"])}"}></span>
-                    <span class="font-mono truncate"><%= c["name"] %></span>
-                    <span class="text-gray-400"><%= c["type"] %></span>
-                    <%= if c["ipv4"] != "" and c["ipv4"] != nil do %>
-                      <span class="text-gray-400 truncate">· <%= c["ipv4"] %></span>
-                    <% end %>
+                <div class="bg-surface rounded p-2 text-xs">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class={"w-2 h-2 rounded-full inline-block align-middle shrink-0 #{container_dot(c["status"])}"}>
+                      </span>
+                      <span class="font-mono truncate"><%= c["name"] %></span>
+                      <span class="text-gray-400"><%= c["type"] %></span>
+                      <%= if c["ipv4"] != "" and c["ipv4"] != nil do %>
+                        <span class="text-gray-400 truncate">· <%= c["ipv4"] %></span>
+                      <% end %>
+                    </div>
+                    <div class="flex gap-1 shrink-0">
+                      <button
+                        phx-click="open_terminal"
+                        phx-value-id={mget(@machine, "id")}
+                        phx-value-name={c["name"]}
+                        class="ghost-btn !px-2 !py-0.5 text-[10px]"
+                      >
+                        shell
+                      </button>
+                      <button
+                        phx-click="start_container"
+                        phx-value-id={mget(@machine, "id")}
+                        phx-value-name={c["name"]}
+                        class="ghost-btn !px-2 !py-0.5 text-[10px]"
+                      >
+                        start
+                      </button>
+                      <button
+                        phx-click="stop_container"
+                        phx-value-id={mget(@machine, "id")}
+                        phx-value-name={c["name"]}
+                        class="ghost-btn !px-2 !py-0.5 text-[10px]"
+                      >
+                        stop
+                      </button>
+                      <%= if (c["location"] == "remote") or ((mget(@machine, "location")) == "remote") do %>
+                        <button
+                          phx-click="expose_container_modal"
+                          phx-value-id={mget(@machine, "id")}
+                          phx-value-name={c["name"]}
+                          class="ghost-btn !px-2 !py-0.5 text-[10px]"
+                        >
+                          expose
+                        </button>
+                      <% end %>
+                      <button
+                        phx-click="delete_container"
+                        phx-value-id={mget(@machine, "id")}
+                        phx-value-name={c["name"]}
+                        class="ghost-btn !text-red !px-2 !py-0.5 text-[10px]"
+                      >
+                        delete
+                      </button>
+                    </div>
                   </div>
-                  <div class="flex gap-1 shrink-0">
-                    <button phx-click="open_terminal" phx-value-id={@machine["id"] || @machine.id} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">shell</button>
-                    <button phx-click="start_container" phx-value-id={@machine["id"] || @machine.id} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">start</button>
-                    <button phx-click="stop_container" phx-value-id={@machine["id"] || @machine.id} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">stop</button>
-                    <%= if (c["location"] == "remote") or ((@machine["location"] || @machine.location) == "remote") do %>
-                      <button phx-click="expose_container_modal" phx-value-id={@machine["id"] || @machine.id} phx-value-name={c["name"]} class="ghost-btn !px-2 !py-0.5 text-[10px]">expose</button>
-                    <% end %>
-                    <button phx-click="delete_container" phx-value-id={@machine["id"] || @machine.id} phx-value-name={c["name"]} class="ghost-btn !text-red !px-2 !py-0.5 text-[10px]">delete</button>
-                  </div>
+                  <%= if c["ipv4"] != "" and c["ipv4"] != nil do %>
+                    <div class="mt-1.5 flex items-center gap-1.5 border-t border-border/50 pt-1.5">
+                      <span class="text-gray-500">ssh</span>
+                      <code class="font-mono text-[10px] text-green-400 truncate">root@<%= c["ipv4"] %></code>
+                      <button
+                        type="button"
+                        id={"copy_ssh_#{c["name"]}"}
+                        phx-hook="CopyToClipboard"
+                        data-copy-text={"ssh root@#{c["ipv4"]}"}
+                        class="ml-auto text-[10px] bg-surface-2 hover:bg-surface border border-border rounded px-1.5 py-0.5 text-text-secondary"
+                      >
+                        copy
+                      </button>
+                    </div>
+                  <% end %>
                 </div>
               <% end %>
             </div>
@@ -390,7 +478,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     <div class="p-4 space-y-6 min-h-full">
       <%= sidebar_header(assigns, %{
         header: "DNS Server",
-        body: "All DNS queries on the subnet are forwarded to this server. Use a public resolver like 1.1.1.1 or a local Pi-hole on your network."
+        body:
+          "All DNS queries on the subnet are forwarded to this server. Use a public resolver like 1.1.1.1 or a local Pi-hole on your network."
       }) %>
 
       <div class="bg-surface rounded-lg p-3 space-y-3">
@@ -412,8 +501,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           phx-click-loading="opacity-50 cursor-wait"
           class="flex items-center justify-center gap-1 bg-accent hover:bg-accent-light p-2 cursor-pointer rounded-md transition-all duration-150 text-xs text-white"
         >
-          <.icon class="w-4 h-4" name="hero-pencil-square" />
-          Change DNS Server
+          <.icon class="w-4 h-4" name="hero-pencil-square" /> Change DNS Server
         </div>
       </div>
     </div>
@@ -479,9 +567,9 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         <div
           phx-click="trigger_action"
           phx-value-action="refresh_service_logs"
-          phx-value-data={Jason.encode!(%{ "id" => Map.get(@service, :id)})}
+          phx-value-data={Jason.encode!(%{"id" => Map.get(@service, :id)})}
           phx-click-loading="opacity-50 cursor-wait"
-          class="flex items-center justify-center gap-1 bg-surface p-2 cursor-pointer rounded-md"
+          class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
         >
           <.icon class="w-4 h-4" name="hero-arrow-path" />
           <div class="truncate text-xs text-text-secondary">Refresh</div>
@@ -529,7 +617,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     """
   end
 
-
   defp human_health(:all_up), do: "healthy"
   defp human_health(:none), do: "down"
   defp human_health(:partial), do: "degraded"
@@ -574,5 +661,13 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       </div>
     </div>
     """
+  end
+
+  # Safely read a key from a machine map (string keys) or struct (atom keys).
+  defp mget(machine, key) when is_binary(key) do
+    case Map.get(machine, key) do
+      nil -> Map.get(machine, String.to_atom(key))
+      val -> val
+    end
   end
 end

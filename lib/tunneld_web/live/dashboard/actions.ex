@@ -76,6 +76,15 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
         Resources.update_share(data, :resource)
 
       # Machines
+      "remove_machine" ->
+        %{"id" => id} = data
+        Tunneld.Machines.remove(id)
+        send(parent, :close_details)
+
+      "install_incus" ->
+        %{"id" => id} = data
+        Tunneld.Machines.install_incus(id)
+
       "enroll_machine" ->
         Tunneld.Machines.enroll(data)
 

@@ -70,7 +70,7 @@ defmodule Tunneld.Machines do
   defp same_subnet?(address, gateway) do
     with {:ok, a} <- parse_ip4(address),
          {:ok, g} <- parse_ip4(gateway) do
-      {a, g} |> same_prefix?() && "local" || "remote"
+      ({a, g} |> same_prefix?() && "local") || "remote"
     else
       _ -> "remote"
     end
@@ -105,20 +105,27 @@ defmodule Tunneld.Machines do
   """
   def probe(id), do: GenServer.call(__MODULE__, {:probe, id}, 30_000)
 
+  @doc "Install Incus on a machine, then probe it. Returns `{:ok, machine}` or `{:error, reason}`."
+  def install_incus(id), do: GenServer.call(__MODULE__, {:install_incus, id}, 120_000)
+
   @doc "List containers/VMs on a machine (live, over SSH or mock)."
   def list_containers(id), do: GenServer.call(__MODULE__, {:list_containers, id}, 30_000)
 
   @doc "Create a container/VM on a machine. `spec` is a map with name, image, type, cpu, memory, ports."
-  def create_container(id, spec), do: GenServer.call(__MODULE__, {:create_container, id, spec}, 60_000)
+  def create_container(id, spec),
+    do: GenServer.call(__MODULE__, {:create_container, id, spec}, 60_000)
 
   @doc "Start a container/VM on a machine."
-  def start_container(id, name), do: GenServer.call(__MODULE__, {:start_container, id, name}, 30_000)
+  def start_container(id, name),
+    do: GenServer.call(__MODULE__, {:start_container, id, name}, 30_000)
 
   @doc "Stop a container/VM on a machine."
-  def stop_container(id, name), do: GenServer.call(__MODULE__, {:stop_container, id, name}, 30_000)
+  def stop_container(id, name),
+    do: GenServer.call(__MODULE__, {:stop_container, id, name}, 30_000)
 
   @doc "Delete a container/VM on a machine."
-  def delete_container(id, name), do: GenServer.call(__MODULE__, {:delete_container, id, name}, 30_000)
+  def delete_container(id, name),
+    do: GenServer.call(__MODULE__, {:delete_container, id, name}, 30_000)
 
   @doc "Remove a machine from the registry and delete its keypair."
   def remove(id), do: GenServer.call(__MODULE__, {:remove, id})
@@ -129,7 +136,11 @@ defmodule Tunneld.Machines do
   end
 
   defp broadcast(event, payload) do
-    Phoenix.PubSub.broadcast(Tunneld.PubSub, @pubsub_topic, %{id: "machines", event: event, data: payload})
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, @pubsub_topic, %{
+      id: "machines",
+      event: event,
+      data: payload
+    })
   end
 
   defp validate_spec(%{"name" => name, "image" => image} = spec) do
@@ -175,6 +186,11 @@ defmodule Tunneld.Machines do
 
   @impl true
   def init(_) do
+    # On startup, asynchronously probe every enrolled machine, install Incus
+    # where it is missing, and refresh status so the dashboard reflects live
+    # state without a manual probe. Runs in a Task so the supervision tree is
+    # not blocked by slow SSH round-trips on a cold boot.
+    Task.start(fn -> recover_machines() end)
     {:ok, %{}}
   end
 
@@ -183,6 +199,7 @@ defmodule Tunneld.Machines do
     name = String.trim(params["name"] || "")
     address = String.trim(params["address"] || "")
     ssh_port = params["ssh_port"] || 22
+    ssh_user = String.trim(params["ssh_user"] || "root")
     kind = params["kind"] || "incus"
     location = params["location"] || infer_location(address)
 
@@ -206,6 +223,7 @@ defmodule Tunneld.Machines do
           "name" => name,
           "address" => address,
           "ssh_port" => ssh_port,
+          "ssh_user" => ssh_user,
           "kind" => kind,
           "location" => location,
           "added_at" => DateTime.utc_now() |> DateTime.to_iso8601(),
@@ -237,17 +255,18 @@ defmodule Tunneld.Machines do
   @impl true
   def handle_call({:probe, id}, _from, state) do
     reply =
-      with {:ok, machine} <- Store.get(id),
-           {:ok, caps} <- Provider.probe(machine) do
-        updated =
-          machine
-          |> Map.put("capabilities", caps)
-          |> Map.put("last_seen", DateTime.utc_now() |> DateTime.to_iso8601())
-          |> Map.put("status", "ready")
+      with {:ok, machine} <- Store.get(id) do
+        do_probe(machine)
+      end
 
-        :ok = Store.put(updated)
-        broadcast(:updated, updated)
-        {:ok, updated}
+    {:reply, reply, state}
+  end
+
+  def handle_call({:install_incus, id}, _from, state) do
+    reply =
+      with {:ok, machine} <- Store.get(id),
+           {:ok, _} <- Provider.install_incus(machine) do
+        do_probe(machine)
       end
 
     {:reply, reply, state}
@@ -327,5 +346,62 @@ defmodule Tunneld.Machines do
         broadcast(:removed, %{"id" => id})
         {:reply, :ok, state}
     end
+  end
+
+  defp do_probe(machine) do
+    with {:ok, caps} <- Provider.probe(machine) do
+      updated =
+        machine
+        |> Map.put("capabilities", caps)
+        |> Map.put("last_seen", DateTime.utc_now() |> DateTime.to_iso8601())
+        |> Map.put("status", "ready")
+
+      :ok = Store.put(updated)
+      broadcast(:updated, updated)
+      {:ok, updated}
+    end
+  end
+
+  # Startup recovery: probe every enrolled machine, install Incus where it is
+  # missing, and mark unreachable machines so the dashboard reflects live state
+  # without a manual probe. Container restart on a machine reboot is handled by
+  # Incus itself (tunneld sets `boot.autostart true` on creation); reverse SSH
+  # expose tunnels are re-opened by `Tunneld.Machines.Expose` on its own init.
+  defp recover_machines do
+    for machine <- Store.all() do
+      id = machine["id"]
+
+      case do_probe(machine) do
+        {:ok, _} ->
+          :ok
+
+        {:error, :incus_not_installed} ->
+          Logger.info("Machine #{id} missing Incus; installing on startup")
+
+          with {:ok, _} <- Provider.install_incus(machine),
+               {:ok, _} <- do_probe(machine) do
+            :ok
+          else
+            {:error, reason} -> mark_unreachable(machine, reason)
+          end
+
+        {:error, reason} ->
+          mark_unreachable(machine, reason)
+      end
+    end
+
+    :ok
+  end
+
+  defp mark_unreachable(machine, reason) do
+    Logger.warning("Machine #{machine["id"]} unreachable on startup: #{inspect(reason)}")
+
+    updated =
+      machine
+      |> Map.put("status", "unreachable")
+      |> Map.put("last_seen", DateTime.utc_now() |> DateTime.to_iso8601())
+
+    :ok = Store.put(updated)
+    broadcast(:updated, updated)
   end
 end

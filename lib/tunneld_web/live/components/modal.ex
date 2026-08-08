@@ -34,22 +34,30 @@ defmodule TunneldWeb.Live.Components.Modal do
     assigns = assigns |> assign(pending_actions)
 
     ~H"""
-    <div class="fixed inset-0 bg-black/70 flex items-center justify-center z-[100]" style="animation: fadeIn 180ms ease-out">
-      <div class="bg-surface rounded-2xl p-6 max-w-[500px] lg:w-1/3 relative border border-border">
-        <div phx-click="modal_close" class="absolute top-0 right-0 p-3 cursor-pointer text-text-tertiary hover:text-text-primary">
+    <div
+      class="fixed inset-0 bg-black/70 flex items-center justify-center z-[100]"
+      style="animation: fadeIn 180ms ease-out"
+    >
+      <div class="bg-surface rounded-2xl p-6 max-w-[500px] lg:w-1/3 relative border border-border max-h-[90vh] overflow-y-auto overflow-x-hidden">
+        <div
+          phx-click="modal_close"
+          class="absolute top-0 right-0 p-3 cursor-pointer text-text-tertiary hover:text-text-primary"
+        >
           <.icon name="hero-x-mark-solid" class="h-5 w-5" />
         </div>
         <div class="py-2">
           <h2 class="text-xl text-text-primary font-medium -tracking-[0.01em]"><%= @title %></h2>
           <h2 :if={@description} class="text-sm text-text-secondary mt-1"><%= @description %></h2>
         </div>
-         <div class="text-sm text-text-primary"><%= render_body(assigns, @body) %></div>
-         <div :if={@body["type"] !== "schema"} class="flex justify-end space-x-3 pt-2 mt-3">
+        <div class="text-sm text-text-primary"><%= render_body(assigns, @body) %></div>
+        <div :if={@body["type"] !== "schema"} class="flex justify-end space-x-3 pt-2 mt-3">
           <% action_loading =
             if @actions do
               @pending_actions
               |> Map.values()
-              |> Enum.any?(fn %{action: pending_action} -> pending_action == @actions["payload"]["type"] end)
+              |> Enum.any?(fn %{action: pending_action} ->
+                pending_action == @actions["payload"]["type"]
+              end)
             else
               false
             end %>
@@ -73,7 +81,11 @@ defmodule TunneldWeb.Live.Components.Modal do
   end
 
   @impl true
-  def handle_event("modal_action", %{"type" => action, "data" => data, "client_id" => client_id}, socket) do
+  def handle_event(
+        "modal_action",
+        %{"type" => action, "data" => data, "client_id" => client_id},
+        socket
+      ) do
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "modal:form:action:#{client_id}", %{
       action: action,
       data: data
@@ -87,13 +99,22 @@ defmodule TunneldWeb.Live.Components.Modal do
   end
 
   defp render_body(assigns, %{"type" => "code", "data" => data}) do
-    assigns = assign(assigns, :data, data)
+    label = Map.get(assigns.body, "label", "From any allowed device on the subnet, run:")
+    assigns = assigns |> assign(:data, data) |> assign(:label, label)
 
     ~H"""
     <div class="mt-2">
-      <p class="text-xs text-gray-300 mb-2">From any allowed device on the subnet, run:</p>
+      <p class="text-xs text-gray-300 mb-2"><%= @label %></p>
       <div class="relative">
-        <pre class="bg-black/60 p-3 rounded text-xs font-mono text-green-400 whitespace-pre-wrap border border-gray-700"><%= @data %></pre>
+        <pre class="bg-black/60 p-3 rounded text-xs font-mono text-green-400 whitespace-pre-wrap break-all border border-gray-700"><%= @data %></pre>
+        <button
+          type="button"
+          id={"copy_#{:erlang.unique_integer([:positive])}"}
+          phx-hook="CopyToClipboard"
+          class="absolute top-2 right-2 text-[10px] bg-surface-2 hover:bg-surface border border-border rounded px-2 py-1 text-text-secondary"
+        >
+          Copy
+        </button>
       </div>
     </div>
     """
@@ -125,6 +146,7 @@ defmodule TunneldWeb.Live.Components.Modal do
          } = payload
        ) do
     pending_actions = Map.get(assigns, :pending_actions, %{})
+
     loading =
       pending_actions
       |> Map.values()

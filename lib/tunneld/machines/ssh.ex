@@ -27,10 +27,14 @@ defmodule Tunneld.Machines.SSH do
 
     {_, 0} =
       System.cmd("ssh-keygen", [
-        "-t", "ed25519",
-        "-N", "",
-        "-C", "tunneld",
-        "-f", tmp,
+        "-t",
+        "ed25519",
+        "-N",
+        "",
+        "-C",
+        "tunneld",
+        "-f",
+        tmp,
         "-q"
       ])
 
@@ -106,17 +110,25 @@ defmodule Tunneld.Machines.SSH do
     id = machine["id"]
     key = key_path(id)
     host = machine["address"]
+    user = machine["ssh_user"] || "root"
     port = Integer.to_string(machine["ssh_port"] || 22)
 
     args = [
-      "-i", key,
-      "-o", "StrictHostKeyChecking=accept-new",
-      "-o", "ConnectTimeout=10",
-      "-o", "ControlMaster=auto",
-      "-o", "ControlPath=#{control_path(id)}",
-      "-o", "ControlPersist=600",
-      "-p", port,
-      "#{host}",
+      "-i",
+      key,
+      "-o",
+      "StrictHostKeyChecking=accept-new",
+      "-o",
+      "ConnectTimeout=10",
+      "-o",
+      "ControlMaster=auto",
+      "-o",
+      "ControlPath=#{control_path(id)}",
+      "-o",
+      "ControlPersist=600",
+      "-p",
+      port,
+      "#{user}@#{host}",
       command
     ]
 

@@ -117,11 +117,15 @@ defmodule TunneldWeb.Live.Dashboard do
   def render(assigns) do
     ~H"""
     <div class="min-h-screen bg-bg text-text-primary">
-      <div class="absolute top-0 left-0 right-0 h-[760px] pointer-events-none z-0"
-        style="background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(6,182,212,0.30) 0%, rgba(6,182,212,0.08) 30%, transparent 70%);">
+      <div
+        class="absolute top-0 left-0 right-0 h-[760px] pointer-events-none z-0"
+        style="background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(6,182,212,0.30) 0%, rgba(6,182,212,0.08) 30%, transparent 70%);"
+      >
       </div>
-      <div class="absolute top-[720px] left-0 right-0 h-20 pointer-events-none z-0"
-        style="background: linear-gradient(to bottom, rgba(11,10,20,0) 0%, #0B0A14 100%);">
+      <div
+        class="absolute top-[720px] left-0 right-0 h-20 pointer-events-none z-0"
+        style="background: linear-gradient(to bottom, rgba(11,10,20,0) 0%, #0B0A14 100%);"
+      >
       </div>
 
       <div class="relative z-[1]">
@@ -133,14 +137,21 @@ defmodule TunneldWeb.Live.Dashboard do
           obfuscated={@obfuscated}
           settings_menu_open={@settings_menu_open}
           services_popover_open={@services_popover_open}
-          device_id={Application.get_env(:tunneld, :metadata)[:device_id] || System.get_env("DEVICE_ID")}
+          device_id={
+            Application.get_env(:tunneld, :metadata)[:device_id] || System.get_env("DEVICE_ID")
+          }
         />
 
         <%= if !@devices_expanded do %>
           <main class="max-w-[1280px] mx-auto px-8 pt-2 pb-16">
             <div class="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6">
               <div class="h-full">
-                <.live_component id="map_card" module={TunneldWeb.Live.Components.MapCard} geo_location={@geo_location} map_status={@map_status} />
+                <.live_component
+                  id="map_card"
+                  module={TunneldWeb.Live.Components.MapCard}
+                  geo_location={@geo_location}
+                  map_status={@map_status}
+                />
               </div>
               <div class="grid grid-rows-[auto_1fr] gap-6 h-full">
                 <div class="grid grid-cols-2 gap-6">
@@ -162,15 +173,25 @@ defmodule TunneldWeb.Live.Dashboard do
             </div>
 
             <div class="mt-6">
-              <.live_component id="resources" module={TunneldWeb.Live.Components.Resources} obfuscated={@obfuscated} />
+              <.live_component
+                id="resources"
+                module={TunneldWeb.Live.Components.Resources}
+                obfuscated={@obfuscated}
+              />
             </div>
 
             <div class="mt-12">
-              <.live_component id="machines" module={TunneldWeb.Live.Components.Machines} obfuscated={@obfuscated} />
+              <.live_component
+                id="machines"
+                module={TunneldWeb.Live.Components.Machines}
+                obfuscated={@obfuscated}
+              />
             </div>
 
             <div class="mt-12">
-              <.section_header>Local devices<.help_icon text="Devices connected to this Tunneld gateway's LAN port via Ethernet. Each device gets a DHCP lease and IP address from dnsmasq. Use Quick Expose to let devices create local resources via a curl command. Revoke IP to release the DHCP lease." /></.section_header>
+              <.section_header>
+                Local devices<.help_icon text="Devices connected to this Tunneld gateway's LAN port via Ethernet. Each device gets a DHCP lease and IP address from dnsmasq. Use Quick Expose to let devices create local resources via a curl command. Revoke IP to release the DHCP lease." />
+              </.section_header>
               <div class="bg-surface border border-border rounded-xl p-6 h-24 flex items-center justify-between">
                 <div class="flex items-center gap-5">
                   <span class="text-text-secondary inline-flex">
@@ -179,13 +200,12 @@ defmodule TunneldWeb.Live.Dashboard do
                   <span class="text-[28px] text-text-primary font-medium -tracking-[0.02em]">
                     <%= length(@devices) %>
                   </span>
-          <span class="text-sm text-text-secondary leading-[1.3] max-w-[180px]">
-            local devices
-          </span>
+                  <span class="text-sm text-text-secondary leading-[1.3] max-w-[180px]">
+                    local devices
+                  </span>
                 </div>
                 <button class="ghost-btn" phx-click="toggle_devices_expanded">
-                  View all devices
-                  <.icon name="hero-chevron-right" class="w-4 h-4" />
+                  View all devices <.icon name="hero-chevron-right" class="w-4 h-4" />
                 </button>
               </div>
             </div>
@@ -195,7 +215,11 @@ defmodule TunneldWeb.Live.Dashboard do
             <button class="ghost-btn mb-6" phx-click="toggle_devices_expanded">
               <.icon name="hero-arrow-left" class="w-4 h-4" /> Back to dashboard
             </button>
-            <.live_component id="devices" module={TunneldWeb.Live.Components.Devices} obfuscated={@obfuscated} />
+            <.live_component
+              id="devices"
+              module={TunneldWeb.Live.Components.Devices}
+              obfuscated={@obfuscated}
+            />
           </main>
         <% end %>
       </div>
@@ -218,7 +242,11 @@ defmodule TunneldWeb.Live.Dashboard do
       />
 
       <%= if @terminal_open do %>
-        <.terminal_modal machine_id={@terminal_machine_id} container={@terminal_container} client_id={@client_id} />
+        <.terminal_modal
+          machine_id={@terminal_machine_id}
+          container={@terminal_container}
+          client_id={@client_id}
+        />
       <% end %>
     </div>
     """
@@ -226,12 +254,19 @@ defmodule TunneldWeb.Live.Dashboard do
 
   defp terminal_modal(assigns) do
     ~H"""
-    <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60" phx-click="close_terminal" phx-window-keydown="close_terminal" phx-key="escape">
-      <div class="bg-bg border border-border rounded-lg w-[95%] max-w-6xl h-[90%] flex flex-col" phx-click="ignore">
+    <div
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+      phx-click="close_terminal"
+      phx-window-keydown="close_terminal"
+      phx-key="escape"
+    >
+      <div
+        class="bg-bg border border-border rounded-lg w-[95%] max-w-6xl h-[90%] flex flex-col"
+        phx-click="ignore"
+      >
         <div class="flex items-center justify-between p-3 border-b border-border">
           <div class="text-sm font-medium">
-            <.icon name="hero-command-line" class="w-4 h-4 inline mr-1" />
-            shell: <%= @container %>
+            <.icon name="hero-command-line" class="w-4 h-4 inline mr-1" /> shell: <%= @container %>
           </div>
           <button phx-click="close_terminal" class="ghost-btn text-xs">close</button>
         </div>
@@ -243,7 +278,12 @@ defmodule TunneldWeb.Live.Dashboard do
           class="flex-1 bg-black overflow-hidden p-2 cursor-text"
         >
           <pre class="text-xs font-mono text-green-400 whitespace-pre-wrap h-full overflow-auto m-0"></pre>
-          <input type="text" class="terminal-input opacity-0 absolute -z-10 w-0 h-0" autocomplete="off" autofocus />
+          <input
+            type="text"
+            class="terminal-input opacity-0 absolute -z-10 w-0 h-0"
+            autocomplete="off"
+            autofocus
+          />
         </div>
       </div>
     </div>
@@ -260,25 +300,27 @@ defmodule TunneldWeb.Live.Dashboard do
     <div
       :if={@sidebar.is_open}
       class="fixed top-0 right-0 z-50 h-screen w-screen lg:w-[35%] lg:max-w-[700px] shadow-lg transition-transform duration-300 ease-in-out"
-
       style="background-color: var(--surface);"
     >
-      <button phx-click="close_details" class="absolute top-4 right-4 z-10 ghost-icon w-9 h-9 flex items-center justify-center">
+      <button
+        phx-click="close_details"
+        class="absolute top-4 right-4 z-10 ghost-icon w-9 h-9 flex items-center justify-center"
+      >
         <.icon class="w-5 h-5" name="hero-x-mark" />
       </button>
 
       <div class="h-full overflow-y-auto system-scroll bg-surface">
         <div class="min-h-full">
-        <.live_component
-          id="sidebar_details"
-          module={SidebarDetails}
-          view={@sidebar.view}
-          uri_info={@uri_info}
-          selection={@sidebar.selection}
-          data={@sidebar.data}
-          containers={@sidebar.containers}
-          obfuscated={@obfuscated}
-        />
+          <.live_component
+            id="sidebar_details"
+            module={SidebarDetails}
+            view={@sidebar.view}
+            uri_info={@uri_info}
+            selection={@sidebar.selection}
+            data={@sidebar.data}
+            containers={@sidebar.containers}
+            obfuscated={@obfuscated}
+          />
         </div>
       </div>
     </div>
@@ -294,36 +336,61 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   def handle_event("disable_tunneld", _params, socket) do
-    modal_data = modal_open(%{
-      title: "Disable Tunneld?",
-      description: "This will stop the gateway, DHCP, and DNS services. All LAN devices will lose connectivity.",
-      body: %{"type" => "code_blocks", "data" => [
-        %{"title" => "To re-enable, SSH into the device and run", "code" => "sudo systemctl start dnsmasq\nsudo systemctl start tunneld"}
-      ]},
-      actions: %{"title" => "Disable", "payload" => %{"type" => "disable_tunneld_service", "data" => %{}}}
-    })
+    modal_data =
+      modal_open(%{
+        title: "Disable Tunneld?",
+        description:
+          "This will stop the gateway, DHCP, and DNS services. All LAN devices will lose connectivity.",
+        body: %{
+          "type" => "code_blocks",
+          "data" => [
+            %{
+              "title" => "To re-enable, SSH into the device and run",
+              "code" => "sudo systemctl start dnsmasq\nsudo systemctl start tunneld"
+            }
+          ]
+        },
+        actions: %{
+          "title" => "Disable",
+          "payload" => %{"type" => "disable_tunneld_service", "data" => %{}}
+        }
+      })
 
     {:noreply, socket |> assign(:modal, modal_data) |> assign(:settings_menu_open, false)}
   end
 
   def handle_event("enable_tunneld", _params, socket) do
-    {:noreply, start_action("enable_tunneld_service", %{}, socket) |> assign(:settings_menu_open, false)}
+    {:noreply,
+     start_action("enable_tunneld_service", %{}, socket) |> assign(:settings_menu_open, false)}
   end
 
   def handle_event("restart_device", _params, socket) do
-    modal_data = modal_open(%{
-      title: "Restart Device?",
-      description: "This will restart the gateway service. The dashboard will be temporarily unavailable.",
-      body: %{"type" => "string", "data" => "All active connections will be interrupted. The device will come back online automatically."},
-      actions: %{"title" => "Restart", "payload" => %{"type" => "restart_device", "data" => %{}}}
-    })
+    modal_data =
+      modal_open(%{
+        title: "Restart Device?",
+        description:
+          "This will restart the gateway service. The dashboard will be temporarily unavailable.",
+        body: %{
+          "type" => "string",
+          "data" =>
+            "All active connections will be interrupted. The device will come back online automatically."
+        },
+        actions: %{
+          "title" => "Restart",
+          "payload" => %{"type" => "restart_device", "data" => %{}}
+        }
+      })
 
     {:noreply, socket |> assign(:modal, modal_data) |> assign(:settings_menu_open, false)}
   end
 
   def handle_event("toggle_obfuscation", %{"obfuscated" => obfuscated}, socket) do
     obfuscated = obfuscated in ["true", true]
-    {:noreply, socket |> assign(:obfuscated, obfuscated) |> push_event("update_obfuscation", %{obfuscated: obfuscated})}
+
+    {:noreply,
+     socket
+     |> assign(:obfuscated, obfuscated)
+     |> push_event("update_obfuscation", %{obfuscated: obfuscated})}
   end
 
   def handle_event("toggle_settings_menu", _params, socket) do
@@ -358,11 +425,15 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   def handle_event("confirm_logout", _params, socket) do
-    modal_data = modal_open(%{
-      title: "Log out?",
-      body: %{"type" => "string", "data" => "You will need to enter your credentials to access the dashboard again."},
-      actions: %{"title" => "Log out", "payload" => %{"type" => "logout", "data" => %{}}}
-    })
+    modal_data =
+      modal_open(%{
+        title: "Log out?",
+        body: %{
+          "type" => "string",
+          "data" => "You will need to enter your credentials to access the dashboard again."
+        },
+        actions: %{"title" => "Log out", "payload" => %{"type" => "logout", "data" => %{}}}
+      })
 
     {:noreply, socket |> assign(:modal, modal_data) |> assign(:settings_menu_open, false)}
   end
@@ -478,39 +549,84 @@ defmodule TunneldWeb.Live.Dashboard do
         {:noreply, put_flash(socket, :info, "Probe complete")}
 
       {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Probe failed: #{inspect(reason)}")}
+        {:noreply, put_flash(socket, :error, "Probe failed: #{probe_error(reason)}")}
     end
   end
 
   def handle_event("remove_machine", %{"id" => id}, socket) do
-    case Tunneld.Machines.remove(id) do
-      :ok ->
-        send(self(), {:machines_changed})
-        {:noreply, put_flash(socket, :info, "Machine removed")}
+    modal = %{
+      show: true,
+      title: "Delete machine",
+      description: "This permanently removes the machine and its SSH key. This cannot be undone.",
+      body: %{"type" => "string", "data" => "Are you sure you want to delete this machine?"},
+      actions: %{
+        "title" => "Delete",
+        "payload" => %{"type" => "remove_machine", "data" => %{"id" => id}}
+      },
+      type: :default
+    }
 
-      _ ->
-        {:noreply, put_flash(socket, :error, "Could not remove machine")}
+    {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal))}
+  end
+
+  def handle_event("view_ssh_key", %{"id" => id}, socket) do
+    case Tunneld.Machines.SSH.public_key_string(id) do
+      nil ->
+        {:noreply, put_flash(socket, :error, "No SSH key found for this machine")}
+
+      pub ->
+        modal = %{
+          show: true,
+          title: "SSH public key",
+          description:
+            "Install this public key on the target machine so tunneld can connect over SSH.",
+          body: %{
+            "type" => "code",
+            "data" => pub,
+            "label" => "Add this key to the target's ~/.ssh/authorized_keys:"
+          },
+          actions: nil,
+          type: :default
+        }
+
+        {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal))}
     end
+  end
+
+  def handle_event("install_incus", %{"id" => id}, socket) do
+    {:noreply, start_action("install_incus", %{"id" => id}, socket)}
   end
 
   def handle_event("start_container", %{"id" => id, "name" => name}, socket) do
     case Tunneld.Machines.start_container(id, name) do
-      {:ok, _} -> {:noreply, put_flash(socket, :info, "#{name} started")}
-      {:error, _} -> {:noreply, put_flash(socket, :error, "Could not start #{name}")}
+      {:ok, _} ->
+        socket = refresh_machine_sidebar(socket, id)
+        {:noreply, put_flash(socket, :info, "#{name} started")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not start #{name}")}
     end
   end
 
   def handle_event("stop_container", %{"id" => id, "name" => name}, socket) do
     case Tunneld.Machines.stop_container(id, name) do
-      {:ok, _} -> {:noreply, put_flash(socket, :info, "#{name} stopped")}
-      {:error, _} -> {:noreply, put_flash(socket, :error, "Could not stop #{name}")}
+      {:ok, _} ->
+        socket = refresh_machine_sidebar(socket, id)
+        {:noreply, put_flash(socket, :info, "#{name} stopped")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not stop #{name}")}
     end
   end
 
   def handle_event("delete_container", %{"id" => id, "name" => name}, socket) do
     case Tunneld.Machines.delete_container(id, name) do
-      {:ok, _} -> {:noreply, put_flash(socket, :info, "#{name} deleted")}
-      {:error, _} -> {:noreply, put_flash(socket, :error, "Could not delete #{name}")}
+      {:ok, _} ->
+        socket = refresh_machine_sidebar(socket, id)
+        {:noreply, put_flash(socket, :info, "#{name} deleted")}
+
+      {:error, _} ->
+        {:noreply, put_flash(socket, :error, "Could not delete #{name}")}
     end
   end
 
@@ -541,23 +657,41 @@ defmodule TunneldWeb.Live.Dashboard do
     devices = Map.get(data, :devices, [])
 
     if socket.assigns.devices_expanded do
-      send_update(message.module, id: message.id, data: message.data, obfuscated: socket.assigns.obfuscated)
+      send_update(message.module,
+        id: message.id,
+        data: message.data,
+        obfuscated: socket.assigns.obfuscated
+      )
     end
 
     {:noreply, assign(socket, :devices, devices)}
   end
 
-  def handle_info(%{id: "resources", module: TunneldWeb.Live.Components.Resources, data: data} = message, socket) do
-    send_update(message.module, id: message.id, data: message.data, obfuscated: socket.assigns.obfuscated)
+  def handle_info(
+        %{id: "resources", module: TunneldWeb.Live.Components.Resources, data: data} = message,
+        socket
+      ) do
+    send_update(message.module,
+      id: message.id,
+      data: message.data,
+      obfuscated: socket.assigns.obfuscated
+    )
+
     socket = maybe_refresh_sidebar_details(socket, data)
     {:noreply, socket}
   end
 
-  def handle_info(%{id: "sidebar_details", module: _module, data: %{dns_server: dns_server}}, socket) do
+  def handle_info(
+        %{id: "sidebar_details", module: _module, data: %{dns_server: dns_server}},
+        socket
+      ) do
     {:noreply, assign(socket, :dns_server, dns_server)}
   end
 
-  def handle_info(%{id: "system_resources", module: TunneldWeb.Live.Components.SystemResources, data: data}, socket) do
+  def handle_info(
+        %{id: "system_resources", module: TunneldWeb.Live.Components.SystemResources, data: data},
+        socket
+      ) do
     resources = Map.get(data, :resources, %{})
     # Preserve update check state from existing assignment
     resources =
@@ -635,6 +769,7 @@ defmodule TunneldWeb.Live.Dashboard do
   def handle_info({:action_done, ref, action, _result}, socket)
       when action in ["add_device_tag", "remove_device_tag"] do
     pending = Map.get(socket.assigns.pending_actions, ref, %{})
+
     devices =
       DevicesServer.fetch_devices()
       |> Enum.map(fn d ->
@@ -653,7 +788,7 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   def handle_info({:action_done, ref, action, result}, socket)
-      when action in ["enroll_machine", "create_container", "expose_container"] do
+      when action in ["enroll_machine", "create_container", "expose_container", "install_incus"] do
     pending = Map.get(socket.assigns.pending_actions, ref, %{})
 
     socket =
@@ -673,6 +808,7 @@ defmodule TunneldWeb.Live.Dashboard do
           |> put_flash(:error, "Action failed: #{machine_error(action, reason)}")
       end
 
+    socket = maybe_refresh_machine_sidebar(socket, pending)
     send(self(), {:machines_changed})
     {:noreply, socket}
   end
@@ -694,7 +830,8 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   def handle_info(:revoke_login_creds, socket) do
-    {:noreply, put_flash(socket, :info, "Auth reset. Next login will require a new password to be setup")}
+    {:noreply,
+     put_flash(socket, :info, "Auth reset. Next login will require a new password to be setup")}
   end
 
   def handle_info(:close_details, socket) do
@@ -819,7 +956,8 @@ defmodule TunneldWeb.Live.Dashboard do
         :pending_actions,
         Map.put(socket.assigns.pending_actions, action_ref, %{
           action: action,
-          keep_modal_open: schema_modal?
+          keep_modal_open: schema_modal?,
+          data: data
         })
       )
 
@@ -908,23 +1046,72 @@ defmodule TunneldWeb.Live.Dashboard do
     end
   end
 
+  # After a container action (create/start/stop/delete/expose), re-fetch the
+  # machine's containers and push them into the open machine sidebar so the
+  # list reflects live state without the user re-opening the sidebar.
+  defp maybe_refresh_machine_sidebar(socket, pending) do
+    case Map.get(pending, :data, %{}) do
+      %{"machine_id" => id} -> refresh_machine_sidebar(socket, id)
+      _ -> socket
+    end
+  end
+
+  defp refresh_machine_sidebar(socket, id) do
+    sidebar = Map.get(socket.assigns, :sidebar, %{})
+
+    if Map.get(sidebar, :view) == :machine and
+         match?(%{type: :machine, id: ^id}, Map.get(sidebar, :selection)) do
+      containers =
+        case Tunneld.Machines.list_containers(id) do
+          {:ok, c} -> c
+          _ -> []
+        end
+
+      sidebar = Map.put(sidebar, :containers, containers)
+      send_update(SidebarDetails, id: "sidebar_details", containers: containers)
+      assign(socket, :sidebar, sidebar)
+    else
+      socket
+    end
+  end
+
   defp sidebar_close(sidebar) when is_map(sidebar) do
     %{is_open: false, view: Map.get(sidebar, :view), selection: nil, data: nil, containers: []}
   end
 
-  defp machine_action_flash(socket, "enroll_machine", %{"public_key" => pub}) when is_binary(pub) do
-    socket =
-      put_flash(
-        socket,
-        :info,
-        "Machine enrolled. Install this public key on the target: #{pub}"
-      )
+  defp machine_action_flash(socket, "enroll_machine", %{"public_key" => pub})
+       when is_binary(pub) do
+    modal = %{
+      show: true,
+      title: "Machine enrolled",
+      description:
+        "Install this public key on the target machine so tunneld can connect over SSH.",
+      body: %{
+        "type" => "code",
+        "data" => pub,
+        "label" => "Add this key to the target's ~/.ssh/authorized_keys:"
+      },
+      actions: nil,
+      type: :default
+    }
 
-    socket
+    assign(socket, :modal, Map.merge(socket.assigns.modal, modal))
   end
 
   defp machine_action_flash(socket, "enroll_machine", %{"machine" => %{"name" => name}}) do
-    put_flash(socket, :info, "Machine #{name} enrolled. You can now install its key and probe it.")
+    put_flash(
+      socket,
+      :info,
+      "Machine #{name} enrolled. You can now install its key and probe it."
+    )
+  end
+
+  defp machine_action_flash(socket, "install_incus", %{"capabilities" => %{"incus_version" => v}}) do
+    put_flash(socket, :info, "Incus installed (#{v}) and machine probed successfully.")
+  end
+
+  defp machine_action_flash(socket, "install_incus", _result) do
+    put_flash(socket, :info, "Incus installed and machine probed successfully.")
   end
 
   defp machine_action_flash(socket, "create_container", %{"name" => name}) do
@@ -932,7 +1119,7 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   defp machine_action_flash(socket, "expose_container", %{"lan_url" => lan_url})
-      when not is_nil(lan_url) do
+       when not is_nil(lan_url) do
     put_flash(socket, :info, "Exposed on the subnet at #{lan_url}")
   end
 
@@ -951,7 +1138,48 @@ defmodule TunneldWeb.Live.Dashboard do
   defp unwrap_result(other), do: {:ok, other}
 
   defp machine_error("enroll_machine", reason), do: "enrollment failed: #{inspect(reason)}"
-  defp machine_error("create_container", reason), do: "container creation failed: #{inspect(reason)}"
+
+  defp machine_error("create_container", reason),
+    do: "container creation failed: #{inspect(reason)}"
+
   defp machine_error("expose_container", reason), do: "expose failed: #{inspect(reason)}"
+
+  defp machine_error("install_incus", {:ssh_failed, _}) do
+    "SSH connection failed. Make sure the public key is installed on the target and the SSH user is correct."
+  end
+
+  defp machine_error("install_incus", :unsupported_distro) do
+    "Unsupported distro. tunneld can auto-install Incus on Ubuntu, Debian, Alpine, and Fedora."
+  end
+
+  defp machine_error("install_incus", {:install_failed, reason}) do
+    "Incus install failed: #{inspect(reason)}"
+  end
+
   defp machine_error(_action, reason), do: inspect(reason)
+
+  defp probe_error(:incus_not_installed),
+    do:
+      "Incus is not installed on the target. Click the 'Install Incus' button in the sidebar to install it automatically, then probe again."
+
+  defp probe_error({:ssh_failed, 255, out}) do
+    msg =
+      out
+      |> String.split("\n")
+      |> Enum.find(
+        &(String.contains?(&1, "Permission denied") or String.contains?(&1, "refused"))
+      )
+      |> case do
+        nil -> "SSH connection failed. Make sure the public key is installed on the target."
+        line -> "SSH connection failed: #{String.trim(line)}"
+      end
+
+    msg
+  end
+
+  defp probe_error({:ssh_failed, _code, _out}),
+    do:
+      "SSH connection failed. Make sure the target is reachable and the public key is installed."
+
+  defp probe_error(reason), do: inspect(reason)
 end

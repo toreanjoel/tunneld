@@ -53,7 +53,19 @@ defmodule Tunneld.Schema.Container do
         },
         "image" => %{
           "type" => "string",
-          "description" => "Image to provision (e.g. ubuntu/24.04)."
+          "description" => "Image to provision.",
+          "ui:enum" => [
+            "images:debian/12",
+            "images:debian/11",
+            "images:ubuntu/25.10",
+            "images:ubuntu/26.04",
+            "images:alpine/3.21",
+            "images:fedora/42",
+            "custom"
+          ],
+          "default" => "images:debian/12",
+          "ui:help" =>
+            "Pick a common image, or choose 'custom' to type your own (e.g. ubuntu/24.04)."
         },
         "type" => %{
           "type" => "string",

@@ -27,11 +27,7 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
           name: key,
           type: props["type"],
           description: props["description"],
-          enum:
-            if(props["type"] == "array",
-              do: nil,
-              else: props["enum"]
-            ),
+          enum: props["ui:enum"] || if(props["type"] == "array", do: nil, else: props["enum"]),
           format: props["format"],
           default: props["default"],
           hidden: props["ui:widget"] == "hidden",
@@ -66,10 +62,7 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
           <label class={"#{hidden} text-text-secondary text-sm font-medium mb-1 capitalize block"}>
             <%= field.name %>
           </label>
-          <label
-            :if={field.description}
-            class={"#{hidden} block text-text-tertiary text-xs mb-1"}
-          >
+          <label :if={field.description} class={"#{hidden} block text-text-tertiary text-xs mb-1"}>
             <%= field.description %>
           </label>
 
@@ -85,16 +78,29 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
                 <%= field.help %>
               </div>
             <% else %>
+              <% current_value = Map.get(@changeset, field.name, field.default || "") %>
+              <% has_custom = "custom" in (field.enum || []) %>
               <select
                 name={"form[#{field.name}]"}
                 class={"#{hidden} tunl-input"}
+                phx-change={if has_custom, do: "field_change", else: nil}
+                phx-target={if has_custom, do: @myself, else: nil}
               >
                 <%= for option <- field.enum do %>
-                  <option value={option} selected={Map.get(@changeset, field.name, "") == option}>
+                  <option value={option} selected={current_value == option}>
                     <%= option %>
                   </option>
                 <% end %>
               </select>
+              <%= if has_custom and current_value == "custom" do %>
+                <input
+                  type="text"
+                  name={"form[#{field.name}_custom]"}
+                  value={Map.get(@changeset, "#{field.name}_custom", "")}
+                  placeholder="e.g. ubuntu/24.04"
+                  class="tunl-input mt-2"
+                />
+              <% end %>
             <% end %>
           <% else %>
             <%= if field.type == "boolean" do %>
@@ -113,7 +119,10 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
                   class={"#{hidden} tunl-input font-mono min-h-[6rem]"}
                   readonly={field.readonly}
                 ><%= array_to_text(Map.get(@changeset, field.name, field.default || [])) %></textarea>
-                <div :if={field.help} class="bg-accent/10 py-2 px-3 rounded-md my-2 text-xs text-accent">
+                <div
+                  :if={field.help}
+                  class="bg-accent/10 py-2 px-3 rounded-md my-2 text-xs text-accent"
+                >
                   <%= field.help %>
                 </div>
               <% else %>
@@ -133,7 +142,10 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
                     class={"#{hidden} tunl-input"}
                     readonly={field.readonly}
                   />
-                  <div :if={field.help} class="bg-accent/10 py-2 px-3 rounded-md my-2 text-xs text-accent">
+                  <div
+                    :if={field.help}
+                    class="bg-accent/10 py-2 px-3 rounded-md my-2 text-xs text-accent"
+                  >
                     <%= field.help %>
                   </div>
                 <% end %>
@@ -162,6 +174,19 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
       </div>
     </form>
     """
+  end
+
+  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
+          {:noreply, Phoenix.LiveView.Socket.t()}
+  def handle_event("field_change", %{"form" => raw_params}, socket) do
+    field_names = Enum.map(socket.assigns.fields, & &1.name)
+
+    changeset =
+      Enum.reduce(raw_params, socket.assigns.changeset, fn {k, v}, acc ->
+        if k in field_names, do: Map.put(acc, k, v), else: acc
+      end)
+
+    {:noreply, assign(socket, changeset: changeset, errors: nil)}
   end
 
   @doc """
@@ -208,20 +233,35 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
                 Map.get(raw_params, field.name)
             end
 
+          # If the field is a "custom" enum option, substitute the typed value.
+          value =
+            if value == "custom" do
+              custom = Map.get(raw_params, "#{field.name}_custom", "")
+
+              if custom == "", do: value, else: custom
+            else
+              value
+            end
+
           Map.put(acc, field.name, value)
         end)
 
       case Validator.validate(socket.assigns.schema, params) do
         :ok ->
-          Phoenix.PubSub.broadcast(Tunneld.PubSub, "modal:form:action:#{socket.assigns.client_id}", %{
-            action: socket.assigns.action,
-            data: params
-          })
+          Phoenix.PubSub.broadcast(
+            Tunneld.PubSub,
+            "modal:form:action:#{socket.assigns.client_id}",
+            %{
+              action: socket.assigns.action,
+              data: params
+            }
+          )
 
           {:noreply, assign(socket, changeset: params, errors: nil, loading: true)}
 
         {:error, errors} ->
-          {:noreply, assign(socket, changeset: params, errors: clean_errors(errors), loading: false)}
+          {:noreply,
+           assign(socket, changeset: params, errors: clean_errors(errors), loading: false)}
       end
     end
   end
