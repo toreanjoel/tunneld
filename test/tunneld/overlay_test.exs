@@ -60,4 +60,44 @@ defmodule Tunneld.OverlayTest do
     {:ok, st} = Overlay.status(m)
     assert st.interface == "wg-#{id}"
   end
+
+  test "overlay IPs are persisted and allocated uniquely across machines" do
+    {:ok, %{"id" => id1}} = Machines.enroll(%{"name" => "a", "address" => "203.0.113.20", "location" => "remote"})
+    {:ok, %{"id" => id2}} = Machines.enroll(%{"name" => "b", "address" => "203.0.113.21", "location" => "remote"})
+    {:ok, m1} = Machines.get(id1)
+    {:ok, m2} = Machines.get(id2)
+
+    ip1 = Overlay.address_for(m1)
+    ip2 = Overlay.address_for(m2)
+
+    assert ip1 != ip2
+    assert ip1 =~ "10.88.0."
+    assert ip2 =~ "10.88.0."
+  end
+
+  test "overlay_ip_for is deterministic from persisted overlay.json" do
+    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "c", "address" => "203.0.113.30", "location" => "remote"})
+    {:ok, m} = Machines.get(id)
+    ip = Overlay.address_for(m)
+
+    # overlay.json now holds the mapping
+    path = Path.join(Application.get_env(:tunneld, :fs)[:root], "overlay.json")
+    assert File.exists?(path)
+    {:ok, %{"peers" => map}} = Jason.decode(File.read!(path))
+    assert map[id] == ip
+  end
+
+  test "address_for returns LAN IP for same-subnet and overlay for remote in one map" do
+    local = Overlay.address_for(%{"address" => "192.168.1.77"})
+    assert local == "192.168.1.77"
+
+    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "d", "address" => "203.0.113.40", "location" => "remote"})
+    {:ok, m} = Machines.get(id)
+    assert Overlay.address_for(m) =~ "10.88.0."
+  end
+
+  test "gateway_overlay_ip and overlay_subnet are sensible defaults" do
+    assert Overlay.overlay_subnet() == "10.88.0.0/24"
+    assert Overlay.gateway_overlay_ip() == "10.88.0.1"
+  end
 end
