@@ -172,7 +172,7 @@ defmodule Tunneld.Machines.Provider do
 
   defp apt_install_command do
     """
-    if apt-cache show incus >/dev/null 2>&1; then
+    if apt-cache policy incus 2>/dev/null | grep -q 'Candidate: [0-9]'; then
       sudo apt-get update -qq && sudo apt-get install -y -qq incus
     else
       command -v curl >/dev/null 2>&1 || sudo apt-get install -y -qq curl
