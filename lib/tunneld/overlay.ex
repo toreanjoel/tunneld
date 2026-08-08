@@ -117,6 +117,7 @@ defmodule Tunneld.Overlay do
   # {gateway_public_key, target_public_key}.
   defp exchange_keys(machine) do
     id = machine["id"]
+    iface = iface_name(id)
     priv_path = Path.join([Tunneld.Config.fs_root(), "wg", id])
     File.mkdir_p!(Path.dirname(priv_path))
 
@@ -135,28 +136,30 @@ defmodule Tunneld.Overlay do
     # public half over SSH; return the target's public half.
     {t_pub, t_priv} = gen_keypair()
 
+    gw_overlay_ip = @gateway_overlay_ip
+
     target_conf = """
     [Interface]
     Address = #{overlay_ip_for(machine)}/32
     PrivateKey = #{t_priv}
     Table = off
+    PostUp = ip route add #{gw_overlay_ip}/32 dev #{iface_name(id)} 2>/dev/null || true
 
     [Peer]
     PublicKey = #{gw_pub}
     AllowedIPs = 0.0.0.0/0
     """
 
-    with :ok <- write_remote(machine, "/etc/wireguard/#{id}.conf", target_conf) do
+    with :ok <- write_remote(machine, "/etc/wireguard/#{iface}.conf", target_conf) do
       {:ok, t_pub}
     end
   end
 
   defp install_target(machine, target_pub, iface) do
-    id = machine["id"]
     _ = target_pub
-    # Enable + start the wg-quick service for this peer
-    run(machine, "systemctl enable --now wg-quick@#{id} 2>/dev/null || true")
-    _ = iface
+    # Enable + start the wg-quick service for this peer (config file is
+    # /etc/wireguard/<iface>.conf, so the unit is wg-quick@<iface>).
+    run(machine, "systemctl enable --now wg-quick@#{iface} 2>/dev/null || true")
     :ok
   end
 
@@ -170,7 +173,7 @@ defmodule Tunneld.Overlay do
     Address = #{@gateway_overlay_ip}/32
     PrivateKey = #{gw_priv}
     Table = off
-    PostUp = ip route add #{overlay_ip}/32 dev #{iface} table 100 2>/dev/null || true
+    PostUp = ip route add #{overlay_ip}/32 dev #{iface} 2>/dev/null || true
 
     [Peer]
     PublicKey = #{String.trim(target_pub)}
@@ -178,14 +181,16 @@ defmodule Tunneld.Overlay do
     PersistentKeepalive = 25
     """
 
-    write_gateway(iface, gw_conf)
-    run_gateway("systemctl enable --now wg-quick@#{id} 2>/dev/null || true")
+    write_gateway("/etc/wireguard/#{iface}.conf", gw_conf)
+    run_gateway("systemctl enable --now wg-quick@#{iface} 2>/dev/null || true")
   end
 
   defp real_remove_peer(machine) do
     id = machine["id"]
-    _ = run(machine, "systemctl stop wg-quick@#{id} 2>/dev/null || true")
-    _ = run_gateway("systemctl stop wg-quick@#{id} 2>/dev/null || true")
+    iface = iface_name(id)
+    _ = run(machine, "systemctl stop wg-quick@#{iface} 2>/dev/null || true")
+    _ = run_gateway("systemctl stop wg-quick@#{iface} 2>/dev/null || true")
+    _ = run_gateway("wg-quick down #{iface} 2>/dev/null || true")
     File.rm(Path.join([Tunneld.Config.fs_root(), "wg", id]))
     File.rm(Path.join([Tunneld.Config.fs_root(), "wg", id, ".pub"]))
     :ok
@@ -219,6 +224,8 @@ defmodule Tunneld.Overlay do
   end
 
   # --- helpers ---
+
+  defp iface_name(id), do: "wg-#{id}"
 
   defp gen_keypair do
     {priv, 0} = System.cmd("wg", ["genkey"], stderr_to_stdout: true)
