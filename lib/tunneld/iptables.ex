@@ -43,8 +43,9 @@ defmodule Tunneld.Iptables do
       "ACCEPT"
     ])
 
-    # Allow gateway services (HTTP dashboard, SSH)
-    for port <- [80, 22] do
+    # Allow gateway services (HTTP dashboard, SSH, and Caddy's resource port so
+    # LAN devices can reach <name>.tunneld.lan:18000)
+    for port <- [80, 22, Tunneld.Caddy.public_port()] do
       System.cmd("iptables", [
         "-A",
         "INPUT",
