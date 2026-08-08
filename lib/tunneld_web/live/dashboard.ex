@@ -319,6 +319,7 @@ defmodule TunneldWeb.Live.Dashboard do
             selection={@sidebar.selection}
             data={@sidebar.data}
             containers={@sidebar.containers}
+            listeners={@sidebar.listeners}
             obfuscated={@obfuscated}
           />
         </div>
@@ -648,6 +649,28 @@ defmodule TunneldWeb.Live.Dashboard do
       {:error, _} ->
         {:noreply, put_flash(socket, :error, "Could not delete #{name}")}
     end
+  end
+
+  def handle_event("make_listener_resource", %{"machine_id" => id, "addr" => addr, "port" => port, "proc" => proc} = _params, socket) do
+    name = sanitize_resource_name("#{proc}-#{port}")
+
+    resource = %{
+      "name" => name,
+      "description" => "Listener #{addr}:#{port} on machine #{id} (#{proc})",
+      "pool" => ["#{addr}:#{port}"],
+      "expose_source" => "listener",
+      "expose_machine_id" => id
+    }
+
+    _ = Tunneld.Servers.Resources.add_share(resource)
+    socket = assign(socket, :listener_made, name)
+
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+      type: :info,
+      message: "Resource '#{name}' created from listener #{addr}:#{port}"
+    })
+
+    {:noreply, socket}
   end
 
   def handle_event("open_terminal", %{"id" => id, "name" => name}, socket) do
@@ -1038,8 +1061,21 @@ defmodule TunneldWeb.Live.Dashboard do
     end
   end
 
+  defp sanitize_resource_name(name) do
+    name
+    |> String.downcase()
+    |> String.replace(~r/[^a-zA-Z0-9\-]/, "-")
+    |> String.replace(~r/-+/, "-")
+    |> String.trim("-")
+    |> String.slice(0, 40)
+    |> case do
+      "" -> "resource"
+      s -> s
+    end
+  end
+
   defp sidebar_open(view, selection) when is_atom(view) do
-    %{is_open: true, view: view, selection: selection, data: nil, containers: []}
+    %{is_open: true, view: view, selection: selection, data: nil, containers: [], listeners: []}
   end
 
   defp open_machine_sidebar(socket, id) do
@@ -1051,12 +1087,19 @@ defmodule TunneldWeb.Live.Dashboard do
             _ -> []
           end
 
+        listeners =
+          case Tunneld.Machines.listeners(id) do
+            {:ok, l} -> l
+            _ -> []
+          end
+
         sidebar = %{
           is_open: true,
           view: :machine,
           selection: %{type: :machine, id: id},
           data: machine,
-          containers: containers
+          containers: containers,
+          listeners: listeners
         }
 
         assign(socket, :sidebar, sidebar)
@@ -1087,8 +1130,14 @@ defmodule TunneldWeb.Live.Dashboard do
           _ -> []
         end
 
-      sidebar = Map.put(sidebar, :containers, containers)
-      send_update(SidebarDetails, id: "sidebar_details", containers: containers)
+      listeners =
+        case Tunneld.Machines.listeners(id) do
+          {:ok, l} -> l
+          _ -> []
+        end
+
+      sidebar = sidebar |> Map.put(:containers, containers) |> Map.put(:listeners, listeners)
+      send_update(SidebarDetails, id: "sidebar_details", containers: containers, listeners: listeners)
       assign(socket, :sidebar, sidebar)
     else
       socket
@@ -1096,7 +1145,7 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   defp sidebar_close(sidebar) when is_map(sidebar) do
-    %{is_open: false, view: Map.get(sidebar, :view), selection: nil, data: nil, containers: []}
+    %{is_open: false, view: Map.get(sidebar, :view), selection: nil, data: nil, containers: [], listeners: []}
   end
 
   defp machine_action_flash(socket, "enroll_machine", %{"public_key" => pub} = result)

@@ -57,6 +57,14 @@ defmodule TunneldWeb.MachineController do
     end
   end
 
+  def listeners(conn, %{"id" => id}) do
+    case Tunneld.Machines.listeners(id) do
+      {:ok, listeners} -> json(conn, %{listeners: listeners})
+      {:error, :not_found} -> conn |> put_status(404) |> json(%{error: "not found"})
+      {:error, reason} -> conn |> put_status(502) |> json(%{error: "list failed", detail: inspect(reason)})
+    end
+  end
+
   def containers(conn, %{"id" => id}) do
     case Tunneld.Machines.list_containers(id) do
       {:ok, containers} -> json(conn, %{containers: containers})

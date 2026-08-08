@@ -23,6 +23,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     view = Map.get(assigns, :view, socket.assigns[:view] || :system_overview)
     data = Map.get(assigns, :data, %{})
     containers = Map.get(assigns, :containers, [])
+    listeners = Map.get(assigns, :listeners, socket.assigns[:listeners] || [])
     selection = Map.get(assigns, :selection, socket.assigns[:selection] || nil)
     obfuscated = Map.get(assigns, :obfuscated, false)
 
@@ -32,6 +33,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(:view, view)
       |> assign(:data, data)
       |> assign(:containers, containers)
+      |> assign(:listeners, listeners)
       |> assign(:selection, selection)
       |> assign(:obfuscated, obfuscated)
 
@@ -247,6 +249,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       assigns
       |> assign(:machine, machine)
       |> assign(:containers, containers)
+      |> assign(:listeners, Map.get(assigns, :listeners, []))
 
     ~H"""
     <div class="p-4 space-y-5 min-h-full">
@@ -335,6 +338,36 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <%= if mget(@machine, "last_seen") do %>
             <div class="text-sm truncate text-gray-400">
               last seen <%= String.slice(mget(@machine, "last_seen"), 0, 19) %>
+            </div>
+          <% end %>
+        </div>
+
+        <div class="mt-4">
+          <div class="text-sm font-semibold mb-2">Listeners</div>
+          <%= if Enum.empty?(@listeners) do %>
+            <div class="text-xs text-gray-400 italic">No listeners discovered</div>
+          <% else %>
+            <div class="space-y-1">
+              <%= for l <- @listeners do %>
+                <div class="bg-surface rounded p-2 text-xs flex items-center justify-between">
+                  <div class="flex items-center gap-2 min-w-0">
+                    <span class="w-2 h-2 rounded-full bg-green shrink-0"></span>
+                    <span class="font-mono truncate"><%= l["addr"] %>:<%= l["port"] %></span>
+                    <span class="text-gray-400 truncate"><%= l["proc"] %> (<%= l["pid"] %>)</span>
+                    <span :if={l["container"]} class="text-accent truncate">· <%= l["container"] %></span>
+                  </div>
+                  <button
+                    phx-click="make_listener_resource"
+                    phx-value-machine_id={mget(@machine, "id")}
+                    phx-value-addr={l["addr"]}
+                    phx-value-port={l["port"]}
+                    phx-value-proc={l["proc"]}
+                    class="ghost-btn !px-2 !py-0.5 text-[10px] shrink-0"
+                  >
+                    make resource
+                  </button>
+                </div>
+              <% end %>
             </div>
           <% end %>
         </div>

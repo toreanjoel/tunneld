@@ -34,7 +34,7 @@ defmodule Tunneld.Machines do
   use GenServer
   require Logger
 
-  alias Tunneld.Machines.{Store, SSH, Provider}
+  alias Tunneld.Machines.{Store, SSH, Provider, Runtime}
   alias Tunneld.Machines.Expose
 
   @pubsub_topic "component:machines"
@@ -104,6 +104,9 @@ defmodule Tunneld.Machines do
   against the machine record and broadcasts an update.
   """
   def probe(id), do: GenServer.call(__MODULE__, {:probe, id}, 30_000)
+
+  @doc "List listening sockets on a machine (runtime-agnostic, live over SSH or mock)."
+  def listeners(id), do: GenServer.call(__MODULE__, {:listeners, id}, 30_000)
 
   @doc "Install Incus on a machine, then probe it. Returns `{:ok, machine}` or `{:error, reason}`."
   def install_incus(id), do: GenServer.call(__MODULE__, {:install_incus, id}, 120_000)
@@ -257,6 +260,16 @@ defmodule Tunneld.Machines do
     reply =
       with {:ok, machine} <- Store.get(id) do
         do_probe(machine)
+      end
+
+    {:reply, reply, state}
+  end
+
+  def handle_call({:listeners, id}, _from, state) do
+    reply =
+      with {:ok, machine} <- Store.get(id),
+           {:ok, listeners} <- Runtime.listeners(machine) do
+        {:ok, listeners}
       end
 
     {:reply, reply, state}
