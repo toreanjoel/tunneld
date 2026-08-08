@@ -126,10 +126,18 @@ defmodule TunneldWeb.Live.Components.Modal do
     ~H"""
     <div class="mt-2 space-y-3">
       <p class="text-xs text-gray-300">From any allowed device on the subnet:</p>
-      <%= for block <- @blocks do %>
+      <%= for {block, i} <- Enum.with_index(@blocks) do %>
         <div class="relative">
           <p class="text-[10px] uppercase font-medium text-gray-400 mb-0.5"><%= block["title"] %></p>
-          <pre class="bg-black/60 p-3 rounded text-xs font-mono text-green-400 whitespace-pre-wrap border border-gray-700"><%= block["code"] %></pre>
+          <pre class="bg-black/60 p-3 pr-14 rounded text-xs font-mono text-green-400 whitespace-pre-wrap break-all border border-gray-700"><%= block["code"] %></pre>
+          <button
+            type="button"
+            id={"copy_block_#{i}_#{:erlang.unique_integer([:positive])}"}
+            phx-hook="CopyToClipboard"
+            class="absolute top-2 right-2 text-[10px] bg-surface-2 hover:bg-surface border border-border rounded px-2 py-1 text-text-secondary"
+          >
+            Copy
+          </button>
         </div>
       <% end %>
     </div>
