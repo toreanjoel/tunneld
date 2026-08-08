@@ -1,11 +1,11 @@
 defmodule Tunneld.Servers.Services do
   @moduledoc """
-  Monitors and manages the core system services (dnsmasq, dhcpcd, nginx).
+  Monitors and manages the core system services (dnsmasq, dhcpcd, caddy).
   """
   use GenServer
   require Logger
 
-  @services [:dnsmasq, :dhcpcd, :nginx]
+  @services [:dnsmasq, :dhcpcd, :caddy]
   @service_log_limit "25"
   @interval 10_000
 

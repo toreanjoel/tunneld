@@ -167,7 +167,7 @@ defmodule TunneldWeb.ExposeController do
       |> put_status(500)
       |> json(%{error: "share was not created - please retry"})
     else
-      lan_url = resource.lan_url || "http://#{Tunneld.Servers.Nginx.lan_hostname(name)}:#{Tunneld.Servers.Nginx.public_port()}"
+      lan_url = resource.lan_url || "http://#{Tunneld.Caddy.lan_hostname(name)}:#{Tunneld.Caddy.public_port()}"
 
       json(conn, %{
         name: name,

@@ -202,6 +202,11 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               <span class="font-bold">LAN URL:</span>
               <span class="ml-1 font-mono text-xs"><%= @data[:lan_url] %></span>
             </div>
+            <div :if={@data[:loopback_port]} class="text-sm truncate">
+              <span class="font-bold">Loopback:</span>
+              <span class="ml-1 font-mono text-xs">127.0.0.1:<%= @data[:loopback_port] %></span>
+              <span class="ml-1 text-xs text-gray-400">(manual exposure via zrok/cloudflared)</span>
+            </div>
           </div>
 
           <% pool_details = Map.get(@data, :pool_details, []) %>
@@ -531,12 +536,12 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               "Client daemon that manages the upstream network lease and interface config"
           }
 
-        :nginx ->
+        :caddy ->
           %{
             id: service,
             name: service |> Atom.to_string() |> String.capitalize(),
             description:
-              "Reverse proxy/load balancer that fronts your exposed resources and distributes traffic."
+              "Reverse proxy/load balancer (Caddy) that fronts your exposed resources and distributes traffic."
           }
 
         # This is needed so when the component updates, we have some default value

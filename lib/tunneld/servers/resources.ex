@@ -6,25 +6,26 @@ defmodule Tunneld.Servers.Resources do
   A resource represents a service that Tunneld can proxy for LAN devices. Each
   resource has:
 
-  - A **pool** of backend `IP:port` entries (load-balanced by nginx)
+  - A **pool** of backend `IP:port` entries (load-balanced by Caddy)
   - A local DNS name (`<name>.tunneld.lan`) served by dnsmasq on the gateway
-  - An nginx reverse-proxy config that listens on `0.0.0.0:18000` and forwards
-    to the backend pool
+  - A Caddy config: a LAN server on `0.0.0.0:18000` (Host-header routed) plus a
+    per-resource loopback listener on `127.0.0.1:<loopback_port>` with no host
+    matcher (for zrok / cloudflared / manual exposure)
 
-  Resources are persisted to `resources.json` and synced to nginx configs.
-  There is no public-internet exposure and no per-resource auth - access is
-  limited to the local subnet.
+  Resources are persisted to `resources.json` and reconciled into a single
+  Caddy config via `Tunneld.Caddy.sync/1`. There is no public-internet
+  exposure and no per-resource auth - access is limited to the local subnet.
 
   State is periodically broadcast to the dashboard via PubSub.
   """
 
   use GenServer
   require Logger
-  alias Tunneld.Servers.Nginx
+  alias Tunneld.Caddy
 
   @interval 10_000
-  @nginx_ip "127.0.0.1"
-  @nginx_port "18000"
+  @gateway_ip "127.0.0.1"
+  @lan_port "18000"
   defp mock?, do: Application.get_env(:tunneld, :mock_data, false)
 
   @broadcast_topic_main "component:resources"
@@ -41,6 +42,9 @@ defmodule Tunneld.Servers.Resources do
   """
   def init(_) do
     if not file_exists?(), do: create_file()
+    # Reconcile Caddy config from persisted resources on startup (idempotent -
+    # a reboot should leave Caddy matching disk state, no manual reopen).
+    _ = Caddy.sync(read_file())
     send(self(), :sync)
     {:ok, %{}}
   end
@@ -56,18 +60,20 @@ defmodule Tunneld.Servers.Resources do
 
         new_resource =
           resource
-          |> Map.put("ip", @nginx_ip)
-          |> Map.put("port", @nginx_port)
+          |> Map.put("ip", @gateway_ip)
+          |> Map.put("port", @lan_port)
           |> Map.put("pool", pool)
+          |> Map.put("loopback_port", allocate_loopback_port(resources))
           |> Map.merge(%{
             "id" => DateTime.utc_now() |> DateTime.to_unix() |> to_string,
             "kind" => "host"
           })
           |> Map.drop(["tunneld"])
 
-        with :ok <- Nginx.upsert_resource_config(new_resource),
-             u_nodes <- resources ++ [new_resource],
-             :ok <- Tunneld.Persistence.write_json(path(), u_nodes) do
+        u_nodes = resources ++ [new_resource]
+
+        with :ok <- Tunneld.Persistence.write_json(path(), u_nodes),
+             :ok <- Caddy.sync(u_nodes) do
           Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
             type: :info,
             message: "resource added successfully"
@@ -143,8 +149,8 @@ defmodule Tunneld.Servers.Resources do
           resource
           |> Map.put("description", data["description"] || resource["description"] || "")
           |> Map.put("pool", pool)
-          |> Map.put("ip", @nginx_ip)
-          |> Map.put("port", @nginx_port)
+          |> Map.put("ip", @gateway_ip)
+          |> Map.put("port", @lan_port)
 
         updated_shares =
           Enum.map(resources, fn r ->
@@ -157,7 +163,7 @@ defmodule Tunneld.Servers.Resources do
 
         case persist_and_broadcast(updated_shares, "Resource updated successfully", "Failed to update resource") do
           {:ok, _} ->
-            _ = ensure_nginx_config(updated_resource)
+            _ = Caddy.sync(updated_shares)
 
             Phoenix.PubSub.broadcast(
               Tunneld.PubSub,
@@ -177,18 +183,14 @@ defmodule Tunneld.Servers.Resources do
 
   def handle_cast({:remove_share, id}, state) do
     resources = read_file()
-    resource = Enum.find(resources, fn s -> s["id"] === id end)
-
-    _ =
-      if resource do
-        Nginx.remove_resource_config(id)
-      end
 
     updated_nodes = Enum.reject(resources, fn resource -> resource["id"] === id end)
 
     update_state =
       case persist_and_broadcast(updated_nodes, "resource removed successfully", "Failed to remove resource") do
         {:ok, _} ->
+          _ = Caddy.sync(updated_nodes)
+
           Phoenix.PubSub.broadcast(Tunneld.PubSub, @broadcast_topic, %{
             id: @component_desktop_id,
             module: @component_module,
@@ -251,8 +253,8 @@ defmodule Tunneld.Servers.Resources do
     Enum.map(resources, fn s ->
       kind = s["kind"] || "host"
       pool = Map.get(s, "pool", [])
-      ip = s["ip"] || @nginx_ip
-      port = s["port"] || @nginx_port
+      ip = s["ip"] || @gateway_ip
+      port = s["port"] || @lan_port
 
       health =
         case kind do
@@ -272,6 +274,7 @@ defmodule Tunneld.Servers.Resources do
         ip: ip,
         description: s["description"],
         port: port,
+        loopback_port: s["loopback_port"],
         pool: pool,
         pool_details: pool_health_details(pool, mock?()),
         status: status_bool,
@@ -290,7 +293,7 @@ defmodule Tunneld.Servers.Resources do
   end
 
   defp lan_url(name) when is_binary(name) do
-    "http://#{Nginx.lan_hostname(name)}:#{Nginx.public_port()}"
+    "http://#{Caddy.lan_hostname(name)}:#{Caddy.public_port()}"
   end
 
   defp lan_url(_), do: nil
@@ -319,7 +322,7 @@ defmodule Tunneld.Servers.Resources do
   end
 
   # Validates that a pool entry matches IP:port format to prevent
-  # injection into nginx upstream configs.
+  # injection into the Caddy upstream config.
   defp valid_pool_entry?(entry) do
     case String.split(entry, ":", parts: 2) do
       [ip, port] ->
@@ -353,27 +356,29 @@ defmodule Tunneld.Servers.Resources do
     end
   end
 
-  defp ensure_nginx_config(resource) do
-    case Map.get(resource, "pool") do
-      pool when is_list(pool) and length(pool) > 0 ->
-        Nginx.upsert_resource_config(resource)
+  # Pick the lowest unused loopback port in Caddy's range so each resource gets
+  # a stable, unique 127.0.0.1:2xxxx listener.
+  defp allocate_loopback_port(resources) do
+    used =
+      resources
+      |> Enum.map(& &1["loopback_port"])
+      |> Enum.reject(&is_nil/1)
 
-      _ ->
-        :ok
-    end
+    (Caddy.loopback_start()..Caddy.loopback_end())
+    |> Enum.find(fn p -> p not in used end)
   end
 
   @doc "Broadcast a single resource's details to the sidebar component."
   def get_resource(id), do: GenServer.cast(__MODULE__, {:get_resource, id})
 
-  @doc "Add a new host resource with nginx config and a local DNS name."
+  @doc "Add a new host resource with a Caddy config and a local DNS name."
   def add_share(resource), do: GenServer.call(__MODULE__, {:add_share, resource}, 25_000)
 
-  @doc "Remove a host resource and clean up its nginx config."
+  @doc "Remove a host resource and reconcile its Caddy config away."
   def remove_share(id), do: GenServer.cast(__MODULE__, {:remove_share, id})
 
   @doc """
-  Update a resource's editable fields (description, pool) and regenerate nginx config.
+  Update a resource's editable fields (description, pool) and reconcile the Caddy config.
   """
   def update_share(data, :resource),
     do: GenServer.cast(__MODULE__, {:update_share, :resource, data})
