@@ -35,7 +35,7 @@ defmodule Tunneld.Caddy do
 
   @public_port 18000
   @lan_domain "tunneld.lan"
-  @admin_url "http://127.0.0.1:2019/config/"
+  @admin_url "http://127.0.0.1:2019/"
   @loopback_start 20_000
   @loopback_end 30_000
 
@@ -146,8 +146,11 @@ defmodule Tunneld.Caddy do
   defp push_config(config) do
     body = Jason.encode!(config)
 
-    case HTTPoison.put(
-           @admin_url,
+    # POST /load atomically replaces the entire config (the recommended way to
+    # load a full new config). PUT /config/ would 409 when a config already
+    # exists.
+    case HTTPoison.post(
+           @admin_url <> "load",
            body,
            [{"content-type", "application/json"}],
            timeout: 10_000,
