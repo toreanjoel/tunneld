@@ -38,6 +38,8 @@ defmodule Tunneld.CaddyTest do
 
     servers = config["apps"]["http"]["servers"]
     assert servers["tunneld_lan"]["listen"] == [":18000"]
+    # auto-HTTPS must be off so Caddy does not try to bind :80 (owned by tunneld)
+    assert servers["tunneld_lan"]["automatic_https"] == %{"disable" => true}
 
     [route] = servers["tunneld_lan"]["routes"]
     assert route["match"] == [%{"host" => ["web.tunneld.lan"]}]
@@ -56,6 +58,7 @@ defmodule Tunneld.CaddyTest do
 
     loop = servers["tunneld_r1_loop"]
     assert loop["listen"] == ["127.0.0.1:20001"]
+    assert loop["automatic_https"] == %{"disable" => true}
     # No host matcher: the route has no "match" key
     [route] = loop["routes"]
     refute Map.has_key?(route, "match")

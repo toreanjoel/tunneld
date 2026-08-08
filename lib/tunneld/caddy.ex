@@ -101,7 +101,13 @@ defmodule Tunneld.Caddy do
         "http" => %{
           "servers" =>
             Map.merge(
-              %{"tunneld_lan" => %{"listen" => [":#{@public_port}"], "routes" => lan_routes}},
+              %{
+                "tunneld_lan" => %{
+                  "listen" => [":#{@public_port}"],
+                  "routes" => lan_routes,
+                  "automatic_https" => %{"disable" => true}
+                }
+              },
               loop_servers
             )
         }
@@ -133,7 +139,8 @@ defmodule Tunneld.Caddy do
   defp loop_server(r) do
     %{
       "listen" => ["127.0.0.1:#{r["loopback_port"]}"],
-      "routes" => [%{"handle" => [reverse_proxy(r["pool"])]}]
+      "routes" => [%{"handle" => [reverse_proxy(r["pool"])]}],
+      "automatic_https" => %{"disable" => true}
     }
   end
 
