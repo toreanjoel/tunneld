@@ -111,7 +111,9 @@ defmodule Tunneld.Machines.SSH do
     key = key_path(id)
     host = machine["address"]
     user = machine["ssh_user"] || "root"
-    port = Integer.to_string(machine["ssh_port"] || 22)
+    # ssh_port may be an integer (older records) or a string (wizard form);
+    # to_string/1 handles both.
+    port = to_string(machine["ssh_port"] || 22)
 
     args = [
       "-i",
