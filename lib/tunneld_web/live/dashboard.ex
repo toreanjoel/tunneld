@@ -95,6 +95,7 @@ defmodule TunneldWeb.Live.Dashboard do
       |> assign(:system_resources, %{})
       |> assign(:map_status, :loading)
       |> assign(:geo_location, nil)
+      |> assign(:enroll_wizard_open, false)
 
     socket =
       case Tunneld.Geolocation.get_location() do
@@ -236,6 +237,12 @@ defmodule TunneldWeb.Live.Dashboard do
         actions={@modal.actions}
         client_id={@client_id}
         pending_actions={@pending_actions}
+      />
+
+      <.live_component
+        module={TunneldWeb.Live.Components.EnrollmentWizard}
+        id="enrollment_wizard"
+        open={@enroll_wizard_open}
       />
 
           </div>
@@ -390,21 +397,7 @@ defmodule TunneldWeb.Live.Dashboard do
   # --- Machines ---
 
   def handle_event("enroll_machine_modal", _params, socket) do
-    modal_data = %{
-      show: true,
-      title: "Add Machine",
-      description: nil,
-      body: %{
-        "type" => "schema",
-        "data" => Tunneld.Schema.Machine.data(),
-        "default_values" => %{"ssh_port" => 22, "location" => "local"},
-        "action" => "enroll_machine"
-      },
-      actions: nil,
-      type: :default
-    }
-
-    {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal_data))}
+    {:noreply, assign(socket, :enroll_wizard_open, true)}
   end
 
 
