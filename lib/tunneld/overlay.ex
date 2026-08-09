@@ -35,6 +35,7 @@ defmodule Tunneld.Overlay do
 
   @overlay_subnet Application.compile_env(:tunneld, :overlay_subnet, "10.88.0.0/24")
   @gateway_overlay_ip Application.compile_env(:tunneld, :overlay_gateway_ip, "10.88.0.1")
+  @wg_port Application.compile_env(:tunneld, :overlay_port, 51_820)
 
   def mock?, do: @mock
 
@@ -165,6 +166,10 @@ defmodule Tunneld.Overlay do
     overlay_ip = overlay_ip_for(machine)
     gw_priv = File.read!(Path.join([Tunneld.Config.fs_root(), "wg", id]))
 
+    # The gateway dials out to the target, so the peer needs the target's
+    # endpoint (public IP for remote, LAN IP for local) on the WG port.
+    endpoint = "#{machine["address"]}:#{@wg_port}"
+
     gw_conf = """
     [Interface]
     Address = #{@gateway_overlay_ip}/32
@@ -175,6 +180,7 @@ defmodule Tunneld.Overlay do
     [Peer]
     PublicKey = #{String.trim(target_pub)}
     AllowedIPs = #{overlay_ip}/32
+    Endpoint = #{endpoint}
     PersistentKeepalive = 25
     """
 
