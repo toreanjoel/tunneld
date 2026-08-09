@@ -54,6 +54,29 @@ defmodule Tunneld.Geolocation do
     GenServer.cast(__MODULE__, :refresh)
   end
 
+  @doc """
+  Best-effort geolocation of an arbitrary IP (used for remote machine pins on
+  the map card). Returns `{:ok, %{latitude, longitude, country_code, ...}}` or
+  `:error`. In mock mode returns a fixed location so the map renders.
+  """
+  def geolocate(ip) when is_binary(ip) do
+    if mock?() do
+      {:ok,
+       %{
+         ip: ip,
+         country_code: "US",
+         country_name: "United States",
+         latitude: 37.7749,
+         longitude: -122.4194
+       }}
+    else
+      case fetch_geolocation(ip) do
+        {:ok, geo} -> {:ok, Map.put(geo, :ip, ip)}
+        _ -> :error
+      end
+    end
+  end
+
   @impl true
   def init(_) do
     if mock?() do

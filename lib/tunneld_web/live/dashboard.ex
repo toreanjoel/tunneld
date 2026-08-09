@@ -148,6 +148,7 @@ defmodule TunneldWeb.Live.Dashboard do
                   module={TunneldWeb.Live.Components.MapCard}
                   geo_location={@geo_location}
                   map_status={@map_status}
+                  nodes={map_nodes()}
                 />
               </div>
               <div class="grid grid-rows-[auto_1fr] gap-6 h-full">
@@ -1015,6 +1016,41 @@ def sidebar(%{sidebar: sidebar, uri_info: uri_info} = assigns) do
   defp egress_machines do
     Tunneld.Machines.list()
     |> Enum.map(fn m -> {m["id"], m["name"] || m["id"]} end)
+  end
+
+  # Map-card pins for managed machines (TODO §6). Remote machines plot by
+  # geolocating their public IP; local machines pin to the gateway's location.
+  # Best-effort: falls back to the gateway location when geolocation fails.
+  defp map_nodes do
+    gateway = socket_geo_location()
+
+    Tunneld.Machines.list()
+    |> Enum.map(fn m ->
+      label = m["name"] || m["id"]
+      location = m["location"] || "local"
+      address = m["address"]
+
+      geo =
+        if location == "remote" and is_binary(address) do
+          case Tunneld.Geolocation.geolocate(address) do
+            {:ok, loc} -> loc
+            _ -> gateway
+          end
+        else
+          gateway
+        end
+
+      %{latitude: geo[:latitude], longitude: geo[:longitude], label: label}
+    end)
+    |> Enum.reject(fn n -> is_nil(n.latitude) or is_nil(n.longitude) end)
+  end
+
+  defp socket_geo_location do
+    # The gateway's own geolocation, read from the Geolocation service.
+    case Tunneld.Geolocation.get_location() do
+      {:ok, loc} -> loc
+      _ -> %{latitude: 37.7749, longitude: -122.4194}
+    end
   end
 
   defp sanitize_resource_name(name) do
