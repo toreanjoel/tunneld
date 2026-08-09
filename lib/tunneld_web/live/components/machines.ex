@@ -23,12 +23,36 @@ defmodule TunneldWeb.Live.Components.Machines do
 
   @impl true
   def update(assigns, socket) do
+    machines =
+      Machines.list()
+      |> Enum.map(&enrich/1)
+
     socket =
       socket
       |> assign(:obfuscated, Map.get(assigns, :obfuscated, false))
-      |> assign(:machines, Machines.list())
+      |> assign(:machines, machines)
 
     {:ok, socket}
+  end
+
+  # Attach overlay IP, WireGuard status, and detected runtimes for the card.
+  # Tolerates mock/unavailable so the UI never crashes.
+  defp enrich(machine) do
+    overlay_ip = Tunneld.Overlay.address_for(machine)
+
+    wg =
+      case Tunneld.Overlay.status(machine) do
+        {:ok, %{up: true}} -> "up"
+        {:ok, _} -> "down"
+        _ -> nil
+      end
+
+    runtimes = get_in(machine, ["capabilities", "detected_runtimes"]) || []
+
+    machine
+    |> Map.put("overlay_ip", overlay_ip)
+    |> Map.put("overlay_status", wg)
+    |> Map.put("detected_runtimes", runtimes)
   end
 
   @impl true
@@ -82,6 +106,18 @@ defmodule TunneldWeb.Live.Components.Machines do
                 <%= location_label(machine["location"]) %>
               </span>
             </div>
+            <div class="flex items-center gap-1.5 text-[10px] text-text-tertiary">
+              <%= if machine["overlay_ip"] do %>
+                <span class="font-mono"><%= machine["overlay_ip"] %></span>
+              <% end %>
+              <%= if machine["overlay_status"] do %>
+                <span class={"w-[7px] h-[7px] rounded-full inline-block #{wg_dot(machine["overlay_status"])}"}></span>
+                <span>WG <%= machine["overlay_status"] %></span>
+              <% end %>
+              <%= if machine["detected_runtimes"] != [] do %>
+                <span class="truncate">· <%= Enum.join(machine["detected_runtimes"], ",") %></span>
+              <% end %>
+            </div>
           </div>
         <% end %>
       </div>
@@ -94,6 +130,9 @@ defmodule TunneldWeb.Live.Components.Machines do
   end
 
   defp machine_detail(_assigns), do: nil
+
+  defp wg_dot("up"), do: "bg-green"
+  defp wg_dot(_), do: "bg-red"
 
   defp status_dot("ready"), do: "bg-green"
   defp status_dot("enrolled"), do: "bg-yellow"
