@@ -14,8 +14,14 @@ defmodule Tunneld.Egress do
   machine keeps a stable table id across restarts.
 
   On the exit machine side, `ensure_exit_capable/1` sets
-  `net.ipv4.ip_forward=1` persistently and adds a MASQUERADE rule on the
-  egress interface. That is the entire exit-node install.
+  `net.ipv4.ip_forward=1` persistently, adds a MASQUERADE rule on the egress
+  interface, and FORWARD-allows the WireGuard interface to/from it (UFW/FORWARD
+  default is DROP, so ip_forward alone is not enough — found in live testing).
+
+  > **Operational caution:** only ever route *device* traffic on the gateway —
+  > never the gateway's own source IP — or you will lock yourself out (a policy
+  > rule on the gateway's own IP misroutes management traffic; recover by
+  > rebooting, since these rules are runtime-only).
 
   **Two things handled explicitly (see TODO §4.5):**
 
@@ -89,7 +95,34 @@ defmodule Tunneld.Egress do
     else
       with {:ok, _} <- SSH.run(machine, "sysctl -w net.ipv4.ip_forward=1 && (grep -q 'net.ipv4.ip_forward=1' /etc/sysctl.conf || echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf)"),
            {:ok, iface} <- default_iface(machine) do
-        SSH.run(machine, "iptables -t nat -C POSTROUTING -o #{iface} -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o #{iface} -j MASQUERADE")
+        # NAT for egressed traffic.
+        _ =
+          SSH.run(
+            machine,
+            "iptables -t nat -C POSTROUTING -o #{iface} -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o #{iface} -j MASQUERADE"
+          )
+
+        # FORWARD-allow the WireGuard interface to/from the egress interface.
+        # Without this the exit drops forwarded device traffic (UFW/FORWARD
+        # default is DROP) even though ip_forward is on. This was found in
+        # live egress testing.
+        wg_iface = "wg-#{machine["id"]}"
+
+        _ =
+          SSH.run(
+            machine,
+            "iptables -C FORWARD -i #{wg_iface} -o #{iface} -j ACCEPT 2>/dev/null || " <>
+              "iptables -I FORWARD 1 -i #{wg_iface} -o #{iface} -j ACCEPT"
+          )
+
+        _ =
+          SSH.run(
+            machine,
+            "iptables -C FORWARD -i #{iface} -o #{wg_iface} -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || " <>
+              "iptables -I FORWARD 1 -i #{iface} -o #{wg_iface} -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT"
+          )
+
+        :ok
       end
     end
   end
