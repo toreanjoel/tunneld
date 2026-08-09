@@ -35,7 +35,9 @@ defmodule Tunneld.Overlay do
 
   @overlay_subnet Application.compile_env(:tunneld, :overlay_subnet, "10.88.0.0/24")
   @gateway_overlay_ip Application.compile_env(:tunneld, :overlay_gateway_ip, "10.88.0.1")
-  @wg_port Application.compile_env(:tunneld, :overlay_port, 51_820)
+  # Per-machine overlay interfaces listen on 51821 (the existing wgtest overlay
+  # already uses 51820 on the gateway/VM).
+  @wg_port Application.compile_env(:tunneld, :overlay_port, 51_821)
 
   def mock?, do: @mock
 
@@ -140,6 +142,7 @@ defmodule Tunneld.Overlay do
     [Interface]
     Address = #{overlay_ip_for(machine)}/32
     PrivateKey = #{t_priv}
+    ListenPort = #{@wg_port}
     Table = off
     PostUp = ip route add #{gw_overlay_ip}/32 dev #{iface_name(id)} 2>/dev/null || true
 
