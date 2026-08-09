@@ -44,6 +44,22 @@ defmodule Tunneld.EgressTest do
     assert :ok = Egress.unroute_device(m, "10.0.0.101")
   end
 
+  test "route_device persists the device->machine mapping and unroute clears it" do
+    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "vps4", "address" => "203.0.113.12", "location" => "remote"})
+    {:ok, m} = Machines.get(id)
+
+    # not routed yet
+    assert Egress.device_egress("10.0.0.200") == nil
+
+    {:ok, _} = Egress.route_device(m, "10.0.0.200")
+    assert Egress.device_egress("10.0.0.200") == id
+    assert Egress.device_egress_map()["10.0.0.200"] == id
+
+    # unroute clears it
+    :ok = Egress.unroute_device(m, "10.0.0.200")
+    assert Egress.device_egress("10.0.0.200") == nil
+  end
+
   test "ensure_exit_capable returns :ok in mock mode" do
     {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "vps4", "address" => "203.0.113.12", "location" => "remote"})
     {:ok, m} = Machines.get(id)

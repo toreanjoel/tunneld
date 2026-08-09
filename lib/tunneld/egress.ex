@@ -53,20 +53,62 @@ defmodule Tunneld.Egress do
   def route_device(machine, device_ip, opts \\ []) do
     dns = Keyword.get(opts, :dns, "local")
 
-    if @mock do
-      {:ok, %{device_ip: device_ip, machine: machine["id"], table: table_for(machine), dns: dns}}
-    else
-      real_route_device(machine, device_ip, dns)
+    result =
+      if @mock do
+        {:ok, %{device_ip: device_ip, machine: machine["id"], table: table_for(machine), dns: dns}}
+      else
+        real_route_device(machine, device_ip, dns)
+      end
+
+    # Persist the device -> machine mapping so the selection survives a refresh.
+    case result do
+      {:ok, _} -> set_device_egress(device_ip, machine["id"])
+      _ -> :ok
     end
+
+    result
   end
 
   @doc "Remove a device from an exit (revert to gateway's own upstream)."
   def unroute_device(machine, device_ip) do
-    if @mock do
-      :ok
-    else
-      real_unroute_device(machine, device_ip)
+    result =
+      if @mock do
+        :ok
+      else
+        real_unroute_device(machine, device_ip)
+      end
+
+    clear_device_egress(device_ip)
+    result
+  end
+
+  @doc "The machine id a device's traffic is currently routed through, or `nil`."
+  def device_egress(device_ip) do
+    Map.get(read_device_egress(), device_ip)
+  end
+
+  @doc "All persisted device -> machine egress mappings."
+  def device_egress_map do
+    read_device_egress()
+  end
+
+  defp set_device_egress(device_ip, machine_id) do
+    write_device_egress(Map.put(read_device_egress(), device_ip, machine_id))
+  end
+
+  defp clear_device_egress(device_ip) do
+    write_device_egress(Map.delete(read_device_egress(), device_ip))
+  end
+
+  defp read_device_egress do
+    case Tunneld.Persistence.read_json(Path.join(Tunneld.Config.fs_root(), "device_egress.json")) do
+      {:ok, %{"devices" => map}} when is_map(map) -> map
+      _ -> %{}
     end
+  end
+
+  defp write_device_egress(map) do
+    Tunneld.Persistence.write_json(Path.join(Tunneld.Config.fs_root(), "device_egress.json"), %{"devices" => map})
   end
 
   @doc "Whether a machine has been made exit-capable (has a table allocated)."

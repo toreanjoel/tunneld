@@ -27,7 +27,12 @@ defmodule TunneldWeb.Live.Components.Devices do
           end
 
         cache = Map.put(cache, d.mac, %{at: now, online: online})
-        d = d |> Map.put(:expose_allowed, Tunneld.Servers.ExposeAllowed.allowed?(d.mac)) |> Map.put(:tags, Tunneld.Servers.DeviceTags.get_tags(d.mac)) |> Map.put(:online, online)
+        d =
+          d
+          |> Map.put(:expose_allowed, Tunneld.Servers.ExposeAllowed.allowed?(d.mac))
+          |> Map.put(:tags, Tunneld.Servers.DeviceTags.get_tags(d.mac))
+          |> Map.put(:online, online)
+          |> Map.put(:egress, Tunneld.Egress.device_egress(d.ip) || "local")
         {[d | acc], cache}
       end)
 
@@ -80,7 +85,11 @@ defmodule TunneldWeb.Live.Components.Devices do
             style="animation: fadeIn 0.5s ease-out forwards;"
           >
             <div class="flex flex-row gap-2">
-              <div class="flex-1 truncate ellipsis flex items-center gap-1.5"><%= mask(@obfuscated, device.hostname) %><span class={"status-dot shrink-0 #{if !@obfuscated && Map.get(device, :online, false), do: "status-dot--green", else: "status-dot--gray"}"} /></div>
+              <div class="flex-1 truncate ellipsis flex items-center gap-1.5"><%= mask(@obfuscated, device.hostname) %><span class={"status-dot shrink-0 #{if !@obfuscated && Map.get(device, :online, false), do: "status-dot--green", else: "status-dot--gray"}"} />
+                <%= if device.egress != "local" do %>
+                  <span class="px-1.5 py-0.5 rounded-full bg-accent/20 text-accent uppercase text-[9px] font-medium shrink-0">via exit</span>
+                <% end %>
+              </div>
               <div
                 phx-click="modal_open"
                 phx-value-modal_title={"Manage tags for #{device.hostname}"}
@@ -179,19 +188,26 @@ defmodule TunneldWeb.Live.Components.Devices do
             </div>
             <div class="mt-auto">
               <div class="flex items-center justify-between gap-2 mb-1">
-                <span class="text-[10px] uppercase tracking-wide text-text-tertiary">Egress</span>
-                <form phx-change="set_device_egress" phx-target={@myself}>
+                <span class="flex items-center text-[10px] uppercase tracking-wide text-text-tertiary">
+                  Egress
+                  <.help_icon
+                    class="ml-1"
+                    text="Route this device's internet traffic out through an exit machine (e.g. a VM) instead of the gateway's own upstream. Pick 'Local' to use the gateway directly."
+                  />
+                </span>
+                <form phx-change="set_device_egress" phx-target={@myself} class="relative">
                   <input type="hidden" name="ip" value={device.ip} />
                   <select
                     name="egress"
                     title="Route this device's traffic through an exit machine"
-                    class="appearance-none cursor-pointer px-1.5 py-0.5 text-[10px] rounded border flex items-center gap-1 shrink-0 bg-surface-2 text-text-secondary border-border"
+                    class="appearance-none cursor-pointer pl-2 pr-6 py-1 text-[10px] rounded border bg-surface-2 text-text-secondary border-border"
                   >
-                    <option value="local">Local</option>
+                    <option value="local" selected={device.egress == "local"}>Local</option>
                     <%= for {mid, mname} <- @egress_machines do %>
-                      <option value={mid}><%= mname %></option>
+                      <option value={mid} selected={device.egress == mid}><%= mname %></option>
                     <% end %>
                   </select>
+                  <.icon name="hero-chevron-down" class="w-3 h-3 pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-text-tertiary" />
                 </form>
               </div>
               <div class="text-xs text-text-tertiary flex items-center gap-1.5 justify-between">
