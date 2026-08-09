@@ -44,3 +44,6 @@ npm-debug.log
 .DS_Store
 .claude/
 docs-site/
+
+__pycache__/
+*.pyc
