@@ -1056,10 +1056,8 @@ def sidebar(%{sidebar: sidebar, uri_info: uri_info} = assigns) do
     %{is_open: false, view: Map.get(sidebar, :view), selection: nil, data: nil, listeners: []}
   end
 
-  defp machine_action_flash(socket, "enroll_machine", %{"public_key" => pub} = result)
+  defp machine_action_flash(socket, "enroll_machine", %{"public_key" => pub})
        when is_binary(pub) do
-    ssh_user = get_in(result, ["machine", "ssh_user"]) || "root"
-
     blocks = [
       %{
         "title" => "1. Enable the SSH server (if not already running)",
@@ -1072,9 +1070,9 @@ def sidebar(%{sidebar: sidebar, uri_info: uri_info} = assigns) do
           "mkdir -p ~/.ssh && echo '#{String.trim(pub)}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
       },
       %{
-        "title" => "3. Give #{ssh_user} passwordless sudo (required for Incus install)",
+        "title" => "3. (Remote machines) Open the WireGuard port in the provider firewall",
         "code" =>
-          "echo '#{ssh_user} ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/#{ssh_user} && sudo chmod 440 /etc/sudoers.d/#{ssh_user}"
+          "Allow inbound UDP/51820 in the target's cloud-provider firewall (e.g. a Vultr security group) so the gateway can bring up the WireGuard overlay."
       }
     ]
 
@@ -1082,7 +1080,7 @@ def sidebar(%{sidebar: sidebar, uri_info: uri_info} = assigns) do
       show: true,
       title: "Machine enrolled",
       description:
-        "Run these on the target machine so tunneld can connect over SSH and install Incus.",
+        "Run these on the target so tunneld can connect over SSH, discover what is listening, and (for remote machines) bring it onto the WireGuard overlay.",
       body: %{"type" => "code_blocks", "data" => blocks},
       actions: nil,
       type: :default
