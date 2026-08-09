@@ -2,12 +2,12 @@
 
 ![Elixir](https://img.shields.io/badge/elixir-1.18+-purple)
 ![Phoenix](https://img.shields.io/badge/phoenix-1.7+-orange)
-![Nginx](https://img.shields.io/badge/nginx-1.18+-green)
+![Caddy](https://img.shields.io/badge/Caddy-2.x-green)![WireGuard](https://img.shields.io/badge/WireGuard-1.x-blue)
 ![Platform](https://img.shields.io/badge/platform-debian-red)
 
-Software for a dual-NIC ARM64 single-board computer that turns it into a wired edge gateway for a private subnet, plus a fleet manager for Incus containers and VMs running on machines it reaches over SSH. Two capabilities, one relationship: the gateway owns the network, and the instances it manages live on or are reachable from that network.
+Software for a dual-NIC ARM64 single-board computer that turns it into a wired edge gateway for a private subnet. The core idea is **a resource is an address, not a container**: tunneld discovers what is *listening* on any Linux host (`ss -tlnp`) and exposes it — over the LAN or the public internet — via **Caddy** and **WireGuard**. It installs exactly two things on a target: **WireGuard and Caddy.**
 
-Each node is self-contained (no database — just atomic JSON files) and runs on a small ARM64 SBC. Plug devices into the downstream port, manage them from a real-time LiveView dashboard, and provision Incus instances on machines you've enrolled over SSH.
+Each node is self-contained (no database — just atomic JSON files) and runs on a small ARM64 SBC. Plug devices into the downstream port, manage them from a real-time LiveView dashboard, and expose services on machines you've enrolled over SSH — locally, remotely over WireGuard, or publicly on the internet.
 
 > **Prerequisites**
 >
@@ -23,7 +23,7 @@ Each node is self-contained (no database — just atomic JSON files) and runs on
 Tunneld is one box that does two jobs:
 
 1. **It is the network.** It runs DHCP and DNS for your subnet, NATs your upstream connection, and gives every device and service a name (`*.tunneld.lan`). Nothing on the subnet needs configuring — it just works.
-2. **It runs the fleet.** Over SSH it reaches other machines (local boxes on the subnet, or remote VPSes), probes their capabilities, and provisions Incus containers and VMs on them. You get a single LiveView dashboard for every machine and every instance.
+2. **It exposes what's listening.** Over SSH it reaches other machines (local boxes on the subnet, or remote VPSes), enumerates their listening sockets (`ss -tlnp`), and turns any of them into a named resource fronted by Caddy — on the LAN, over a WireGuard overlay, or on the public internet.
 
 Everything is reachable by name from anything on the subnet. No cloud, no accounts, no per-device setup. It works fully offline — local networking, DHCP, and name resolution keep functioning without internet.
 
@@ -31,7 +31,7 @@ Everything is reachable by name from anything on the subnet. No cloud, no accoun
 WAN (upstream) ── Tunneld SBC ── LAN (downstream) ── switch ── devices
                       │
                       └── SSH ──> targets (local machines / remote VMs)
-                                     └── Incus ──> containers & VMs
+                                     └── WireGuard ──> remote machines are local
 ```
 
 No Wi-Fi. No overlay network. No control-plane dependency.
@@ -97,7 +97,7 @@ iptables handles NAT masquerading, packet forwarding, and DNS redirection (port 
 - **Lease revocation** — kick a device off the network by removing its MAC from `dnsmasq.leases` and restarting dnsmasq. MAC-format validated to prevent command injection.
 
 ### Service monitoring
-Watches the underlying systemd units: `dnsmasq`, `dhcpcd`, `nginx`. `check_service/1` runs `systemctl is-active` and auto-starts the unit if inactive. Logs are surfaced via `journalctl -u`.
+Watches the underlying systemd units: `dnsmasq`, `dhcpcd`, `caddy`. `check_service/1` runs `systemctl is-active` and auto-starts the unit if inactive. Logs are surfaced via `journalctl -u`.
 
 ### Auth
 Sessions (in-memory, IP-keyed, TTL'd) + bcrypt admin credentials. Login and signup are in the LiveView dashboard. First-run onboarding is gated by an `onboarded` flag in `auth.json`.
@@ -107,8 +107,8 @@ Sessions (in-memory, IP-keyed, TTL'd) + bcrypt admin credentials. Login and sign
 ### Works offline
 Local networking, DHCP, and name resolution keep functioning without internet. The only internet-dependent features are geolocation and the OTA update checker, both of which are non-blocking and async.
 
-### Fleet management (Machines + Incus)
-Enroll machines (local subnet devices or remote VPSes) that expose a Linux SSH endpoint. Tunneld generates an Ed25519 keypair per machine, displays the public half for you to install on the target, probes capabilities over SSH, and can create, start, stop, list, and delete Incus containers and VMs.
+### Runtime discovery (Machines + Runtime)
+Enroll machines (local subnet devices or remote VPSes) that expose a Linux SSH endpoint. Tunneld generates an Ed25519 keypair per machine, displays the public half for you to install on the target, probes generic capabilities over SSH (OS, kernel, arch, CPU, RAM, detected runtimes), and enumerates listening sockets with `ss -tlnp`. Any listener can be promoted to a named resource.
 
 - **Host specs surfaced per target** from a capability probe: `incus_version`, `os`, `cpu_count`, `memory_mb`, `storage`, `kvm`, `gpu`.
 - **State is queried live over SSH** (`incus list --format json`, capability probe) rather than persisted and reconciled. The target is the source of truth; tunneld persists only the target list and credentials.
@@ -130,16 +130,16 @@ Open a browser terminal into a container or VM over the Phoenix channel `exec:<m
 macvlan only spans a single Layer-2 segment, so a container on a machine reached over the internet cannot appear as a subnet device. For **remote** machines, tunneld instead:
 
 1. Opens a local SSH port-forward (`ssh -f -N -L 127.0.0.1:<local>:<container_ip>:<remote>` with `ExitOnForwardFailure=yes`) from the gateway to the container's port on the remote host.
-2. Registers an nginx resource whose pool points at the forwarded port (`127.0.0.1:<forwarded>`).
+2. (Legacy) registered an nginx resource whose pool pointed at the forwarded port. This SSH-tunnel path was removed in M3 — remote machines are now WireGuard peers, so their services are reached directly over the overlay.
 
 The container service becomes reachable subnet-wide at `http://<name>.tunneld.lan:18000`, indistinguishable from a local service. Exposures are persisted in `expose.json` and **re-opened automatically on gateway startup** so they survive reboots. Local port is allocated from the 20000–30000 range.
 
 ### Resources and reverse proxy
-nginx runs on the gateway and fronts a resource registry (`resources.json`). Each resource has a name and a **pool** of `IP:port` backends, health-checked via TCP probes every 10 seconds.
+Caddy runs on the gateway and fronts a resource registry (`resources.json`). Each resource has a name and a **pool** of `IP:port` backends, health-checked via TCP probes every 10 seconds.
 
-- nginx load-balances across healthy backends; each resource is reachable at `http://<name>.tunneld.lan:18000`.
+- Caddy load-balances across healthy backends; each resource is reachable at `http://<name>.tunneld.lan:18000` (and on a per-resource loopback port for manual/zrok-style exposure).
 - No public-internet exposure, no per-resource auth — access is limited to the subnet.
-- Pool entries are validated as `IP:port` before writing the nginx upstream config (injection-safe).
+- Pool entries are validated as `IP:port` before writing the Caddy upstream config (injection-safe).
 - A resource is a named pointer to already-running backends. For containers, local macvlan and remote expose handle this automatically; **Add Resource** is mainly for non-container services running directly on devices.
 
 ### Quick Expose
@@ -185,9 +185,9 @@ A dashboard-wide obfuscation toggle masks IPs, MACs, and other sensitive values 
 
 - **Wi-Fi bridging and all wireless management.** Wired only.
 - **zrok / OpenZiti integration and public/private shares.**
-- **WireGuard mesh, relay coordinator, and per-peer key exchange.** (A previous WireGuard mesh was removed; supervision tree docstring notes this.)
-- **Local PKI and per-resource certificate issuance.** nginx listens on plain `http://` port 18000; no TLS, no cert generation.
-- **Automatic nginx config generation beyond the resource pool model.** nginx configs are generated only for resources in `resources.json`.
+- **WireGuard mesh / relay coordinator.** (A previous WireGuard mesh was removed; a per-machine WireGuard **overlay** is used instead so remote machines are reached directly.)
+- **Local PKI on the LAN.** Caddy listens on plain `http://` port 18000; no LAN TLS. (Public exposure via a hostname lets Caddy auto-provision TLS.)
+- **Automatic config generation beyond the resource pool model.** Caddy configs are reconciled only for resources in `resources.json`.
 - **CLI quick-share beyond the device-facing API.** Quick Expose is the only share endpoint.
 - **Off-LAN / internet exposure of resources.** Operator-managed, separate from tunneld.
 - **Non-Linux host management via a Linux VM.** Documented as a future direction but not implemented; only `kind: "incus"` is supported.
@@ -200,14 +200,14 @@ A dashboard-wide obfuscation toggle masks IPs, MACs, and other sensitive values 
 | Component | Role |
 |-----------|------|
 | `dnsmasq` | DHCP server + DNS resolver (forwarding + `*.tunneld.lan` named resolution) |
-| `nginx` | Reverse proxy with per-resource upstream load balancing (`0.0.0.0:18000`) |
+| `caddy` | Reverse proxy with per-resource upstream load balancing (`0.0.0.0:18000`) + public plane |
 | `iptables` | NAT, packet forwarding, DNS interception between `:upstream` and `:downstream` |
 | `SSH` | Transport to managed machines (ControlMaster multiplexing, per-machine Ed25519 keys) |
-| `Incus` | Container/VM provider on managed machines |
+| `WireGuard` | Overlay so remote machines are reachable as local IPs |
 | `Elixir/Phoenix` | Application server, LiveView dashboard, GenServer process management |
 
 ### Supervision tree
-One `one_for_one` supervisor (`Tunneld.Supervisor`) starts Telemetry, DNSCluster, PubSub, the Endpoint, and the domain servers: Session, SystemResources, Services, Resources, Devices, Auth, DnsConfig, Updater, Machines, Expose, and Geolocation. In mock mode a fake Incus/SSH target is also started.
+One `one_for_one` supervisor (`Tunneld.Supervisor`) starts Telemetry, DNSCluster, PubSub, the Endpoint, and the domain servers: Session, SystemResources, Services, Resources, Devices, Auth, DnsConfig, Updater, Machines, AgentTokens, Jobs, and Geolocation. In mock mode a fake SSH/Incus target is also started. In mock mode a fake Incus/SSH target is also started.
 
 ### Diagrams
 Detailed architecture diagrams with Mermaid (rendered on GitHub):
@@ -231,7 +231,7 @@ Set by the installer in the `tunneld.service` systemd unit:
 | `PORT` | HTTP port for the dashboard (default `80`) |
 
 ### Dev/test config
-Interface names default to `eth0` / `eth1` in `config/dev.exs` and `config/test.exs`. Mock mode is on by default in both. The LAN domain (`tunneld.lan`) and nginx listen port (`18000`) are module attributes in `Tunneld.Servers.Nginx`.
+Interface names default to `eth0` / `eth1` in `config/dev.exs` and `config/test.exs`. Mock mode is on by default in both. The LAN domain (`tunneld.lan`) and listen port (`18000`) are module attributes in `Tunneld.Caddy`.
 
 ### Persistent state
 All state is JSON files under `TUNNELD_DATA` (prod: `/var/lib/tunneld`, dev: `data/`). Writes are atomic (write to temp file, rename) with `.bak` recovery on read.
@@ -258,7 +258,7 @@ Tunneld is designed for Debian-based SBCs such as Raspberry Pi, NanoPi, or any c
 curl -sSf https://raw.githubusercontent.com/toreanjoel/tunneld-installer/main/install.sh | sudo bash
 ```
 
-The installer handles all dependencies: `dnsmasq`, `dhcpcd`, `nginx`, `iptables`, and `openssl`. It prompts you to select your upstream and downstream interfaces from a list of detected NICs, then writes a systemd unit that passes `UPSTREAM_INTERFACE` and `DOWNSTREAM_INTERFACE` to the app. It also wires dnsmasq to resolve `*.tunneld.lan` names to the gateway so named resources are reachable across the subnet. No Wi-Fi, Zrok, or VPN setup steps.
+The installer handles all dependencies: `dnsmasq`, `dhcpcd`, `caddy`, `iptables`, and `openssl`. It prompts you to select your upstream and downstream interfaces from a list of detected NICs, then writes a systemd unit that passes `UPSTREAM_INTERFACE` and `DOWNSTREAM_INTERFACE` to the app. It also wires dnsmasq to resolve `*.tunneld.lan` names to the gateway so named resources are reachable across the subnet. No Wi-Fi, Zrok, or VPN setup steps.
 
 > **Note**: The installer lives in a separate repo ([tunneld-installer](https://github.com/toreanjoel/tunneld-installer)) and has been updated alongside this rework.
 
@@ -275,12 +275,12 @@ lib/
     geolocation.ex          # IP geolocation GenServer with PubSub broadcasts
     iptables.ex             # iptables firewall rule management
     persistence.ex          # Atomic JSON file persistence with .bak recovery
-    machines.ex             # Machine registry + SSH-backed Incus control plane
+    machines.ex             # Machine registry + SSH-backed control plane
     machines/
       store.ex              # machines.json persistence
       ssh.ex                # SSH transport (Ed25519 keys, ControlMaster)
-      ssh/mock.ex           # Simulated Incus target for dev
-      provider.ex           # Incus provider dispatch (probe/list/create/start/stop/delete)
+      ssh/mock.ex           # Simulated SSH target for dev
+      runtime.ex            # Runtime-agnostic listeners (ss -tlnp) + generic probe
       exec.ex               # Interactive incus exec over SSH, streamed to browser
       expose.ex             # Reverse-SSH expose path for remote containers
     geo_data/
@@ -291,10 +291,9 @@ lib/
     servers/
       session.ex            # In-memory IP-keyed auth sessions
       auth.ex               # bcrypt admin credentials + onboarding flag
-      resources.ex          # Resource registry (CRUD, nginx config, pool health every 10s)
+      resources.ex          # Resource registry (CRUD, Caddy config, pool health every 10s)
       devices.ex            # DHCP lease monitoring, tagging, and revocation
-      services.ex           # systemd service monitoring (dnsmasq, dhcpcd, nginx)
-      nginx.ex              # Nginx reverse proxy config generation (per-resource server block)
+      services.ex           # systemd service monitoring (dnsmasq, dhcpcd, caddy)
       dns_config.ex         # DNS upstream server configuration (user-selectable)
       updater.ex            # OTA update checking (polls GitHub for new releases)
       system_resources.ex   # CPU, memory, disk, and CPU temperature monitoring
@@ -331,7 +330,7 @@ Run Tunneld locally with mocked hardware interactions:
 
 Mock data is enabled by default in dev via `config/dev.exs`. Visit `localhost:80` in your browser.
 
-In mock mode (`MOCK_DATA=true`) no system commands are executed — `systemctl`, `iptables`, sysfs reads, and SSH are all stubbed. Ethernet link state comes from `Tunneld.Servers.FakeData.ethernet/0`, DHCP leases from `FakeData.devices/0`, and a fake Incus target is simulated via `Tunneld.Machines.SSH.Mock` so the full enroll → probe → provision → exec loop works on a laptop. This lets you develop the full application on macOS, Linux, or any platform with Elixir installed.
+In mock mode (`MOCK_DATA=true`) no system commands are executed — `systemctl`, `iptables`, sysfs reads, and SSH are all stubbed. Ethernet link state comes from `Tunneld.Servers.FakeData.ethernet/0`, DHCP leases from `FakeData.devices/0`, and a fake SSH target is simulated via `Tunneld.Machines.SSH.Mock` so the full enroll → probe → list loop works on a laptop. This lets you develop the full application on macOS, Linux, or any platform with Elixir installed.
 
 ### Running tests
 
@@ -339,7 +338,7 @@ In mock mode (`MOCK_DATA=true`) no system commands are executed — `systemctl`,
 mix test
 ```
 
-Tests cover the NetLink helper, machine enrollment, Incus provider/provisioning lifecycle, and interactive exec. Tests that modify Application env use `async: false`.
+Tests cover the NetLink helper, machine enrollment, Runtime listeners, Overlay, Egress, Reconcile/Disenroll, and the agent API. Tests that modify Application env use `async: false`.
 
 ### Version management
 
