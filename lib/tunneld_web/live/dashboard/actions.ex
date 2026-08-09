@@ -84,6 +84,20 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       "enroll_machine" ->
         Tunneld.Machines.enroll(data)
 
+      "add_pool_member" ->
+        id = data["id"]
+        backend = data["backend"]
+
+        case Tunneld.Servers.Resources.fetch_shares() |> Enum.find(&(&1.id == id)) do
+          nil ->
+            {:error, "resource not found"}
+
+          resource ->
+            pool = (resource.pool || []) ++ [backend]
+            Tunneld.Servers.Resources.update_share(%{"id" => id, "pool" => pool}, :resource)
+            {:ok, %{id: id, pool: pool}}
+        end
+
       # Device restart
       "restart_device" ->
         if @mock do

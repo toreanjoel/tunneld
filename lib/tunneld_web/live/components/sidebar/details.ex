@@ -213,7 +213,16 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
           <%= if @data.kind == "host" and @has_data do %>
             <div class="mt-3 border-t border-gray-700 pt-3">
-              <h2 class="text-sm font-semibold mb-2">Pool Backends</h2>
+              <div class="flex items-center justify-between mb-2">
+                <h2 class="text-sm font-semibold">Pool Backends</h2>
+                <button
+                  phx-click="add_pool_member_modal"
+                  phx-value-id={@data.id}
+                  class="ghost-btn !px-2 !py-0.5 text-[10px]"
+                >
+                  + Add backend
+                </button>
+              </div>
               <div class="bg-surface rounded-lg p-2 space-y-1.5">
                 <%= if Enum.empty?(pool_details) do %>
                   <div class="text-xs text-gray-400">No backends configured</div>

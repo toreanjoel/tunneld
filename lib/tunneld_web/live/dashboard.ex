@@ -550,6 +550,36 @@ defmodule TunneldWeb.Live.Dashboard do
 
 
 
+  def handle_event("add_pool_member_modal", %{"id" => id}, socket) do
+    modal_data = %{
+      show: true,
+      title: "Add Backend",
+      description: "Add a backend (IP:PORT) to this resource's pool.",
+      body: %{
+        "type" => "schema",
+        "data" => %{
+          "title" => "Add Backend",
+          "type" => "object",
+          "properties" => %{
+            "id" => %{"type" => "string", "ui:widget" => "hidden", "readOnly" => true, "default" => id},
+            "backend" => %{
+              "type" => "string",
+              "pattern" => "^[^\s:]+:[0-9]{1,5}$",
+              "description" => "Backend address (IP:PORT), e.g. 10.0.0.5:3000"
+            }
+          },
+          "required" => ["id", "backend"]
+        },
+        "default_values" => %{"id" => id},
+        "action" => "add_pool_member"
+      },
+      actions: nil,
+      type: :default
+    }
+
+    {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal_data))}
+  end
+
   def handle_event("make_listener_resource", %{"machine_id" => id, "addr" => addr, "port" => port, "proc" => proc} = _params, socket) do
     name = sanitize_resource_name("#{proc}-#{port}")
 
