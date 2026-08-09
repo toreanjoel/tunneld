@@ -237,7 +237,10 @@ defmodule Tunneld.Overlay do
 
     # System.cmd has no :input option; pipe the private key to `wg pubkey`
     # via a temp file so the public half can be derived.
-    tmp = Path.join(System.tmp_dir!(), "wg_key_#{System.unique_integer([:positive])}")
+    # Unique per call (unique_integer can collide across two rapid calls in the
+    # same process, which would make `wg pubkey` read the wrong/removed file).
+    nonce = :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
+    tmp = Path.join(System.tmp_dir!(), "wg_key_#{System.unique_integer([:positive])}_#{nonce}")
     File.write!(tmp, priv <> "\n")
     File.chmod!(tmp, 0o600)
     {pub, 0} = System.cmd("sh", ["-c", "wg pubkey < #{tmp}"], stderr_to_stdout: true)
