@@ -23,8 +23,6 @@ defmodule Tunneld.Reconcile do
   alias Tunneld.Machines.SSH
   alias Tunneld.Overlay
 
-  defp mock?, do: Application.get_env(:tunneld, :mock_data, false) in [true, "true"]
-
   @doc """
   Reconcile a machine against desired state. `opts` may include
   `repair: true` to apply fixes (idempotent) or `repair: false` (default) to
