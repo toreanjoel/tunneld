@@ -182,7 +182,11 @@ defmodule TunneldWeb.Live.Components.Devices do
                 <span class="text-[10px] uppercase tracking-wide text-text-tertiary">Egress</span>
                 <form phx-change="set_device_egress" phx-target={@myself}>
                   <input type="hidden" name="ip" value={device.ip} />
-                  <select name="egress" class="tunl-input !py-0.5 !px-1 text-[10px] !w-auto">
+                  <select
+                    name="egress"
+                    title="Route this device's traffic through an exit machine"
+                    class="appearance-none cursor-pointer px-1.5 py-0.5 text-[10px] rounded border flex items-center gap-1 shrink-0 bg-surface-2 text-text-secondary border-border"
+                  >
                     <option value="local">Local</option>
                     <%= for {mid, mname} <- @egress_machines do %>
                       <option value={mid}><%= mname %></option>
