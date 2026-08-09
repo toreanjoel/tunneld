@@ -39,6 +39,7 @@ defmodule TunneldWeb.Live.Components.Devices do
       |> assign_new(:obfuscated, fn -> false end)
       |> assign(:obfuscated, obfuscated)
       |> assign(:probe_cache, probe_cache)
+      |> assign(:egress_machines, Map.get(assigns, :egress_machines, []))
 
     new_loading =
       case devices do

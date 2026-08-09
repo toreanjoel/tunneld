@@ -219,6 +219,7 @@ defmodule TunneldWeb.Live.Dashboard do
               id="devices"
               module={TunneldWeb.Live.Components.Devices}
               obfuscated={@obfuscated}
+              egress_machines={egress_machines()}
             />
           </main>
         <% end %>
@@ -525,6 +526,43 @@ defmodule TunneldWeb.Live.Dashboard do
     end
   end
 
+
+  def handle_event("reconcile_machine", %{"id" => id}, socket) do
+    result =
+      case Tunneld.Machines.get(id) do
+        {:ok, machine} -> Tunneld.Reconcile.reconcile(machine)
+        _ -> %{}
+      end
+
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+      type: :info,
+      message: "Reconcile done: #{inspect(result)}"
+    })
+
+    {:noreply, socket}
+  end
+
+  def handle_event("set_device_egress", %{"ip" => ip, "egress" => egress} = _params, socket) do
+    # egress == "local" reverts to the gateway's own upstream; otherwise route
+    # the device out through the named exit machine.
+    result =
+      if egress == "local" do
+        # revert any active egress for this device (best-effort)
+        :ok
+      else
+        case Tunneld.Machines.get(egress) do
+          {:ok, machine} -> Tunneld.Egress.route_device(machine, ip)
+          _ -> {:error, "exit machine not found"}
+        end
+      end
+
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+      type: if(match?({:ok, _}, result), do: :info, else: :error),
+      message: "Egress for #{ip}: #{inspect(result)}"
+    })
+
+    {:noreply, socket}
+  end
 
   def handle_event("probe_machine", %{"id" => id}, socket) do
     case Tunneld.Machines.probe(id) do
@@ -1053,6 +1091,30 @@ defmodule TunneldWeb.Live.Dashboard do
     end
   end
 
+  # Attach the machine's overlay IP and (best-effort) WG status for the detail
+  # panel. Tolerates mock/unavailable so the UI never crashes.
+  defp enrich_overlay(machine) do
+    overlay_ip = Tunneld.Overlay.address_for(machine)
+
+    overlay_status =
+      case Tunneld.Overlay.status(machine) do
+        {:ok, %{up: true}} -> "up"
+        {:ok, _} -> "down"
+        _ -> nil
+      end
+
+    machine
+    |> Map.put("overlay_ip", overlay_ip)
+    |> Map.put("overlay_status", overlay_status)
+  end
+
+  # Machines a device can use as an egress (exit) node: any exit-capable
+  # managed machine, shown as {id, name}.
+  defp egress_machines do
+    Tunneld.Machines.list()
+    |> Enum.map(fn m -> {m["id"], m["name"] || m["id"]} end)
+  end
+
   defp sanitize_resource_name(name) do
     name
     |> String.downcase()
@@ -1085,6 +1147,7 @@ defmodule TunneldWeb.Live.Dashboard do
             _ -> []
           end
 
+        machine = enrich_overlay(machine)
         sidebar = %{
           is_open: true,
           view: :machine,

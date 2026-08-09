@@ -276,6 +276,16 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           </div>
 
           <div
+            phx-click="reconcile_machine"
+            phx-value-id={mget(@machine, "id")}
+            phx-click-loading="opacity-50 cursor-wait"
+            class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
+          >
+            <.icon name="hero-arrow-path" class="h-5 w-5" />
+            <div class="truncate text-xs">Reconcile</div>
+          </div>
+
+          <div
             phx-click="view_ssh_key"
             phx-value-id={mget(@machine, "id")}
             class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
@@ -338,6 +348,18 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <%= if mget(@machine, "last_seen") do %>
             <div class="text-sm truncate text-gray-400">
               last seen <%= String.slice(mget(@machine, "last_seen"), 0, 19) %>
+            </div>
+          <% end %>
+          <%= if mget(@machine, "overlay_ip") do %>
+            <div class="text-sm truncate">
+              <span class="font-bold">Overlay:</span>
+              <span class="ml-1 font-mono text-xs text-accent"><%= mget(@machine, "overlay_ip") %></span>
+            </div>
+          <% end %>
+          <%= if mget(@machine, "overlay_status") do %>
+            <div class="text-sm truncate">
+              <span class="font-bold">WireGuard:</span>
+              <span class="ml-1"><%= mget(@machine, "overlay_status") %></span>
             </div>
           <% end %>
         </div>
