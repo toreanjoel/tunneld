@@ -69,6 +69,11 @@ defmodule Tunneld.Egress do
     end
   end
 
+  @doc "Whether a machine has been made exit-capable (has a table allocated)."
+  def exit_capable?(machine) do
+    Map.has_key?(read_tables(), machine["id"])
+  end
+
   @doc "Get the routing table id allocated to an exit machine (stable)."
   def table_for(machine) do
     tables = read_tables()

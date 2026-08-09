@@ -207,9 +207,9 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               <span class="ml-1 font-mono text-xs"><%= @data[:lan_url] %></span>
             </div>
             <div :if={@data[:loopback_port]} class="text-sm truncate">
-              <span class="font-bold">Loopback:</span>
-              <span class="ml-1 font-mono text-xs">127.0.0.1:<%= @data[:loopback_port] %></span>
-              <span class="ml-1 text-xs text-gray-400">(manual exposure via zrok/cloudflared)</span>
+              <span class="font-bold">Manual exposure:</span>
+              <span class="ml-1 font-mono text-xs"><%= Tunneld.Caddy.gateway_ip() || "127.0.0.1" %>:<%= @data[:loopback_port] %></span>
+              <span class="ml-1 text-xs text-gray-400">(point zrok/cloudflared here from any subnet machine)</span>
             </div>
           </div>
 
@@ -275,16 +275,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
         <div class="grid grid-cols-2 gap-1.5 my-2 items-stretch">
           <div
-            phx-click="probe_machine"
-            phx-value-id={mget(@machine, "id")}
-            phx-click-loading="opacity-50 cursor-wait"
-            class="flex items-center justify-center gap-1.5 w-full h-9 bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
-          >
-            <.icon name="hero-arrow-path" class="h-4 w-4 shrink-0" />
-            <div class="truncate text-xs">Probe</div>
-          </div>
-
-          <div
             phx-click="reconcile_machine"
             phx-value-id={mget(@machine, "id")}
             phx-click-loading="opacity-50 cursor-wait"
@@ -295,20 +285,10 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           </div>
 
           <div
-            phx-click="install_wireguard"
-            phx-value-id={mget(@machine, "id")}
-            phx-click-loading="opacity-50 cursor-wait"
-            class="flex items-center justify-center gap-1.5 w-full h-9 bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
-          >
-            <.icon name="hero-link" class="h-4 w-4 shrink-0" />
-            <div class="truncate text-xs">WireGuard</div>
-          </div>
-
-          <div
             phx-click="make_exit_node"
             phx-value-id={mget(@machine, "id")}
             phx-click-loading="opacity-50 cursor-wait"
-            class="flex items-center justify-center gap-1.5 w-full h-9 bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
+            class={"flex items-center justify-center gap-1.5 w-full h-9 p-2 cursor-pointer rounded-md #{if @machine["exit_capable"], do: "bg-accent/20 text-accent hover:bg-accent/30", else: "bg-surface hover:bg-surface-2"}"}
           >
             <.icon name="hero-arrow-up-tray" class="h-4 w-4 shrink-0" />
             <div class="truncate text-xs">Exit Node</div>
@@ -367,6 +347,16 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               <span class="capitalize"><%= mget(@machine, "overlay_status") %></span>
             </div>
           <% end %>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-text-tertiary">Exit</span>
+            <span class="flex items-center gap-1.5 capitalize">
+              <span class={"w-[10px] h-[10px] rounded-full inline-block #{if mget(@machine, "exit_capable"), do: "bg-emerald-500", else: "bg-gray-500"}"}></span>
+              <%= if mget(@machine, "exit_capable"), do: "capable", else: "not set" %>
+            </span>
+          </div>
+          <div class="text-[11px] text-text-tertiary leading-snug">
+            Route specific devices through this exit from the <b>Devices</b> list.
+          </div>
           <%= if mget(@machine, "last_seen") do %>
             <div class="flex items-center justify-between text-sm">
               <span class="text-text-tertiary">Last seen</span>

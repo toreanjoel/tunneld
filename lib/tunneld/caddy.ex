@@ -48,6 +48,15 @@ defmodule Tunneld.Caddy do
 
   defp mock?, do: Application.get_env(:tunneld, :mock_data, false) in [true, "true"]
 
+  @doc "The gateway's LAN IP (the downstream interface address)."
+  def gateway_ip do
+    case Application.get_env(:tunneld, :network, []) do
+      kw when is_list(kw) -> Keyword.get(kw, :gateway)
+      map when is_map(map) -> Map.get(map, :gateway) || Map.get(map, "gateway")
+      _ -> nil
+    end
+  end
+
   @doc "The LAN domain used for resource DNS names."
   def lan_domain, do: @lan_domain
 
@@ -186,8 +195,14 @@ defmodule Tunneld.Caddy do
   end
 
   defp loop_server(r) do
+    # Bind to the gateway's LAN IP (not just loopback) so the no-host-matcher
+    # listener is reachable from any machine on the subnet — e.g. a zrok /
+    # cloudflared instance running on another box can share
+    # http://<gateway-ip>:<port> without tunneld knowing anything about it.
+    bind = gateway_ip() || "127.0.0.1"
+
     %{
-      "listen" => ["127.0.0.1:#{r["loopback_port"]}"],
+      "listen" => ["#{bind}:#{r["loopback_port"]}"],
       "routes" => [%{"handle" => [reverse_proxy(r["pool"])]}],
       "automatic_https" => %{"disable" => true}
     }

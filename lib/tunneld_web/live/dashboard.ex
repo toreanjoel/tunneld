@@ -401,26 +401,18 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, assign(socket, :enroll_wizard_open, true)}
   end
 
-  def handle_event("install_wireguard", %{"id" => id}, socket) do
-    result =
-      case Tunneld.Machines.get(id) do
-        {:ok, machine} -> Tunneld.Overlay.ensure_peer(machine)
-        _ -> {:error, "machine not found"}
-      end
-
-    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-      type: if(match?({:ok, _}, result), do: :info, else: :error),
-      message: "WireGuard: #{inspect(result)}"
-    })
-
-    {:noreply, socket}
-  end
-
   def handle_event("make_exit_node", %{"id" => id}, socket) do
     result =
       case Tunneld.Machines.get(id) do
-        {:ok, machine} -> Tunneld.Egress.ensure_exit_capable(machine)
-        _ -> {:error, "machine not found"}
+        {:ok, machine} ->
+          if Tunneld.Egress.exit_capable?(machine) do
+            {:ok, "already exit-capable"}
+          else
+            Tunneld.Egress.ensure_exit_capable(machine)
+          end
+
+        _ ->
+          {:error, "machine not found"}
       end
 
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
@@ -428,14 +420,22 @@ defmodule TunneldWeb.Live.Dashboard do
       message: "Exit node: #{inspect(result)}"
     })
 
+    send(self(), {:machines_changed})
     {:noreply, socket}
   end
 
   def handle_event("reconcile_machine", %{"id" => id}, socket) do
     result =
       case Tunneld.Machines.get(id) do
-        {:ok, machine} -> Tunneld.Reconcile.reconcile(machine)
-        _ -> %{}
+        {:ok, machine} ->
+          # One "sync" action: ensure the overlay is up, probe, then check drift.
+          overlay = Tunneld.Overlay.ensure_peer(machine)
+          probe = Tunneld.Machines.probe(id)
+          reconcile = Tunneld.Reconcile.reconcile(machine, repair: true)
+          %{overlay: overlay, probe: probe, reconcile: reconcile}
+
+        _ ->
+          %{error: "machine not found"}
       end
 
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
@@ -443,18 +443,8 @@ defmodule TunneldWeb.Live.Dashboard do
       message: "Reconcile done: #{inspect(result)}"
     })
 
+    send(self(), {:machines_changed})
     {:noreply, socket}
-  end
-
-  def handle_event("probe_machine", %{"id" => id}, socket) do
-    case Tunneld.Machines.probe(id) do
-      {:ok, _} ->
-        send(self(), {:machines_changed})
-        {:noreply, put_flash(socket, :info, "Probe complete")}
-
-      {:error, reason} ->
-        {:noreply, put_flash(socket, :error, "Probe failed: #{probe_error(reason)}")}
-    end
   end
 
   def handle_event("remove_machine", %{"id" => id}, socket) do
@@ -1009,6 +999,7 @@ def sidebar(%{sidebar: sidebar, uri_info: uri_info} = assigns) do
     machine
     |> Map.put("overlay_ip", overlay_ip)
     |> Map.put("overlay_status", overlay_status)
+    |> Map.put("exit_capable", Tunneld.Egress.exit_capable?(machine))
   end
 
   # Machines a device can use as an egress (exit) node: any exit-capable
@@ -1184,24 +1175,4 @@ def sidebar(%{sidebar: sidebar, uri_info: uri_info} = assigns) do
 
 
 
-  defp probe_error({:ssh_failed, 255, out}) do
-    msg =
-      out
-      |> String.split("\n")
-      |> Enum.find(
-        &(String.contains?(&1, "Permission denied") or String.contains?(&1, "refused"))
-      )
-      |> case do
-        nil -> "SSH connection failed. Make sure the public key is installed on the target."
-        line -> "SSH connection failed: #{String.trim(line)}"
-      end
-
-    msg
-  end
-
-  defp probe_error({:ssh_failed, _code, _out}),
-    do:
-      "SSH connection failed. Make sure the target is reachable and the public key is installed."
-
-  defp probe_error(reason), do: inspect(reason)
 end

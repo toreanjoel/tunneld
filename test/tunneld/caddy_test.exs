@@ -57,7 +57,7 @@ defmodule Tunneld.CaddyTest do
     servers = config["apps"]["http"]["servers"]
 
     loop = servers["tunneld_r1_loop"]
-    assert loop["listen"] == ["127.0.0.1:20001"]
+    assert loop["listen"] == ["#{Caddy.gateway_ip()}:20001"]
     assert loop["automatic_https"] == %{"disable" => true}
     # No host matcher: the route has no "match" key
     [route] = loop["routes"]
@@ -75,7 +75,7 @@ defmodule Tunneld.CaddyTest do
 
     config = decode_mock()
     assert config["apps"]["http"]["servers"]["tunneld_#{r.id}_loop"]["listen"] ==
-             ["127.0.0.1:#{r.loopback_port}"]
+             ["#{Caddy.gateway_ip()}:#{r.loopback_port}"]
   end
 
   test "removing a resource reconciles the loopback server away" do
