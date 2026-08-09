@@ -23,13 +23,13 @@ defmodule TunneldWeb.Live.Setup do
     },
     %{
       icon: "hero-server-stack",
-      title: "Fleet management",
-      body: "Enroll machines (on the subnet or over the internet) and provision Incus containers or VMs over SSH, right from the dashboard."
+      title: "Machine discovery",
+      body: "Enroll machines (on the subnet or over the internet) and discover what is listening on them with ss -tlnp — runtime-agnostic (Incus, Docker, systemd, or a bare binary)."
     },
     %{
       icon: "hero-link",
       title: "Expose services",
-      body: "Make container services reachable across the subnet at a tunneld.lan name — locally via macvlan, remotely via reverse SSH tunnels."
+      body: "Promote any listener to a named resource on the LAN at <name>.tunneld.lan — and reach remote machines over a WireGuard overlay as if they were local."
     },
     %{
       icon: "hero-cpu-chip",
@@ -73,6 +73,43 @@ defmodule TunneldWeb.Live.Setup do
     """
   end
 
+  defp render_step(%{step: :requirements} = assigns) do
+    ~H"""
+    <div class="space-y-4">
+      <div class="bg-surface rounded-lg p-4 text-sm text-text-secondary">
+        To connect remote machines over the WireGuard overlay and expose services
+        publicly, two network prerequisites must be met on each target:
+      </div>
+      <div class="bg-surface border border-border rounded-lg p-4">
+        <ul class="text-sm text-text-secondary space-y-3">
+          <li>
+            <span class="font-medium text-text-primary">WireGuard port (default 51820/UDP)</span>
+            <div class="text-xs text-text-tertiary mt-0.5">
+              Must be allowed <b>inbound</b> in the target's <b>provider firewall</b> (e.g. a Vultr security
+              group). This is separate from the OS firewall and cannot be changed over SSH.
+            </div>
+          </li>
+          <li>
+            <span class="font-medium text-text-primary">Exposed TCP port (for public exposure)</span>
+            <div class="text-xs text-text-tertiary mt-0.5">
+              Open the service port inbound in the provider firewall for internet reachability.
+            </div>
+          </li>
+          <li>
+            <span class="font-medium text-text-primary">SSH key</span>
+            <div class="text-xs text-text-tertiary mt-0.5">
+              After enrollment, install tunneld's public key into the target's ~/.ssh/authorized_keys.
+            </div>
+          </li>
+        </ul>
+      </div>
+      <button phx-click="finish_setup" class="w-full bg-accent hover:bg-accent-light p-2 rounded-md text-white text-sm">
+        Got it — go to dashboard
+      </button>
+    </div>
+    """
+  end
+
   defp render_step(%{step: :welcome} = assigns) do
     ~H"""
     <div class="space-y-4">
@@ -95,12 +132,17 @@ defmodule TunneldWeb.Live.Setup do
       </div>
 
       <div class="flex flex-col gap-2 pt-4">
-        <button phx-click="finish_setup" class="w-full p-3 rounded-lg bg-accent text-sm font-medium hover:bg-accent-light transition">
-          Go to dashboard
+        <button phx-click="next_step" class="w-full p-3 rounded-lg bg-accent text-sm font-medium hover:bg-accent-light transition">
+          Next: connection requirements →
         </button>
       </div>
     </div>
     """
+  end
+
+  @impl true
+  def handle_event("next_step", _, socket) do
+    {:noreply, assign(socket, step: :requirements)}
   end
 
   @impl true
@@ -134,4 +176,5 @@ defmodule TunneldWeb.Live.Setup do
   end
 
   defp step_description(:welcome), do: "Welcome"
+  defp step_description(:requirements), do: "Before you connect machines"
 end
