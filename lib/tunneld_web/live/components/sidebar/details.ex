@@ -282,6 +282,26 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           </div>
 
           <div
+            phx-click="install_wireguard"
+            phx-value-id={mget(@machine, "id")}
+            phx-click-loading="opacity-50 cursor-wait"
+            class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
+          >
+            <.icon name="hero-link" class="h-5 w-5" />
+            <div class="truncate text-xs">Install WireGuard</div>
+          </div>
+
+          <div
+            phx-click="make_exit_node"
+            phx-value-id={mget(@machine, "id")}
+            phx-click-loading="opacity-50 cursor-wait"
+            class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
+          >
+            <.icon name="hero-arrow-up-tray" class="h-5 w-5" />
+            <div class="truncate text-xs">Make Exit Node</div>
+          </div>
+
+          <div
             phx-click="view_ssh_key"
             phx-value-id={mget(@machine, "id")}
             class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"

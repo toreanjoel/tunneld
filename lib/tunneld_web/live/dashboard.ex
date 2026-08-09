@@ -409,6 +409,36 @@ defmodule TunneldWeb.Live.Dashboard do
 
 
 
+  def handle_event("install_wireguard", %{"id" => id}, socket) do
+    result =
+      case Tunneld.Machines.get(id) do
+        {:ok, machine} -> Tunneld.Overlay.ensure_peer(machine)
+        _ -> {:error, "machine not found"}
+      end
+
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+      type: if(match?({:ok, _}, result), do: :info, else: :error),
+      message: "WireGuard: #{inspect(result)}"
+    })
+
+    {:noreply, socket}
+  end
+
+  def handle_event("make_exit_node", %{"id" => id}, socket) do
+    result =
+      case Tunneld.Machines.get(id) do
+        {:ok, machine} -> Tunneld.Egress.ensure_exit_capable(machine)
+        _ -> {:error, "machine not found"}
+      end
+
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+      type: if(match?({:ok, _}, result), do: :info, else: :error),
+      message: "Exit node: #{inspect(result)}"
+    })
+
+    {:noreply, socket}
+  end
+
   def handle_event("reconcile_machine", %{"id" => id}, socket) do
     result =
       case Tunneld.Machines.get(id) do
