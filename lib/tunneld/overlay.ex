@@ -29,8 +29,6 @@ defmodule Tunneld.Overlay do
   machine's own address so the flow runs on a laptop.
   """
 
-  require Logger
-
   alias Tunneld.Machines.SSH
 
   @mock Application.compile_env(:tunneld, :mock_data, false)
@@ -105,7 +103,6 @@ defmodule Tunneld.Overlay do
   defp real_ensure_peer(machine) do
     id = machine["id"]
     iface = iface_name(id)
-
     with {:ok, target_pub} <- exchange_keys(machine),
          :ok <- install_target(machine, target_pub, iface),
          :ok <- configure_gateway(machine, target_pub, iface) do
@@ -323,7 +320,10 @@ defmodule Tunneld.Overlay do
   defp write_remote(machine, path, content) do
     # Write a file on the target via a heredoc over SSH (no SCP dependency).
     cmd = "cat > #{path} <<'TUNNELD_EOF'\n#{content}\nTUNNELD_EOF\nchmod 600 #{path}"
-    run(machine, cmd)
+    case run(machine, cmd) do
+      {:ok, _} -> :ok
+      err -> err
+    end
   end
 
   defp write_gateway(path, content) do
