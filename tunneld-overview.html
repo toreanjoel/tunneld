@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tunneld — Runtime-Agnostic Gateway · Full Overview</title>
+<style>
+  :root{--bg:#0b0d12;--panel:#12151d;--panel2:#171b25;--line:#242a38;
+    --fg:#e8ecf4;--muted:#9aa3b5;--accent:#00e676;--accent2:#38bdf8;
+    --warn:#fbbf24;--red:#f87171;--code:#0f1420;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{background:var(--bg);color:var(--fg);font-family:'Segoe UI',system-ui,sans-serif;overflow:hidden}
+  .deck{width:100vw;height:100vh;position:relative}
+  .slide{position:absolute;inset:0;display:none;flex-direction:column;padding:4.5vh 5vw;overflow-y:auto}
+  .slide.active{display:flex}
+  .inner{max-width:1200px;margin:0 auto;width:100%}
+  h1{font-size:clamp(1.7rem,4.2vw,3rem);font-weight:700;letter-spacing:-.02em;line-height:1.1}
+  h2{font-size:clamp(1.3rem,3vw,2.1rem);font-weight:600;margin-bottom:.5em;color:var(--accent)}
+  h3{font-size:1.05rem;font-weight:600;margin:1em 0 .4em}
+  p{font-size:clamp(.92rem,1.5vw,1.12rem);line-height:1.55;margin-bottom:.7em}
+  .muted{color:var(--muted)} .small{font-size:.84rem} .accent{color:var(--accent)} .blue{color:var(--accent2)} .warn{color:var(--warn)} .red{color:var(--red)}
+  code,pre{font-family:'JetBrains Mono',ui-monospace,monospace}
+  code{background:var(--code);border:1px solid var(--line);padding:.1em .4em;border-radius:5px;font-size:.85em}
+  pre{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:.9em 1.1em;overflow-x:auto;font-size:.8rem;line-height:1.5;margin:.5em 0}
+  .grid{display:grid;gap:1em} .g2{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+  .g3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))} .g4{grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:1em}
+  .card h4{font-size:.92rem;margin-bottom:.35em}
+  .lbl{display:inline-block;font-size:.66rem;text-transform:uppercase;letter-spacing:.08em;padding:.15em .6em;border-radius:20px;margin-bottom:.45em;font-weight:600}
+  .lbl.g{background:rgba(0,230,118,.12);color:var(--accent)} .lbl.b{background:rgba(56,189,248,.12);color:var(--accent2)}
+  .lbl.y{background:rgba(251,191,36,.12);color:var(--warn)} .lbl.r{background:rgba(248,113,113,.12);color:var(--red)} .lbl.m{background:rgba(148,163,184,.15);color:var(--muted)}
+  ul{margin:.2em 0 .7em 1.1em} li{margin:.3em 0;line-height:1.5}
+  table{width:100%;border-collapse:collapse;font-size:.84rem;margin:.5em 0}
+  th,td{text-align:left;padding:.45em .6em;border-bottom:1px solid var(--line)}
+  th{color:var(--accent);text-transform:uppercase;font-size:.7rem;letter-spacing:.05em}
+  .flow{display:flex;flex-wrap:wrap;gap:.5em;align-items:center}
+  .flow .step{background:var(--panel2);border:1px solid var(--line);padding:.4em .85em;border-radius:8px;font-size:.78rem}
+  .flow .arrow{color:var(--accent);font-weight:700}
+  .ok{color:var(--accent);font-weight:700} .x{color:var(--red);font-weight:700}
+  .quote{border-left:3px solid var(--accent);padding:.4em 1em;background:var(--panel);border-radius:0 8px 8px 0;font-style:italic;margin:.8em 0}
+  .nav{position:fixed;bottom:2vh;left:50%;transform:translateX(-50%);display:flex;gap:1em;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:30px;padding:.45em 1.1em;z-index:50;font-size:.78rem}
+  .nav button{background:var(--panel2);color:var(--fg);border:1px solid var(--line);border-radius:20px;padding:.3em .95em;cursor:pointer;font-size:.78rem}
+  .nav button:hover{border-color:var(--accent);color:var(--accent)}
+  .dots{display:flex;gap:.35em} .dot{width:8px;height:8px;border-radius:50%;background:var(--line);cursor:pointer} .dot.on{background:var(--accent)}
+  .progress{position:fixed;top:0;left:0;height:3px;background:var(--accent);z-index:60;transition:width .2s}
+  .diagram{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:1em;font-family:ui-monospace,monospace;font-size:.78rem;line-height:1.5;white-space:pre;overflow-x:auto}
+  .kbd{background:var(--panel2);border:1px solid var(--line);border-radius:4px;padding:.1em .4em;font-size:.75em}
+</style>
+</head>
+<body>
+<div class="progress" id="progress"></div>
+<div class="deck" id="deck">
+
+<!-- 1 TITLE -->
+<section class="slide active"><div class="inner">
+  <div style="margin-bottom:1.5em"><span class="tag" style="font-size:.72rem;background:var(--panel2);border:1px solid var(--line);padding:.2em .7em;border-radius:6px;color:var(--muted)">feature/rationalizing-core</span></div>
+  <h1>Tunneld — Runtime-Agnostic Gateway</h1>
+  <p class="sub" style="font-size:1.05rem;color:var(--muted)">A complete overview: what tunneld is, how it works, and how to use it. Built after the M1–M8 refactor.</p>
+  <div class="quote" style="margin-top:1.5em">"A resource is an address, not a container. Tunneld installs exactly two things, ever: <span class="accent">WireGuard</span> and <span class="accent">Caddy</span>. WireGuard makes remote machines local."</div>
+  <div class="g4 grid" style="margin-top:1.8em">
+    <div class="card"><div class="lbl g">Edge gateway</div><h4>dual-NIC ARM64 SBC</h4><p class="small muted">upstream + downstream, DHCP/DNS, iptables NAT</p></div>
+    <div class="card"><div class="lbl b">Discovery</div><h4>what is listening?</h4><p class="small muted">ss -tlnp, runtime-agnostic</p></div>
+    <div class="card"><div class="lbl y">Overlay</div><h4>WireGuard</h4><p class="small muted">remote machines are local</p></div>
+    <div class="card"><div class="lbl m">Proxy</div><h4>Caddy</h4><p class="small muted">LAN + loopback + public planes</p></div>
+  </div>
+  <p class="small muted" style="margin-top:2em">Navigate with <span class="kbd">←</span> <span class="kbd">→</span>, dots, or Prev/Next.</p>
+</div></section>
+
+<!-- 2 WHAT IS TUNNELD -->
+<section class="slide"><div class="inner">
+  <h2>What is Tunneld?</h2>
+  <div class="diagram">
+Tunneld Device (ARM64 SBC)
+ ┌────────────────────────────────────────────┐
+ │  upstream NIC ──→ internet                 │
+ │  downstream NIC ──→ private subnet (LAN)   │
+ │                                            │
+ │  dnsmasq   DHCP + DNS ( *.tunneld.lan )    │
+ │  iptables  NAT / forwarding / DNS redirect │
+ │  Caddy     reverse proxy (:18000 + loopback)│
+ │  WireGuard overlay ( wg-&lt;machine&gt; )   │
+ │  Phoenix LiveView dashboard                │
+ │  Agent API ( /api/v1/agent )               │
+ └────────────────────────────────────────────┘
+        │            │              │
+   LAN devices   enrolled boxes    remote VPS
+  (DHCP leases) (local, via SSH)   (WireGuard peer)
+  </div>
+  <div class="grid g2" style="margin-top:1em">
+    <div class="card"><div class="lbl g">Self-contained</div><p class="small">No database — atomic JSON files under <code>TUNNELD_DATA</code>.</p></div>
+    <div class="card"><div class="lbl b">No agent on hosts</div><p class="small">Tunneld is the chokepoint — egress policy, audit, scoped tokens. Agents talk over HTTP.</p></div>
+    <div class="card"><div class="lbl y">Two installs</div><p class="small">WireGuard + Caddy on a target. Anything else is "the operator SSHes in."</p></div>
+    <div class="card"><div class="lbl m">Ethernet-first</div><p class="small">Wired only; no Wi-Fi mesh, no zrok, no relay coordinator.</p></div>
+  </div>
+</div></section>
+
+<!-- 3 CORE IDEA -->
+<section class="slide"><div class="inner">
+  <h2>The core idea</h2>
+  <p>Tunneld never asks "what runtime is this?" It asks <span class="accent">"what is listening?"</span></p>
+  <div class="grid g2">
+    <div class="card"><div class="lbl b">Discovery</div><h4>One command enumerates everything</h4>
+      <p class="small"><code>ss -tlnp</code> lists every listening socket + owning process on any Linux host — Docker, Incus, systemd, a tmux'd binary, or a runtime not yet invented.</p>
+      <pre>{"addr":"0.0.0.0","port":3000,"proc":"node","pid":5678,"container":null}</pre>
+    </div>
+    <div class="card"><div class="lbl y">Two ideas</div><h4>address, not container</h4>
+      <ul class="small">
+        <li>Containers remain <i>visible</i> (they listen on ports) but are no longer <i>managed</i>.</li>
+        <li><b>WireGuard makes remote machines local</b> — one IP tunneld can route to.</li>
+      </ul>
+    </div>
+  </div>
+  <h3>Principles that shaped the code</h3>
+  <ul class="small">
+    <li><span class="accent">Idempotence</span> — every op is <code>ensure_*</code>; re-running converges. No reopen-on-boot logic.</li>
+    <li><span class="accent">Namespace ownership</span> — one <code>tunneld-*</code> namespace per concern per machine.</li>
+    <li><span class="accent">Remote state is authoritative</span> — disk is a hint.</li>
+    <li><span class="accent">Reconcile over repair</span> — one <code>reconcile/1</code> reads live state and diffs.</li>
+    <li><span class="accent">Delete more than you add</span> — net −766 lines over the refactor.</li>
+  </ul>
+</div></section>
+
+<!-- 4 ARCHITECTURE -->
+<section class="slide"><div class="inner">
+  <h2>Architecture — module map</h2>
+  <div class="diagram">
+lib/tunneld/
+  application.ex        supervision tree
+  machines.ex           registry + SSH control plane (plain module)
+  machines/runtime.ex   ss -tlnp listeners + generic probe   [NEW]
+  machines/ssh.ex       ControlMaster SSH transport
+  overlay.ex            WireGuard peers, address_for/1        [NEW]
+  egress.ex             per-device exit routing               [NEW]
+  reconcile.ex          drift detection + repair              [NEW]
+  disenroll.ex          full reverse teardown                 [NEW]
+  caddy.ex              JSON admin API (LAN+loopback+public)  [NEW]
+  agent_tokens.ex       scoped, hashed bearer tokens          [NEW]
+  audit.ex              append-only JSONL audit               [NEW]
+  jobs.ex               202 async job registry                [NEW]
+  servers/resources.ex  resource registry (Caddy-backed)
+  servers/services.ex   systemd monitor (dnsmasq/dhcpcd/caddy)
+  iptables.ex           gateway NAT/firewall
+  net_link.ex           link state from /sys/class/net
+  schema/               JSON schemas for the form renderer
+  (removed) provider.ex · expose.ex · nginx.ex
+  </div>
+  <p class="small muted">Supervision: <code>one_for_one</code> with Session, SystemResources, Services, Resources, Devices, Auth, DnsConfig, Updater, Machines, <span class="accent">AgentTokens</span>, <span class="accent">Jobs</span>, Geolocation, Endpoint.</p>
+</div></section>
+
+<!-- 5 M1 CADDY -->
+<section class="slide"><div class="inner">
+  <h2>M1 — Caddy on the gateway</h2>
+  <p class="sub">nginx replaced by a Caddy driven entirely through its JSON admin API (no config files, no reload).</p>
+  <div class="grid g2">
+    <div class="card"><div class="lbl g">sync/1</div><p class="small">Reconciles the <b>entire</b> config from the resource list, idempotently. Loaded via <code>POST /load</code> (PUT /config/ 409s on existing config). Per-server <code>automatic_https.disable=true</code> so Caddy never binds :80.</p></div>
+    <div class="card"><div class="lbl b">Three planes</div>
+      <ul class="small">
+        <li><b>LAN</b> — <code>:18000</code>, Host-header routed (<code>&lt;name&gt;.tunneld.lan</code>).</li>
+        <li><b>Loopback</b> — <code>127.0.0.1:2xxxx</code> per resource, no host matcher (zrok/cloudflared/manual).</li>
+        <li><b>Public</b> — the machine's own Caddy (M4).</li>
+      </ul>
+    </div>
+  </div>
+  <h3>Example resource config</h3>
+  <pre>{ "apps": { "http": { "servers": {
+  "tunneld_lan": { "listen":[":18000"],
+    "routes":[{"match":[{"host":["app.tunneld.lan"]}],
+      "handle":[{"handler":"reverse_proxy","upstreams":[{"dial":"10.0.0.5:3000"}]}]}],
+    "automatic_https":{"disable":true} },
+  "tunneld_123_loop": { "listen":["127.0.0.1:20001"],
+    "routes":[{"handle":[{"handler":"reverse_proxy",
+      "upstreams":[{"dial":"10.0.0.5:3000"}]}]}],
+    "automatic_https":{"disable":true} }
+}}}}}</pre>
+  <p class="small muted">Also: opened :18000 in gateway iptables; installer swaps nginx → Caddy; services monitor keyed off :caddy.</p>
+</div></section>
+
+<!-- 6 M2 RUNTIME -->
+<section class="slide"><div class="inner">
+  <h2>M2 — Runtime discovery</h2>
+  <p class="sub">The "what is listening?" generalization. Discovery, not management.</p>
+  <div class="grid g2">
+    <div class="card"><div class="lbl g">Runtime.listeners/1</div>
+      <p class="small">Runs <code>ss -tlnp</code>, parses into maps. Annotates the owning <code>container</code> only if a runtime is detected — never gated on one. A bare box works identically to an Incus host.</p>
+    </div>
+    <div class="card"><div class="lbl b">Surface</div>
+      <p class="small">Machine detail shows a <b>Listeners</b> panel with a per-row <b>"make resource"</b> action. Backend routed via <code>Overlay.address_for/1</code>.</p>
+    </div>
+  </div>
+  <h3>Example</h3>
+  <pre>GET /api/v1/machines/:id/listeners
+→ {"listeners":[
+    {"addr":"0.0.0.0","port":22,"proc":"sshd","pid":1140,"container":null},
+    {"addr":"0.0.0.0","port":3000,"proc":"node","pid":5678,"container":null}
+  ]}</pre>
+</div></section>
+
+<!-- 7 M3 OVERLAY -->
+<section class="slide"><div class="inner">
+  <h2>M3 — Overlay (WireGuard) + Expose deletion</h2>
+  <div class="grid g2">
+    <div class="card"><div class="lbl g">Overlay</div>
+      <ul class="small">
+        <li>Gateway dials out to each machine (<code>PersistentKeepalive=25</code>), one iface <code>wg-&lt;id&gt;</code>.</li>
+        <li><b><code>Table = off</code></b> — routes hand-installed (prevents loops; prerequisite for egress).</li>
+        <li>Keys on the gateway, mode 0600; target only gets its half.</li>
+        <li><code>address_for/1</code> — LAN IP same-subnet, overlay IP remote. The single place <code>location</code> is branched.</li>
+      </ul>
+    </div>
+    <div class="card"><div class="lbl r">Deleted</div>
+      <p class="small"><code>Machines.Expose</code> (SSH <code>-L</code> tunnels) removed — replaced by the overlay. This also removed bugs §3.2 (tunnel leak) and §3.3 (failed exposures persisted). <b>Quick Expose</b> (LAN curl endpoint) kept.</p>
+    </div>
+  </div>
+  <h3>Live-verified acceptance</h3>
+  <ul class="small">
+    <li><span class="ok">✓</span> Resource over overlay serves at <code>http://overlayapp.tunneld.lan:18000</code>, <b>no SSH tunnel</b>.</li>
+    <li><span class="ok">✓</span> Reboot-survives — WG iface up with a fresh handshake after gateway reboot, no orphans.</li>
+    <li><span class="warn">setup note:</span> the target needs <b>inbound UDP/51820</b> open in its <b>provider</b> firewall (e.g. Vultr), not the OS firewall.</li>
+  </ul>
+</div></section>
+
+<!-- 8 M4 PUBLIC -->
+<section class="slide"><div class="inner">
+  <h2>M4 — Remote Caddy + public exposure</h2>
+  <div class="grid g2">
+    <div class="card"><div class="lbl g">Mechanism</div>
+      <p class="small">Drive the <b>machine's own Caddy</b> admin API at <code>http://&lt;overlay_ip&gt;:2019</code> over WireGuard. Admin bound to the overlay address only — never 0.0.0.0/public.</p>
+      <pre>Caddy.sync_public(machine, resources)</pre>
+    </div>
+    <div class="card"><div class="lbl b">One listen field</div>
+      <table><tr><th>listen</th><th>result</th></tr>
+      <tr><td><code>"8080"</code></td><td>:8080, no domain/TLS (day one)</td></tr>
+      <tr><td><code>"app.example.com"</code></td><td>:80/:443, auto-TLS</td></tr>
+      </table>
+      <p class="small muted">Same object, one field, no migration. Point DNS + change one field.</p>
+    </div>
+  </div>
+  <h3>Example transition (build_public_config)</h3>
+  <pre>listen "8080"  → server listen [":8080"], no host matcher, auto_https.disable=true
+listen "app.example.com" → server listen [":80",":443"],
+    match host app.example.com, auto-TLS (default)
+  </pre>
+  <p class="small muted"><span class="ok">Verified:</span> VM Caddy admin over overlay, public config pushed (HTTP 200), served :8081 over the tunnel. Public internet hop needs a Vultr inbound TCP rule.</p>
+</div></section>
+
+<!-- 9 M5 AGENT API -->
+<section class="slide"><div class="inner">
+  <h2>M5 — Agent API (the product)</h2>
+  <p class="sub">The HTTP API is the product; CLI/skill/MCP are thin adapters.</p>
+  <div class="grid g2">
+    <div class="card"><div class="lbl g">Tokens / Audit / Jobs</div>
+      <ul class="small">
+        <li><b>AgentTokens</b> — scoped, revocable, <b>hashed-at-rest</b> <code>tnld_...</code>. Forbidden scopes (token issuance, enrollment, iptables admin, DNS provider, WG keys) can never be granted.</li>
+        <li><b>Audit</b> — append-only JSONL (ts, token_id, action, target, result).</li>
+        <li><b>Jobs</b> — probe/exec return <code>202 {job_id}</code>; poll <code>/jobs/:id</code>.</li>
+      </ul>
+    </div>
+    <div class="card"><div class="lbl b">Contract</div>
+      <table><tr><th>Method</th><th>Path</th><th>Scope</th></tr>
+      <tr><td>GET</td><td><code>/machines</code></td><td>machines:read</td></tr>
+      <tr><td>GET</td><td><code>/machines/:id/listeners</code></td><td>machines:read</td></tr>
+      <tr><td>POST</td><td><code>/machines/:id/exec</code></td><td>exec</td></tr>
+      <tr><td>GET/POST/DELETE</td><td><code>/resources</code></td><td>resources:*</td></tr>
+      <tr><td>GET</td><td><code>/jobs/:id</code></td><td>any valid token</td></tr>
+      </table>
+    </div>
+  </div>
+  <h3>Example</h3>
+  <pre>POST /api/v1/agent/machines/:id/exec {"cmd":"echo hi"} → 202 {"job_id":"962","status":"running"}
+GET  /api/v1/agent/jobs/962 → 200 {"id":"962","status":"done","result":"{...}"}</pre>
+  <p class="small muted"><span class="ok">Live-verified:</span> 200 machines/resources, 201 resource create via real Caddy path, 202 exec → JSON-safe job, 401/403 scope enforcement.</p>
+</div></section>
+
+<!-- 10 M6 EGRESS -->
+<section class="slide"><div class="inner">
+  <h2>M6 — Egress (per-device exit routing)</h2>
+  <div class="diagram">
+gateway                          exit machine (VM)
+  ip rule add from &lt;device&gt; lookup &lt;N&gt;   sysctl ip_forward=1 (persistent)
+  ip route add default dev wg-&lt;id&gt; table &lt;N&gt;  iptables -t nat -A POSTROUTING -o &lt;iface&gt; -j MASQUERADE
+        │  device traffic                            allow forward on wg iface
+        └─────────────► wg-&lt;id&gt; ──────────────► exit ──► internet (as exit's public IP)
+  </div>
+  <ul class="small">
+    <li>One <code>ip rule</code> adds a device; one delete removes it. Table IDs persisted, stable across restarts.</li>
+    <li>Works because tunneld is the DHCP default gateway — asserted at runtime with a clear error otherwise.</li>
+    <li><b>DNS leaks</b>: explicit <code>dns: "exit" | "local"</code> choice, never silent.</li>
+  </ul>
+  <div class="card" style="margin-top:.8em"><div class="lbl r">Operational caution (learned live)</div>
+    <p class="small">Only ever route <b>device</b> traffic — never the gateway's own source IP, or you will lock yourself out of the gateway (a policy rule on <code>10.0.0.1</code> misroutes management traffic; fix = reboot, since it's runtime-only). Always keep a rollback path.</p>
+  </div>
+  <h3>Setup that must be surfaced (docs/UI)</h3>
+  <ul class="small">
+    <li>Exit machine: ip_forward=1 persistent, MASQUERADE on egress iface, FORWARD allow on wg iface, and the gateway peer's <code>AllowedIPs</code> must include the LAN subnet.</li>
+    <li>Gateway: routing table per exit + one rule per device.</li>
+  </ul>
+</div></section>
+
+<!-- 11 M7 RECONCILE/DISENROLL/UI -->
+<section class="slide"><div class="inner">
+  <h2>M7 — Reconcile, Disenroll, UI</h2>
+  <div class="grid g2">
+    <div class="card"><div class="lbl g">Reconcile</div>
+      <p class="small"><code>reconcile/1</code> reads live state (WG, Caddy, SSH) and diffs against desired; <code>repair: true</code> idempotently fixes drift. The single live-state authority, replacing ad-hoc reopen-on-boot.</p>
+    </div>
+    <div class="card"><div class="lbl g">Disenroll</div>
+      <p class="small">Full reverse teardown: WG config/unit/iface, iptables TUNNELD chain, the tunneld <code>authorized_keys</code> entry, then the registry + key. <span class="ok">Live-verified:</span> 0 tunneld artifacts remain on the target.</p>
+    </div>
+  </div>
+  <h3>UI polish</h3>
+  <ul class="small">
+    <li>Machine detail: <b>Reconcile</b> button + <b>Overlay IP / WireGuard status</b> panel (headless-browser verified, no console errors).</li>
+    <li>Device row: <b>egress dropdown</b> (Local or any exit-capable machine) wired to <code>Egress.route_device</code>.</li>
+    <li>Listeners panel with <b>make resource</b> per row.</li>
+  </ul>
+</div></section>
+
+<!-- 12 M8 ADAPTERS -->
+<section class="slide"><div class="inner">
+  <h2>M8 — Adapters (CLI → skill → MCP)</h2>
+  <p class="sub">Thin adapters over the agent HTTP API; the API is the product.</p>
+  <div class="g3 grid">
+    <div class="card"><div class="lbl b">CLI</div><h4>mix tunneld.agent</h4>
+      <p class="small">machines, listeners, probe, exec, jobs, resources, add/rm-resource. Uses <code>TUNNELD_URL</code> + <code>TUNNELD_TOKEN</code>.</p>
+    </div>
+    <div class="card"><div class="lbl b">Skill</div><h4>skill/tunneld_agent.py</h4>
+      <p class="small">Thin Python client (~95 lines). Verified end-to-end against a live gateway.</p>
+    </div>
+    <div class="card"><div class="lbl b">MCP</div><h4>tunneld_mcp.py</h4>
+      <p class="small">MCP JSON-RPC over stdio, 9 tools, one per endpoint, no policy.</p>
+    </div>
+  </div>
+  <h3>Example</h3>
+  <pre>mix tunneld.issue_token machines:read,resources:write,exec   # operator mints token
+mix tunneld.agent machines
+mix tunneld.agent add-resource myapp 10.0.0.5:3000
+mix tunneld.agent exec &lt;id&gt; "systemctl status app"</pre>
+</div></section>
+
+<!-- 13 BUGS + LIVE -->
+<section class="slide"><div class="inner">
+  <h2>Bugs fixed &amp; live findings</h2>
+  <table>
+    <tr><th>#</th><th>Issue</th><th>Resolution</th></tr>
+    <tr><td>3.1</td><td>macvlan device line never worked</td><td class="muted">Deleted with Provider</td></tr>
+    <tr><td>3.2</td><td>SSH -L tunnels leak on restart</td><td class="accent">Removed by Expose deletion</td></tr>
+    <tr><td>3.3</td><td>Failed exposures persisted</td><td class="accent">Removed</td></tr>
+    <tr><td>3.4</td><td>Docstring wrong ("reverse" vs local forward)</td><td class="accent">Gone with Expose</td></tr>
+    <tr><td>3.5</td><td>Unauthenticated GET /machines, /containers</td><td class="accent">Now require admin</td></tr>
+    <tr><td>3.6</td><td>boot.autostart set unconditionally</td><td class="muted">Moot with Provider deleted</td></tr>
+  </table>
+  <h3>Live-found &amp; fixed during deployment</h3>
+  <ul class="small">
+    <li><span class="accent">Caddy /load vs /config/</span> — POST /load (409 on existing config).</li>
+    <li><span class="accent">auto-HTTPS bind :80</span> — per-server disable=true.</li>
+    <li><span class="accent">iptables blocked :18000</span> — opened Caddy public port.</li>
+    <li><span class="accent">"any"-scope jobs</span> — <code>authorize_any/1</code>.</li>
+    <li><span class="accent">Job results not JSON-safe</span> — normalized.</li>
+    <li><span class="accent">Egress crypto-routing</span> — exit peer AllowedIPs must include the LAN subnet.</li>
+  </ul>
+</div></section>
+
+<!-- 14 SETUP REQUIREMENTS -->
+<section class="slide"><div class="inner">
+  <h2>Setup &amp; connection requirements (must be surfaced)</h2>
+  <div class="g2 grid">
+    <div class="card"><div class="lbl y">WireGuard overlay (enroll a remote machine)</div>
+      <ul class="small">
+        <li>Target reachable over SSH; operator installs tunneld's public key.</li>
+        <li><b>Inbound UDP/51820</b> open in the target's <b>provider firewall</b> (e.g. Vultr security group) — NOT the OS firewall.</li>
+        <li>Tunneld installs <code>wireguard-tools</code>, writes configs, brings up <code>wg-quick@wg-&lt;id&gt;</code>.</li>
+        <li>Verify on the target: <code>wg show</code> (handshake), <code>ip -o addr show wg-*</code>.</li>
+      </ul>
+    </div>
+    <div class="card"><div class="lbl y">Public exposure (M4)</div>
+      <ul class="small">
+        <li>Install Caddy on the machine; admin API bound to the <b>overlay address</b> only.</li>
+        <li><b>Open the exposed TCP port</b> in the provider firewall for internet reachability.</li>
+        <li>For auto-TLS: point a hostname's DNS at the machine.</li>
+      </ul>
+    </div>
+    <div class="card"><div class="lbl y">Egress (M6)</div>
+      <ul class="small">
+        <li>Exit machine: <code>ip_forward=1</code> (persistent), MASQUERADE on egress iface, FORWARD allow on wg iface, gateway peer <code>AllowedIPs</code> includes the LAN subnet.</li>
+        <li>Gateway: per-exit routing table + one <code>ip rule</code> per device.</li>
+        <li>Never route the gateway's own IP (lockout risk).</li>
+      </ul>
+    </div>
+    <div class="card"><div class="lbl m">Gateway itself</div>
+      <ul class="small">
+        <li>iptables INPUT policy DROP; opens :80, :22, :18000 (Caddy), :5336, DHCP.</li>
+        <li>dnsmasq resolves <code>*.tunneld.lan</code> → gateway.</li>
+        <li>Caddy admin on 127.0.0.1:2019.</li>
+      </ul>
+    </div>
+  </div>
+</div></section>
+
+<!-- 15 INSTALLER -->
+<section class="slide"><div class="inner">
+  <h2>Installer (tunneld-installer)</h2>
+  <div class="grid g2">
+    <div class="card"><div class="lbl g">install.sh</div>
+      <p class="small">Installs Caddy (official apt repo) instead of nginx; enables <code>caddy.service</code>; drops nginx from deps + systemd list. README updated.</p>
+    </div>
+    <div class="card"><div class="lbl b">releases/</div>
+      <p class="small">Staged the M1 Caddy build (v0.18.17) tarball + checksum + metadata for the self-update path.</p>
+    </div>
+  </div>
+  <h3>Versions / tags</h3>
+  <table>
+    <tr><th>Tool</th><th>Badge / tag</th></tr>
+    <tr><td>Elixir</td><td>1.18+</td></tr>
+    <tr><td>Phoenix</td><td>1.7+</td></tr>
+    <tr><td>Caddy</td><td>2.x</td></tr>
+    <tr><td>WireGuard</td><td>1.x</td></tr>
+    <tr><td>Platform</td><td>debian</td></tr>
+    <tr><td>Release</td><td>v0.18.17 (pre-alpha)</td></tr>
+  </table>
+</div></section>
+
+<!-- 16 VERIFICATION -->
+<section class="slide"><div class="inner">
+  <h2>Verification &amp; live evidence</h2>
+  <div class="g2 grid">
+    <div class="card"><div class="lbl g">Automated</div>
+      <ul class="small">
+        <li><code>mix compile --warnings-as-errors</code> — clean</li>
+        <li><code>mix test</code> — 85 tests, 0 failures</li>
+        <li><code>MOCK_DATA=true mix phx.server</code> — full flow on a laptop</li>
+        <li>Headless browser — dashboard + new surfaces, no console errors</li>
+      </ul>
+    </div>
+    <div class="card"><div class="lbl b">Live (gateway 10.0.0.1 + VM)</div>
+      <ul class="small">
+        <li><span class="ok">✓</span> WG overlay up — ping 10.88.0.2 0% loss</li>
+        <li><span class="ok">✓</span> Remote service at overlayapp.tunneld.lan:18000 — no SSH tunnel</li>
+        <li><span class="ok">✓</span> Gateway reboot → overlay + resource survive</li>
+        <li><span class="ok">✓</span> M5 agent API live (machines, resources, exec/job, 401/403)</li>
+        <li><span class="ok">✓</span> M7 disenroll — no tunneld artifacts left on target</li>
+        <li><span class="ok">✓</span> M4 mechanism — VM Caddy admin over overlay, public plane served</li>
+      </ul>
+    </div>
+  </div>
+  <h3>Build &amp; deploy loop</h3>
+  <div class="flow">
+    <span class="step">patch build_release_mac.sh</span><span class="arrow">→</span>
+    <span class="step">mix test</span><span class="arrow">→</span>
+    <span class="step">backup mix.lock + build</span><span class="arrow">→</span>
+    <span class="step">restore mix.lock</span><span class="arrow">→</span>
+    <span class="step">scp tarball</span><span class="arrow">→</span>
+    <span class="step">extract /opt/tunneld + restart</span><span class="arrow">→</span>
+    <span class="step">verify HTTP 200 + Caddy config</span>
+  </div>
+</div></section>
+
+<!-- 17 HOW TO RUN -->
+<section class="slide"><div class="inner">
+  <h2>How to run &amp; use it</h2>
+  <h3>Local dev (no SBC)</h3>
+  <pre>MOCK_DATA=true mix phx.server   # full flow on a laptop</pre>
+  <h3>Issue a scoped token (operator, on the gateway)</h3>
+  <pre>mix tunneld.issue_token machines:read,resources:write,exec</pre>
+  <h3>Use the CLI / skill / MCP</h3>
+  <pre>export TUNNELD_URL=http://10.0.0.1 TUNNELD_TOKEN=tnld_...
+mix tunneld.agent machines
+mix tunneld.agent listeners &lt;machine_id&gt;
+mix tunneld.agent add-resource web 10.0.0.5:3000
+
+# Python skill
+from tunneld_agent import TunneldClient
+c = TunneldClient(); print(c.resources())
+
+# MCP (stdio JSON-RPC)
+python skill/tunneld_mcp.py</pre>
+  <h3>Deploy</h3>
+  <pre>scp ~/tunneld_build/tunneld-pre-alpha.tar.gz root@10.0.0.1:/tmp/
+ssh root@10.0.0.1 'tar -xzf /tmp/tunneld-pre-alpha.tar.gz -C /opt/tunneld && systemctl restart tunneld'</pre>
+</div></section>
+
+<!-- 18 STATUS -->
+<section class="slide"><div class="inner">
+  <h2>Status &amp; roadmap</h2>
+  <div class="g2 grid">
+    <div class="card"><div class="lbl g">Done &amp; verified</div>
+      <ul class="small">
+        <li>M1–M8 code — 26 commits, 85 tests green, net +3,497/−766.</li>
+        <li>M1/M2/M3/M5 live-verified; M3 overlay live-accepted (no SSH tunnel, reboot-survives).</li>
+        <li>M4 mechanism verified; M7 disenroll live-verified.</li>
+        <li>Docs (README + 4 linked docs) aligned; installer updated; summary presentation committed.</li>
+      </ul>
+    </div>
+    <div class="card"><div class="lbl y">Remaining / external</div>
+      <ul class="small">
+        <li>M4 public internet reachability — open the exposed TCP port in the provider firewall.</li>
+        <li>M6 egress live run — needs a second device (and the exit-node setup documented above).</li>
+        <li>Optional: onboarding wizard surfacing the WireGuard/iptables prerequisites in the UI.</li>
+      </ul>
+    </div>
+  </div>
+  <div class="quote" style="margin-top:1.2em">"A resource is an address, not a container. WireGuard makes remote machines local. Tunneld installs exactly two things, ever."</div>
+  <p class="small muted" style="margin-top:.8em">Full overview presentation · all artifacts on <code>feature/rationalizing-core</code>.</p>
+</div></section>
+
+</div>
+
+<div class="nav">
+  <button onclick="go(-1)">← Prev</button>
+  <span id="counter" class="muted"></span>
+  <button onclick="go(1)">Next →</button>
+  <span class="dots" id="dots"></span>
+</div>
+
+<script>
+const slides=[...document.querySelectorAll('.slide')];
+const dots=document.getElementById('dots');
+let cur=0;
+slides.forEach((_,i)=>{const d=document.createElement('div');d.className='dot';d.onclick=()=>show(i);dots.appendChild(d);});
+function show(i){
+  cur=Math.max(0,Math.min(slides.length-1,i));
+  slides.forEach((s,j)=>s.classList.toggle('active',j===cur));
+  [...dots.children].forEach((d,j)=>d.classList.toggle('on',j===cur));
+  document.getElementById('counter').textContent=(cur+1)+' / '+slides.length;
+  document.getElementById('progress').style.width=((cur+1)/slides.length*100)+'%';
+  slides[cur].scrollTop=0;
+}
+function go(d){show(cur+d);}
+document.addEventListener('keydown',e=>{
+  if(e.key==='ArrowRight'||e.key==='PageDown'||e.key===' ')show(cur+1);
+  if(e.key==='ArrowLeft'||e.key==='PageUp')show(cur-1);
+});
+show(0);
+</script>
+</body>
+</html>
