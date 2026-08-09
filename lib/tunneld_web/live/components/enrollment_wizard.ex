@@ -22,7 +22,16 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
 
   @impl true
   def mount(socket) do
-    {:ok, assign(socket, step: 1, machine: nil, public_key: nil, error: nil, probing: false)}
+    {:ok,
+     assign(socket,
+       step: 1,
+       machine: nil,
+       public_key: nil,
+       error: nil,
+       probing: false,
+       wg_result: nil,
+       exit_result: nil
+     )}
   end
 
   @impl true
@@ -45,9 +54,10 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
 
   def handle_event("wizard_test_connection", _params, socket) do
     id = socket.assigns.machine_id
-    {:noreply, assign(socket, step: 3, probing: true)}
 
-    # Test connection by probing; report a specific error on failure.
+    # Test connection by probing; report a specific error on failure. The probe
+    # is synchronous, so assign the result directly (a live_component has no
+    # process of its own; send(self(), ...) would go to the parent LiveView).
     result =
       case Machines.probe(id) do
         {:ok, machine} -> {:ok, machine}
@@ -55,22 +65,25 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
         {:error, reason} -> {:error, "Connection failed: #{inspect(reason)}"}
       end
 
-    send(self(), {:wizard_probe_result, result})
-    {:noreply, socket}
+    case result do
+      {:ok, machine} ->
+        {:noreply, assign(socket, step: 4, machine: machine, probing: false, error: nil)}
+
+      {:error, reason} ->
+        {:noreply, assign(socket, step: 3, probing: false, error: reason)}
+    end
   end
 
   def handle_event("wizard_install_wg", _params, socket) do
     id = socket.assigns.machine_id
     result = with {:ok, m} <- Machines.get(id), do: Tunneld.Overlay.ensure_peer(m)
-    send(self(), {:wizard_wg_result, result})
-    {:noreply, socket}
+    {:noreply, assign(socket, wg_result: result)}
   end
 
   def handle_event("wizard_make_exit", _params, socket) do
     id = socket.assigns.machine_id
     result = with {:ok, m} <- Machines.get(id), do: Tunneld.Egress.ensure_exit_capable(m)
-    send(self(), {:wizard_exit_result, result})
-    {:noreply, socket}
+    {:noreply, assign(socket, exit_result: result)}
   end
 
   def handle_event("wizard_close", _params, socket) do
@@ -107,7 +120,7 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
     <div id="enrollment-wizard-root">
       <div :if={@open} class="fixed inset-0 bg-black/70 flex items-center justify-center z-[100]">
         <div class="bg-surface rounded-2xl p-6 max-w-[560px] w-full relative border border-border max-h-[90vh] overflow-y-auto">
-          <div phx-click="wizard_close" class="absolute top-0 right-0 p-3 cursor-pointer text-text-tertiary hover:text-text-primary">
+          <div phx-click="wizard_close" phx-target={@myself} class="absolute top-0 right-0 p-3 cursor-pointer text-text-tertiary hover:text-text-primary">
             <.icon name="hero-x-mark-solid" class="h-5 w-5" />
           </div>
           <h2 class="text-xl font-medium mb-1">Enroll Machine</h2>
@@ -127,20 +140,22 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
         Enter the machine's details. Tunneld will generate an Ed25519 keypair and show you the
         public half to install on the target.
       </p>
-      <div class="grid grid-cols-2 gap-3">
-        <input name="name" phx-keyup="wizard_enroll" placeholder="Name" class="tunl-input col-span-2" />
-        <input name="address" phx-keyup="wizard_enroll" placeholder="Address / IP" class="tunl-input col-span-2" />
-        <input name="ssh_port" phx-keyup="wizard_enroll" placeholder="SSH port" value="22" class="tunl-input" />
-        <input name="ssh_user" phx-keyup="wizard_enroll" placeholder="SSH user" value="root" class="tunl-input" />
-      </div>
-      <div class="flex items-center gap-2">
-        <span class="text-xs text-text-tertiary">Location:</span>
-        <select name="location" phx-change="wizard_enroll" class="tunl-input !w-auto">
-          <option value="local">local</option>
-          <option value="remote">remote</option>
-        </select>
-      </div>
-      <button phx-click="wizard_enroll" class="w-full bg-accent p-2 rounded-md text-white text-sm">Generate keypair →</button>
+      <form phx-submit="wizard_enroll" phx-target={@myself} class="space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <input name="name" placeholder="Name" required class="tunl-input col-span-2" />
+          <input name="address" placeholder="Address / IP" required class="tunl-input col-span-2" />
+          <input name="ssh_port" placeholder="SSH port" value="22" class="tunl-input" />
+          <input name="ssh_user" placeholder="SSH user" value="root" class="tunl-input" />
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="text-xs text-text-tertiary">Location:</span>
+          <select name="location" class="tunl-input !w-auto">
+            <option value="local">local</option>
+            <option value="remote">remote</option>
+          </select>
+        </div>
+        <button type="submit" class="w-full bg-accent p-2 rounded-md text-white text-sm">Generate keypair →</button>
+      </form>
       <p :if={@error} class="text-xs text-red"><%= @error %></p>
     </div>
     """
@@ -159,7 +174,7 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
         <code class="text-[10px] bg-code border border-border rounded p-1 flex-1 overflow-x-auto">echo '<%= @public_key %>' &gt;&gt; ~/.ssh/authorized_keys</code>
         <button type="button" id="wizard_copy_key" phx-hook="CopyToClipboard" data-copy-text={"echo '#{@public_key}' >> ~/.ssh/authorized_keys"} class="ghost-btn !px-2 !py-1 text-[10px]">copy</button>
       </div>
-      <button phx-click="wizard_test_connection" class="w-full bg-accent p-2 rounded-md text-white text-sm">I've installed the key — test connection →</button>
+      <button phx-click="wizard_test_connection" phx-target={@myself} class="w-full bg-accent p-2 rounded-md text-white text-sm">I've installed the key — test connection →</button>
     </div>
     """
   end
@@ -170,7 +185,7 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
       <p class="text-sm text-text-secondary">Testing the SSH connection to the target...</p>
       <p :if={@probing} class="text-xs text-text-tertiary">Probing...</p>
       <p :if={@error} class="text-xs text-red"><%= @error %></p>
-      <button :if={@error} phx-click="wizard_test_connection" class="w-full bg-accent p-2 rounded-md text-white text-sm">Retry</button>
+      <button :if={@error} phx-click="wizard_test_connection" phx-target={@myself} class="w-full bg-accent p-2 rounded-md text-white text-sm">Retry</button>
     </div>
     """
   end
@@ -191,9 +206,9 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
         <div><b>Runtimes:</b> <%= if @runtimes == [], do: "none detected", else: Enum.join(@runtimes, ", ") %></div>
       </div>
       <div class="flex flex-col gap-2 pt-2">
-        <button phx-click="wizard_install_wg" class="w-full bg-surface p-2 rounded-md text-sm hover:bg-surface-2">Install WireGuard (overlay)</button>
-        <button phx-click="wizard_make_exit" class="w-full bg-surface p-2 rounded-md text-sm hover:bg-surface-2">Make Exit Node</button>
-        <button phx-click="wizard_close" class="w-full bg-accent p-2 rounded-md text-white text-sm">Done</button>
+        <button phx-click="wizard_install_wg" phx-target={@myself} class="w-full bg-surface p-2 rounded-md text-sm hover:bg-surface-2">Install WireGuard (overlay)</button>
+        <button phx-click="wizard_make_exit" phx-target={@myself} class="w-full bg-surface p-2 rounded-md text-sm hover:bg-surface-2">Make Exit Node</button>
+        <button phx-click="wizard_close" phx-target={@myself} class="w-full bg-accent p-2 rounded-md text-white text-sm">Done</button>
       </div>
       <p :if={@wg_result} class="text-xs text-text-tertiary">WireGuard: <%= inspect(@wg_result) %></p>
       <p :if={@exit_result} class="text-xs text-text-tertiary">Exit node: <%= inspect(@exit_result) %></p>
