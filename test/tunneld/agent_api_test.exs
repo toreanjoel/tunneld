@@ -79,7 +79,7 @@ defmodule Tunneld.AgentApiTest do
     {job_id, _pid} = Tunneld.Jobs.enqueue(fn -> 42 end)
     # give the task a moment
     Process.sleep(50)
-    assert {:ok, %{status: :done, result: {:ok, 42}}} = Tunneld.Jobs.get(job_id)
+    assert {:ok, %{status: :done, result: 42}} = Tunneld.Jobs.get(job_id)
   end
 
 
@@ -88,6 +88,14 @@ defmodule Tunneld.AgentApiTest do
     assert {:ok, _id, _} = AgentTokens.authorize_any(raw)
     # but authorize still requires the specific scope
     assert :error = AgentTokens.authorize(raw, "exec")
+  end
+
+  test "job results with non-encodable tuples are JSON-safe" do
+    {job_id, _pid} = Tunneld.Jobs.enqueue(fn -> {:error, {:ssh_failed, 255, "No route to host"}} end)
+    Process.sleep(80)
+    {:ok, %{status: :done, result: result}} = Tunneld.Jobs.get(job_id)
+    # result must be JSON-encodable
+    assert is_binary(Jason.encode!(result))
   end
 
   test "jobs endpoint is reachable by any valid token" do

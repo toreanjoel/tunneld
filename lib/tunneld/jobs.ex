@@ -50,14 +50,24 @@ defmodule Tunneld.Jobs do
   defp run(id, fun) do
     result =
       try do
-        {:ok, fun.()}
+        # The result may be an SSH/error tuple that Jason cannot serialize, so
+        # normalize to a JSON-encodable plain value.
+        safe_encode(fun.())
       rescue
-        e -> {:error, Exception.message(e)}
+        e -> Exception.message(e)
       catch
-        kind, reason -> {:error, "#{kind}: #{inspect(reason)}"}
+        kind, reason -> "#{kind}: #{inspect(reason)}"
       end
 
     GenServer.cast(__MODULE__, {:complete, id, result})
+  end
+
+  # Encode to JSON then decode back so nested maps/strings stay JSON-safe;
+  # falls back to inspect() for values that cannot be encoded (tuples, etc).
+  defp safe_encode(value) do
+    Jason.encode!(value) |> Jason.decode!()
+  rescue
+    _ -> inspect(value)
   end
 
   @impl true
