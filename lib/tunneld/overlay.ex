@@ -161,6 +161,12 @@ defmodule Tunneld.Overlay do
     # Enable + start the wg-quick service for this peer (config file is
     # /etc/wireguard/<iface>.conf, so the unit is wg-quick@<iface>).
     run(machine, "systemctl enable --now wg-quick@#{iface} 2>/dev/null || true")
+    # Open the overlay port on the target's firewall (ufw or iptables) so the
+    # gateway's dial-out handshake can reach it.
+    run(machine,
+      "ufw allow #{@wg_port}/udp 2>/dev/null || " <>
+        "iptables -I INPUT 1 -p udp --dport #{@wg_port} -j ACCEPT 2>/dev/null || true"
+    )
     :ok
   end
 
