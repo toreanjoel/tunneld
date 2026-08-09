@@ -26,7 +26,7 @@ defmodule Tunneld.MachinesTest do
     assert String.starts_with?(pub, "ssh-ed25519 ")
     assert machine["name"] == "box1"
     assert machine["address"] == "10.0.0.5"
-    assert machine["kind"] == "incus"
+    assert machine["kind"] == "host"
     assert machine["status"] == "enrolled"
     assert is_nil(machine["capabilities"])
 

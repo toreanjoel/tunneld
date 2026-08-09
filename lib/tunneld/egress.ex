@@ -106,7 +106,7 @@ defmodule Tunneld.Egress do
         # Without this the exit drops forwarded device traffic (UFW/FORWARD
         # default is DROP) even though ip_forward is on. This was found in
         # live egress testing.
-        wg_iface = "wg-#{machine["id"]}"
+        wg_iface = Tunneld.Overlay.iface_name(machine["id"])
 
         _ =
           SSH.run(
@@ -131,7 +131,7 @@ defmodule Tunneld.Egress do
 
   defp real_route_device(machine, device_ip, dns) do
     id = machine["id"]
-    iface = "wg-#{id}"
+    iface = Tunneld.Overlay.iface_name(id)
     table = table_for(machine)
 
     with :ok <- assert_gateway_role(device_ip),

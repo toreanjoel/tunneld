@@ -58,7 +58,7 @@ defmodule Tunneld.OverlayTest do
     {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "vps5", "address" => "203.0.113.12", "location" => "remote"})
     {:ok, m} = Machines.get(id)
     {:ok, st} = Overlay.status(m)
-    assert st.interface == "wg-#{id}"
+    assert st.interface == Tunneld.Overlay.iface_name(id)
   end
 
   test "overlay IPs are persisted and allocated uniquely across machines" do

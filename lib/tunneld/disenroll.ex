@@ -45,7 +45,7 @@ defmodule Tunneld.Disenroll do
   # Remove the remote artifacts over SSH. Tolerates missing pieces (idempotent).
   defp teardown_remote(machine) do
     id = machine["id"]
-    iface = "wg-#{id}"
+    iface = Tunneld.Overlay.iface_name(id)
 
     # 1. Stop + remove WireGuard iface/config (order matters: down first).
     _ = SSH.run(machine, "systemctl stop wg-quick@#{id} 2>/dev/null || true")

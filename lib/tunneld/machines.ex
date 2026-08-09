@@ -9,7 +9,7 @@ defmodule Tunneld.Machines do
         "name" => "human label",
         "address" => "host or ip",
         "ssh_port" => 22,
-        "kind" => "incus",
+        "kind" => "host",
         "location" => "local" | "remote",
         "added_at" => "ISO8601",
         "capabilities" => %{...} | nil,
@@ -139,7 +139,7 @@ defmodule Tunneld.Machines do
     address = String.trim(params["address"] || "")
     ssh_port = params["ssh_port"] || 22
     ssh_user = String.trim(params["ssh_user"] || "root")
-    kind = params["kind"] || "incus"
+    kind = params["kind"] || "host"
     location = params["location"] || infer_location(address)
 
     cond do

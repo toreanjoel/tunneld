@@ -85,7 +85,7 @@ defmodule Tunneld.Overlay do
   @doc "Parsed `wg show` status for a machine: handshake age, tx/rx bytes."
   def status(machine) do
     if @mock do
-      {:ok, %{interface: "wg-#{machine["id"]}", handshake: nil, tx: 0, rx: 0, up: false}}
+      {:ok, %{interface: iface_name(machine["id"]), handshake: nil, tx: 0, rx: 0, up: false}}
     else
       real_status(machine)
     end
@@ -104,7 +104,7 @@ defmodule Tunneld.Overlay do
 
   defp real_ensure_peer(machine) do
     id = machine["id"]
-    iface = "wg-#{id}"
+    iface = iface_name(id)
 
     with {:ok, target_pub} <- exchange_keys(machine),
          :ok <- install_target(machine, target_pub, iface),
@@ -198,9 +198,9 @@ defmodule Tunneld.Overlay do
 
   defp real_status(machine) do
     id = machine["id"]
-    case run_gateway("wg show wg-#{id} 2>/dev/null") do
-      {:ok, ""} -> {:ok, %{interface: "wg-#{id}", up: false, handshake: nil, tx: 0, rx: 0}}
-      {:ok, out} -> parse_wg_show(out, "wg-#{id}")
+    case run_gateway("wg show #{iface_name(id)} 2>/dev/null") do
+      {:ok, ""} -> {:ok, %{interface: iface_name(id), up: false, handshake: nil, tx: 0, rx: 0}}
+      {:ok, out} -> parse_wg_show(out, iface_name(id))
       err -> err
     end
   end
@@ -225,7 +225,11 @@ defmodule Tunneld.Overlay do
 
   # --- helpers ---
 
-  defp iface_name(id), do: "wg-#{id}"
+  @doc "WireGuard interface name for a machine. wg-quick caps names at 15 chars,\n  so use a short hash of the machine id rather than the full UUID."
+  def iface_name(id) do
+    short = :crypto.hash(:sha256, id) |> Base.encode16(case: :lower) |> String.slice(0, 8)
+    "wg-#{short}"
+  end
 
   defp gen_keypair do
     {priv, 0} = System.cmd("wg", ["genkey"], stderr_to_stdout: true)

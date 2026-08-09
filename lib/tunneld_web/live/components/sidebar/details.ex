@@ -16,7 +16,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   use TunneldWeb, :live_component
 
   def mount(socket) do
-    {:ok, socket}
+    {:ok, assign(socket, listeners_expanded: false)}
   end
 
   def update(assigns, socket) do
@@ -36,6 +36,10 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(:obfuscated, obfuscated)
 
     {:ok, socket}
+  end
+
+  def handle_event("toggle_listeners", _params, socket) do
+    {:noreply, assign(socket, :listeners_expanded, !socket.assigns.listeners_expanded)}
   end
 
   @spec render(%{:view => :system_overview, optional(any()) => any()}) ::
@@ -269,14 +273,14 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             "#{mget(@machine, "address")} · #{mget(@machine, "kind")} · #{location_label(mget(@machine, "location"))}"
         }) %>
 
-        <div class="grid grid-cols-2 gap-1 my-2">
+        <div class="grid grid-cols-2 gap-1.5 my-2 items-stretch">
           <div
             phx-click="probe_machine"
             phx-value-id={mget(@machine, "id")}
             phx-click-loading="opacity-50 cursor-wait"
-            class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
+            class="flex items-center justify-center gap-1.5 w-full h-9 bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
           >
-            <.icon name="hero-arrow-path" class="h-5 w-5" />
+            <.icon name="hero-arrow-path" class="h-4 w-4 shrink-0" />
             <div class="truncate text-xs">Probe</div>
           </div>
 
@@ -284,9 +288,9 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             phx-click="reconcile_machine"
             phx-value-id={mget(@machine, "id")}
             phx-click-loading="opacity-50 cursor-wait"
-            class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
+            class="flex items-center justify-center gap-1.5 w-full h-9 bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
           >
-            <.icon name="hero-arrow-path" class="h-5 w-5" />
+            <.icon name="hero-arrow-path" class="h-4 w-4 shrink-0" />
             <div class="truncate text-xs">Reconcile</div>
           </div>
 
@@ -294,104 +298,123 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             phx-click="install_wireguard"
             phx-value-id={mget(@machine, "id")}
             phx-click-loading="opacity-50 cursor-wait"
-            class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
+            class="flex items-center justify-center gap-1.5 w-full h-9 bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
           >
-            <.icon name="hero-link" class="h-5 w-5" />
-            <div class="truncate text-xs">Install WireGuard</div>
+            <.icon name="hero-link" class="h-4 w-4 shrink-0" />
+            <div class="truncate text-xs">WireGuard</div>
           </div>
 
           <div
             phx-click="make_exit_node"
             phx-value-id={mget(@machine, "id")}
             phx-click-loading="opacity-50 cursor-wait"
-            class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
+            class="flex items-center justify-center gap-1.5 w-full h-9 bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
           >
-            <.icon name="hero-arrow-up-tray" class="h-5 w-5" />
-            <div class="truncate text-xs">Make Exit Node</div>
+            <.icon name="hero-arrow-up-tray" class="h-4 w-4 shrink-0" />
+            <div class="truncate text-xs">Exit Node</div>
           </div>
 
           <div
             phx-click="view_ssh_key"
             phx-value-id={mget(@machine, "id")}
-            class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
+            class="flex items-center justify-center gap-1.5 w-full h-9 bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
           >
-            <.icon name="hero-key" class="h-5 w-5" />
+            <.icon name="hero-key" class="h-4 w-4 shrink-0" />
             <div class="truncate text-xs">SSH Key</div>
           </div>
 
           <div
             phx-click="remove_machine"
             phx-value-id={mget(@machine, "id")}
-            class="flex items-center justify-center gap-1 w-full bg-red p-2 cursor-pointer rounded-md hover:opacity-80"
+            class="flex items-center justify-center gap-1.5 w-full h-9 bg-red p-2 cursor-pointer rounded-md hover:opacity-80"
           >
-            <.icon name="hero-trash" class="h-5 w-5" />
+            <.icon name="hero-trash" class="h-4 w-4 shrink-0" />
             <div class="truncate text-xs">Remove</div>
           </div>
         </div>
 
-        <div class="flex flex-col p-3 mb-1 bg-surface rounded-lg font-light space-y-1">
-          <div class="text-sm truncate">
-            <span class="font-bold">Status:</span>
-            <span class={"ml-1 w-[13px] h-[13px] rounded-full inline-block align-middle #{status_dot(mget(@machine, "status"))}"}>
+        <div class="flex flex-col p-3 mb-1 bg-surface rounded-lg font-light space-y-1.5">
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-text-tertiary">Status</span>
+            <span class="flex items-center gap-1.5 capitalize">
+              <span class={"w-[10px] h-[10px] rounded-full inline-block #{status_dot(mget(@machine, "status"))}"}></span>
+              <%= mget(@machine, "status") %>
             </span>
-            <span class="ml-1 capitalize"><%= mget(@machine, "status") %></span>
           </div>
-          <%= if mget(@machine, "capabilities") do %>
-            <% caps = mget(@machine, "capabilities") %>
-            <div class="text-sm truncate"><span class="font-bold">OS:</span> <%= caps["os"] %></div>
-            <div class="text-sm truncate">
-              <span class="font-bold">CPU:</span> <%= caps["cpu_count"] %>
+          <%= if caps = mget(@machine, "capabilities") do %>
+            <div class="flex items-center justify-between text-sm gap-3">
+              <span class="text-text-tertiary shrink-0">OS</span>
+              <span class="truncate text-right"><%= caps["os"] %></span>
             </div>
-            <div class="text-sm truncate">
-              <span class="font-bold">RAM:</span> <%= caps["memory_mb"] %> MB
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-text-tertiary">CPU</span>
+              <span><%= caps["cpu_count"] %></span>
             </div>
-          <% end %>
-          <%= if mget(@machine, "last_seen") do %>
-            <div class="text-sm truncate text-gray-400">
-              last seen <%= String.slice(mget(@machine, "last_seen"), 0, 19) %>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-text-tertiary">RAM</span>
+              <span><%= caps["memory_mb"] %> MB</span>
             </div>
           <% end %>
           <%= if mget(@machine, "overlay_ip") do %>
-            <div class="text-sm truncate">
-              <span class="font-bold">Overlay:</span>
-              <span class="ml-1 font-mono text-xs text-accent"><%= mget(@machine, "overlay_ip") %></span>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-text-tertiary">Overlay</span>
+              <span class="font-mono text-xs text-accent"><%= mget(@machine, "overlay_ip") %></span>
             </div>
           <% end %>
           <%= if mget(@machine, "overlay_status") do %>
-            <div class="text-sm truncate">
-              <span class="font-bold">WireGuard:</span>
-              <span class="ml-1"><%= mget(@machine, "overlay_status") %></span>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-text-tertiary">WireGuard</span>
+              <span class="capitalize"><%= mget(@machine, "overlay_status") %></span>
+            </div>
+          <% end %>
+          <%= if mget(@machine, "last_seen") do %>
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-text-tertiary">Last seen</span>
+              <span class="text-gray-400"><%= String.slice(mget(@machine, "last_seen"), 0, 19) %></span>
             </div>
           <% end %>
         </div>
 
         <div class="mt-4">
-          <div class="text-sm font-semibold mb-2">Listeners</div>
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-sm font-semibold">Listeners</div>
+            <button
+              phx-click="toggle_listeners"
+              phx-target={@myself}
+              class="ghost-btn !px-2 !py-0.5 text-[10px]"
+            >
+              <%= if @listeners_expanded, do: "Hide", else: "Show #{length(@listeners)}" %>
+            </button>
+          </div>
           <%= if Enum.empty?(@listeners) do %>
             <div class="text-xs text-gray-400 italic">No listeners discovered</div>
           <% else %>
-            <div class="space-y-1">
-              <%= for l <- @listeners do %>
-                <div class="bg-surface rounded p-2 text-xs flex items-center justify-between">
-                  <div class="flex items-center gap-2 min-w-0">
-                    <span class="w-2 h-2 rounded-full bg-green shrink-0"></span>
-                    <span class="font-mono truncate"><%= l["addr"] %>:<%= l["port"] %></span>
-                    <span class="text-gray-400 truncate"><%= l["proc"] %> (<%= l["pid"] %>)</span>
-                    <span :if={l["container"]} class="text-accent truncate">· <%= l["container"] %></span>
+            <%= if @listeners_expanded do %>
+              <div class="space-y-1">
+                <%= for l <- @listeners do %>
+                  <div class="bg-surface rounded p-2 text-xs flex items-center justify-between">
+                    <div class="flex items-center gap-2 min-w-0">
+                      <span class="w-2 h-2 rounded-full bg-green shrink-0"></span>
+                      <span class="font-mono truncate"><%= l["addr"] %>:<%= l["port"] %></span>
+                      <span class="text-gray-400 truncate"><%= l["proc"] %> (<%= l["pid"] %>)</span>
+                      <span :if={l["container"]} class="text-accent truncate">· <%= l["container"] %></span>
+                    </div>
+                    <button
+                      phx-click="make_listener_resource"
+                      phx-value-machine_id={mget(@machine, "id")}
+                      phx-value-addr={l["addr"]}
+                      phx-value-port={l["port"]}
+                      phx-value-proc={l["proc"]}
+                      class="ghost-btn !px-2 !py-0.5 text-[10px] shrink-0"
+                    >
+                      make resource
+                    </button>
                   </div>
-                  <button
-                    phx-click="make_listener_resource"
-                    phx-value-machine_id={mget(@machine, "id")}
-                    phx-value-addr={l["addr"]}
-                    phx-value-port={l["port"]}
-                    phx-value-proc={l["proc"]}
-                    class="ghost-btn !px-2 !py-0.5 text-[10px] shrink-0"
-                  >
-                    make resource
-                  </button>
-                </div>
-              <% end %>
-            </div>
+                <% end %>
+              </div>
+            <% else %>
+              <div class="text-xs text-gray-400 italic">Collapsed — click Show to see listening processes.</div>
+            <% end %>
           <% end %>
         </div>
 
