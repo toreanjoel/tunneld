@@ -133,10 +133,13 @@ defmodule Tunneld.Egress do
     id = machine["id"]
     iface = Tunneld.Overlay.iface_name(id)
     table = table_for(machine)
+    overlay_ip = Tunneld.Overlay.address_for(machine)
 
     with :ok <- assert_gateway_role(device_ip),
          :ok <- add_rule(device_ip, table),
-         :ok <- add_default_route(iface, table),
+         :ok <- add_default_route(overlay_ip, iface, table),
+         :ok <- add_lan_route(table),
+         :ok <- add_vm_device_route(machine, device_ip, iface),
          :ok <- maybe_set_dns(device_ip, machine, dns) do
       {:ok, %{device_ip: device_ip, machine: id, table: table, dns: dns}}
     end
@@ -152,8 +155,23 @@ defmodule Tunneld.Egress do
     run_gateway("ip rule add from #{device_ip} lookup #{table}")
   end
 
-  defp add_default_route(iface, table) do
-    run_gateway("ip route add default dev #{iface} table #{table} 2>/dev/null || true")
+  defp add_default_route(overlay_ip, iface, table) do
+    # The default route needs the VM's overlay IP as next-hop; a bare
+    # `dev <iface>` link-scope route can't reach the internet.
+    run_gateway("ip route add default via #{overlay_ip} dev #{iface} table #{table} 2>/dev/null || true")
+  end
+
+  # Keep the device's LAN traffic local (to the gateway) instead of sending it
+  # through the tunnel, so the device can still reach the gateway/subnet.
+  defp add_lan_route(table) do
+    gw = gateway_ip()
+    iface = lan_iface()
+    run_gateway("ip route add #{lan_subnet(gw)} dev #{iface} table #{table} 2>/dev/null || true")
+  end
+
+  # The VM must route the device's return traffic back through the tunnel.
+  defp add_vm_device_route(machine, device_ip, iface) do
+    SSH.run(machine, "ip route add #{device_ip}/32 dev #{iface} 2>/dev/null || true")
   end
 
   # Assert tunneld is the device's default gateway (the prerequisite for egress).
@@ -206,6 +224,26 @@ defmodule Tunneld.Egress do
       _ -> nil
     end
   end
+
+  # The gateway's LAN interface (downstream). Used to keep a device's LAN
+  # traffic local when it is egressed through a remote exit.
+  defp lan_iface do
+    case Application.get_env(:tunneld, :network, []) do
+      kw when is_list(kw) -> Keyword.get(kw, :downstream) || "eth1"
+      map when is_map(map) -> Map.get(map, :downstream) || Map.get(map, "downstream") || "eth1"
+      _ -> "eth1"
+    end
+  end
+
+  # The LAN subnet (e.g. 10.0.0.0/24) derived from the gateway IP.
+  defp lan_subnet(gw) when is_binary(gw) do
+    case String.split(gw, ".") do
+      [a, b, c, _] -> "#{a}.#{b}.#{c}.0/24"
+      _ -> "10.0.0.0/24"
+    end
+  end
+
+  defp lan_subnet(_), do: "10.0.0.0/24"
 
   defp read_tables do
     case Tunneld.Persistence.read_json(Path.join(Tunneld.Config.fs_root(), "egress_tables.json")) do

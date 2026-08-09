@@ -188,7 +188,10 @@ defmodule Tunneld.Overlay do
 
     [Peer]
     PublicKey = #{String.trim(target_pub)}
-    AllowedIPs = #{overlay_ip}/32
+    # 0.0.0.0/0 so the gateway can pass egressed device traffic through the
+    # tunnel (the per-machine overlay is point-to-point; Table=off keeps the
+    # gateway's own routing on eth0).
+    AllowedIPs = 0.0.0.0/0
     Endpoint = #{endpoint}
     PersistentKeepalive = 25
     """
