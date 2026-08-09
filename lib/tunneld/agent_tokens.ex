@@ -72,6 +72,15 @@ defmodule Tunneld.AgentTokens do
     GenServer.call(__MODULE__, :list)
   end
 
+  @doc """
+  Verify a token is valid regardless of scope (used for endpoints that any
+  authenticated token may reach, e.g. GET /jobs/:id). Returns
+  `{:ok, token_id, scopes}` or `:error`.
+  """
+  def authorize_any(token) do
+    GenServer.call(__MODULE__, {:authorize_any, token})
+  end
+
   # --- GenServer ---
 
   @impl true
@@ -116,6 +125,14 @@ defmodule Tunneld.AgentTokens do
         else
           {:reply, :error, state}
         end
+    end
+  end
+
+  @impl true
+  def handle_call({:authorize_any, token}, _from, state) do
+    case find_by_hash(hash(token)) do
+      nil -> {:reply, :error, state}
+      {id, record} -> {:reply, {:ok, id, record["scopes"]}, state}
     end
   end
 

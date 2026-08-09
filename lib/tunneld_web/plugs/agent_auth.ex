@@ -26,7 +26,16 @@ defmodule TunneldWeb.Plugs.AgentAuth do
         |> halt()
 
       token ->
-        case Tunneld.AgentTokens.authorize(token, scope) do
+        # scope "any" means "any valid token" (e.g. GET /jobs/:id); otherwise
+        # the token must hold the requested scope.
+        auth =
+          if scope == "any" do
+            Tunneld.AgentTokens.authorize_any(token)
+          else
+            Tunneld.AgentTokens.authorize(token, scope)
+          end
+
+        case auth do
           {:ok, token_id, scopes} ->
             _ = Tunneld.Audit.log(action(conn), target(conn), :ok, token_id)
 

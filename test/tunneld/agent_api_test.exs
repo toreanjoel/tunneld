@@ -81,4 +81,19 @@ defmodule Tunneld.AgentApiTest do
     Process.sleep(50)
     assert {:ok, %{status: :done, result: {:ok, 42}}} = Tunneld.Jobs.get(job_id)
   end
+
+
+  test "authorize_any accepts a valid token regardless of scope" do
+    {:ok, raw, _id, _scopes} = AgentTokens.issue(["machines:read"])
+    assert {:ok, _id, _} = AgentTokens.authorize_any(raw)
+    # but authorize still requires the specific scope
+    assert :error = AgentTokens.authorize(raw, "exec")
+  end
+
+  test "jobs endpoint is reachable by any valid token" do
+    {:ok, raw, _id, _scopes} = AgentTokens.issue(["machines:read"])
+    conn = build_conn() |> put_req_header("authorization", "Bearer #{raw}") |> get("/api/v1/agent/jobs/nonexistent")
+    # token valid -> reaches the controller (404 job not found, not 403)
+    assert response(conn, 404)
+  end
 end
