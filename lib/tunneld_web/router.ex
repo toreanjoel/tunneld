@@ -37,6 +37,15 @@ defmodule TunneldWeb.Router do
       get "/device/resources", DeviceController, :resources
       get "/device/health", DeviceController, :health
 
+      # Token issuance: admin session ONLY (tokens:issue is a forbidden scope
+      # for bearer tokens). Never under agent_auth.
+      scope "/agent" do
+        pipe_through [:fetch_session]
+        post "/tokens", AgentTokenController, :create
+        get "/tokens", AgentTokenController, :index
+        delete "/tokens/:id", AgentTokenController, :delete
+      end
+
       # Agent API: scoped bearer-token auth. The product contract.
       scope "/agent" do
         pipe_through :agent_auth
