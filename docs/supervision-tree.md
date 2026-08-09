@@ -20,7 +20,8 @@ graph TD
         DNS_CFG[DnsConfig]
         UPD[Updater Server]
         MACH[Machines Server]
-        EXPO[Expose Server]
+        TOK[AgentTokens]
+        JOBS[Jobs]
         GEO[Geolocation]
     end
 
@@ -29,15 +30,23 @@ graph TD
     end
 
     subgraph Plain Modules - No Process
-        NGX[Nginx]
+        CADDY[Caddy]
+        RUNTIME[Machines.Runtime]
+        OVERLAY[Overlay]
+        EGRESS[Egress]
+        RECON[Reconcile]
+        DISEN[Disenroll]
+        AUDIT[Audit]
         NETLINK[NetLink]
         PERSIST[Persistence]
         CFG[Config]
     end
 
-    RES --> NGX
+    RES --> CADDY
     RES --> PERSIST
     AUTH --> PERSIST
+    MACH --> RUNTIME
+    MACH --> OVERLAY
     NETLINK -.reads.-> SYSFS[/sys/class/net/]
 
     style EP fill:#7c3aed,color:#fff
