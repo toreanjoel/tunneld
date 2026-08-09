@@ -45,6 +45,8 @@ defmodule Tunneld.Application do
           {DnsConfig, []},
           {Updater, []},
           {Machines, []},
+          {Tunneld.AgentTokens, []},
+          {Tunneld.Jobs, []},
           {Tunneld.Geolocation, []},
           TunneldWeb.Endpoint
         ]

@@ -18,7 +18,7 @@ defmodule TunneldWeb.MachineController do
   use TunneldWeb, :controller
   require Logger
 
-  plug :require_admin when action in [:create, :probe, :delete, :create_container, :start_container, :stop_container, :delete_container]
+  plug :require_admin when action in [:index, :show, :containers, :listeners, :create, :probe, :delete, :create_container, :start_container, :stop_container, :delete_container]
 
   def index(conn, _params) do
     json(conn, %{machines: Tunneld.Machines.list()})
@@ -121,18 +121,48 @@ defmodule TunneldWeb.MachineController do
     end
   end
 
+  # Job-based probe: enqueue, return 202 {job_id}; poll /agent/jobs/:id.
+  def probe_job(conn, %{"id" => id}) do
+    {job_id, _pid} = Tunneld.Jobs.enqueue(fn -> Tunneld.Machines.probe(id) end)
+    conn |> put_status(202) |> json(%{job_id: job_id, status: "running"})
+  end
+
+  # Run a command on a machine over SSH (scoped to `exec`). Returns job.
+  def exec(conn, %{"id" => id} = params) do
+    cmd = params["cmd"] || "true"
+
+    case Tunneld.Machines.get(id) do
+      {:ok, machine} ->
+        {job_id, _pid} =
+          Tunneld.Jobs.enqueue(fn ->
+            Tunneld.Machines.SSH.run(machine, cmd)
+          end)
+
+        conn |> put_status(202) |> json(%{job_id: job_id, status: "running"})
+
+      {:error, :not_found} ->
+        conn |> put_status(404) |> json(%{error: "machine not found"})
+    end
+  end
+
   # --- Auth ---
 
   defp require_admin(conn, _opts) do
-    client_id = get_session(conn, :client_id)
-
-    if client_id && Tunneld.Servers.Session.valid?(client_id) do
+    # Agent-API routes carry an agent_scope in conn.private (auth handled by
+    # the AgentAuth plug); skip the session check for those.
+    if Map.has_key?(conn.private, :agent_scope) do
       conn
     else
-      conn
-      |> put_status(401)
-      |> json(%{error: "admin session required"})
-      |> halt()
+      client_id = get_session(conn, :client_id)
+
+      if client_id && Tunneld.Servers.Session.valid?(client_id) do
+        conn
+      else
+        conn
+        |> put_status(401)
+        |> json(%{error: "admin session required"})
+        |> halt()
+      end
     end
   end
 end

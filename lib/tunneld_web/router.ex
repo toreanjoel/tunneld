@@ -14,6 +14,10 @@ defmodule TunneldWeb.Router do
     plug :accepts, ["json"]
   end
 
+  pipeline :agent_auth do
+    plug TunneldWeb.Plugs.AgentAuth
+  end
+
   pipeline :set_client_id do
     plug TunneldWeb.Plugs.SetClientId
   end
@@ -32,6 +36,24 @@ defmodule TunneldWeb.Router do
       get "/device/machines/:id/containers", DeviceController, :containers
       get "/device/resources", DeviceController, :resources
       get "/device/health", DeviceController, :health
+
+      # Agent API: scoped bearer-token auth. The product contract.
+      scope "/agent" do
+        pipe_through :agent_auth
+
+        get "/machines", MachineController, :index, private: %{agent_scope: "machines:read"}
+        get "/machines/:id", MachineController, :show, private: %{agent_scope: "machines:read"}
+        get "/machines/:id/listeners", MachineController, :listeners, private: %{agent_scope: "machines:read"}
+        post "/machines/:id/probe", MachineController, :probe_job, private: %{agent_scope: "machines:write"}
+        post "/machines/:id/exec", MachineController, :exec, private: %{agent_scope: "exec"}
+        delete "/machines/:id", MachineController, :delete, private: %{agent_scope: "machines:write"}
+
+        get "/resources", AgentResourceController, :index, private: %{agent_scope: "resources:read"}
+        post "/resources", AgentResourceController, :create, private: %{agent_scope: "resources:write"}
+        delete "/resources/:id", AgentResourceController, :delete, private: %{agent_scope: "resources:write"}
+
+        get "/jobs/:id", AgentResourceController, :job, private: %{agent_scope: "any"}
+      end
 
       pipe_through [:fetch_session]
       get "/machines", MachineController, :index
