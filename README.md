@@ -110,37 +110,37 @@ Local networking, DHCP, and name resolution keep functioning without internet. T
 ### Runtime discovery (Machines + Runtime)
 Enroll machines (local subnet devices or remote VPSes) that expose a Linux SSH endpoint. Tunneld generates an Ed25519 keypair per machine, displays the public half for you to install on the target, probes generic capabilities over SSH (OS, kernel, arch, CPU, RAM, detected runtimes), and enumerates listening sockets with `ss -tlnp`. Any listener can be promoted to a named resource.
 
-- **Host specs surfaced per target** from a capability probe: `incus_version`, `os`, `cpu_count`, `memory_mb`, `storage`, `kvm`, `gpu`.
-- **State is queried live over SSH** (`incus list --format json`, capability probe) rather than persisted and reconciled. The target is the source of truth; tunneld persists only the target list and credentials.
+- **Host specs surfaced per target** from a generic capability probe: `os`, `kernel`, `arch`, `cpu_count`, `memory_mb`, `detected_runtimes` (no container-runtime fields).
+- **Listeners discovered live** with `ss -tlnp`; the target is the source of truth. Tunneld persists only the target list and credentials.
 - **SSH transport** uses ControlMaster multiplexing (`ControlMaster=auto`, `ControlPersist=600`) so repeated commands reuse one persistent connection per machine.
-- **Container autostart** — every created container gets `boot.autostart=true`, so instances survive host reboots.
+- **Runtime-agnostic** — tunneld never asks "what runtime is this?", only "what is listening?". Incus/Docker/systemd/bare processes all work identically; it installs exactly two things on a target: **WireGuard and Caddy**.
 
-> **Note:** Only `kind: "incus"` is supported today. The README previously claimed non-Linux hosts are managed via a Linux VM on that host — this is **aspirational, not implemented**. Other kinds return `unsupported_provider`.
+### Local vs remote machines
+The `location` field is inferred from the subnet (same `/24` as the gateway = `"local"`, otherwise
+`"remote"`) but it now collapses into a single function, `Overlay.address_for/1`:
 
-### Local vs remote targets
-The `location` field is inferred from the subnet (same `/24` as the gateway = `"local"`, otherwise `"remote"`) and drives the networking model:
+- **Local machine** → its LAN IP.
+- **Remote machine** → its **overlay IP** (over the WireGuard tunnel). WireGuard makes remote
+  machines local.
 
-- **Local targets → macvlan**: a macvlan container gets its own MAC address and DHCP lease straight from the gateway's dnsmasq, appearing on the subnet as an independent device. Reachable by name and SSH-able with no proxying. Only valid for containers (not VMs) on local targets.
-- **Remote targets → NAT bridge**: the container is NAT'd behind the remote host. Reaching an app inside it requires an explicit exposure path (see below). Incus proxy devices map host ports to container ports.
+### Overlay (WireGuard)
+Tunneld installs WireGuard on each enrolled machine and brings up a `wg-<id>` peer. The gateway
+dials out to each machine (`PersistentKeepalive=25`, `Table=off` with hand-installed routes), so a
+remote VPS's services become reachable as if they were on the subnet.
 
-### Interactive shell (Incus exec)
-Open a browser terminal into a container or VM over the Phoenix channel `exec:<machine>:<container>`, streaming `incus exec` over SSH with a PTY (`-tt`). Keypresses flow from the browser to the SSH stdin in real time. A mock shell is provided for dev mode.
+### Runtime discovery & resources
+Tunneld discovers what is *listening* (`ss -tlnp`) on a machine; any listener can be promoted to a
+**resource**. A resource is a named pointer to already-running backends:
 
-### Exposing remote container services to the subnet
-macvlan only spans a single Layer-2 segment, so a container on a machine reached over the internet cannot appear as a subnet device. For **remote** machines, tunneld instead:
-
-1. Opens a local SSH port-forward (`ssh -f -N -L 127.0.0.1:<local>:<container_ip>:<remote>` with `ExitOnForwardFailure=yes`) from the gateway to the container's port on the remote host.
-2. (Legacy) registered an nginx resource whose pool pointed at the forwarded port. This SSH-tunnel path was removed in M3 — remote machines are now WireGuard peers, so their services are reached directly over the overlay.
-
-The container service becomes reachable subnet-wide at `http://<name>.tunneld.lan:18000`, indistinguishable from a local service. Exposures are persisted in `expose.json` and **re-opened automatically on gateway startup** so they survive reboots. Local port is allocated from the 20000–30000 range.
-
-### Resources and reverse proxy
-Caddy runs on the gateway and fronts a resource registry (`resources.json`). Each resource has a name and a **pool** of `IP:port` backends, health-checked via TCP probes every 10 seconds.
-
-- Caddy load-balances across healthy backends; each resource is reachable at `http://<name>.tunneld.lan:18000` (and on a per-resource loopback port for manual/zrok-style exposure).
-- No public-internet exposure, no per-resource auth — access is limited to the subnet.
+- Caddy load-balances across healthy backends; each resource is reachable at
+  `http://<name>.tunneld.lan:18000` (and on a per-resource loopback port `127.0.0.1:2xxxx` for
+  manual/zrok-style exposure).
+- Remote machines are reached over the overlay, so no SSH tunnel is involved and resources survive
+  a gateway reboot.
+- Public exposure drives the machine's own Caddy (over the overlay) with a single `listen` field:
+  a port (`8080`, no TLS) or a hostname (`app.example.com`, auto-TLS).
 - Pool entries are validated as `IP:port` before writing the Caddy upstream config (injection-safe).
-- A resource is a named pointer to already-running backends. For containers, local macvlan and remote expose handle this automatically; **Add Resource** is mainly for non-container services running directly on devices.
+- No public-internet exposure without an explicit public-plane action.
 
 ### Quick Expose
 A subnet device can create, list, and remove a local resource with a single `curl` — no login. The gateway resolves the caller from its DHCP lease (`conn.remote_ip` matched against `dnsmasq.leases`) and validates a per-device allowlist (`expose_allowed.json`, MAC → boolean). The operator must explicitly allowlist a MAC before that device can Quick Expose.
