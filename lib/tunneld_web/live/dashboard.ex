@@ -400,8 +400,6 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, assign(socket, :enroll_wizard_open, true)}
   end
 
-
-
   def handle_event("install_wireguard", %{"id" => id}, socket) do
     result =
       case Tunneld.Machines.get(id) do
@@ -604,7 +602,12 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, socket}
   end
 
-
+  # The enrollment wizard is a live_component whose open state is owned by
+  # this parent (@enroll_wizard_open). When the wizard asks to close, reset
+  # the parent flag so the modal stays closed on subsequent re-renders.
+  def handle_info(:wizard_closed, socket) do
+    {:noreply, assign(socket, :enroll_wizard_open, false)}
+  end
 
   def handle_info(
         %{id: "devices", module: TunneldWeb.Live.Components.Devices, data: data} = message,

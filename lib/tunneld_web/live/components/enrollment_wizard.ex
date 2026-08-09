@@ -74,6 +74,10 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
   end
 
   def handle_event("wizard_close", _params, socket) do
+    # The parent owns the open state (it re-renders this component from
+    # @enroll_wizard_open). Tell the parent to close so the modal stays
+    # closed instead of being re-opened on the next parent re-render.
+    send(socket.parent_pid, :wizard_closed)
     {:noreply, assign(socket, open: false)}
   end
 
