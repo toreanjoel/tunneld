@@ -230,7 +230,15 @@ defmodule Tunneld.Overlay do
   defp gen_keypair do
     {priv, 0} = System.cmd("wg", ["genkey"], stderr_to_stdout: true)
     priv = String.trim(priv)
-    {pub, 0} = System.cmd("wg", ["pubkey"], input: priv <> "\n", stderr_to_stdout: true)
+
+    # System.cmd has no :input option; pipe the private key to `wg pubkey`
+    # via a temp file so the public half can be derived.
+    tmp = Path.join(System.tmp_dir!(), "wg_key_#{System.unique_integer([:positive])}")
+    File.write!(tmp, priv <> "\n")
+    File.chmod!(tmp, 0o600)
+    {pub, 0} = System.cmd("sh", ["-c", "wg pubkey < #{tmp}"], stderr_to_stdout: true)
+    File.rm(tmp)
+
     {String.trim(pub), priv}
   end
 
