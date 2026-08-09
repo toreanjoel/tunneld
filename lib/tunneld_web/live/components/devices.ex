@@ -178,6 +178,18 @@ defmodule TunneldWeb.Live.Components.Devices do
               <% end %>
             </div>
             <div class="mt-auto">
+              <div class="flex items-center justify-between gap-2 mb-1">
+                <span class="text-[10px] uppercase tracking-wide text-text-tertiary">Egress</span>
+                <form phx-change="set_device_egress" phx-target={@myself}>
+                  <input type="hidden" name="ip" value={device.ip} />
+                  <select name="egress" class="tunl-input !py-0.5 !px-1 text-[10px] !w-auto">
+                    <option value="local">Local</option>
+                    <%= for {mid, mname} <- @egress_machines do %>
+                      <option value={mid}><%= mname %></option>
+                    <% end %>
+                  </select>
+                </form>
+              </div>
               <div class="text-xs text-text-tertiary flex items-center gap-1.5 justify-between">
                 <span><%= mask(@obfuscated, device.ip) %></span>
               </div>
@@ -188,6 +200,32 @@ defmodule TunneldWeb.Live.Components.Devices do
       </div>
     </div>
     """
+  end
+
+  # The egress dropdown lives on each device card. The actual routing logic is
+  # owned by the parent dashboard (set_device_egress), so forward the change
+  # there. The select sends the chosen value as "value"; ip comes from phx-value-ip.
+  def handle_event("set_device_egress", %{"ip" => ip, "egress" => egress}, socket) do
+    # egress == "local" reverts to the gateway's own upstream; otherwise route
+    # the device out through the named exit machine. Done here (not forwarded to
+    # the parent) because this component is re-rendered via send_update and has
+    # no reliable parent_pid.
+    result =
+      if egress == "local" do
+        :ok
+      else
+        case Tunneld.Machines.get(egress) do
+          {:ok, machine} -> Tunneld.Egress.route_device(machine, ip)
+          _ -> {:error, "exit machine not found"}
+        end
+      end
+
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+      type: if(match?({:ok, _}, result), do: :info, else: :error),
+      message: "Egress for #{ip}: #{inspect(result)}"
+    })
+
+    {:noreply, socket}
   end
 
   defp tag_classes(_tag), do: "bg-surface-2 text-text-secondary border-border"

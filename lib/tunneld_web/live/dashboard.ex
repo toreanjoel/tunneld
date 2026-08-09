@@ -445,28 +445,6 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, socket}
   end
 
-  def handle_event("set_device_egress", %{"ip" => ip, "egress" => egress} = _params, socket) do
-    # egress == "local" reverts to the gateway's own upstream; otherwise route
-    # the device out through the named exit machine.
-    result =
-      if egress == "local" do
-        # revert any active egress for this device (best-effort)
-        :ok
-      else
-        case Tunneld.Machines.get(egress) do
-          {:ok, machine} -> Tunneld.Egress.route_device(machine, ip)
-          _ -> {:error, "exit machine not found"}
-        end
-      end
-
-    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-      type: if(match?({:ok, _}, result), do: :info, else: :error),
-      message: "Egress for #{ip}: #{inspect(result)}"
-    })
-
-    {:noreply, socket}
-  end
-
   def handle_event("probe_machine", %{"id" => id}, socket) do
     case Tunneld.Machines.probe(id) do
       {:ok, _} ->
@@ -619,7 +597,8 @@ defmodule TunneldWeb.Live.Dashboard do
       send_update(message.module,
         id: message.id,
         data: message.data,
-        obfuscated: socket.assigns.obfuscated
+        obfuscated: socket.assigns.obfuscated,
+        egress_machines: egress_machines()
       )
     end
 
