@@ -33,8 +33,7 @@ defmodule TunneldWeb.Live.Dashboard do
     is_open: false,
     view: nil,
     selection: nil,
-    data: nil,
-    containers: []
+    data: nil
   }
 
   @link_poll_interval 15_000
@@ -96,9 +95,6 @@ defmodule TunneldWeb.Live.Dashboard do
       |> assign(:system_resources, %{})
       |> assign(:map_status, :loading)
       |> assign(:geo_location, nil)
-      |> assign(:terminal_open, false)
-      |> assign(:terminal_machine_id, nil)
-      |> assign(:terminal_container, nil)
 
     socket =
       case Tunneld.Geolocation.get_location() do
@@ -242,92 +238,10 @@ defmodule TunneldWeb.Live.Dashboard do
         pending_actions={@pending_actions}
       />
 
-      <%= if @terminal_open do %>
-        <.terminal_modal
-          machine_id={@terminal_machine_id}
-          container={@terminal_container}
-          client_id={@client_id}
-        />
-      <% end %>
-    </div>
-    """
-  end
-
-  defp terminal_modal(assigns) do
-    ~H"""
-    <div
-      class="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
-      phx-click="close_terminal"
-      phx-window-keydown="close_terminal"
-      phx-key="escape"
-    >
-      <div
-        class="bg-bg border border-border rounded-lg w-[95%] max-w-6xl h-[90%] flex flex-col"
-        phx-click="ignore"
-      >
-        <div class="flex items-center justify-between p-3 border-b border-border">
-          <div class="text-sm font-medium">
-            <.icon name="hero-command-line" class="w-4 h-4 inline mr-1" /> shell: <%= @container %>
           </div>
-          <button phx-click="close_terminal" class="ghost-btn text-xs">close</button>
-        </div>
-        <div
-          id={"terminal-#{@machine_id}-#{@container}"}
-          phx-hook="Terminal"
-          data-topic={"exec:#{@machine_id}:#{@container}"}
-          data-client-id={@client_id}
-          class="flex-1 bg-black overflow-hidden p-2 cursor-text"
-        >
-          <pre class="text-xs font-mono text-green-400 whitespace-pre-wrap h-full overflow-auto m-0"></pre>
-          <input
-            type="text"
-            class="terminal-input opacity-0 absolute -z-10 w-0 h-0"
-            autocomplete="off"
-            autofocus
-          />
-        </div>
-      </div>
-    </div>
     """
   end
 
-  def sidebar(%{sidebar: sidebar, uri_info: uri_info} = assigns) do
-    assigns =
-      assigns
-      |> assign(:sidebar, sidebar)
-      |> assign(:uri_info, uri_info)
-
-    ~H"""
-    <div
-      :if={@sidebar.is_open}
-      class="fixed top-0 right-0 z-50 h-screen w-screen lg:w-[35%] lg:max-w-[700px] shadow-lg transition-transform duration-300 ease-in-out"
-      style="background-color: var(--surface);"
-    >
-      <button
-        phx-click="close_details"
-        class="absolute top-4 right-4 z-10 ghost-icon w-9 h-9 flex items-center justify-center"
-      >
-        <.icon class="w-5 h-5" name="hero-x-mark" />
-      </button>
-
-      <div class="h-full overflow-y-auto system-scroll bg-surface">
-        <div class="min-h-full">
-          <.live_component
-            id="sidebar_details"
-            module={SidebarDetails}
-            view={@sidebar.view}
-            uri_info={@uri_info}
-            selection={@sidebar.selection}
-            data={@sidebar.data}
-            containers={@sidebar.containers}
-            listeners={@sidebar.listeners}
-            obfuscated={@obfuscated}
-          />
-        </div>
-      </div>
-    </div>
-    """
-  end
 
   defp services_list do
     status = Tunneld.Servers.Services.get_status()
@@ -493,38 +407,6 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal_data))}
   end
 
-  def handle_event("create_container_modal", %{"id" => id}, socket) do
-    case Tunneld.Machines.get(id) do
-      {:ok, machine} ->
-        caps = machine["capabilities"] || %{}
-
-        modal_data = %{
-          show: true,
-          title: "New Container/VM",
-          description: "Provision an Incus container or VM on #{machine["name"]}.",
-          body: %{
-            "type" => "schema",
-            "data" =>
-              Tunneld.Schema.Container.data(%{
-                machine_id: id,
-                kvm: caps["kvm"] == true,
-                location: machine["location"],
-                cpu_count: caps["cpu_count"],
-                memory_mb: caps["memory_mb"]
-              }),
-            "default_values" => %{"type" => "container", "network" => "bridge"},
-            "action" => "create_container"
-          },
-          actions: nil,
-          type: :default
-        }
-
-        {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal_data))}
-
-      {:error, :not_found} ->
-        {:noreply, put_flash(socket, :error, "Machine not found")}
-    end
-  end
 
 
   def handle_event("reconcile_machine", %{"id" => id}, socket) do
@@ -635,42 +517,8 @@ defmodule TunneldWeb.Live.Dashboard do
     end
   end
 
-  def handle_event("install_incus", %{"id" => id}, socket) do
-    {:noreply, start_action("install_incus", %{"id" => id}, socket)}
-  end
 
-  def handle_event("start_container", %{"id" => id, "name" => name}, socket) do
-    case Tunneld.Machines.start_container(id, name) do
-      {:ok, _} ->
-        socket = refresh_machine_sidebar(socket, id)
-        {:noreply, put_flash(socket, :info, "#{name} started")}
 
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Could not start #{name}")}
-    end
-  end
-
-  def handle_event("stop_container", %{"id" => id, "name" => name}, socket) do
-    case Tunneld.Machines.stop_container(id, name) do
-      {:ok, _} ->
-        socket = refresh_machine_sidebar(socket, id)
-        {:noreply, put_flash(socket, :info, "#{name} stopped")}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Could not stop #{name}")}
-    end
-  end
-
-  def handle_event("delete_container", %{"id" => id, "name" => name}, socket) do
-    case Tunneld.Machines.delete_container(id, name) do
-      {:ok, _} ->
-        socket = refresh_machine_sidebar(socket, id)
-        {:noreply, put_flash(socket, :info, "#{name} deleted")}
-
-      {:error, _} ->
-        {:noreply, put_flash(socket, :error, "Could not delete #{name}")}
-    end
-  end
 
   def handle_event("make_listener_resource", %{"machine_id" => id, "addr" => addr, "port" => port, "proc" => proc} = _params, socket) do
     name = sanitize_resource_name("#{proc}-#{port}")
@@ -703,25 +551,7 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, socket}
   end
 
-  def handle_event("open_terminal", %{"id" => id, "name" => name}, socket) do
-    socket =
-      socket
-      |> assign(:terminal_open, true)
-      |> assign(:terminal_machine_id, id)
-      |> assign(:terminal_container, name)
 
-    {:noreply, socket}
-  end
-
-  def handle_event("close_terminal", _params, socket) do
-    socket =
-      socket
-      |> assign(:terminal_open, false)
-      |> assign(:terminal_machine_id, nil)
-      |> assign(:terminal_container, nil)
-
-    {:noreply, socket}
-  end
 
   def handle_info(
         %{id: "devices", module: TunneldWeb.Live.Components.Devices, data: data} = message,
@@ -861,7 +691,7 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   def handle_info({:action_done, ref, action, result}, socket)
-      when action in ["enroll_machine", "create_container", "install_incus"] do
+      when action in ["enroll_machine"] do
     pending = Map.get(socket.assigns.pending_actions, ref, %{})
 
     socket =
@@ -975,6 +805,43 @@ defmodule TunneldWeb.Live.Dashboard do
       "authentication" ->
         :authentication
     end
+  end
+
+def sidebar(%{sidebar: sidebar, uri_info: uri_info} = assigns) do
+    assigns =
+      assigns
+      |> assign(:sidebar, sidebar)
+      |> assign(:uri_info, uri_info)
+
+    ~H"""
+    <div
+      :if={@sidebar.is_open}
+      class="fixed top-0 right-0 z-50 h-screen w-screen lg:w-[35%] lg:max-w-[700px] shadow-lg transition-transform duration-300 ease-in-out"
+      style="background-color: var(--surface);"
+    >
+      <button
+        phx-click="close_details"
+        class="absolute top-4 right-4 z-10 ghost-icon w-9 h-9 flex items-center justify-center"
+      >
+        <.icon class="w-5 h-5" name="hero-x-mark" />
+      </button>
+
+      <div class="h-full overflow-y-auto system-scroll bg-surface">
+        <div class="min-h-full">
+          <.live_component
+            id="sidebar_details"
+            module={SidebarDetails}
+            view={@sidebar.view}
+            uri_info={@uri_info}
+            selection={@sidebar.selection}
+            data={@sidebar.data}
+            listeners={@sidebar.listeners}
+            obfuscated={@obfuscated}
+          />
+        </div>
+      </div>
+    </div>
+    """
   end
 
   defp sidebar_selection("resource", id) when is_binary(id), do: %{type: :resource, id: id}
@@ -1129,18 +996,12 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   defp sidebar_open(view, selection) when is_atom(view) do
-    %{is_open: true, view: view, selection: selection, data: nil, containers: [], listeners: []}
+    %{is_open: true, view: view, selection: selection, data: nil, listeners: []}
   end
 
   defp open_machine_sidebar(socket, id) do
     case Tunneld.Machines.get(id) do
       {:ok, machine} ->
-        containers =
-          case Tunneld.Machines.list_containers(id) do
-            {:ok, c} -> c
-            _ -> []
-          end
-
         listeners =
           case Tunneld.Machines.listeners(id) do
             {:ok, l} -> l
@@ -1153,7 +1014,6 @@ defmodule TunneldWeb.Live.Dashboard do
           view: :machine,
           selection: %{type: :machine, id: id},
           data: machine,
-          containers: containers,
           listeners: listeners
         }
 
@@ -1165,7 +1025,6 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   # After a container action (create/start/stop/delete/expose), re-fetch the
-  # machine's containers and push them into the open machine sidebar so the
   # list reflects live state without the user re-opening the sidebar.
   defp maybe_refresh_machine_sidebar(socket, pending) do
     case Map.get(pending, :data, %{}) do
@@ -1179,20 +1038,14 @@ defmodule TunneldWeb.Live.Dashboard do
 
     if Map.get(sidebar, :view) == :machine and
          match?(%{type: :machine, id: ^id}, Map.get(sidebar, :selection)) do
-      containers =
-        case Tunneld.Machines.list_containers(id) do
-          {:ok, c} -> c
-          _ -> []
-        end
-
       listeners =
         case Tunneld.Machines.listeners(id) do
           {:ok, l} -> l
           _ -> []
         end
 
-      sidebar = sidebar |> Map.put(:containers, containers) |> Map.put(:listeners, listeners)
-      send_update(SidebarDetails, id: "sidebar_details", containers: containers, listeners: listeners)
+      sidebar = Map.put(sidebar, :listeners, listeners)
+      send_update(SidebarDetails, id: "sidebar_details", listeners: listeners)
       assign(socket, :sidebar, sidebar)
     else
       socket
@@ -1200,7 +1053,7 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   defp sidebar_close(sidebar) when is_map(sidebar) do
-    %{is_open: false, view: Map.get(sidebar, :view), selection: nil, data: nil, containers: [], listeners: []}
+    %{is_open: false, view: Map.get(sidebar, :view), selection: nil, data: nil, listeners: []}
   end
 
   defp machine_action_flash(socket, "enroll_machine", %{"public_key" => pub} = result)
@@ -1246,18 +1099,6 @@ defmodule TunneldWeb.Live.Dashboard do
     )
   end
 
-  defp machine_action_flash(socket, "install_incus", %{"capabilities" => %{"incus_version" => v}}) do
-    put_flash(socket, :info, "Incus installed (#{v}) and machine probed successfully.")
-  end
-
-  defp machine_action_flash(socket, "install_incus", _result) do
-    put_flash(socket, :info, "Incus installed and machine probed successfully.")
-  end
-
-  defp machine_action_flash(socket, "create_container", %{"name" => name}) do
-    put_flash(socket, :info, "Container #{name} created")
-  end
-
   defp machine_action_flash(socket, _action, _result), do: socket
 
   # start_action wraps perform/3 as {:ok, perform(...)}. perform/3 itself returns
@@ -1270,26 +1111,9 @@ defmodule TunneldWeb.Live.Dashboard do
 
   defp machine_error("enroll_machine", reason), do: "enrollment failed: #{inspect(reason)}"
 
-  defp machine_error("create_container", reason),
-    do: "container creation failed: #{inspect(reason)}"
-
-  defp machine_error("install_incus", {:ssh_failed, _}) do
-    "SSH connection failed. Make sure the public key is installed on the target and the SSH user is correct."
-  end
-
-  defp machine_error("install_incus", :unsupported_distro) do
-    "Unsupported distro. tunneld can auto-install Incus on Ubuntu, Debian, Alpine, and Fedora."
-  end
-
-  defp machine_error("install_incus", {:install_failed, reason}) do
-    "Incus install failed: #{inspect(reason)}"
-  end
-
   defp machine_error(_action, reason), do: inspect(reason)
 
-  defp probe_error(:incus_not_installed),
-    do:
-      "Incus is not installed on the target. Click the 'Install Incus' button in the sidebar to install it automatically, then probe again."
+
 
   defp probe_error({:ssh_failed, 255, out}) do
     msg =

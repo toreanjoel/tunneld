@@ -2,14 +2,13 @@ defmodule TunneldWeb.DeviceController do
   @moduledoc """
   Device-facing (no-login) read API for subnet devices.
 
-  These endpoints let a device on the gateway's subnet query machine, container,
+  These endpoints let a device on the gateway's subnet query machine,
   health, and exposure data without credentials. The caller is resolved from
   its DHCP lease (same model as Quick Expose), so only devices that have a
   lease from this gateway are allowed.
 
   Endpoints (under /api/v1/device):
     GET /api/v1/device/machines                 list machines + status + capabilities
-    GET /api/v1/device/machines/:id/containers  list containers on a machine (live)
     GET /api/v1/device/machines/:id             machine detail + health
     GET /api/v1/device/resources                list exposed resources
     GET /api/v1/device/health                   gateway + service status
@@ -62,20 +61,7 @@ defmodule TunneldWeb.DeviceController do
     end
   end
 
-  @doc "List containers on a machine (live over SSH or mock)."
-  def containers(conn, %{"id" => id}) do
-    with {:ok, _ip, _mac} <- resolve_device(conn) do
-      case Tunneld.Machines.list_containers(id) do
-        {:ok, containers} -> json(conn, %{containers: containers})
-        {:error, :not_found} -> conn |> put_status(404) |> json(%{error: "machine not found"})
-        {:error, reason} -> conn |> put_status(502) |> json(%{error: "list failed", detail: inspect(reason)})
-      end
-    else
-      err -> render_error(err, conn)
-    end
-  end
 
-  @doc "List resources exposed on the subnet (incl. remote container exposures)."
   def resources(conn, _params) do
     with {:ok, _ip, _mac} <- resolve_device(conn) do
       resources =

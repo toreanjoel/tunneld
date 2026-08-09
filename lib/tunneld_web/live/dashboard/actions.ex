@@ -81,27 +81,8 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
         Tunneld.Machines.remove(id)
         send(parent, :close_details)
 
-      "install_incus" ->
-        %{"id" => id} = data
-        Tunneld.Machines.install_incus(id)
-
       "enroll_machine" ->
         Tunneld.Machines.enroll(data)
-
-      "create_container" ->
-        id = data["machine_id"]
-
-        spec = %{
-          "name" => data["name"],
-          "image" => data["image"],
-          "type" => data["type"] || "container",
-          "network" => data["network"] || "bridge",
-          "cpu" => data["cpu"],
-          "memory" => data["memory"],
-          "ports" => data["ports"] || []
-        }
-
-        Tunneld.Machines.create_container(id, spec)
 
       # Device restart
       "restart_device" ->

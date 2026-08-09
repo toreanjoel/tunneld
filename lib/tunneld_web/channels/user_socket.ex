@@ -6,7 +6,6 @@ defmodule TunneldWeb.UserSocket do
   """
   use Phoenix.Socket
 
-  channel "exec:*", TunneldWeb.ExecChannel
 
   def connect(%{"client_id" => client_id}, socket, _connect_info) do
     if client_id && Tunneld.Servers.Session.valid?(client_id) do

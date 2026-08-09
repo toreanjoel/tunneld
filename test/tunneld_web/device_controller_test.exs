@@ -45,14 +45,6 @@ defmodule TunneldWeb.DeviceControllerTest do
     assert health["probed"] == false
   end
 
-  test "containers lists containers for a machine" do
-    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "box2", "address" => "10.0.0.6"})
-
-    conn = build_conn() |> device_conn() |> get("/api/v1/device/machines/#{id}/containers")
-    assert %{"containers" => containers} = json_response(conn, 200)
-    assert Enum.any?(containers, &(&1["name"] == "mock-app"))
-  end
-
   test "resources returns exposed resources" do
     conn = build_conn() |> device_conn() |> get("/api/v1/device/resources")
     assert %{"resources" => resources} = json_response(conn, 200)

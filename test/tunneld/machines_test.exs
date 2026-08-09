@@ -63,43 +63,19 @@ defmodule Tunneld.MachinesTest do
              Machines.enroll(%{"name" => "x", "address" => "10.0.0.5", "location" => "cloud"})
   end
 
-  test "probe fills capabilities and sets status ready (mock mode)" do
+  test "probe fills generic capabilities and sets status ready (mock mode)" do
     {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "box2", "address" => "10.0.0.6"})
     {:ok, machine} = Machines.probe(id)
 
     caps = machine["capabilities"]
-    assert caps["provider"] == "incus"
-    assert caps["incus_version"] == "Incus 6.0.0"
+    assert caps["os"] == "Ubuntu 24.04 LTS"
+    assert caps["kernel"] == "6.8.0-31-generic"
+    assert caps["arch"] == "x86_64"
     assert caps["cpu_count"] == 4
     assert caps["memory_mb"] == 8192
-    assert caps["kvm"] == true
-    assert caps["gpu"] == false
+    assert "incus" in caps["detected_runtimes"]
     assert machine["status"] == "ready"
     assert machine["last_seen"] != nil
-  end
-
-  test "list_containers returns live state (mock mode)" do
-    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "box3", "address" => "10.0.0.7"})
-    {:ok, containers} = Machines.list_containers(id)
-
-    names = Enum.map(containers, & &1["name"])
-    assert "mock-app" in names
-    assert "mock-vm" in names
-
-    [app] = Enum.filter(containers, &(&1["name"] == "mock-app"))
-    assert app["status"] == "Running"
-    assert app["type"] == "container"
-  end
-
-  test "list_containers extracts IPv4 from the nested incus state.network structure" do
-    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "box3b", "address" => "10.0.0.7"})
-    {:ok, containers} = Machines.list_containers(id)
-
-    [app] = Enum.filter(containers, &(&1["name"] == "mock-app"))
-    assert app["ipv4"] == "10.10.0.42"
-
-    [vm] = Enum.filter(containers, &(&1["name"] == "mock-vm"))
-    assert vm["ipv4"] == ""
   end
 
   test "remove deletes the record and key" do
@@ -136,7 +112,7 @@ defmodule Tunneld.MachinesTest do
     assert eventually(fn ->
              case Machines.get(id) do
                {:ok, %{"status" => "ready", "capabilities" => caps}} when not is_nil(caps) ->
-                 caps["incus_version"] == "Incus 6.0.0"
+                 caps["arch"] == "x86_64"
 
                _ ->
                  false
@@ -151,102 +127,6 @@ defmodule Tunneld.MachinesTest do
       true ->
         Process.sleep(20)
         eventually(fun, attempts - 1)
-    end
-  end
-
-  describe "container provisioning (mock)" do
-    test "create_container provisions a new container visible in list" do
-      {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "prov1", "address" => "10.0.0.10"})
-
-      spec = %{
-        "name" => "my-app",
-        "image" => "ubuntu/24.04",
-        "type" => "container",
-        "cpu" => 2,
-        "memory" => 1024,
-        "ports" => [%{"host" => 8080, "container" => 80}]
-      }
-
-      {:ok, container} = Machines.create_container(id, spec)
-      assert container["name"] == "my-app"
-      assert container["status"] == "Running"
-
-      {:ok, list} = Machines.list_containers(id)
-      names = Enum.map(list, & &1["name"])
-      assert "my-app" in names
-    end
-
-    test "create_container with vm type" do
-      {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "prov2", "address" => "10.0.0.11"})
-
-      {:ok, container} =
-        Machines.create_container(id, %{
-          "name" => "my-vm",
-          "image" => "ubuntu/24.04",
-          "type" => "vm"
-        })
-
-      assert container["type"] == "vm"
-    end
-
-    test "create_container validates spec" do
-      {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "prov3", "address" => "10.0.0.12"})
-
-      assert {:error, "name is required"} = Machines.create_container(id, %{"image" => "x"})
-      assert {:error, "image is required"} = Machines.create_container(id, %{"name" => "x"})
-      assert {:error, "type must be container or vm"} = Machines.create_container(id, %{"name" => "x", "image" => "y", "type" => "hyper-v"})
-      assert {:error, "cpu must be a positive integer"} = Machines.create_container(id, %{"name" => "x", "image" => "y", "cpu" => 0})
-    end
-
-    test "start/stop/delete container lifecycle" do
-      {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "prov4", "address" => "10.0.0.13"})
-      {:ok, _} = Machines.create_container(id, %{"name" => "lifecycle", "image" => "ubuntu/24.04"})
-
-      {:ok, stopped} = Machines.stop_container(id, "lifecycle")
-      assert stopped["status"] == "Stopped"
-
-      {:ok, started} = Machines.start_container(id, "lifecycle")
-      assert started["status"] == "Running"
-
-      {:ok, deleted} = Machines.delete_container(id, "lifecycle")
-      assert deleted["status"] == "deleted"
-
-      {:ok, list} = Machines.list_containers(id)
-      refute Enum.any?(list, &(&1["name"] == "lifecycle"))
-    end
-
-    test "create_container with macvlan network" do
-      {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "prov5", "address" => "10.0.0.14"})
-
-      {:ok, container} =
-        Machines.create_container(id, %{
-          "name" => "macvlan-app",
-          "image" => "ubuntu/24.04",
-          "network" => "macvlan"
-        })
-
-      assert container["network"] == "macvlan"
-
-      {:ok, list} = Machines.list_containers(id)
-      assert Enum.any?(list, &(&1["name"] == "macvlan-app"))
-    end
-
-    test "create_container rejects macvlan for VMs" do
-      {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "prov6", "address" => "10.0.0.15"})
-
-      assert {:error, "macvlan networking is not supported for VMs"} =
-               Machines.create_container(id, %{"name" => "vm", "image" => "x", "type" => "vm", "network" => "macvlan"})
-    end
-
-    test "create_container validates network" do
-      {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "prov7", "address" => "10.0.0.16"})
-
-      assert {:error, "network must be bridge or macvlan"} =
-               Machines.create_container(id, %{"name" => "x", "image" => "y", "network" => "host"})
-    end
-
-    test "create_container on unknown machine returns not_found" do
-      assert {:error, :not_found} = Machines.create_container("nope", %{"name" => "x", "image" => "y"})
     end
   end
 end

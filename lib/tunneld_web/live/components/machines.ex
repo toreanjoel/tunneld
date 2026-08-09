@@ -1,9 +1,9 @@
 defmodule TunneldWeb.Live.Components.Machines do
   @moduledoc """
   Managed machines LiveView component: a flat list of enrolled machines,
-  per-machine probe/containers actions, and the enrollment flow.
+  per-machine probe actions, and the enrollment flow.
 
-  State on disk is a hint; capabilities and containers are fetched live
+  State on disk is a hint; capabilities are fetched live
   over SSH (or mock) on click, never cached as truth.
   """
 
@@ -18,28 +18,15 @@ defmodule TunneldWeb.Live.Components.Machines do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:machines")
     end
 
-    {:ok, assign(socket, machines: Machines.list(), selected: nil, containers: [], loading: false)}
+    {:ok, assign(socket, machines: Machines.list(), selected: nil, loading: false)}
   end
 
   @impl true
   def update(assigns, socket) do
-    selected_id = socket.assigns[:selected] && socket.assigns[:selected]["id"]
-
-    containers =
-      if selected_id do
-        case Machines.list_containers(selected_id) do
-          {:ok, c} -> c
-          _ -> []
-        end
-      else
-        Map.get(assigns, :containers, [])
-      end
-
     socket =
       socket
       |> assign(:obfuscated, Map.get(assigns, :obfuscated, false))
       |> assign(:machines, Machines.list())
-      |> assign(:containers, containers)
 
     {:ok, socket}
   end
@@ -100,7 +87,7 @@ defmodule TunneldWeb.Live.Components.Machines do
       </div>
 
       <%= if @selected do %>
-        <.machine_detail machine={@selected} containers={@containers} loading={@loading} />
+        <.machine_detail machine={@selected} loading={@loading} />
       <% end %>
     </div>
     """

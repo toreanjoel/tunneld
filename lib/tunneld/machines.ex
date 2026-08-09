@@ -18,12 +18,10 @@ defmodule Tunneld.Machines do
       }
 
   `location` distinguishes machines reachable on the gateway's own subnet
-  (`"local"`, eligible for macvlan container networking) from machines reached
-  over the internet (`"remote"`, containers use a NAT bridge + proxy devices).
+  (`"local"`) from machines reached over the internet (`"remote"`).
 
-  State on disk is a hint. Live state (containers running, capabilities) is
-  always queried from the machine over SSH, never trusted from the cache,
-  because SSH-managed machines drift outside tunneld's view.
+  State on disk is a hint. Live state (listeners, capabilities) is always
+  queried from the machine over SSH, never trusted from the cache.
 
   SSH is shelled out to `ssh` with ControlMaster multiplexing so repeated
   commands (list, exec, probe) reuse one master connection per machine.
@@ -34,7 +32,7 @@ defmodule Tunneld.Machines do
   use GenServer
   require Logger
 
-  alias Tunneld.Machines.{Store, SSH, Provider, Runtime}
+  alias Tunneld.Machines.{Store, SSH, Runtime}
 
   @pubsub_topic "component:machines"
 
@@ -107,28 +105,6 @@ defmodule Tunneld.Machines do
   @doc "List listening sockets on a machine (runtime-agnostic, live over SSH or mock)."
   def listeners(id), do: GenServer.call(__MODULE__, {:listeners, id}, 30_000)
 
-  @doc "Install Incus on a machine, then probe it. Returns `{:ok, machine}` or `{:error, reason}`."
-  def install_incus(id), do: GenServer.call(__MODULE__, {:install_incus, id}, 120_000)
-
-  @doc "List containers/VMs on a machine (live, over SSH or mock)."
-  def list_containers(id), do: GenServer.call(__MODULE__, {:list_containers, id}, 30_000)
-
-  @doc "Create a container/VM on a machine. `spec` is a map with name, image, type, cpu, memory, ports."
-  def create_container(id, spec),
-    do: GenServer.call(__MODULE__, {:create_container, id, spec}, 60_000)
-
-  @doc "Start a container/VM on a machine."
-  def start_container(id, name),
-    do: GenServer.call(__MODULE__, {:start_container, id, name}, 30_000)
-
-  @doc "Stop a container/VM on a machine."
-  def stop_container(id, name),
-    do: GenServer.call(__MODULE__, {:stop_container, id, name}, 30_000)
-
-  @doc "Delete a container/VM on a machine."
-  def delete_container(id, name),
-    do: GenServer.call(__MODULE__, {:delete_container, id, name}, 30_000)
-
   @doc "Remove a machine from the registry and delete its keypair."
   def remove(id), do: GenServer.call(__MODULE__, {:remove, id})
 
@@ -144,45 +120,6 @@ defmodule Tunneld.Machines do
       data: payload
     })
   end
-
-  defp validate_spec(%{"name" => name, "image" => image} = spec) do
-    cond do
-      not is_binary(name) or String.trim(name) == "" ->
-        {:error, "name is required"}
-
-      not Regex.match?(~r/^[a-zA-Z0-9\-]{1,63}$/, name) ->
-        {:error, "name must be alphanumeric/hyphens, max 63 chars"}
-
-      not is_binary(image) or String.trim(image) == "" ->
-        {:error, "image is required"}
-
-      spec["type"] not in [nil, "container", "vm"] ->
-        {:error, "type must be container or vm"}
-
-      spec["network"] not in [nil, "bridge", "macvlan"] ->
-        {:error, "network must be bridge or macvlan"}
-
-      spec["cpu"] != nil and (not is_integer(spec["cpu"]) or spec["cpu"] < 1) ->
-        {:error, "cpu must be a positive integer"}
-
-      spec["memory"] != nil and (not is_integer(spec["memory"]) or spec["memory"] < 1) ->
-        {:error, "memory must be a positive integer (MiB)"}
-
-      spec["network"] == "macvlan" and spec["type"] == "vm" ->
-        {:error, "macvlan networking is not supported for VMs"}
-
-      true ->
-        :ok
-    end
-  end
-
-  defp validate_spec(%{"image" => _} = spec) when not is_map_key(spec, "name"),
-    do: {:error, "name is required"}
-
-  defp validate_spec(%{"name" => _} = spec) when not is_map_key(spec, "image"),
-    do: {:error, "image is required"}
-
-  defp validate_spec(_), do: {:error, "name and image are required"}
 
   # --- GenServer ---
 
@@ -274,77 +211,12 @@ defmodule Tunneld.Machines do
     {:reply, reply, state}
   end
 
-  def handle_call({:install_incus, id}, _from, state) do
-    reply =
-      with {:ok, machine} <- Store.get(id),
-           {:ok, _} <- Provider.install_incus(machine) do
-        do_probe(machine)
-      end
 
-    {:reply, reply, state}
-  end
 
-  @impl true
-  def handle_call({:list_containers, id}, _from, state) do
-    reply =
-      with {:ok, machine} <- Store.get(id),
-           {:ok, containers} <- Provider.list_containers(machine) do
-        {:ok, containers}
-      end
 
-    {:reply, reply, state}
-  end
 
-  @impl true
-  def handle_call({:create_container, id, spec}, _from, state) do
-    reply =
-      with {:ok, machine} <- Store.get(id),
-           :ok <- validate_spec(spec),
-           {:ok, container} <- Provider.create_container(machine, spec) do
-        broadcast(:container_added, %{"machine_id" => id, "container" => container})
-        {:ok, container}
-      end
 
-    {:reply, reply, state}
-  end
 
-  @impl true
-  def handle_call({:start_container, id, name}, _from, state) do
-    reply =
-      with {:ok, machine} <- Store.get(id),
-           {:ok, result} <- Provider.start_container(machine, name) do
-        broadcast(:container_updated, %{"machine_id" => id, "container" => result})
-        {:ok, result}
-      end
-
-    {:reply, reply, state}
-  end
-
-  @impl true
-  def handle_call({:stop_container, id, name}, _from, state) do
-    reply =
-      with {:ok, machine} <- Store.get(id),
-           {:ok, result} <- Provider.stop_container(machine, name) do
-        broadcast(:container_updated, %{"machine_id" => id, "container" => result})
-        {:ok, result}
-      end
-
-    {:reply, reply, state}
-  end
-
-  @impl true
-  def handle_call({:delete_container, id, name}, _from, state) do
-    reply =
-      with {:ok, machine} <- Store.get(id),
-           {:ok, result} <- Provider.delete_container(machine, name) do
-        broadcast(:container_removed, %{"machine_id" => id, "name" => name})
-        {:ok, result}
-      end
-
-    {:reply, reply, state}
-  end
-
-  @impl true
   def handle_call({:remove, id}, _from, state) do
     case Store.get(id) do
       {:error, :not_found} ->
@@ -359,7 +231,7 @@ defmodule Tunneld.Machines do
   end
 
   defp do_probe(machine) do
-    with {:ok, caps} <- Provider.probe(machine) do
+    with {:ok, caps} <- Runtime.probe(machine) do
       updated =
         machine
         |> Map.put("capabilities", caps)
@@ -374,29 +246,14 @@ defmodule Tunneld.Machines do
 
   # Startup recovery: probe every enrolled machine, install Incus where it is
   # missing, and mark unreachable machines so the dashboard reflects live state
-  # without a manual probe. Container restart on a machine reboot is handled by
+  # without a manual probe.
   # Incus itself (tunneld sets `boot.autostart true` on creation); reverse SSH
 
   defp recover_machines do
     for machine <- Store.all() do
-      id = machine["id"]
-
       case do_probe(machine) do
-        {:ok, _} ->
-          :ok
-
-        {:error, :incus_not_installed} ->
-          Logger.info("Machine #{id} missing Incus; installing on startup")
-
-          with {:ok, _} <- Provider.install_incus(machine),
-               {:ok, _} <- do_probe(machine) do
-            :ok
-          else
-            {:error, reason} -> mark_unreachable(machine, reason)
-          end
-
-        {:error, reason} ->
-          mark_unreachable(machine, reason)
+        {:ok, _} -> :ok
+        {:error, reason} -> mark_unreachable(machine, reason)
       end
     end
 

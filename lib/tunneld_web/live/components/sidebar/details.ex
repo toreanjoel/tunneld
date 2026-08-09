@@ -6,7 +6,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
   - `:system_overview` - default "all good" panel
   - `:resource`        - a single resource's details and actions
-  - `:machine`         - a single managed machine's details and containers
+  - `:machine`         - a single managed machine's details and listeners
   - `:ethernet`        - upstream/downstream interface link state
   - `:dns_server`      - upstream DNS server configuration
   - `:authentication`  - login reset
@@ -22,7 +22,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   def update(assigns, socket) do
     view = Map.get(assigns, :view, socket.assigns[:view] || :system_overview)
     data = Map.get(assigns, :data, %{})
-    containers = Map.get(assigns, :containers, [])
     listeners = Map.get(assigns, :listeners, socket.assigns[:listeners] || [])
     selection = Map.get(assigns, :selection, socket.assigns[:selection] || nil)
     obfuscated = Map.get(assigns, :obfuscated, false)
@@ -32,7 +31,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign_new(:obfuscated, fn -> false end)
       |> assign(:view, view)
       |> assign(:data, data)
-      |> assign(:containers, containers)
       |> assign(:listeners, listeners)
       |> assign(:selection, selection)
       |> assign(:obfuscated, obfuscated)
@@ -243,12 +241,10 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           Phoenix.LiveView.Rendered.t()
   def render(%{view: :machine} = assigns) do
     machine = Map.get(assigns, :data, %{})
-    containers = Map.get(assigns, :containers, [])
 
     assigns =
       assigns
       |> assign(:machine, machine)
-      |> assign(:containers, containers)
       |> assign(:listeners, Map.get(assigns, :listeners, []))
 
     ~H"""
@@ -295,25 +291,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           </div>
 
           <div
-            phx-click="install_incus"
-            phx-value-id={mget(@machine, "id")}
-            phx-click-loading="opacity-50 cursor-wait"
-            class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
-          >
-            <.icon name="hero-cog-6-tooth" class="h-5 w-5" />
-            <div class="truncate text-xs">Install Incus</div>
-          </div>
-
-          <div
-            phx-click="create_container_modal"
-            phx-value-id={mget(@machine, "id")}
-            class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
-          >
-            <.icon name="hero-plus-circle" class="h-5 w-5" />
-            <div class="truncate text-xs">New Container</div>
-          </div>
-
-          <div
             phx-click="remove_machine"
             phx-value-id={mget(@machine, "id")}
             class="flex items-center justify-center gap-1 w-full bg-red p-2 cursor-pointer rounded-md hover:opacity-80"
@@ -332,9 +309,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           </div>
           <%= if mget(@machine, "capabilities") do %>
             <% caps = mget(@machine, "capabilities") %>
-            <div class="text-sm truncate">
-              <span class="font-bold">Incus:</span> <%= caps["incus_version"] %>
-            </div>
             <div class="text-sm truncate"><span class="font-bold">OS:</span> <%= caps["os"] %></div>
             <div class="text-sm truncate">
               <span class="font-bold">CPU:</span> <%= caps["cpu_count"] %>
@@ -342,8 +316,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             <div class="text-sm truncate">
               <span class="font-bold">RAM:</span> <%= caps["memory_mb"] %> MB
             </div>
-            <div class="text-sm truncate"><span class="font-bold">KVM:</span> <%= caps["kvm"] %></div>
-            <div class="text-sm truncate"><span class="font-bold">GPU:</span> <%= caps["gpu"] %></div>
           <% end %>
           <%= if mget(@machine, "last_seen") do %>
             <div class="text-sm truncate text-gray-400">
@@ -394,79 +366,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <% end %>
         </div>
 
-        <div>
-          <div class="text-sm font-semibold mb-2">Containers</div>
-          <%= if Enum.empty?(@containers) do %>
-            <div class="text-xs text-gray-400 italic">No containers</div>
-          <% else %>
-            <div class="space-y-1">
-              <%= for c <- @containers do %>
-                <div class="bg-surface rounded p-2 text-xs">
-                  <div class="flex items-center justify-between">
-                    <div class="flex items-center gap-2 min-w-0">
-                      <span class={"w-2 h-2 rounded-full inline-block align-middle shrink-0 #{container_dot(c["status"])}"}>
-                      </span>
-                      <span class="font-mono truncate"><%= c["name"] %></span>
-                      <span class="text-gray-400"><%= c["type"] %></span>
-                      <%= if c["ipv4"] != "" and c["ipv4"] != nil do %>
-                        <span class="text-gray-400 truncate">· <%= c["ipv4"] %></span>
-                      <% end %>
-                    </div>
-                    <div class="flex gap-1 shrink-0">
-                      <button
-                        phx-click="open_terminal"
-                        phx-value-id={mget(@machine, "id")}
-                        phx-value-name={c["name"]}
-                        class="ghost-btn !px-2 !py-0.5 text-[10px]"
-                      >
-                        shell
-                      </button>
-                      <button
-                        phx-click="start_container"
-                        phx-value-id={mget(@machine, "id")}
-                        phx-value-name={c["name"]}
-                        class="ghost-btn !px-2 !py-0.5 text-[10px]"
-                      >
-                        start
-                      </button>
-                      <button
-                        phx-click="stop_container"
-                        phx-value-id={mget(@machine, "id")}
-                        phx-value-name={c["name"]}
-                        class="ghost-btn !px-2 !py-0.5 text-[10px]"
-                      >
-                        stop
-                      </button>
-                      <button
-                        phx-click="delete_container"
-                        phx-value-id={mget(@machine, "id")}
-                        phx-value-name={c["name"]}
-                        class="ghost-btn !text-red !px-2 !py-0.5 text-[10px]"
-                      >
-                        delete
-                      </button>
-                    </div>
-                  </div>
-                  <%= if c["ipv4"] != "" and c["ipv4"] != nil do %>
-                    <div class="mt-1.5 flex items-center gap-1.5 border-t border-border/50 pt-1.5">
-                      <span class="text-gray-500">ssh</span>
-                      <code class="font-mono text-[10px] text-green-400 truncate">root@<%= c["ipv4"] %></code>
-                      <button
-                        type="button"
-                        id={"copy_ssh_#{c["name"]}"}
-                        phx-hook="CopyToClipboard"
-                        data-copy-text={"ssh root@#{c["ipv4"]}"}
-                        class="ml-auto text-[10px] bg-surface-2 hover:bg-surface border border-border rounded px-1.5 py-0.5 text-text-secondary"
-                      >
-                        copy
-                      </button>
-                    </div>
-                  <% end %>
-                </div>
-              <% end %>
-            </div>
-          <% end %>
-        </div>
       <% end %>
     </div>
     """
@@ -689,10 +588,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   defp status_dot("probing"), do: "bg-yellow"
   defp status_dot("unreachable"), do: "bg-red"
   defp status_dot(_), do: "bg-gray-500"
-
-  defp container_dot("Running"), do: "bg-green"
-  defp container_dot("Stopped"), do: "bg-red"
-  defp container_dot(_), do: "bg-gray-500"
 
   defp location_label("remote"), do: "remote"
   defp location_label(_), do: "local"

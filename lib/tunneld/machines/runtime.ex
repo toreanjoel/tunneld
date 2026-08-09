@@ -17,7 +17,7 @@ defmodule Tunneld.Machines.Runtime do
 
   `probe/1` is the generic capability probe: OS, kernel, architecture, CPU,
   memory, and a `detected_runtimes` list. It contains no Incus-specific
-  fields (those live in the now-legacy `Provider` until M3 removes it).
+  fields (the legacy Incus probe was removed with the container CRUD).
   """
 
   alias Tunneld.Machines.SSH

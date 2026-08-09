@@ -2,23 +2,20 @@ defmodule TunneldWeb.MachineController do
   @moduledoc """
   HTTP API for machine enrollment and management.
 
-  v1 gating: admin session (same auth as the dashboard). The per-device
-  allowlist path (for subnet devices to self-provision) arrives with
-  container provisioning in a later milestone.
+  v1 gating: admin session (same auth as the dashboard).
 
   Endpoints (under /api/v1):
     GET    /machines            list enrolled machines
     POST   /machines            enroll a new machine (returns public key to install)
     GET    /machines/:id        fetch one machine
     POST   /machines/:id/probe   re-probe capabilities (live over SSH)
-    GET    /machines/:id/containers  list containers/VMs (live)
     DELETE /machines/:id        remove machine and delete its keypair
   """
 
   use TunneldWeb, :controller
   require Logger
 
-  plug :require_admin when action in [:index, :show, :containers, :listeners, :create, :probe, :delete, :create_container, :start_container, :stop_container, :delete_container]
+  plug :require_admin when action in [:index, :show, :listeners, :create, :probe, :delete]
 
   def index(conn, _params) do
     json(conn, %{machines: Tunneld.Machines.list()})
@@ -62,55 +59,6 @@ defmodule TunneldWeb.MachineController do
       {:ok, listeners} -> json(conn, %{listeners: listeners})
       {:error, :not_found} -> conn |> put_status(404) |> json(%{error: "not found"})
       {:error, reason} -> conn |> put_status(502) |> json(%{error: "list failed", detail: inspect(reason)})
-    end
-  end
-
-  def containers(conn, %{"id" => id}) do
-    case Tunneld.Machines.list_containers(id) do
-      {:ok, containers} -> json(conn, %{containers: containers})
-      {:error, :not_found} -> conn |> put_status(404) |> json(%{error: "not found"})
-      {:error, reason} -> conn |> put_status(502) |> json(%{error: "list failed", detail: inspect(reason)})
-    end
-  end
-
-  def create_container(conn, %{"id" => id} = params) do
-    spec = %{
-      "name" => params["name"],
-      "image" => params["image"],
-      "type" => params["type"] || "container",
-      "cpu" => params["cpu"],
-      "memory" => params["memory"],
-      "ports" => params["ports"] || []
-    }
-
-    case Tunneld.Machines.create_container(id, spec) do
-      {:ok, container} -> conn |> put_status(201) |> json(%{container: container})
-      {:error, :not_found} -> conn |> put_status(404) |> json(%{error: "machine not found"})
-      {:error, reason} -> conn |> put_status(422) |> json(%{error: reason})
-    end
-  end
-
-  def start_container(conn, %{"id" => id, "name" => name}) do
-    case Tunneld.Machines.start_container(id, name) do
-      {:ok, c} -> json(conn, %{container: c})
-      {:error, :not_found} -> conn |> put_status(404) |> json(%{error: "not found"})
-      {:error, reason} -> conn |> put_status(502) |> json(%{error: "start failed", detail: inspect(reason)})
-    end
-  end
-
-  def stop_container(conn, %{"id" => id, "name" => name}) do
-    case Tunneld.Machines.stop_container(id, name) do
-      {:ok, c} -> json(conn, %{container: c})
-      {:error, :not_found} -> conn |> put_status(404) |> json(%{error: "not found"})
-      {:error, reason} -> conn |> put_status(502) |> json(%{error: "stop failed", detail: inspect(reason)})
-    end
-  end
-
-  def delete_container(conn, %{"id" => id, "name" => name}) do
-    case Tunneld.Machines.delete_container(id, name) do
-      {:ok, c} -> json(conn, %{container: c})
-      {:error, :not_found} -> conn |> put_status(404) |> json(%{error: "not found"})
-      {:error, reason} -> conn |> put_status(502) |> json(%{error: "delete failed", detail: inspect(reason)})
     end
   end
 
