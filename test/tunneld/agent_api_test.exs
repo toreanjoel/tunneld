@@ -18,12 +18,6 @@ defmodule Tunneld.AgentApiTest do
     :ok
   end
 
-  defp auth_conn(token, scope \\ "any") do
-    build_conn()
-    |> put_req_header("authorization", "Bearer #{token}")
-    |> Map.put(:private, %{phoenix_action: String.to_atom(scope)})
-  end
-
   test "issuing a token returns a tnld_ prefixed token and stores only a hash" do
     {:ok, raw, id, scopes} = AgentTokens.issue(["machines:read", "resources:write"])
     assert String.starts_with?(raw, "tnld_")
@@ -69,7 +63,7 @@ defmodule Tunneld.AgentApiTest do
   end
 
   test "audit log records authenticated calls" do
-    {:ok, raw, id, _scopes} = AgentTokens.issue(["machines:read"])
+    {:ok, _raw, id, _scopes} = AgentTokens.issue(["machines:read"])
     _ = Tunneld.Audit.log("test_action", "/test", :ok, id)
     entries = Tunneld.Audit.list()
     assert Enum.any?(entries, &(&1["token_id"] == id and &1["action"] == "test_action"))

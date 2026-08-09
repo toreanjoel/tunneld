@@ -45,5 +45,8 @@ npm-debug.log
 .claude/
 docs-site/
 
+# Working task spec with real deployment credentials — never commit
+/lib/TODO.md
+
 __pycache__/
 *.pyc
