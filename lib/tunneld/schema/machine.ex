@@ -9,7 +9,7 @@ defmodule Tunneld.Schema.Machine do
     %{
       "title" => "Enroll Machine",
       "description" =>
-        "Register a machine (local or remote) to manage Incus containers and VMs over SSH. After enrolling, the modal shows the SSH key to install and the passwordless-sudo setup required for Incus install.",
+        "Register a machine (local or remote) to discover what is listening on it and expose services. After enrolling, the modal shows the SSH key to install and (for remote machines) the WireGuard UDP/51820 provider-firewall prerequisite.",
       "type" => "object",
       "ui:order" => ["name", "address", "ssh_port", "ssh_user", "location"],
       "properties" => %{
@@ -39,7 +39,7 @@ defmodule Tunneld.Schema.Machine do
           "default" => "root",
           "description" => "SSH user to connect as on the target.",
           "ui:help" =>
-            "The user tunneld will SSH in as. It needs passwordless sudo (for Incus install) and access to Incus (e.g. add it to the incus group)."
+            "The user tunneld will SSH in as. It needs to be able to read the SSH key and (for remote overlay) have sudo to install WireGuard."
         },
         "location" => %{
           "type" => "string",
@@ -47,7 +47,7 @@ defmodule Tunneld.Schema.Machine do
           "default" => "local",
           "description" => "Where the machine is reachable from.",
           "ui:help" =>
-            "Local machines sit on this gateway's subnet and can use macvlan containers. Remote machines are reached over the internet and use NAT-bridged containers."
+            "Local machines sit on this gateway's subnet. Remote machines are reached over the internet via a WireGuard overlay (the gateway dials out) — the target needs inbound UDP/51820 open in its provider firewall."
         }
       },
       "required" => ["name", "address", "location"]
