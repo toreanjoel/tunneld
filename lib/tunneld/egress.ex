@@ -199,13 +199,15 @@ defmodule Tunneld.Egress do
   end
 
   defp add_rule(device_ip, table) do
-    run_gateway("ip rule add from #{device_ip} lookup #{table}")
+    # Idempotent: a duplicate `ip rule add` fails with "File exists", so swallow
+    # that specific case but surface real errors.
+    run_gateway("ip rule add from #{device_ip} lookup #{table} 2>/dev/null || true")
   end
 
   defp add_default_route(overlay_ip, iface, table) do
-    # The default route needs the VM's overlay IP as next-hop; a bare
-    # `dev <iface>` link-scope route can't reach the internet.
-    run_gateway("ip route add default via #{overlay_ip} dev #{iface} table #{table} 2>/dev/null || true")
+    # `ip route replace` is idempotent and reports real failures (no `|| true`),
+    # so a broken route surfaces as an error instead of a false success.
+    run_gateway("ip route replace default via #{overlay_ip} dev #{iface} table #{table}")
   end
 
   # Keep the device's LAN traffic local (to the gateway) instead of sending it
@@ -213,7 +215,7 @@ defmodule Tunneld.Egress do
   defp add_lan_route(table) do
     gw = gateway_ip()
     iface = lan_iface()
-    run_gateway("ip route add #{lan_subnet(gw)} dev #{iface} table #{table} 2>/dev/null || true")
+    run_gateway("ip route replace #{lan_subnet(gw)} dev #{iface} table #{table}")
   end
 
   # The VM must route the device's return traffic back through the tunnel.
