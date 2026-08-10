@@ -7,7 +7,10 @@ defmodule TunneldWeb.Live.Components.Devices do
   import TunneldWeb.Live.Components.HelpIcon
 
   def mount(socket) do
-    {:ok, socket |> assign(loading: true)}
+    # Paint from current state immediately instead of waiting for broadcast
+    current = Tunneld.Servers.Devices.current()
+    has_data = length(Map.get(current, :devices, [])) > 0
+    {:ok, socket |> assign(loading: !has_data) |> assign(data: current)}
   end
 
   def update(assigns, socket) do
@@ -79,7 +82,10 @@ defmodule TunneldWeb.Live.Components.Devices do
         </div>
       </div>
 
-      <div :if={!@loading} class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div
+        :if={!@loading}
+        class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 items-start"
+      >
         <%= for device <- Map.get(@data, :devices, []) do %>
           <div
             class="p-4 flex flex-col bg-surface border border-border rounded-lg w-full min-h-[130px] h-auto transition-colors duration-[120ms] hover:bg-[#17161F] hover:border-[#2A2838]"
@@ -201,7 +207,7 @@ defmodule TunneldWeb.Live.Components.Devices do
                 <.icon name="hero-x-mark-solid" class="h-4 w-4 text-red" />
               </div>
             </div>
-            <div class={if device.tags != [], do: "grow-0 h-1", else: "grow"} />
+            <div class="grow" />
             <div :if={device.tags != []} class="flex flex-wrap gap-1 mb-1 pt-1">
               <%= for tag <- device.tags |> Enum.sort_by(& &1) |> Enum.take(2) do %>
                 <span
@@ -225,7 +231,7 @@ defmodule TunneldWeb.Live.Components.Devices do
                 </span>
               <% end %>
             </div>
-            <div class="mt-auto pt-3 border-t border-border/50">
+            <div class="mt-auto pt-3">
               <div class="flex items-center justify-between gap-2 mb-1.5 px-1">
                 <span class="text-[10px] uppercase tracking-wide text-text-tertiary">
                   Egress

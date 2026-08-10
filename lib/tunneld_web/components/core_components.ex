@@ -32,11 +32,13 @@ defmodule TunneldWeb.CoreComponents do
       ]}
       {@rest}
     >
-      <div class="flex items-center gap-2">
-        <.icon :if={@kind == :info} name="hero-check-circle" class="h-4 w-4 shrink-0" />
-        <.icon :if={@kind == :error} name="hero-exclamation-circle" class="h-4 w-4 shrink-0" />
-        <p :if={@title} class="font-semibold"><%= @title %></p>
-        <p><%= msg %></p>
+      <div class="flex items-start gap-2">
+        <.icon :if={@kind == :info} name="hero-check-circle" class="h-4 w-4 shrink-0 mt-0.5" />
+        <.icon :if={@kind == :error} name="hero-exclamation-circle" class="h-4 w-4 shrink-0 mt-0.5" />
+        <div class="min-w-0 flex-1">
+          <p :if={@title} class="font-semibold"><%= @title %></p>
+          <p class="break-words"><%= msg %></p>
+        </div>
       </div>
     </div>
     """

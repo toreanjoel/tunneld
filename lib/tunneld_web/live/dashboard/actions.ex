@@ -22,7 +22,10 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
 
     case action do
       "revoke_release_ip" ->
-        if mac = data["mac"], do: Devices.revoke_lease(mac)
+        if mac = data["mac"] do
+          Devices.revoke_lease(mac)
+          Devices.sync_now()
+        end
 
       "allow_device_expose" ->
         if mac = data["mac"], do: Tunneld.Servers.ExposeAllowed.allow(mac)
@@ -41,10 +44,16 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
           if t != "", do: Tunneld.Servers.DeviceTags.add_tag(mac, t)
         end)
 
+        Devices.sync_now()
+
       "remove_device_tag" ->
         mac = data["mac"]
         tag = data["tag"]
-        if mac && tag, do: Tunneld.Servers.DeviceTags.remove_tag(mac, tag)
+
+        if mac && tag do
+          Tunneld.Servers.DeviceTags.remove_tag(mac, tag)
+          Devices.sync_now()
+        end
 
       "revoke_login_creds" ->
         File.rm(Auth.path())

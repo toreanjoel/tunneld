@@ -26,6 +26,51 @@ defmodule Tunneld.Servers.Devices do
     {:ok, %{}}
   end
 
+  @doc """
+  Return the current devices from the GenServer state.
+  If no data yet, returns an empty map.
+  """
+  def current do
+    try do
+      GenServer.call(__MODULE__, :current)
+    catch
+      :exit, _ -> %{count: 0, devices: []}
+    end
+  end
+
+  @doc """
+  Force an immediate sync: fetch devices and broadcast now.
+  """
+  def sync_now do
+    GenServer.cast(__MODULE__, :sync_now)
+  end
+
+  def handle_call(:current, _from, state) do
+    result = %{
+      count: Map.get(state, :count, 0),
+      devices: Map.get(state, :devices, [])
+    }
+
+    {:reply, result, state}
+  end
+
+  def handle_cast(:sync_now, state) do
+    devices = fetch_devices()
+
+    result = %{
+      count: length(devices),
+      devices: devices
+    }
+
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "component:devices", %{
+      id: "devices",
+      module: TunneldWeb.Live.Components.Devices,
+      data: result
+    })
+
+    {:noreply, Map.merge(state, result)}
+  end
+
   def handle_info(:sync, state) do
     devices = fetch_devices()
 
