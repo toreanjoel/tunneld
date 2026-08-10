@@ -60,6 +60,20 @@ defmodule Tunneld.EgressTest do
     assert Egress.device_egress("10.0.0.200") == nil
   end
 
+  test "cleanup_machine removes the table allocation and device mappings" do
+    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "vps5", "address" => "203.0.113.13", "location" => "remote"})
+    {:ok, m} = Machines.get(id)
+
+    {:ok, _} = Egress.route_device(m, "10.0.0.210")
+    assert Egress.device_egress("10.0.0.210") == id
+    assert Egress.exit_capable?(m)
+
+    :ok = Egress.cleanup_machine(m)
+
+    assert Egress.device_egress("10.0.0.210") == nil
+    refute Egress.exit_capable?(m)
+  end
+
   test "ensure_exit_capable returns :ok in mock mode" do
     {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "vps4", "address" => "203.0.113.12", "location" => "remote"})
     {:ok, m} = Machines.get(id)

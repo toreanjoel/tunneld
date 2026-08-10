@@ -116,6 +116,41 @@ defmodule Tunneld.Egress do
     Map.has_key?(read_tables(), machine["id"])
   end
 
+  @doc """
+  Remove all egress state for a machine (called on disenroll/delete): the
+  table allocation, any device->machine mappings, the gateway FORWARD rules,
+  and the routing table + ip rules. Idempotent.
+  """
+  def cleanup_machine(machine) do
+    id = machine["id"]
+    iface = Tunneld.Overlay.iface_name(id)
+
+    # Drop any device->machine mappings that point at this machine.
+    devices = read_device_egress()
+    write_device_egress(Map.reject(devices, fn {_ip, mid} -> mid == id end))
+
+    # Remove the table allocation and its routes/rules.
+    case Map.get(read_tables(), id) do
+      nil ->
+        :ok
+
+      table ->
+        _ = run_gateway("ip route flush table #{table} 2>/dev/null || true")
+        _ = run_gateway("ip rule del lookup #{table} 2>/dev/null || true")
+        write_tables(Map.delete(read_tables(), id))
+    end
+
+    # Remove the gateway FORWARD rules for this machine's WG interface.
+    lan = lan_iface()
+    _ = run_gateway("iptables -D FORWARD -i #{lan} -o #{iface} -j ACCEPT 2>/dev/null || true")
+    _ =
+      run_gateway(
+        "iptables -D FORWARD -i #{iface} -o #{lan} -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true"
+      )
+
+    :ok
+  end
+
   @doc "Get the routing table id allocated to an exit machine (stable)."
   def table_for(machine) do
     tables = read_tables()

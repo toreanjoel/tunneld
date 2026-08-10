@@ -83,6 +83,13 @@ defmodule Tunneld.Overlay do
     end
   end
 
+  @doc "Remove a machine's overlay IP allocation (called on disenroll/delete)."
+  def remove_overlay_ip(machine) do
+    map = overlay_ips() |> Map.delete(machine["id"])
+    Tunneld.Persistence.write_json(Path.join(Tunneld.Config.fs_root(), "overlay.json"), %{"peers" => map})
+    :ok
+  end
+
   @doc "Parsed `wg show` status for a machine: handshake age, tx/rx bytes."
   def status(machine) do
     if @mock do

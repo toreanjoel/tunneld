@@ -222,7 +222,12 @@ defmodule Tunneld.Machines do
       {:error, :not_found} ->
         {:reply, {:error, "not found"}, state}
 
-      {:ok, _record} ->
+      {:ok, machine} ->
+        # Clean up egress + overlay state so no stale tables/rules/IPs remain.
+        _ = Tunneld.Egress.cleanup_machine(machine)
+        _ = Tunneld.Overlay.remove_overlay_ip(machine)
+        _ = Tunneld.Overlay.remove_peer(machine)
+
         :ok = Store.delete(id)
         SSH.delete_key(id)
         broadcast(:removed, %{"id" => id})
