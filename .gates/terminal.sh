@@ -116,6 +116,21 @@ if grep -q 'def id(_socket), do: nil' lib/tunneld_web/channels/user_socket.ex; t
   bad "socket id/1 returns nil - sessions cannot be force-disconnected on logout"
 else ok "socket id/1 allows targeted disconnect"; fi
 
+# --- 13. JS-managed DOM must be excluded from LiveView patching --------------
+# xterm injects its own canvas/rows into the hook element. Without
+# phx-update="ignore", the next diff (devices sync 10s, link poll 15s) reconciles
+# that subtree back to the empty server-rendered div and the terminal vanishes
+# a couple of seconds after opening.
+if grep -A6 'phx-hook="Terminal"' lib/tunneld_web/live/dashboard.ex | grep -q 'phx-update="ignore"' \
+   || grep -B6 'phx-hook="Terminal"' lib/tunneld_web/live/dashboard.ex | grep -q 'phx-update="ignore"'; then
+  ok "terminal element is excluded from DOM patching"
+else bad "terminal hook element lacks phx-update=ignore - it will be patched away"; fi
+# the status text is written by JS too
+if grep -q 'id="terminal-status"' lib/tunneld_web/live/dashboard.ex && \
+   grep -A3 'id="terminal-status"' lib/tunneld_web/live/dashboard.ex | grep -q 'phx-update="ignore"'; then
+  ok "JS-written terminal status is excluded from patching"
+else bad "terminal status text will be reset by re-renders"; fi
+
 echo "-----------------------------------------------"
 [ "$FAIL" -eq 0 ] && echo "TERMINAL GATE: PASS" || echo "TERMINAL GATE: FAIL"
 exit $FAIL

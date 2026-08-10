@@ -16,3 +16,4 @@
 - Socket auth reads the signed HttpOnly session via connect_info, never a socket param
 - No client_id (a shell-granting credential) is exposed to frontend JS
 - socket id/1 permits force-disconnect on logout
+- The terminal hook element and the JS-written status use phx-update=ignore so LiveView diffs do not wipe them

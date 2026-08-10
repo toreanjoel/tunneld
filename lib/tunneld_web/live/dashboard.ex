@@ -258,7 +258,13 @@ defmodule TunneldWeb.Live.Dashboard do
             <div class="flex items-center gap-3">
               <.icon name="hero-command-line" class="w-5 h-5 text-accent" />
               <span class="text-sm font-medium">Terminal: <%= @terminal_modal.machine_name %></span>
-              <div class="terminal-status flex items-center gap-2 text-xs text-text-tertiary">
+              <%!-- Written by the Terminal hook. Must be ignored by DOM patching or the
+                   dashboard's periodic re-renders reset it to "Initializing...". --%>
+              <div
+                id="terminal-status"
+                phx-update="ignore"
+                class="terminal-status flex items-center gap-2 text-xs text-text-tertiary"
+              >
                 <span class="terminal-status-icon"></span>
                 <span class="terminal-status-text">Initializing...</span>
               </div>
@@ -270,9 +276,14 @@ defmodule TunneldWeb.Live.Dashboard do
               <.icon name="hero-x-mark" class="w-4 h-4" />
             </button>
           </div>
+          <%!-- phx-update="ignore" is REQUIRED. xterm.js injects its own canvas/rows
+               into .terminal-container; without this, the next LiveView diff (devices
+               sync at 10s, link poll at 15s, etc.) reconciles that subtree back to the
+               empty server-rendered div and the terminal visibly vanishes. --%>
           <div
-            id="terminal"
+            id={"terminal-#{@terminal_modal.machine_id}"}
             phx-hook="Terminal"
+            phx-update="ignore"
             data-machine-id={@terminal_modal.machine_id}
             class="flex-1 flex flex-col"
           >
