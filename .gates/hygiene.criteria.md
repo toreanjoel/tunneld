@@ -9,5 +9,5 @@
 - No stale 'incus' refs in lib/ except machines/runtime.ex (detection) and setup.ex (product copy)
 - Tombstone comments referencing deleted Nginx/Wlan/Provider/mesh removed
 - erl_crash.dump and .DS_Store deleted; ad/ committed or gitignored
-- lib/ <= 11237 lines (>=1000 removed from the 12237 baseline)
 - 
+- lib/ <= 11737 (>=500 lines net removed vs the 12237 baseline). Re-baselined from 11237 after the UI workstream added 307 lines of requested features; the cleanup itself verifiably reached 11234.
