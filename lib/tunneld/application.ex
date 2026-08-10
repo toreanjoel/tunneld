@@ -3,10 +3,6 @@ defmodule Tunneld.Application do
   OTP Application entry point. Starts the supervision tree with all
   GenServers, PubSub, and the Phoenix endpoint. In production, also
   resets iptables firewall rules on startup.
-
-  Supervision tree (after WireGuard mesh removal):
-    Session, SystemResources, Services, Resources, Devices, Auth,
-    DnsConfig, Updater, Geolocation, Endpoint.
   """
 
   use Application
@@ -22,8 +18,6 @@ defmodule Tunneld.Application do
     Updater
   }
 
-  alias Tunneld.Machines
-
   @impl true
   def start(_type, _args) do
     Tunneld.Template.ensure_template()
@@ -34,7 +28,6 @@ defmodule Tunneld.Application do
         {DNSCluster, query: Application.get_env(:tunneld, :dns_cluster_query) || :ignore},
         {Phoenix.PubSub, name: Tunneld.PubSub}
       ] ++
-        mock_children() ++
         [
           {Session, []},
           {SystemResources, []},
@@ -44,7 +37,6 @@ defmodule Tunneld.Application do
           {Auth, []},
           {DnsConfig, []},
           {Updater, []},
-          {Machines, []},
           {Tunneld.AgentTokens, []},
           {Tunneld.Jobs, []},
           {Tunneld.Geolocation, []},
@@ -57,14 +49,16 @@ defmodule Tunneld.Application do
 
     opts = [strategy: :one_for_one, name: Tunneld.Supervisor]
 
-    Supervisor.start_link(children, opts)
-  end
+    case Supervisor.start_link(children, opts) do
+      {:ok, pid} ->
+        # Machines is a plain module, so boot-time recovery has no init/1 to run
+        # from. Probing the fleet can take a minute per unreachable host, so it
+        # must not block application start. Only run it once the tree is up.
+        Task.start(fn -> Tunneld.Machines.recover_all() end)
+        {:ok, pid}
 
-  defp mock_children do
-    if Application.get_env(:tunneld, :mock_data, false) do
-      [{Tunneld.Machines.SSH.Mock.MockState, []}]
-    else
-      []
+      other ->
+        other
     end
   end
 

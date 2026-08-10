@@ -209,8 +209,12 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             </div>
             <div :if={@data[:loopback_port]} class="text-sm truncate">
               <span class="font-bold">Manual exposure:</span>
-              <span class="ml-1 font-mono text-xs"><%= Tunneld.Caddy.gateway_ip() || "127.0.0.1" %>:<%= @data[:loopback_port] %></span>
-              <span class="ml-1 text-xs text-gray-400">(point zrok/cloudflared here from any subnet machine)</span>
+              <span class="ml-1 font-mono text-xs">
+                <%= Tunneld.Caddy.gateway_ip() || "127.0.0.1" %>:<%= @data[:loopback_port] %>
+              </span>
+              <span class="ml-1 text-xs text-gray-400">
+                (point zrok/cloudflared here from any subnet machine)
+              </span>
             </div>
           </div>
 
@@ -283,7 +287,10 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           >
             <.icon name="hero-arrow-path" class="h-4 w-4 shrink-0" />
             <div class="truncate text-xs">Reconcile</div>
-            <.help_icon class="ml-0.5" text="Sync this machine: ensure the WireGuard overlay is up, re-probe its OS/runtimes/listeners, and check for drift." />
+            <.help_icon
+              class="ml-0.5"
+              text="Sync this machine: ensure the WireGuard overlay is up, re-probe its OS/runtimes/listeners, and check for drift."
+            />
           </div>
 
           <div
@@ -294,7 +301,10 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           >
             <.icon name="hero-arrow-up-tray" class="h-4 w-4 shrink-0" />
             <div class="truncate text-xs">Exit Node</div>
-            <.help_icon class="ml-0.5" text="Make this machine exit-capable (enables IP forwarding + NAT on it). Then route specific devices through it from the Devices list." />
+            <.help_icon
+              class="ml-0.5"
+              text="Make this machine exit-capable (enables IP forwarding + NAT on it). Then route specific devices through it from the Devices list."
+            />
           </div>
 
           <div
@@ -320,7 +330,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <div class="flex items-center justify-between text-sm">
             <span class="text-text-tertiary">Status</span>
             <span class="flex items-center gap-1.5 capitalize">
-              <span class={"w-[10px] h-[10px] rounded-full inline-block #{status_dot(mget(@machine, "status"))}"}></span>
+              <span class={"w-[10px] h-[10px] rounded-full inline-block #{status_dot(mget(@machine, "status"))}"}>
+              </span>
               <%= mget(@machine, "status") %>
             </span>
           </div>
@@ -353,7 +364,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <div class="flex items-center justify-between text-sm">
             <span class="text-text-tertiary">Exit</span>
             <span class="flex items-center gap-1.5 capitalize">
-              <span class={"w-[10px] h-[10px] rounded-full inline-block #{if mget(@machine, "exit_capable"), do: "bg-emerald-500", else: "bg-gray-500"}"}></span>
+              <span class={"w-[10px] h-[10px] rounded-full inline-block #{if mget(@machine, "exit_capable"), do: "bg-emerald-500", else: "bg-gray-500"}"}>
+              </span>
               <%= if mget(@machine, "exit_capable"), do: "capable", else: "not set" %>
             </span>
           </div>
@@ -363,7 +375,9 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <%= if mget(@machine, "last_seen") do %>
             <div class="flex items-center justify-between text-sm">
               <span class="text-text-tertiary">Last seen</span>
-              <span class="text-gray-400"><%= String.slice(mget(@machine, "last_seen"), 0, 19) %></span>
+              <span class="text-gray-400">
+                <%= String.slice(mget(@machine, "last_seen"), 0, 19) %>
+              </span>
             </div>
           <% end %>
         </div>
@@ -390,7 +404,9 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                       <span class="w-2 h-2 rounded-full bg-green shrink-0"></span>
                       <span class="font-mono truncate"><%= l["addr"] %>:<%= l["port"] %></span>
                       <span class="text-gray-400 truncate"><%= l["proc"] %> (<%= l["pid"] %>)</span>
-                      <span :if={l["container"]} class="text-accent truncate">· <%= l["container"] %></span>
+                      <span :if={l["container"]} class="text-accent truncate">
+                        · <%= l["container"] %>
+                      </span>
                     </div>
                     <button
                       phx-click="make_listener_resource"
@@ -406,11 +422,12 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                 <% end %>
               </div>
             <% else %>
-              <div class="text-xs text-gray-400 italic">Collapsed — click Show to see listening processes.</div>
+              <div class="text-xs text-gray-400 italic">
+                Collapsed — click Show to see listening processes.
+              </div>
             <% end %>
           <% end %>
         </div>
-
       <% end %>
     </div>
     """
@@ -624,10 +641,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   defp pool_health_dot(:partial), do: "bg-yellow"
   defp pool_health_dot(_), do: "bg-gray-500"
 
-  #
-  # Sidebar header componen
-  # Contains information around the sidebar context, will take params but this will be specific to sidebar
-  #
   defp status_dot("ready"), do: "bg-green"
   defp status_dot("enrolled"), do: "bg-yellow"
   defp status_dot("probing"), do: "bg-yellow"
@@ -653,7 +666,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     """
   end
 
-  # Safely read a key from a machine map (string keys) or struct (atom keys).
   defp mget(machine, key) when is_binary(key) do
     case Map.get(machine, key) do
       nil -> Map.get(machine, String.to_atom(key))

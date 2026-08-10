@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SSH Transport — Tunneld Curriculum</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav>
+    <a href="index.html">← Back to Curriculum</a>
+  </nav>
+
+  <div class="container">
+    <h1>08 — SSH Transport</h1>
+
+    <p class="file-ref">Key source: <code>lib/tunneld/machines/ssh.ex</code>, <code>lib/tunneld/machines/runtime.ex</code></p>
+
+    <section id="what-it-is">
+      <h2>What SSH Is</h2>
+
+      <p>
+        SSH (Secure Shell) is a protocol for secure remote access to machines. It encrypts 
+        all traffic, authenticates both client and server, and provides a secure channel for 
+        running commands, transferring files, and forwarding ports. SSH replaced older 
+        insecure protocols like telnet and rsh.
+      </p>
+
+      <p>
+        For Tunneld, SSH is the actuation transport: every command that runs on a managed 
+        machine goes through SSH. When you click "Install WireGuard" in the dashboard, 
+        Tunneld SSHes into the machine and runs <code>apt-get install wireguard-tools</code>. 
+        When you view listeners, it runs <code>ss -tlnp</code> over SSH and parses the output.
+      </p>
+
+      <p>
+        SSH uses public-key cryptography for authentication. Each managed machine gets its 
+        own Ed25519 keypair, generated on the gateway. The operator installs the public key 
+        on the target's <code>authorized_keys</code>, and Tunneld uses the private key to 
+        authenticate. No passwords are stored.
+      </p>
+    </section>
+
+    <section id="how-it-works">
+      <h2>How SSH Works</h2>
+
+      <h3>Key-Based Authentication</h3>
+
+      <p>
+        SSH keypairs work like a lock and key. The private key stays secret on the client 
+        (the gateway); the public key is installed on the server (the target). When 
+        connecting, the client proves it holds the private key without revealing it, using 
+        a cryptographic challenge-response.
+      </p>
+
+<pre>
+# Generate an Ed25519 keypair:
+$ ssh-keygen -t ed25519 -C "tunneld" -f /tmp/my_key -N ""
+
+$ cat /tmp/my_key.pub
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBqK... tunneld
+
+# Install on target:
+$ echo "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBqK..." >> ~/.ssh/authorized_keys
+$ chmod 600 ~/.ssh/authorized_keys
+
+# Now connect using the private key:
+$ ssh -i /tmp/my_key user@target
+</pre>
+
+      <h3>Host Key Verification</h3>
+
+      <p>
+        The first time you connect to a server, SSH shows its fingerprint and asks if you 
+        trust it. This prevents man-in-the-middle attacks. Tunneld uses 
+        <code>StrictHostKeyChecking=accept-new</code> to automatically accept keys on first 
+        connection but reject changes.
+      </p>
+
+      <h3>ControlMaster Multiplexing</h3>
+
+      <p>
+        Establishing an SSH connection involves a TCP handshake, key exchange, and 
+        authentication — slow for repeated commands. ControlMaster lets multiple SSH 
+        sessions share one underlying connection. The first connection creates a "master" 
+        socket; subsequent connections reuse it instantly.
+      </p>
+
+<pre>
+# SSH options for multiplexing:
+ssh -o ControlMaster=auto \
+    -o ControlPath=/tmp/ssh_%r@%h:%p \
+    -o ControlPersist=600 \
+    user@target "echo hello"
+
+# First command: ~1 second (full connection)
+# Subsequent commands: ~0.1 seconds (reuse master)
+</pre>
+    </section>
+
+    <section id="how-tunneld-uses-it">
+      <h2>How Tunneld Uses SSH</h2>
+
+      <h3>Key Generation</h3>
+
+      <p>
+        When enrolling a machine, Tunneld generates an Ed25519 keypair and stores the 
+        private key under <code>TUNNELD_DATA/ssh/&lt;machine_id&gt;</code> (mode 0600).
+      </p>
+
+<pre>
+# From lib/tunneld/machines/ssh.ex:
+def generate_keypair do
+  tmp = Path.join(System.tmp_dir!(), "tunneld_key_#{System.unique_integer([:positive])}")
+
+  {_, 0} = System.cmd("ssh-keygen", [
+    "-t", "ed25519",
+    "-N", "",           # No passphrase
+    "-C", "tunneld",    # Comment
+    "-f", tmp,
+    "-q"                # Quiet
+  ])
+
+  {:ok, priv} = File.read(tmp)
+  {:ok, pub} = File.read(tmp <> ".pub")
+  File.rm(tmp)
+  File.rm(tmp <> ".pub")
+  {pub, priv}
+end
+
+def store_key(machine_id, priv_pem) do
+  path = key_path(machine_id)
+  File.mkdir_p!(Path.dirname(path))
+  File.write!(path, priv_pem)
+  File.chmod!(path, 0o600)
+end
+</pre>
+
+      <h3>Running Commands</h3>
+
+      <p>
+        The <code>run/2</code> function executes a command on a machine and returns the 
+        output. It uses <code>System.cmd("ssh", ...)</code> with ControlMaster options.
+      </p>
+
+<pre>
+# From lib/tunneld/machines/ssh.ex:
+defp real_run(machine, command, _opts) do
+  id = machine["id"]
+  key = key_path(id)
+  host = machine["address"]
+  user = machine["ssh_user"] || "root"
+  port = to_string(machine["ssh_port"] || 22)
+
+  args = [
+    "-i", key,
+    "-o", "StrictHostKeyChecking=accept-new",
+    "-o", "ConnectTimeout=10",
+    "-o", "ControlMaster=auto",
+    "-o", "ControlPath=#{control_path(id)}",
+    "-o", "ControlPersist=600",
+    "-p", port,
+    "#{user}@#{host}",
+    command
+  ]
+
+  case System.cmd("ssh", args, stderr_to_stdout: true) do
+    {out, 0} -> {:ok, out}
+    {out, code} -> {:error, {:ssh_failed, code, out}}
+  end
+end
+</pre>
+
+      <h3>Listener Discovery</h3>
+
+      <p>
+        <code>lib/tunneld/machines/runtime.ex</code> uses SSH to run <code>ss -tlnp</code> 
+        and parses the output into structured data.
+      </p>
+
+<pre>
+# From lib/tunneld/machines/runtime.ex:
+def listeners(machine) do
+  with {:ok, ss_out} <- run(machine, "ss -tlnp 2>/dev/null || ss -tln 2>/dev/null") do
+    runtime_map = container_runtime_map(machine)
+    parsed = parse_listeners(ss_out, runtime_map)
+    {:ok, parsed}
+  end
+end
+
+# ss -tlnp output:
+# State  Recv-Q Send-Q Local Address:Port  Peer Address:Port Process
+# LISTEN 0      128    0.0.0.0:80          0.0.0.0:*         users:(("nginx",pid=1234,fd=6))
+
+# Parsed into:
+# %{"addr" => "0.0.0.0", "port" => 80, "proc" => "nginx", "pid" => 1234}
+</pre>
+    </section>
+
+    <section id="why">
+      <h2>Why SSH</h2>
+
+      <h3>Why Not an Agent Daemon</h3>
+
+      <p>
+        Tunneld does not install an agent on each machine. Why? Because SSH already exists, 
+        is battle-tested, and does not require managing another process. An agent would need 
+        its own update mechanism, its own credentials, and would multiply the attack surface 
+        by the fleet size.
+      </p>
+
+      <p>
+        SSH gives you one key, one version, one audit trail. The gateway is the chokepoint — 
+        all commands flow through it. If you need exec capabilities on a machine, you 
+        <code>POST /machines/:id/exec</code> and the gateway SSHes in.
+      </p>
+
+      <h3>Why Ed25519</h3>
+
+      <p>
+        Ed25519 keys are short (256 bits), fast, and considered the most secure option 
+        available. RSA keys work but are larger (4096 bits for equivalent security) and 
+        slower to generate.
+      </p>
+
+      <h3>Why ControlMaster</h3>
+
+      <p>
+        Without multiplexing, every <code>SSH.run/2</code> call would establish a new 
+        connection (~1 second). With ControlMaster, the first call creates a master 
+        connection, and subsequent calls reuse it (~0.1 seconds). This matters when probing 
+        a machine or running multiple commands in sequence.
+      </p>
+    </section>
+
+    <section id="examples">
+      <h2>Examples</h2>
+
+      <h3>View stored keys</h3>
+
+<pre>
+# Keys are stored under TUNNELD_DATA/ssh/:
+$ ls -la /var/lib/tunneld/ssh/
+-rw------- 1 root root 411 Aug 10 12:00 abc123-def456
+-rw-r--r-- 1 root root  93 Aug 10 12:00 abc123-def456.pub
+
+# View the public key:
+$ cat /var/lib/tunneld/ssh/abc123-def456.pub
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBqK... tunneld
+</pre>
+
+      <h3>Test SSH connectivity</h3>
+
+<pre>
+# Using the stored key:
+$ ssh -i /var/lib/tunneld/ssh/abc123-def456 \
+      -o StrictHostKeyChecking=accept-new \
+      root@10.0.0.50 "echo hello"
+hello
+
+# Check if ControlMaster socket exists:
+$ ls /tmp/tunneld_ssh_abc123-def456
+/tmp/tunneld_ssh_abc123-def456
+</pre>
+
+      <h3>Debug SSH issues</h3>
+
+<pre>
+# Verbose output:
+$ ssh -v -i /var/lib/tunneld/ssh/abc123-def456 root@10.0.0.50 "echo test"
+...
+debug1: Authentications that can continue: publickey
+debug1: Offering public key: /var/lib/tunneld/ssh/abc123-def456
+debug1: Server accepts key: /var/lib/tunneld/ssh/abc123-def456
+debug1: Authentication succeeded (publickey).
+...
+
+# Common issues:
+# - Permission denied: key not in authorized_keys
+# - Connection refused: sshd not running or wrong port
+# - Host key changed: server was reinstalled (check known_hosts)
+</pre>
+
+      <h3>List listeners on a machine</h3>
+
+<pre>
+# What Runtime.listeners/1 does:
+$ ssh -i key root@10.0.0.50 "ss -tlnp"
+State  Recv-Q Send-Q Local Address:Port Peer Address:Port Process
+LISTEN 0      128    0.0.0.0:22         0.0.0.0:*         users:(("sshd",pid=912))
+LISTEN 0      511    0.0.0.0:80         0.0.0.0:*         users:(("nginx",pid=1234))
+LISTEN 0      128    127.0.0.1:11434    0.0.0.0:*         users:(("ollama",pid=5678))
+</pre>
+    </section>
+
+    <footer>
+      <a href="07-dns-dnsmasq-dhcp.html">← Previous: DNS, dnsmasq &amp; DHCP</a> · 
+      <a href="index.html">Curriculum Index</a> · 
+      <a href="09-elixir-otp-supervision.html">Next: Elixir &amp; OTP Supervision →</a>
+    </footer>
+  </div>
+</body>
+</html>

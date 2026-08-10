@@ -15,10 +15,21 @@ defmodule TunneldWeb.Live.Components.InternetCard do
     box_shadow = if assigns.on, do: "0 0 32px rgba(46,204,113,0.40)", else: "none"
     animation = if assigns.on, do: "ringBreathe 2s ease-in-out infinite", else: "none"
 
-    assigns = assign(assigns, ring_color: ring_color, label_color: label_color, box_shadow: box_shadow, animation: animation)
+    assigns =
+      assign(assigns,
+        ring_color: ring_color,
+        label_color: label_color,
+        box_shadow: box_shadow,
+        animation: animation
+      )
 
     ~H"""
-    <div class="hero-card px-6 py-5 flex flex-col gap-3.5 cursor-pointer" phx-click="show_details" phx-value-type="ethernet" phx-value-id="_">
+    <div
+      class="hero-card px-6 py-5 flex flex-col gap-3.5 cursor-pointer"
+      phx-click="show_details"
+      phx-value-type="ethernet"
+      phx-value-id="_"
+    >
       <div class="flex justify-between items-center">
         <div class="text-[11px] tracking-[0.08em] uppercase text-text-secondary font-medium">
           INTERNET ACCESS

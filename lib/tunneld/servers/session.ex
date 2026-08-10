@@ -63,7 +63,6 @@ defmodule Tunneld.Servers.Session do
     {:ok, %{}}
   end
 
-  # Create or overwrite a session with fresh TTL
   @impl true
   def handle_call({:create, id}, _from, state) do
     now = unix_now()
@@ -72,7 +71,6 @@ defmodule Tunneld.Servers.Session do
     {:reply, {:ok, "Session Created"}, new_state}
   end
 
-  # Get a session; enforce expiry immediately
   @impl true
   def handle_call({:get, id}, _from, state) do
     case Map.fetch(state, id) do
@@ -82,7 +80,6 @@ defmodule Tunneld.Servers.Session do
         if exp > now do
           {:reply, {:ok, sess}, state}
         else
-          # evict expired
           {:reply, {:error, "Session expired"}, Map.delete(state, id)}
         end
 
@@ -91,7 +88,6 @@ defmodule Tunneld.Servers.Session do
     end
   end
 
-  # Renew a session's expiry if present and not expired
   @impl true
   def handle_call({:renew, id}, _from, state) do
     case Map.fetch(state, id) do
@@ -111,7 +107,6 @@ defmodule Tunneld.Servers.Session do
     end
   end
 
-  # Delete one session
   @impl true
   def handle_call({:delete, id}, _from, state) do
     if Map.has_key?(state, id) do
@@ -121,7 +116,6 @@ defmodule Tunneld.Servers.Session do
     end
   end
 
-  # Periodic cleanup of expired sessions
   @impl true
   def handle_info(:init_cleaner, state) do
     now = unix_now()

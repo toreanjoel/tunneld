@@ -9,9 +9,6 @@ defmodule TunneldWeb.Live.Login do
 
   on_mount TunneldWeb.Hooks.CheckAuth
 
-  @doc """
-  Initialize the login page and the session data for the client
-  """
   def mount(_params, %{"client_id" => client_id} = _session, socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "modal:form:action:#{client_id}")
@@ -37,9 +34,6 @@ defmodule TunneldWeb.Live.Login do
     {:ok, socket}
   end
 
-  @doc """
-  Render the login form
-  """
   def render(assigns) do
     ~H"""
     <div id="auth" class="flex flex-col-reverse lg:flex-row min-h-screen">
@@ -48,13 +42,19 @@ defmodule TunneldWeb.Live.Login do
 
         <div class="flex-1 flex flex-col items-center justify-center text-center hidden lg:flex">
           <h1 class="text-4xl font-semibold text-text-primary mb-2 -tracking-[0.01em]">Tunneld</h1>
-          <p class="text-sm text-text-secondary font-light tracking-[0.02em]">A subnet in your pocket.</p>
+          <p class="text-sm text-text-secondary font-light tracking-[0.02em]">
+            A subnet in your pocket.
+          </p>
           <div class="text-xs text-text-tertiary font-mono mt-4">
             <%= Application.get_env(:tunneld, :metadata)[:device_id] || System.get_env("DEVICE_ID") %>
           </div>
         </div>
         <div class="text-sm text-text-secondary pt-3 lg:pb-4 text-center">
-          <a href="https://github.com/toreanjoel/tunneld" target="_blank" class="underline underline-offset-4 decoration-text-tertiary hover:text-text-primary hover:decoration-text-secondary transition-colors">
+          <a
+            href="https://github.com/toreanjoel/tunneld"
+            target="_blank"
+            class="underline underline-offset-4 decoration-text-tertiary hover:text-text-primary hover:decoration-text-secondary transition-colors"
+          >
             by Torean with ☕
           </a>
         </div>
@@ -62,7 +62,9 @@ defmodule TunneldWeb.Live.Login do
 
       <div class="lg:w-2/5 w-full flex flex-col flex-1 lg:flex-none justify-center p-6 lg:p-8 lg:bg-surface lg:min-h-0">
         <div :if={@type === :login} class="w-full max-w-sm mx-auto">
-          <h1 class="text-2xl text-text-primary font-medium mb-6 text-center -tracking-[0.01em]">Login</h1>
+          <h1 class="text-2xl text-text-primary font-medium mb-6 text-center -tracking-[0.01em]">
+            Login
+          </h1>
           <.live_component
             id={"login_#{DateTime.utc_now()}"}
             module={TunneldWeb.Live.Components.JsonSchemaRenderer}
@@ -73,7 +75,9 @@ defmodule TunneldWeb.Live.Login do
           />
         </div>
         <div :if={@type === :signup} class="w-full max-w-sm mx-auto">
-          <h1 class="text-2xl text-text-primary font-medium mb-6 text-center -tracking-[0.01em]">Register</h1>
+          <h1 class="text-2xl text-text-primary font-medium mb-6 text-center -tracking-[0.01em]">
+            Register
+          </h1>
           <.live_component
             id={"signup_#{DateTime.utc_now()}"}
             module={TunneldWeb.Live.Components.JsonSchemaRenderer}

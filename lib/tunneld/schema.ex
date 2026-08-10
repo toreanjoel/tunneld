@@ -17,12 +17,12 @@ defmodule Tunneld.Schema do
       "properties" => %{
         "name" => %{
           "type" => "string",
-          "description" => "The device user account",
+          "description" => "The device user account"
         },
         "password" => %{
           "type" => "string",
           "format" => "password",
-          "description" => "Password associated with the user account",
+          "description" => "Password associated with the user account"
         }
       },
       "required" => ["name", "password"]
@@ -38,16 +38,16 @@ defmodule Tunneld.Schema do
       "properties" => %{
         "name" => %{
           "type" => "string",
-          "description" => "The device user account",
+          "description" => "The device user account"
         },
         "password" => %{
           "type" => "string",
           "format" => "password",
-          "description" => "Password associated with the user account",
+          "description" => "Password associated with the user account"
         },
         "confirm_password" => %{
           "type" => "string",
-          "format" => "password",
+          "format" => "password"
         }
       },
       "required" => ["name", "password", "confirm_password"]
@@ -57,7 +57,8 @@ defmodule Tunneld.Schema do
   def data(:dns_server) do
     %{
       "title" => "DNS Server",
-      "description" => "Set the upstream DNS server that all subnet DNS queries are forwarded to.",
+      "description" =>
+        "Set the upstream DNS server that all subnet DNS queries are forwarded to.",
       "type" => "object",
       "properties" => %{
         "server" => %{
@@ -72,11 +73,14 @@ defmodule Tunneld.Schema do
     }
   end
 
-  # --- Arity-2 schemas ---
-
   def data(:device_tag, %{hostname: hostname} = opts) do
     current_tags = Map.get(opts, :current_tags, [])
-    tags_note = if current_tags != [], do: "Current tags: #{Enum.join(current_tags, ", ")}. Enter new tags to append.", else: "Enter a label or category for this device. Use commas to add multiple tags at once."
+
+    tags_note =
+      if current_tags != [],
+        do: "Current tags: #{Enum.join(current_tags, ", ")}. Enter new tags to append.",
+        else:
+          "Enter a label or category for this device. Use commas to add multiple tags at once."
 
     %{
       "title" => "Add tag to #{hostname}",
@@ -97,5 +101,4 @@ defmodule Tunneld.Schema do
       "required" => ["tag", "mac"]
     }
   end
-
 end

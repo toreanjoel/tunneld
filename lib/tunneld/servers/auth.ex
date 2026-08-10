@@ -49,6 +49,5 @@ defmodule Tunneld.Servers.Auth do
   """
   def file_exists?(), do: path() |> File.exists?()
 
-  # Path helper
   def path(), do: Path.join(Tunneld.Config.fs(:root), Tunneld.Config.fs(:auth))
 end

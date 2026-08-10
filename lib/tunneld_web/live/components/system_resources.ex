@@ -21,13 +21,13 @@ defmodule TunneldWeb.Live.Components.SystemResources do
   """
   use TunneldWeb, :live_component
 
-  # The constant for the gauge radius
   @radius 65
 
   def mount(socket) do
     if connected?(socket) do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:system_resources")
     end
+
     {:ok, socket}
   end
 
@@ -39,19 +39,17 @@ defmodule TunneldWeb.Live.Components.SystemResources do
     {:ok, socket}
   end
 
-  @doc """
-  Render the resource usage as gauges.
-  """
   def render(assigns) do
     data = Map.get(assigns, :data)
-    resources = Map.get(data, :resources, %{
-      cpu: 0,
-      mem: 0,
-      storage: 0,
-      temp: nil
-    })
 
-    # Calculate the circumference for the progress circles
+    resources =
+      Map.get(data, :resources, %{
+        cpu: 0,
+        mem: 0,
+        storage: 0,
+        temp: nil
+      })
+
     assigns =
       assigns
       |> assign(resources: resources)
@@ -71,23 +69,21 @@ defmodule TunneldWeb.Live.Components.SystemResources do
             <div class={"bg-primary relative w-full max-w-[150px] md:max-w-[180px] rounded-lg #{if not available?, do: "opacity-30 pointer-events-none", else: ""}"}>
               <svg class="w-full h-full" viewBox="0 0 170 170">
                 <!-- Background circle -->
-                <circle
-                  cx="85"
-                  cy="85"
-                  r={@radius}
-                  stroke-width="5"
-                  fill="none"
-                />
+                <circle cx="85" cy="85" r={@radius} stroke-width="5" fill="none" />
                 <!-- Progress circle -->
                 <circle
                   cx="85"
                   cy="85"
                   r={@radius}
-                  class={if available?, do: get_percent_color(percent) <> " animate-dashoffset", else: ""}
+                  class={
+                    if available?, do: get_percent_color(percent) <> " animate-dashoffset", else: ""
+                  }
                   stroke-width="10"
                   fill="#202226"
                   stroke-dasharray={@circumference}
-                  stroke-dashoffset={if available?, do: @circumference * (1 - percent / 100), else: @circumference}
+                  stroke-dashoffset={
+                    if available?, do: @circumference * (1 - percent / 100), else: @circumference
+                  }
                   stroke-linecap="round"
                   style="transform: rotate(-90deg); transform-origin: center;"
                   stroke="currentColor"
@@ -111,8 +107,6 @@ defmodule TunneldWeb.Live.Components.SystemResources do
     mem = Map.get(resources, :mem)
     storage = Map.get(resources, :storage)
     temp = Map.get(resources, :temp)
-
-    # Convert temp (°C) to a percentage for the gauge (0-100°C range)
     temp_percent = if temp, do: min(round(temp), 100), else: nil
 
     [
@@ -123,7 +117,6 @@ defmodule TunneldWeb.Live.Components.SystemResources do
     ]
   end
 
-  # Check the percent and return relevant color
   defp get_percent_color(val) do
     cond do
       val > 60 and val <= 80 -> "text-yellow"

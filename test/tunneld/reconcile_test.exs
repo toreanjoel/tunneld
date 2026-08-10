@@ -9,7 +9,12 @@ defmodule Tunneld.ReconcileTest do
     File.mkdir_p!(tmp)
     prev_root = Application.get_env(:tunneld, :fs, []) |> Keyword.get(:root)
     Application.put_env(:tunneld, :fs, root: tmp, auth: "auth.json", resources: "resources.json")
-    on_exit(fn -> File.rm_rf!(tmp); Application.put_env(:tunneld, :fs, root: prev_root) end)
+
+    on_exit(fn ->
+      File.rm_rf!(tmp)
+      Application.put_env(:tunneld, :fs, root: prev_root)
+    end)
+
     :ok
   end
 
@@ -21,12 +26,15 @@ defmodule Tunneld.ReconcileTest do
     assert Map.has_key?(result, :caddy)
     assert Map.has_key?(result, :ssh)
     assert Map.has_key?(result, :resources)
-    assert result.wireguard == :ok  # local machines skip WG
+    # local machines skip WG
+    assert result.wireguard == :ok
     assert result.ssh == :ok
   end
 
   test "reconcile detects wireguard drift on a remote machine (mock)" do
-    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "vps", "address" => "203.0.113.9", "location" => "remote"})
+    {:ok, %{"id" => id}} =
+      Machines.enroll(%{"name" => "vps", "address" => "203.0.113.9", "location" => "remote"})
+
     {:ok, m} = Machines.get(id)
     # mock Overlay.status returns up: false -> drift
     result = Reconcile.reconcile(m)
@@ -34,7 +42,9 @@ defmodule Tunneld.ReconcileTest do
   end
 
   test "reconcile with repair calls Overlay.ensure_peer (mock returns ok)" do
-    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "vps2", "address" => "203.0.113.10", "location" => "remote"})
+    {:ok, %{"id" => id}} =
+      Machines.enroll(%{"name" => "vps2", "address" => "203.0.113.10", "location" => "remote"})
+
     {:ok, m} = Machines.get(id)
     result = Reconcile.reconcile(m, repair: true)
     assert result.wireguard in [:ok, {:repaired, :wireguard}]

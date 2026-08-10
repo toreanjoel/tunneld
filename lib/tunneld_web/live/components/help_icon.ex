@@ -13,10 +13,15 @@ defmodule TunneldWeb.Live.Components.HelpIcon do
     ~H"""
     <span
       id={"help-#{:erlang.unique_integer([:positive])}"}
-      class={["inline-flex items-center justify-center w-4 h-4 rounded-full bg-accent/20 text-accent text-[10px] font-bold select-none cursor-help ml-3 shrink-0", @class]}
+      class={[
+        "inline-flex items-center justify-center w-4 h-4 rounded-full bg-accent/20 text-accent text-[10px] font-bold select-none cursor-help ml-3 shrink-0",
+        @class
+      ]}
       data-help-text={@text}
       phx-hook="HelpTooltip"
-    >?</span>
+    >
+      ?
+    </span>
     """
   end
 end

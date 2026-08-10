@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Networking Foundations — Tunneld Curriculum</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav>
+    <a href="index.html">← Back to Curriculum</a>
+  </nav>
+
+  <div class="container">
+    <h1>02 — Networking Foundations</h1>
+
+    <p class="file-ref">Key source: <code>lib/tunneld/iptables.ex</code>, <code>lib/tunneld/net_link.ex</code>, <code>lib/tunneld/overlay.ex</code></p>
+
+    <section id="what-it-is">
+      <h2>What Networking Is</h2>
+
+      <p>
+        Networking is how computers find and talk to each other. At its core, every device on a 
+        network has an address (like a phone number), and data is broken into packets that travel 
+        from source to destination through intermediate devices. The rules for how this works are 
+        layered: at the bottom, raw electrical signals; at the top, applications like web browsers.
+      </p>
+
+      <p>
+        Tunneld operates primarily at layers 3 and 4 of the OSI model: the network layer (IP 
+        addressing, routing) and the transport layer (TCP/UDP, ports). Understanding these layers 
+        is essential because Tunneld manipulates IP addresses, routes packets between networks, 
+        and exposes services bound to specific ports.
+      </p>
+
+      <p>
+        The key concepts you need to understand are: IP addresses (how devices are identified), 
+        subnets (how addresses are grouped), routing (how packets find their way), NAT (how 
+        private addresses reach the public internet), ports (how multiple services share one IP), 
+        and sockets (how applications bind to addresses and ports).
+      </p>
+    </section>
+
+    <section id="how-it-works">
+      <h2>How Networking Works</h2>
+
+      <h3>IP Addresses</h3>
+
+      <p>
+        An IPv4 address is a 32-bit number, written as four octets separated by dots: 
+        <code>192.168.1.50</code>. Each octet ranges from 0 to 255. This gives about 4.3 billion 
+        possible addresses — not enough for every device, which is why NAT and private addresses 
+        exist.
+      </p>
+
+      <p>
+        Private address ranges (RFC 1918) are reserved for local networks and are not routable 
+        on the public internet:
+      </p>
+
+      <ul>
+        <li><code>10.0.0.0/8</code> — 16 million addresses</li>
+        <li><code>172.16.0.0/12</code> — 1 million addresses</li>
+        <li><code>192.168.0.0/16</code> — 65,536 addresses</li>
+      </ul>
+
+      <p>
+        Tunneld's default subnet is <code>10.0.0.0/24</code> with the gateway at <code>10.0.0.1</code>. 
+        The overlay subnet for WireGuard is <code>10.88.0.0/24</code>. Both are private ranges.
+      </p>
+
+<pre>
+# Example: parsing the gateway IP in lib/tunneld/overlay.ex
+defp gateway_ip do
+  case Application.get_env(:tunneld, :network, []) do
+    kw when is_list(kw) -> Keyword.get(kw, :gateway)  # e.g., "10.0.0.1"
+    map when is_map(map) -> Map.get(map, :gateway)
+    _ -> nil
+  end
+end
+</pre>
+
+      <h3>Subnets and CIDR Notation</h3>
+
+      <p>
+        A subnet is a logical division of an IP network. CIDR notation (<code>10.0.0.0/24</code>) 
+        specifies the network prefix length — how many bits identify the network vs. the host. 
+        <code>/24</code> means the first 24 bits are the network portion, leaving 8 bits (256 
+        addresses) for hosts.
+      </p>
+
+<pre>
+# CIDR examples:
+10.0.0.0/24    = 10.0.0.0   to 10.0.0.255   (256 addresses)
+10.0.0.0/16    = 10.0.0.0   to 10.0.255.255 (65,536 addresses)
+10.88.0.0/24   = 10.88.0.0  to 10.88.0.255  (Tunneld overlay subnet)
+
+# The /24 is called the "subnet mask" or "prefix length"
+# In dotted form: /24 = 255.255.255.0
+</pre>
+
+      <p>
+        Two devices are on the "same subnet" if their network portions match. In 
+        <code>lib/tunneld/overlay.ex</code>, the <code>same_subnet?/1</code> function checks 
+        this by comparing the first three octets (for a /24):
+      </p>
+
+<pre>
+# From lib/tunneld/overlay.ex:
+defp same_subnet?(address) do
+  gw = gateway_ip()  # e.g., "10.0.0.1"
+  with {:ok, a} <- parse_ip4(address),
+       {:ok, g} <- parse_ip4(gw) do
+    match?({[x, y, z, _], [x, y, z, _]}, {a, g})  # First 3 octets match
+  else
+    _ -> false
+  end
+end
+</pre>
+
+      <h3>Routing</h3>
+
+      <p>
+        Routing is how packets find their way from source to destination. Every device has a 
+        routing table that says "packets for network X go out interface Y (optionally via 
+        gateway Z)." When a packet arrives, the kernel consults this table to decide what to do.
+      </p>
+
+      <p>
+        The most important route is the <strong>default gateway</strong>: where to send packets 
+        when no more specific route matches. On Tunneld's subnet, every device's default gateway 
+        is the Tunneld box itself (<code>10.0.0.1</code>). This is set via DHCP option 3.
+      </p>
+
+<pre>
+# Viewing the routing table on Linux:
+$ ip route show
+default via 10.0.0.1 dev eth0 proto dhcp metric 100
+10.0.0.0/24 dev eth0 proto kernel scope link src 10.0.0.50
+10.88.0.0/24 dev wg-d4f4632f proto kernel scope link
+
+# Reading: "default" = any destination not matched below
+# "via 10.0.0.1" = send to the gateway
+# "dev eth0" = out this interface
+</pre>
+
+      <h3>NAT (Network Address Translation)</h3>
+
+      <p>
+        NAT allows devices on a private subnet to reach the public internet using the gateway's 
+        public IP. The gateway rewrites the source IP of outgoing packets (from the private 
+        address to its own public address) and remembers the mapping so replies can be routed 
+        back to the right device.
+      </p>
+
+      <p>
+        Tunneld uses MASQUERADE, a form of SNAT (source NAT) that automatically uses the 
+        outgoing interface's address. This is configured in <code>lib/tunneld/iptables.ex</code>:
+      </p>
+
+<pre>
+# From lib/tunneld/iptables.ex:
+defp internet_passthrough() do
+  System.cmd("iptables", [
+    "-t", "nat",              # Use the NAT table
+    "-A", "POSTROUTING",      # After routing decision, before leaving
+    "-o", get_env(:upstream), # On packets going out the upstream interface
+    "-j", "MASQUERADE"        # Rewrite source IP to the interface's IP
+  ])
+end
+</pre>
+
+      <h3>Ports and Sockets</h3>
+
+      <p>
+        An IP address identifies a machine, but a machine runs many services. Ports (0-65535) 
+        identify which service a packet is for. A socket is the combination of IP address + 
+        port that a service binds to and listens on.
+      </p>
+
+      <p>
+        When you run <code>ss -tlnp</code> (or netstat), you see listening sockets:
+      </p>
+
+<pre>
+$ ss -tlnp
+State  Recv-Q Send-Q Local Address:Port   Peer Address:Port Process
+LISTEN 0      128    0.0.0.0:80            0.0.0.0:*         users:(("nginx",pid=1234))
+LISTEN 0      128    127.0.0.1:5432        0.0.0.0:*         users:(("postgres",pid=5678))
+LISTEN 0      128    0.0.0.0:22            0.0.0.0:*         users:(("sshd",pid=910))
+
+# 0.0.0.0:80 means "listen on all interfaces, port 80"
+# 127.0.0.1:5432 means "listen only on loopback, port 5432"
+</pre>
+    </section>
+
+    <section id="how-tunneld-uses-it">
+      <h2>How Tunneld Uses Networking</h2>
+
+      <p>
+        Tunneld operates as a dual-homed gateway: one interface faces the internet (upstream), 
+        the other faces the local subnet (downstream). It performs several networking functions:
+      </p>
+
+      <h3>Interface Configuration</h3>
+
+      <p>
+        Interface names are read from app config, never hardcoded. In production, these come 
+        from environment variables set by the installer:
+      </p>
+
+<pre>
+# config/runtime.exs:
+config :tunneld, :network,
+  upstream: System.get_env("UPSTREAM_INTERFACE") || "eth0",
+  downstream: System.get_env("DOWNSTREAM_INTERFACE") || "eth1",
+  gateway: System.get_env("GATEWAY") || "10.0.0.1"
+
+# lib/tunneld/iptables.ex reads these:
+def get_env(:upstream), do: Application.get_env(:tunneld, :network)[:upstream]
+def get_env(:downstream), do: Application.get_env(:tunneld, :network)[:downstream]
+</pre>
+
+      <h3>Link State</h3>
+
+      <p>
+        <code>lib/tunneld/net_link.ex</code> reads whether an interface is up or down from the 
+        kernel's sysfs interface. The module provides <code>upstream_up?/0</code> and 
+        <code>downstream_up?/0</code> which return booleans. Internally, it reads from 
+        <code>/sys/class/net/&lt;iface&gt;/operstate</code>:
+      </p>
+
+<pre>
+# From lib/tunneld/net_link.ex:
+@operstate_path "/sys/class/net"
+
+defp iface_up?(which) do
+  cond do
+    mock?() ->
+      fake_state(which)
+
+    iface = net_config()[which] ->
+      case File.read(Path.join(@operstate_path, "#{iface}/operstate")) do
+        {:ok, contents} -> String.trim(contents) == "up"
+        _ -> false
+      end
+
+    true ->
+      false
+  end
+end
+</pre>
+
+      <p>
+        The public API is simple: <code>NetLink.upstream_up?/0</code> returns <code>true</code> 
+        or <code>false</code>. The <code>status/0</code> function returns a map with both 
+        interfaces:
+      </p>
+
+<pre>
+# From lib/tunneld/net_link.ex:
+def status do
+  %{
+    upstream: %{iface: upstream_iface(), up: upstream_up?()},
+    downstream: %{iface: downstream_iface(), up: downstream_up?()}
+  }
+end
+</pre>
+
+      <h3>Overlay vs LAN Addresses</h3>
+
+      <p>
+        The <code>address_for/1</code> function in <code>lib/tunneld/overlay.ex</code> is the 
+        critical decision point: given a machine, should we reach it at its LAN IP or its 
+        overlay (WireGuard) IP?
+      </p>
+
+<pre>
+# lib/tunneld/overlay.ex:
+def address_for(machine) do
+  if same_subnet?(machine["address"]) do
+    machine["address"]         # Local: use LAN IP (e.g., 10.0.0.50)
+  else
+    overlay_ip_for(machine)    # Remote: use overlay IP (e.g., 10.88.0.5)
+  end
+end
+</pre>
+    </section>
+
+    <section id="why">
+      <h2>Why These Choices</h2>
+
+      <h3>Private Subnets</h3>
+
+      <p>
+        The 10.0.0.0/24 and 10.88.0.0/24 subnets are chosen because they are in the largest 
+        private range (10.0.0.0/8), unlikely to collide with home routers (which typically use 
+        192.168.x.x), and provide plenty of address space. The overlay uses a separate subnet 
+        so WireGuard traffic does not collide with LAN traffic.
+      </p>
+
+      <h3>MASQUERADE vs SNAT</h3>
+
+      <p>
+        MASQUERADE is used instead of SNAT because the upstream interface might have a dynamic 
+        IP (DHCP from an ISP). MASQUERADE automatically uses the current IP of the outgoing 
+        interface, while SNAT requires specifying a fixed source IP.
+      </p>
+
+      <h3>Config-Driven Interface Names</h3>
+
+      <p>
+        Interface names (eth0, enp0s3, etc.) vary by hardware and distribution. Hardcoding 
+        them would break on different devices. By reading from config, the same binary runs 
+        on any hardware — the installer just sets the right environment variables.
+      </p>
+    </section>
+
+    <section id="examples">
+      <h2>Examples</h2>
+
+      <h3>Check interface link state</h3>
+
+<pre>
+# On the gateway:
+$ cat /sys/class/net/eth0/operstate
+up
+
+$ cat /sys/class/net/eth1/operstate
+up
+
+# This is what NetLink.link_state/1 reads
+</pre>
+
+      <h3>View the routing table</h3>
+
+<pre>
+# On the gateway:
+$ ip route show
+default via 192.168.1.1 dev eth0 proto dhcp    # Upstream (to ISP router)
+10.0.0.0/24 dev eth1 proto kernel scope link   # Downstream (local subnet)
+10.88.0.0/24 dev wg-d4f4632f scope link        # Overlay (WireGuard peers)
+
+# On a device on the subnet:
+$ ip route show
+default via 10.0.0.1 dev eth0    # All traffic goes to Tunneld gateway
+10.0.0.0/24 dev eth0 scope link  # Except local subnet traffic
+</pre>
+
+      <h3>Check which process is listening on a port</h3>
+
+<pre>
+# On any machine:
+$ ss -tlnp | grep :80
+LISTEN 0 128 0.0.0.0:80 0.0.0.0:* users:(("nginx",pid=1234,fd=6))
+
+# This is what Runtime.listeners/1 parses
+</pre>
+    </section>
+
+    <footer>
+      <a href="01-architecture.html">← Previous: Architecture</a> · 
+      <a href="index.html">Curriculum Index</a> · 
+      <a href="03-wireguard.html">Next: WireGuard →</a>
+    </footer>
+  </div>
+</body>
+</html>

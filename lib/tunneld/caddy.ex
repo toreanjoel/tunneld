@@ -2,10 +2,9 @@ defmodule Tunneld.Caddy do
   @moduledoc """
   Drives Caddy as the gateway's reverse proxy / load balancer.
 
-  Replaces the former `Tunneld.Servers.Nginx`. Caddy is a single static
-  binary configured entirely through its JSON admin API — there is no config
-  template, no `sites-available` symlink dance, and no reload signal. Config
-  changes are `PUT` against the admin endpoint and are atomic.
+  Caddy is a single static binary configured entirely through its JSON admin
+  API — there is no config template, no `sites-available` symlink dance, and
+  no reload signal. Config changes are `POST` to `/load` and are atomic.
 
   ## Three planes (kept distinct)
 
@@ -67,22 +66,12 @@ defmodule Tunneld.Caddy do
   def loopback_start, do: @loopback_start
   def loopback_end, do: @loopback_end
 
-  @doc """
-  Build the local DNS hostname for a resource name (e.g. `"printer"` ->
-  `"printer.tunneld.lan"`).
-  """
+  @doc "Build the local DNS hostname for a resource name."
   def lan_hostname(name) when is_binary(name) do
     "#{name}.#{@lan_domain}"
   end
 
-  @doc """
-  Reconcile Caddy's config to match the given resource list. `resources` is
-  the **full** set of persisted resources (each with `"id"`, `"name"`,
-  `"pool"`, and an optional `"loopback_port"`).
-
-  Idempotent: re-running with the same resources converges to the same
-  config. Returns `:ok` or `{:error, reason}`.
-  """
+  @doc "Reconcile Caddy config to match the resource list. Idempotent."
   def sync(resources) when is_list(resources) do
     config = build_config(resources)
 
@@ -93,10 +82,7 @@ defmodule Tunneld.Caddy do
     end
   end
 
-  @doc """
-  Build the full Caddy JSON config document for the given resource list.
-  Exposed for testing.
-  """
+  @doc "Build the full Caddy JSON config document for the resource list."
   def build_config(resources) do
     lan_routes =
       Enum.map(resources, fn r ->
@@ -108,7 +94,7 @@ defmodule Tunneld.Caddy do
 
     loop_servers =
       resources
-      |> Enum.reject(&(r_empty(&1["loopback_port"])))
+      |> Enum.reject(&r_empty(&1["loopback_port"]))
       |> Map.new(fn r -> {loop_server_name(r["id"]), loop_server(r)} end)
 
     %{
@@ -131,24 +117,14 @@ defmodule Tunneld.Caddy do
     }
   end
 
-  @doc """
-  Return the loopback listener server name for a resource id.
-  """
+  @doc "Return loopback listener server name for a resource id."
   def loop_server_name(id), do: "tunneld_#{id}_loop"
 
-  @doc """
-  Build a Caddy config for a **remote machine's** public exposure. This drives
-  the machine's own Caddy admin API (over WireGuard) so a service is reachable
-  on the public internet without a tunneld-side tunnel.
-
-  `listen` is a single object: `"8080"` (plain port, no domain/TLS) or
-  `"app.example.com"` (domain — Caddy auto-provisions TLS). Returns a full
-  Caddy JSON document.
-  """
+  @doc "Build Caddy config for remote machine public exposure."
   def build_public_config(resources) when is_list(resources) do
     servers =
       resources
-      |> Enum.reject(&(r_empty(&1["listen"])))
+      |> Enum.reject(&r_empty(&1["listen"]))
       |> Map.new(fn r -> {public_server_name(r["id"]), public_server(r)} end)
 
     %{
@@ -160,30 +136,28 @@ defmodule Tunneld.Caddy do
   @doc "Return the public server name for a resource id."
   def public_server_name(id), do: "tunneld_#{id}_public"
 
-  @doc """
-  Drive a remote machine's Caddy admin API (at `http://<overlay_ip>:2019`,
-  reached over the WireGuard overlay) to apply a public-exposure config.
-  Returns `:ok` or `{:error, reason}`. In mock mode, writes to disk.
-  """
+  @doc "Apply public-exposure config to a remote machine's Caddy via overlay."
   def sync_public(machine, resources) when is_list(resources) do
     config = build_public_config(resources)
 
     if mock?() do
       dir = Path.join(Config.fs_root(), "caddy")
       File.mkdir_p!(dir)
-      File.write(Path.join(dir, "public_#{machine["id"]}.json"), Jason.encode!(config, pretty: true))
+
+      File.write(
+        Path.join(dir, "public_#{machine["id"]}.json"),
+        Jason.encode!(config, pretty: true)
+      )
     else
       overlay_ip = Tunneld.Overlay.address_for(machine)
       push_config(config, "http://#{overlay_ip}:2019/")
     end
   end
 
-  # --- config building ---
-
   defp reverse_proxy(pool) do
     upstreams =
       pool
-      |> Enum.reject(&(r_empty(&1)))
+      |> Enum.reject(&r_empty(&1))
       |> Enum.map(fn entry ->
         case String.split(entry, ":", parts: 2) do
           [ip, port] -> %{"dial" => "#{ip}:#{port}"}
@@ -236,8 +210,6 @@ defmodule Tunneld.Caddy do
   defp r_empty(nil), do: true
   defp r_empty(""), do: true
   defp r_empty(_), do: false
-
-  # --- apply ---
 
   defp push_config(config), do: push_config(config, @admin_url)
 

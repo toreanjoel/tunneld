@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Build, Release &amp; Deploy — Tunneld Curriculum</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav>
+    <a href="index.html">← Back to Curriculum</a>
+  </nav>
+
+  <div class="container">
+    <h1>13 — Build, Release &amp; Deploy</h1>
+
+    <p class="file-ref">Key source: <code>lib/tunneld/application.ex</code>, <code>mix.exs</code>, <code>config/runtime.exs</code></p>
+
+    <section id="what-it-is">
+      <h2>What a Mix Release Is</h2>
+
+      <p>
+        A Mix release is a self-contained package of your Elixir application and the Erlang 
+        runtime (ERTS). It can be deployed to a target machine without installing Elixir 
+        or Erlang — everything needed to run is bundled. This is how Tunneld runs on the 
+        gateway SBC.
+      </p>
+
+      <p>
+        The release includes: compiled BEAM bytecode (<code>.beam</code> files), the Erlang 
+        VM binary, boot scripts, and configuration. It is a tarball that you extract, 
+        configure, and run. No compilation happens on the target.
+      </p>
+
+      <p>
+        Cross-compilation is necessary because Tunneld is developed on x86_64 macOS/Linux 
+        but deployed on ARM64 Debian. The release must be built for the target architecture, 
+        not the development machine.
+      </p>
+    </section>
+
+    <section id="how-it-works">
+      <h2>How Releases Work</h2>
+
+      <h3>Building a Release</h3>
+
+<pre>
+# Standard release build:
+$ MIX_ENV=prod mix release
+
+# This creates:
+# _build/prod/rel/tunneld/
+#   bin/tunneld           # Entry script
+#   lib/tunneld-0.19.0/   # Application beams
+#   releases/0.19.0/      # Boot scripts, config
+#   erts-15.0/            # Erlang runtime
+</pre>
+
+      <h3>Cross-Compilation for ARM64</h3>
+
+      <p>
+        To build for ARM64 from an x86_64 machine, you need an ARM64 Erlang/Elixir toolchain. 
+        Docker is the common approach: run the build inside an ARM64 container.
+      </p>
+
+<pre>
+# Using Docker for ARM64 build:
+$ docker build --platform linux/arm64 -t tunneld-builder .
+$ docker run --platform linux/arm64 tunneld-builder mix release
+
+# Or use QEMU for ARM emulation:
+$ docker run --platform linux/arm64 -v $(pwd):/app elixir:1.18 \
+    bash -c "cd /app && mix deps.get && MIX_ENV=prod mix release"
+</pre>
+
+      <h3>ERTS Bundling and glibc Compatibility</h3>
+
+      <p>
+        The release bundles ERTS (Erlang Run-Time System) — the BEAM VM binary. This binary 
+        is compiled for a specific architecture (ARM64) and links against the system's glibc. 
+        Here is where things get tricky:
+      </p>
+
+      <p>
+        glibc is backward-compatible but not forward-compatible. If you build the release on 
+        a system with glibc 2.36, it will NOT run on a system with glibc 2.31. The error is 
+        cryptic: <code>GLIBC_2.36 not found</code>.
+      </p>
+
+      <p>
+        The solution: build on an OS version older than or equal to your targets. If your 
+        SBCs run Debian 11 (glibc 2.31), build in a Debian 11 container. A Debian 12 build 
+        (glibc 2.36) will not run on Debian 11.
+      </p>
+
+<pre>
+# Check glibc version on the target:
+$ ldd --version
+ldd (Debian GLIBC 2.31-13+deb11u6) 2.31
+
+# Your build container must have glibc <= 2.31
+
+# Using an older Debian for the build:
+$ docker run --platform linux/arm64 -v $(pwd):/app debian:bullseye \
+    bash -c "apt-get update && apt-get install -y erlang elixir && \
+             cd /app && mix deps.get && MIX_ENV=prod mix release"
+</pre>
+
+      <p>
+        Alternatively, some projects use musl (Alpine Linux) for fully static binaries that 
+        do not depend on glibc at all. However, the BEAM's compatibility with musl has 
+        edge cases, and Tunneld targets Debian/Armbian systems with glibc.
+      </p>
+
+      <h3>Runtime Configuration</h3>
+
+      <p>
+        <code>config/runtime.exs</code> is evaluated at release startup, not compile time. 
+        This is where environment variables become config:
+      </p>
+
+<pre>
+# config/runtime.exs:
+import Config
+
+if config_env() == :prod do
+  config :tunneld, :network,
+    upstream: System.get_env("UPSTREAM_INTERFACE") || "eth0",
+    downstream: System.get_env("DOWNSTREAM_INTERFACE") || "eth1",
+    gateway: System.get_env("GATEWAY") || "10.0.0.1"
+
+  config :tunneld, TunneldWeb.Endpoint,
+    secret_key_base: System.fetch_env!("SECRET_KEY_BASE"),
+    http: [port: String.to_integer(System.get_env("PORT") || "80")]
+end
+</pre>
+    </section>
+
+    <section id="how-tunneld-uses-it">
+      <h2>How Tunneld Builds and Deploys</h2>
+
+      <h3>The Build Process</h3>
+
+<pre>
+# 1. Clean previous build
+$ rm -rf _build/prod
+
+# 2. Get dependencies
+$ MIX_ENV=prod mix deps.get
+
+# 3. Compile (includes assets)
+$ MIX_ENV=prod mix compile
+
+# 4. Build release
+$ MIX_ENV=prod mix release --overwrite
+
+# 5. Create tarball
+$ cd _build/prod/rel/tunneld
+$ tar czf ../../../tunneld-0.19.0.tar.gz .
+</pre>
+
+      <h3>Deploying to the Gateway</h3>
+
+<pre>
+# Copy the tarball:
+$ scp tunneld-0.19.0.tar.gz root@<GATEWAY_IP>:/tmp/
+
+# On the gateway:
+$ systemctl stop tunneld
+$ cd /opt/tunneld
+$ tar xzf /tmp/tunneld-0.19.0.tar.gz
+$ systemctl start tunneld
+</pre>
+
+      <blockquote class="danger">
+        <p><strong>Case Study: The Stale-Beam Hazard</strong></p>
+        <p>
+          A critical bug was discovered in production (documented in <code>lib/TODO.md</code> 
+          section 12): even after deleting <code>_build/prod</code> and rebuilding from scratch, 
+          <code>mix release</code> packaged an OLD beam file into the tarball.
+        </p>
+        <p>
+          The situation: <code>lib/tunneld/egress.ex</code> was fixed (a <code>with</code>-chain 
+          bug), <code>mix compile --force</code> ran successfully, and the correct beam file 
+          appeared in <code>_build/prod/lib/tunneld/ebin/Elixir.Tunneld.Egress.beam</code> 
+          (8304 bytes, containing <code>add_default_route</code>).
+        </p>
+        <p>
+          But <code>mix release</code> pulled the beam from <code>_build/prod/rel/</code>, 
+          where a stale 6196-byte version lived. The tarball contained the OLD code. Deployed 
+          to the gateway, the "fixed" release still had the bug. Debugging took hours because 
+          the source looked correct.
+        </p>
+      </blockquote>
+
+      <p>
+        The lesson: <strong>never trust that <code>mix release</code> used the right beams</strong>. 
+        Always verify the tarball before deploying:
+      </p>
+
+<pre>
+# Step 1: Check the beam file is in the tarball
+$ tar tzf tunneld-0.19.0.tar.gz | grep Egress
+lib/tunneld-0.19.0/ebin/Elixir.Tunneld.Egress.beam
+
+# Step 2: Extract and check size matches _build
+$ tar xOf tunneld-0.19.0.tar.gz lib/tunneld-0.19.0/ebin/Elixir.Tunneld.Egress.beam | wc -c
+8304
+$ wc -c _build/prod/lib/tunneld/ebin/Elixir.Tunneld.Egress.beam
+8304  # Should match!
+
+# Step 3: Check for expected function names/strings
+$ tar xOf tunneld-0.19.0.tar.gz lib/tunneld-0.19.0/ebin/Elixir.Tunneld.Egress.beam | strings | grep add_default_route
+add_default_route   # <-- Expected function is present
+
+# If the string is MISSING, the tarball has stale code!
+</pre>
+
+      <p>
+        To prevent this, you can force-clean the release directory before building:
+      </p>
+
+<pre>
+# Nuclear option: delete the entire release tree
+$ rm -rf _build/prod/rel
+$ MIX_ENV=prod mix release --overwrite
+</pre>
+    </section>
+
+    <section id="why">
+      <h2>Why Mix Releases</h2>
+
+      <h3>No Runtime Dependencies</h3>
+
+      <p>
+        The gateway does not need Elixir or Erlang installed. The release bundles ERTS, 
+        so it runs on any Linux with glibc. This simplifies the installer dramatically: 
+        it downloads a tarball, extracts it, and creates a systemd unit. No package 
+        managers, no version conflicts, no "apt-get install erlang" step that might 
+        pull in an incompatible version.
+      </p>
+
+      <p>
+        This matters for SBCs where package availability varies. A NanoPi might have 
+        different packages available than a Raspberry Pi. A release tarball is 
+        architecture-specific but distribution-agnostic: the same tarball runs on 
+        Debian, Ubuntu, Armbian, or any other Linux with a compatible glibc.
+      </p>
+
+      <h3>Reproducible Deploys</h3>
+
+      <p>
+        The release tarball is a single artifact. Deploy the same tarball to dev, staging, 
+        and prod. No "works on my machine" issues from different Elixir versions. The 
+        exact bytes that passed CI are the exact bytes that run in production.
+      </p>
+
+      <p>
+        This reproducibility extends to debugging. If a bug appears in production, you 
+        can download the exact tarball, extract it locally, and debug with confidence 
+        that you are looking at the same code. There is no drift between environments.
+      </p>
+
+      <h3>Fast Startup</h3>
+
+      <p>
+        Releases start faster than <code>mix phx.server</code> because there is no 
+        compilation step. The BEAM loads precompiled bytecode directly. On an SBC with 
+        slow storage, this difference is noticeable: seconds instead of tens of seconds.
+      </p>
+
+      <p>
+        Fast startup also improves recovery from crashes. With <code>Restart=on-failure</code> 
+        in the systemd unit, a crashed Tunneld restarts within seconds. If compilation 
+        were involved, the restart would be slow enough to affect users.
+      </p>
+
+      <h3>Versioned Rollbacks</h3>
+
+      <p>
+        Each release tarball has a version number. If a deploy breaks something, you can 
+        roll back to the previous tarball instantly. Keep the last few tarballs on the 
+        gateway, and rollback is just extracting an older one and restarting.
+      </p>
+
+      <p>
+        This is simpler than Git-based rollbacks, which would require re-compiling the 
+        old code. With tarballs, the old code is already compiled and ready to run.
+      </p>
+    </section>
+
+    <section id="examples">
+      <h2>Examples</h2>
+
+      <h3>Build and verify a release</h3>
+
+<pre>
+# Full clean build:
+$ rm -rf _build/prod deps
+$ MIX_ENV=prod mix deps.get
+$ MIX_ENV=prod mix release --overwrite
+
+# Check the release version:
+$ _build/prod/rel/tunneld/bin/tunneld version
+0.19.0
+
+# List included applications:
+$ ls _build/prod/rel/tunneld/lib/
+tunneld-0.19.0  phoenix-1.7.24  ...
+</pre>
+
+      <h3>Run a release locally</h3>
+
+<pre>
+# Set required env vars:
+$ export SECRET_KEY_BASE=$(mix phx.gen.secret)
+$ export UPSTREAM_INTERFACE=eth0
+$ export DOWNSTREAM_INTERFACE=eth1
+$ export GATEWAY=10.0.0.1
+
+# Start in foreground:
+$ _build/prod/rel/tunneld/bin/tunneld start
+
+# Or as a daemon:
+$ _build/prod/rel/tunneld/bin/tunneld daemon
+$ _build/prod/rel/tunneld/bin/tunneld pid
+</pre>
+
+      <h3>Evaluate code in a running release</h3>
+
+<pre>
+# Remote IEx console:
+$ _build/prod/rel/tunneld/bin/tunneld remote
+
+# Or one-off eval:
+$ _build/prod/rel/tunneld/bin/tunneld eval "Tunneld.Machines.list()"
+</pre>
+    </section>
+
+    <footer>
+      <a href="12-agent-api-auth.html">← Previous: Agent API &amp; Auth</a> · 
+      <a href="index.html">Curriculum Index</a> · 
+      <a href="14-testing-mock-mode.html">Next: Testing &amp; Mock Mode →</a>
+    </footer>
+  </div>
+</body>
+</html>

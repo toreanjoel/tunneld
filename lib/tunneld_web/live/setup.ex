@@ -19,22 +19,26 @@ defmodule TunneldWeb.Live.Setup do
     %{
       icon: "hero-globe-alt",
       title: "Edge gateway",
-      body: "Turns this device into a wired gateway: DHCP + DNS for everything on the downstream LAN port, with NAT and forwarding handled automatically."
+      body:
+        "Turns this device into a wired gateway: DHCP + DNS for everything on the downstream LAN port, with NAT and forwarding handled automatically."
     },
     %{
       icon: "hero-server-stack",
       title: "Machine discovery",
-      body: "Enroll machines (on the subnet or over the internet) and discover what is listening on them with ss -tlnp — runtime-agnostic (Incus, Docker, systemd, or a bare binary)."
+      body:
+        "Enroll machines (on the subnet or over the internet) and discover what is listening on them with ss -tlnp — runtime-agnostic (Incus, Docker, systemd, or a bare binary)."
     },
     %{
       icon: "hero-link",
       title: "Expose services",
-      body: "Promote any listener to a named resource on the LAN at <name>.tunneld.lan — and reach remote machines over a WireGuard overlay as if they were local."
+      body:
+        "Promote any listener to a named resource on the LAN at <name>.tunneld.lan — and reach remote machines over a WireGuard overlay as if they were local."
     },
     %{
       icon: "hero-cpu-chip",
       title: "Health & monitoring",
-      body: "Track link state, resources, system load, and manage which DNS resolver your subnet uses."
+      body:
+        "Track link state, resources, system load, and manage which DNS resolver your subnet uses."
     }
   ]
 
@@ -85,7 +89,9 @@ defmodule TunneldWeb.Live.Setup do
           <li>
             <span class="font-medium text-text-primary">WireGuard port (default 51820/UDP)</span>
             <div class="text-xs text-text-tertiary mt-0.5">
-              Must be allowed <b>inbound</b> in the target's <b>provider firewall</b> (e.g. a Vultr security
+              Must be allowed <b>inbound</b>
+              in the target's <b>provider firewall</b>
+              (e.g. a Vultr security
               group). This is separate from the OS firewall and cannot be changed over SSH.
             </div>
           </li>
@@ -103,7 +109,10 @@ defmodule TunneldWeb.Live.Setup do
           </li>
         </ul>
       </div>
-      <button phx-click="finish_setup" class="w-full bg-accent hover:bg-accent-light p-2 rounded-md text-white text-sm">
+      <button
+        phx-click="finish_setup"
+        class="w-full bg-accent hover:bg-accent-light p-2 rounded-md text-white text-sm"
+      >
         Got it — go to dashboard
       </button>
     </div>
@@ -132,7 +141,10 @@ defmodule TunneldWeb.Live.Setup do
       </div>
 
       <div class="flex flex-col gap-2 pt-4">
-        <button phx-click="next_step" class="w-full p-3 rounded-lg bg-accent text-sm font-medium hover:bg-accent-light transition">
+        <button
+          phx-click="next_step"
+          class="w-full p-3 rounded-lg bg-accent text-sm font-medium hover:bg-accent-light transition"
+        >
           Next: connection requirements →
         </button>
       </div>

@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Testing &amp; Mock Mode — Tunneld Curriculum</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav>
+    <a href="index.html">← Back to Curriculum</a>
+  </nav>
+
+  <div class="container">
+    <h1>14 — Testing &amp; Mock Mode</h1>
+
+    <p class="file-ref">Key source: <code>lib/tunneld/machines/ssh.ex</code>, <code>test/tunneld/overlay_test.exs</code>, <code>config/test.exs</code></p>
+
+    <section id="what-it-is">
+      <h2>What Mock Mode Is</h2>
+
+      <p>
+        Mock mode (<code>MOCK_DATA=true</code>) allows Tunneld to run on a development 
+        machine without real hardware or SSH targets. System commands (<code>iptables</code>, 
+        <code>systemctl</code>, <code>ssh</code>) are stubbed, and fake data is provided 
+        for DHCP leases, ethernet link state, and machine probes.
+      </p>
+
+      <p>
+        This enables development on macOS or any Linux workstation without an SBC. The 
+        full enroll → probe → expose flow works, just with simulated responses. The 
+        dashboard is fully functional, you just cannot actually route packets.
+      </p>
+
+      <p>
+        ExUnit is Elixir's testing framework. Tunneld's tests use mock mode to verify 
+        business logic without needing real machines. Tests cover machine enrollment, 
+        overlay IP allocation, egress routing, and API endpoints.
+      </p>
+    </section>
+
+    <section id="how-it-works">
+      <h2>How Mock Mode Works</h2>
+
+      <h3>Compile-Time Config</h3>
+
+      <p>
+        The <code>@mock</code> attribute is set at compile time from app config:
+      </p>
+
+<pre>
+# In lib/tunneld/overlay.ex:
+@mock Application.compile_env(:tunneld, :mock_data, false)
+
+def ensure_peer(machine) do
+  if @mock do
+    {:ok, %{overlay_ip: mock_overlay_ip(machine)}}
+  else
+    real_ensure_peer(machine)
+  end
+end
+</pre>
+
+      <h3>Fake SSH Responses</h3>
+
+      <p>
+        <code>lib/tunneld/machines/ssh/mock.ex</code> provides a fake SSH target that 
+        responds to commands with simulated output:
+      </p>
+
+<pre>
+# From lib/tunneld/machines/ssh/mock.ex (simplified):
+def run(_machine, "ss -tlnp" <> _, _opts) do
+  {:ok, """
+  State  Recv-Q Send-Q Local Address:Port Peer Address:Port Process
+  LISTEN 0      128    0.0.0.0:22         0.0.0.0:*         users:(("sshd",pid=1))
+  LISTEN 0      128    0.0.0.0:8080       0.0.0.0:*         users:(("nginx",pid=2))
+  """}
+end
+
+def run(_machine, "cat /etc/os-release" <> _, _opts) do
+  {:ok, "PRETTY_NAME=\"Debian GNU/Linux 12\""}
+end
+</pre>
+
+      <h3>Fake Data for GenServers</h3>
+
+      <p>
+        <code>lib/tunneld/servers/fake_data.ex</code> provides static data for devices, 
+        ethernet state, and system resources:
+      </p>
+
+<pre>
+# From lib/tunneld/servers/fake_data.ex:
+def devices do
+  [
+    %{"mac" => "aa:bb:cc:dd:ee:ff", "ip" => "10.0.0.100", "hostname" => "laptop"},
+    %{"mac" => "11:22:33:44:55:66", "ip" => "10.0.0.101", "hostname" => "phone"}
+  ]
+end
+
+def ethernet do
+  %{upstream: :up, downstream: :up}
+end
+</pre>
+    </section>
+
+    <section id="how-tunneld-uses-it">
+      <h2>How Tunneld Tests</h2>
+
+      <h3>Test Configuration</h3>
+
+      <p>
+        <code>config/test.exs</code> enables mock mode and sets test-specific paths:
+      </p>
+
+<pre>
+# config/test.exs:
+import Config
+
+config :tunneld,
+  mock_data: true,
+  fs_root: "test/tmp"
+
+config :tunneld, TunneldWeb.Endpoint,
+  server: false  # Don't start HTTP server in tests
+</pre>
+
+      <h3>Example Test: Overlay IP Allocation</h3>
+
+<pre>
+# From test/tunneld/overlay_test.exs:
+defmodule Tunneld.OverlayTest do
+  use ExUnit.Case, async: false  # Modifies app env
+
+  alias Tunneld.Overlay
+
+  setup do
+    # Clean up overlay.json before each test
+    File.rm_rf("test/tmp/overlay.json")
+    :ok
+  end
+
+  test "ensure_peer allocates overlay IP" do
+    machine = %{"id" => "test-123", "address" => "45.76.183.185"}
+
+    assert {:ok, %{overlay_ip: ip}} = Overlay.ensure_peer(machine)
+    assert ip =~ ~r/^10\.88\.0\.\d+$/
+
+    # Second call returns same IP (idempotent)
+    assert {:ok, %{overlay_ip: ^ip}} = Overlay.ensure_peer(machine)
+  end
+
+  test "address_for returns overlay IP for remote machine" do
+    machine = %{"id" => "test-456", "address" => "45.76.183.185"}
+    Overlay.ensure_peer(machine)
+
+    addr = Overlay.address_for(machine)
+    assert addr =~ ~r/^10\.88\.0\.\d+$/
+  end
+end
+</pre>
+
+      <h3>Example Test: Runtime Listener Parsing</h3>
+
+<pre>
+# From test/tunneld/machines/runtime_test.exs:
+test "parse_listeners extracts address, port, and process" do
+  ss_output = """
+  State  Recv-Q Send-Q Local Address:Port Peer Address:Port Process
+  LISTEN 0      128    0.0.0.0:80         0.0.0.0:*         users:(("nginx",pid=1234,fd=6))
+  LISTEN 0      128    127.0.0.1:5432     0.0.0.0:*         users:(("postgres",pid=5678,fd=5))
+  """
+
+  listeners = Runtime.parse_listeners(ss_output, %{})
+
+  assert length(listeners) == 2
+  assert Enum.find(listeners, &(&1["port"] == 80))["proc"] == "nginx"
+  assert Enum.find(listeners, &(&1["port"] == 5432))["addr"] == "127.0.0.1"
+end
+</pre>
+    </section>
+
+    <section id="why">
+      <h2>Why Mock Mode</h2>
+
+      <h3>Development Without Hardware</h3>
+
+      <p>
+        You do not need an SBC to develop Tunneld. Run <code>mix phx.server</code> on 
+        a MacBook and the dashboard works. This makes onboarding new contributors easier. 
+        The full enrollment-probe-expose flow runs on a laptop, complete with fake DHCP 
+        leases, simulated SSH responses, and working LiveView updates.
+      </p>
+
+      <h3>Fast Tests</h3>
+
+      <p>
+        Tests that SSH to real machines take seconds per command. Mock tests complete in 
+        milliseconds. The CI can run the full test suite quickly. A single 
+        <code>SSH.run/2</code> call takes ~1 second to a real machine (TCP handshake, 
+        key exchange, authentication, command execution, response). The mock returns 
+        instantly from in-memory data.
+      </p>
+
+      <h3>Deterministic Results</h3>
+
+      <p>
+        Real machines have varying state. Mock responses are predictable, so tests do 
+        not flake due to network issues or changed machine state. A test that expects 
+        nginx on port 80 will always see it in mock mode, even if someone reconfigured 
+        the real machine.
+      </p>
+
+      <h3>What Mock Mode Does NOT Cover</h3>
+
+      <p>
+        Here is the hard truth: mock mode gives you fast, deterministic tests, but it 
+        does not prove the system works. Many tests assert only on mock constants — they 
+        verify the mock returns what the mock was told to return, which is a tautology.
+      </p>
+
+      <p>
+        A code audit reveals significant gaps:
+      </p>
+
+      <ul>
+        <li>
+          <strong>Overlay's real key exchange</strong> — <code>ensure_peer/1</code> in 
+          mock mode returns a fake overlay IP. No test runs <code>wg genkey</code>, 
+          pushes config over SSH, or verifies a handshake actually completes. The 
+          real exchange logic in <code>exchange_keys/1</code> and <code>configure_gateway/3</code> 
+          is untested.
+        </li>
+        <li>
+          <strong>Egress's real ip rule/route</strong> — <code>route_device/3</code> in 
+          mock mode tracks state in memory and never touches <code>ip rule</code> or 
+          <code>ip route</code>. The actual routing table manipulation, including the 
+          critical <code>add_default_route/3</code> and <code>add_forward_rules/1</code> 
+          functions, runs only in production.
+        </li>
+        <li>
+          <strong>Disenroll.teardown_remote</strong> — The disenrollment flow removes 
+          WireGuard configs, Caddy routes, and SSH keys from targets. In mock mode, 
+          these are just map deletions. The real SSH commands that delete 
+          <code>/etc/wireguard/wg-*.conf</code> on targets are never executed.
+        </li>
+      </ul>
+
+      <h3>How to Tell a Real Test from a Tautological One</h3>
+
+      <p>
+        A tautological test looks like this:
+      </p>
+
+<pre>
+test "ensure_peer returns overlay IP" do
+  machine = %{"id" => "test-123", "address" => "45.76.183.185"}
+  assert {:ok, %{overlay_ip: ip}} = Overlay.ensure_peer(machine)
+  assert ip =~ ~r/^10\.88\.0\.\d+$/
+end
+# This passes because mock_overlay_ip/1 generates "10.88.0.N"
+# It does NOT test WireGuard installation or handshakes
+</pre>
+
+      <p>
+        A meaningful test verifies behavior that could break:
+      </p>
+
+<pre>
+test "parse_listeners handles IPv6 addresses" do
+  ss_output = "LISTEN 0 128 [::]:80 [::]:* users:..."
+  listeners = Runtime.parse_listeners(ss_output, %{})
+  assert Enum.find(listeners, &(&1["port"] == 80))["addr"] == "[::]"
+end
+# This tests the PARSER, which runs the same in mock and prod
+# If the regex breaks, this test fails
+</pre>
+
+      <p>
+        The distinction: meaningful tests verify logic that runs the same in both modes 
+        (parsing, data transformation, allocation algorithms). Tautological tests verify 
+        that the mock stub returns the expected stub value.
+      </p>
+    </section>
+
+    <section id="examples">
+      <h2>Examples</h2>
+
+      <h3>Run tests</h3>
+
+<pre>
+# Run all tests:
+$ mix test
+
+# Run a specific test file:
+$ mix test test/tunneld/overlay_test.exs
+
+# Run with verbose output:
+$ mix test --trace
+</pre>
+
+      <h3>Run in mock mode for development</h3>
+
+<pre>
+# This is the default in dev:
+$ mix phx.server
+# Dashboard at http://localhost:80
+
+# Explicitly set mock mode:
+$ MOCK_DATA=true mix phx.server
+</pre>
+
+      <h3>Debug a failing test</h3>
+
+<pre>
+# Add IO.inspect to see values:
+test "something" do
+  result = MyModule.function()
+  IO.inspect(result, label: "result")
+  assert result == expected
+end
+
+# Or use IEx.pry:
+test "something" do
+  require IEx
+  IEx.pry()  # Pauses here, opens IEx
+  assert true
+end
+</pre>
+
+      <h3>What mock mode does NOT test</h3>
+
+<pre>
+# These require real hardware/machines:
+- Actual packet routing through iptables
+- Real WireGuard handshakes
+- Real SSH connections
+- Real DHCP lease assignment
+- Actual Caddy proxying
+
+# Tests verify:
+- Data parsing (ss -tlnp output, lease files)
+- State management (overlay IP allocation)
+- API contract (endpoints return expected shapes)
+- Business logic (egress table allocation)
+</pre>
+    </section>
+
+    <footer>
+      <a href="13-build-release-deploy.html">← Previous: Build, Release &amp; Deploy</a> · 
+      <a href="index.html">Curriculum Index</a> · 
+      <a href="15-systemd-service-lifecycle.html">Next: systemd Service Lifecycle →</a>
+    </footer>
+  </div>
+</body>
+</html>

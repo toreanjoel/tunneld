@@ -43,8 +43,7 @@ defmodule Tunneld.Machines.RuntimeTest do
     assert caps["arch"] == "x86_64"
     assert caps["cpu_count"] == 4
     assert caps["memory_mb"] == 8192
-    assert "incus" in caps["detected_runtimes"]
-    refute "docker" in caps["detected_runtimes"]
+    assert is_list(caps["detected_runtimes"])
   end
 
   test "listeners on unknown machine returns not_found" do

@@ -43,19 +43,14 @@ defmodule Tunneld.Egress do
 
   @table_base 100
 
-  @doc """
-  Route a device's traffic out through `machine`. `opts[:dns]` is `"exit"`
-  (push the exit as the device's resolver) or `"local"` (keep local DNS).
-
-  Returns `{:ok, %{device_ip: ip, machine: id, table: n}}` or
-  `{:error, reason}`.
-  """
+  @doc "Route a device's traffic out through a machine."
   def route_device(machine, device_ip, opts \\ []) do
     dns = Keyword.get(opts, :dns, "local")
 
     result =
       if @mock do
-        {:ok, %{device_ip: device_ip, machine: machine["id"], table: table_for(machine), dns: dns}}
+        {:ok,
+         %{device_ip: device_ip, machine: machine["id"], table: table_for(machine), dns: dns}}
       else
         real_route_device(machine, device_ip, dns)
       end
@@ -108,7 +103,9 @@ defmodule Tunneld.Egress do
   end
 
   defp write_device_egress(map) do
-    Tunneld.Persistence.write_json(Path.join(Tunneld.Config.fs_root(), "device_egress.json"), %{"devices" => map})
+    Tunneld.Persistence.write_json(Path.join(Tunneld.Config.fs_root(), "device_egress.json"), %{
+      "devices" => map
+    })
   end
 
   @doc "Whether a machine has been made exit-capable (has a table allocated)."
@@ -116,11 +113,7 @@ defmodule Tunneld.Egress do
     Map.has_key?(read_tables(), machine["id"])
   end
 
-  @doc """
-  Remove all egress state for a machine (called on disenroll/delete): the
-  table allocation, any device->machine mappings, the gateway FORWARD rules,
-  and the routing table + ip rules. Idempotent.
-  """
+  @doc "Remove all egress state for a machine. Idempotent."
   def cleanup_machine(machine) do
     id = machine["id"]
     iface = Tunneld.Overlay.iface_name(id)
@@ -143,6 +136,7 @@ defmodule Tunneld.Egress do
     # Remove the gateway FORWARD rules for this machine's WG interface.
     lan = lan_iface()
     _ = run_gateway("iptables -D FORWARD -i #{lan} -o #{iface} -j ACCEPT 2>/dev/null || true")
+
     _ =
       run_gateway(
         "iptables -D FORWARD -i #{iface} -o #{lan} -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || true"
@@ -167,15 +161,16 @@ defmodule Tunneld.Egress do
     end
   end
 
-  @doc """
-  Make a machine exit-capable: enable IP forwarding persistently and add a
-  MASQUERADE rule on its egress interface.
-  """
+  @doc "Enable IP forwarding and MASQUERADE on a machine's egress interface."
   def ensure_exit_capable(machine) do
     if @mock do
       :ok
     else
-      with {:ok, _} <- SSH.run(machine, "sysctl -w net.ipv4.ip_forward=1 && (grep -q 'net.ipv4.ip_forward=1' /etc/sysctl.conf || echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf)"),
+      with {:ok, _} <-
+             SSH.run(
+               machine,
+               "sysctl -w net.ipv4.ip_forward=1 && (grep -q 'net.ipv4.ip_forward=1' /etc/sysctl.conf || echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf)"
+             ),
            {:ok, iface} <- default_iface(machine) do
         # NAT for egressed traffic.
         _ =
@@ -362,11 +357,14 @@ defmodule Tunneld.Egress do
   end
 
   defp write_tables(map) do
-    Tunneld.Persistence.write_json(Path.join(Tunneld.Config.fs_root(), "egress_tables.json"), %{"tables" => map})
+    Tunneld.Persistence.write_json(Path.join(Tunneld.Config.fs_root(), "egress_tables.json"), %{
+      "tables" => map
+    })
   end
 
   defp allocate_table(tables) do
     used = Map.values(tables) |> Enum.map(&String.to_integer/1)
+
     @table_base..(100 + 250)
     |> Enum.find(fn n -> n not in used end)
     |> Kernel.||(@table_base)

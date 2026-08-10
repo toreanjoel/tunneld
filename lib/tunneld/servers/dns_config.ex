@@ -58,16 +58,6 @@ defmodule Tunneld.Servers.DnsConfig do
   end
 
   @impl true
-  def handle_call(:ensure_lan_domain, _from, state) do
-    unless Application.get_env(:tunneld, :mock_data, false) do
-      write_lan_domain_config()
-      Tunneld.Servers.Services.restart_service(:dnsmasq, :no_notify)
-    end
-
-    {:reply, :ok, state}
-  end
-
-  @impl true
   def handle_call({:set_dns_server, ip}, _from, _state) do
     path = dns_path()
     Tunneld.Persistence.write_json(path, %{"server" => ip})
@@ -85,24 +75,6 @@ defmodule Tunneld.Servers.DnsConfig do
     })
 
     {:reply, :ok, %{"server" => ip}}
-  end
-
-  @doc """
-  Ensure the LAN domain (`*.tunneld.lan`) resolves to the gateway IP so named
-  resources and exposed services are reachable by name across the subnet.
-  No-op in mock mode.
-  """
-  def ensure_lan_domain do
-    if Process.whereis(__MODULE__) do
-      GenServer.call(__MODULE__, :ensure_lan_domain)
-    else
-      unless Application.get_env(:tunneld, :mock_data, false) do
-        write_lan_domain_config()
-        Tunneld.Servers.Services.restart_service(:dnsmasq, :no_notify)
-      end
-
-      :ok
-    end
   end
 
   defp write_dnsmasq_config(server) do

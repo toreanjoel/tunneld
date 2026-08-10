@@ -22,6 +22,7 @@ defmodule Tunneld.Audit do
     path = path()
 
     File.mkdir_p!(Path.dirname(path))
+
     File.open(path, [:append, :utf8], fn io ->
       IO.write(io, line <> "\n")
     end)

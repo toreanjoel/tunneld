@@ -21,15 +21,11 @@ defmodule Tunneld.Servers.Devices do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 
-  @doc """
-  Init devices
-  """
   def init(_) do
     send(self(), :sync)
     {:ok, %{}}
   end
 
-  # periodic sync/broadcast
   def handle_info(:sync, state) do
     devices = fetch_devices()
 
@@ -38,10 +34,7 @@ defmodule Tunneld.Servers.Devices do
       devices: devices
     }
 
-    # Broadcast to the live view (or parent) so it can update the Devices component.
-    # Use an id that matches the one used in your live_component render.
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "component:devices", %{
-      # Make sure this matches your component's id.
       id: "devices",
       module: TunneldWeb.Live.Components.Devices,
       data: result
@@ -51,13 +44,10 @@ defmodule Tunneld.Servers.Devices do
     {:noreply, Map.merge(state, result)}
   end
 
-  # schedule next sync
   defp sync_devices() do
     :timer.send_after(@interval, :sync)
   end
 
-  # remove the matching MAC line from the leases file
-  # mock mode: just pretend success
   defp delete_lease_line(_mac, true), do: {:ok, :mock}
 
   defp delete_lease_line(mac, false) do
@@ -79,9 +69,8 @@ defmodule Tunneld.Servers.Devices do
     end
   end
 
-  # restart dnsmasq using our Services server
-  # mock mode: pretend success
   defp restart_dnsmasq(true), do: :ok
+
   defp restart_dnsmasq(false) do
     try do
       Tunneld.Servers.Services.restart_service(:dnsmasq, :no_notify)

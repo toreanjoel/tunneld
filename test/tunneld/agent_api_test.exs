@@ -25,7 +25,8 @@ defmodule Tunneld.AgentApiTest do
 
     path = Path.join(Application.get_env(:tunneld, :fs)[:root], "tokens.json")
     stored = File.read!(path)
-    refute String.contains?(stored, raw)  # raw token is never stored
+    # raw token is never stored
+    refute String.contains?(stored, raw)
     assert String.contains?(stored, id)
   end
 
@@ -54,11 +55,18 @@ defmodule Tunneld.AgentApiTest do
   end
 
   test "agent API lists machines with a scoped token" do
-    {:ok, _} = Machines.enroll(%{"name" => "vps", "address" => "203.0.113.50", "location" => "remote"})
+    {:ok, _} =
+      Machines.enroll(%{"name" => "vps", "address" => "203.0.113.50", "location" => "remote"})
+
     {:ok, raw, _id, _scopes} = AgentTokens.issue(["machines:read"])
     # isolate: does authorize work directly?
     assert {:ok, _id, _scopes} = AgentTokens.authorize(raw, "machines:read")
-    conn = build_conn() |> put_req_header("authorization", "Bearer #{raw}") |> get("/api/v1/agent/machines")
+
+    conn =
+      build_conn()
+      |> put_req_header("authorization", "Bearer #{raw}")
+      |> get("/api/v1/agent/machines")
+
     assert %{"machines" => [_]} = json_response(conn, 200)
   end
 
@@ -76,7 +84,6 @@ defmodule Tunneld.AgentApiTest do
     assert {:ok, %{status: :done, result: 42}} = Tunneld.Jobs.get(job_id)
   end
 
-
   test "authorize_any accepts a valid token regardless of scope" do
     {:ok, raw, _id, _scopes} = AgentTokens.issue(["machines:read"])
     assert {:ok, _id, _} = AgentTokens.authorize_any(raw)
@@ -85,7 +92,9 @@ defmodule Tunneld.AgentApiTest do
   end
 
   test "job results with non-encodable tuples are JSON-safe" do
-    {job_id, _pid} = Tunneld.Jobs.enqueue(fn -> {:error, {:ssh_failed, 255, "No route to host"}} end)
+    {job_id, _pid} =
+      Tunneld.Jobs.enqueue(fn -> {:error, {:ssh_failed, 255, "No route to host"}} end)
+
     Process.sleep(80)
     {:ok, %{status: :done, result: result}} = Tunneld.Jobs.get(job_id)
     # result must be JSON-encodable
@@ -94,7 +103,12 @@ defmodule Tunneld.AgentApiTest do
 
   test "jobs endpoint is reachable by any valid token" do
     {:ok, raw, _id, _scopes} = AgentTokens.issue(["machines:read"])
-    conn = build_conn() |> put_req_header("authorization", "Bearer #{raw}") |> get("/api/v1/agent/jobs/nonexistent")
+
+    conn =
+      build_conn()
+      |> put_req_header("authorization", "Bearer #{raw}")
+      |> get("/api/v1/agent/jobs/nonexistent")
+
     # token valid -> reaches the controller (404 job not found, not 403)
     assert response(conn, 404)
   end

@@ -24,7 +24,9 @@ defmodule Tunneld.OverlayTest do
   end
 
   test "address_for returns overlay IP for remote machines" do
-    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "vps", "address" => "203.0.113.5", "location" => "remote"})
+    {:ok, %{"id" => id}} =
+      Machines.enroll(%{"name" => "vps", "address" => "203.0.113.5", "location" => "remote"})
+
     {:ok, m} = Machines.get(id)
     ip = Overlay.address_for(m)
     assert ip =~ "10.88.0."
@@ -32,7 +34,9 @@ defmodule Tunneld.OverlayTest do
   end
 
   test "ensure_peer returns a stable overlay IP (mock mode)" do
-    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "vps2", "address" => "203.0.113.9", "location" => "remote"})
+    {:ok, %{"id" => id}} =
+      Machines.enroll(%{"name" => "vps2", "address" => "203.0.113.9", "location" => "remote"})
+
     {:ok, m} = Machines.get(id)
     {:ok, %{overlay_ip: ip}} = Overlay.ensure_peer(m)
     {:ok, %{overlay_ip: ip2}} = Overlay.ensure_peer(m)
@@ -41,13 +45,17 @@ defmodule Tunneld.OverlayTest do
   end
 
   test "address_for is stable across calls for a remote machine" do
-    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "vps3", "address" => "203.0.113.10", "location" => "remote"})
+    {:ok, %{"id" => id}} =
+      Machines.enroll(%{"name" => "vps3", "address" => "203.0.113.10", "location" => "remote"})
+
     {:ok, m} = Machines.get(id)
     assert Overlay.address_for(m) == Overlay.address_for(m)
   end
 
   test "remove_peer is idempotent (mock mode)" do
-    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "vps4", "address" => "203.0.113.11", "location" => "remote"})
+    {:ok, %{"id" => id}} =
+      Machines.enroll(%{"name" => "vps4", "address" => "203.0.113.11", "location" => "remote"})
+
     {:ok, m} = Machines.get(id)
     _ = Overlay.ensure_peer(m)
     assert :ok = Overlay.remove_peer(m)
@@ -55,15 +63,21 @@ defmodule Tunneld.OverlayTest do
   end
 
   test "status returns a map (mock mode)" do
-    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "vps5", "address" => "203.0.113.12", "location" => "remote"})
+    {:ok, %{"id" => id}} =
+      Machines.enroll(%{"name" => "vps5", "address" => "203.0.113.12", "location" => "remote"})
+
     {:ok, m} = Machines.get(id)
     {:ok, st} = Overlay.status(m)
     assert st.interface == Tunneld.Overlay.iface_name(id)
   end
 
   test "overlay IPs are persisted and allocated uniquely across machines" do
-    {:ok, %{"id" => id1}} = Machines.enroll(%{"name" => "a", "address" => "203.0.113.20", "location" => "remote"})
-    {:ok, %{"id" => id2}} = Machines.enroll(%{"name" => "b", "address" => "203.0.113.21", "location" => "remote"})
+    {:ok, %{"id" => id1}} =
+      Machines.enroll(%{"name" => "a", "address" => "203.0.113.20", "location" => "remote"})
+
+    {:ok, %{"id" => id2}} =
+      Machines.enroll(%{"name" => "b", "address" => "203.0.113.21", "location" => "remote"})
+
     {:ok, m1} = Machines.get(id1)
     {:ok, m2} = Machines.get(id2)
 
@@ -76,7 +90,9 @@ defmodule Tunneld.OverlayTest do
   end
 
   test "overlay_ip_for is deterministic from persisted overlay.json" do
-    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "c", "address" => "203.0.113.30", "location" => "remote"})
+    {:ok, %{"id" => id}} =
+      Machines.enroll(%{"name" => "c", "address" => "203.0.113.30", "location" => "remote"})
+
     {:ok, m} = Machines.get(id)
     ip = Overlay.address_for(m)
 
@@ -91,7 +107,9 @@ defmodule Tunneld.OverlayTest do
     local = Overlay.address_for(%{"address" => "192.168.1.77"})
     assert local == "192.168.1.77"
 
-    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "d", "address" => "203.0.113.40", "location" => "remote"})
+    {:ok, %{"id" => id}} =
+      Machines.enroll(%{"name" => "d", "address" => "203.0.113.40", "location" => "remote"})
+
     {:ok, m} = Machines.get(id)
     assert Overlay.address_for(m) =~ "10.88.0."
   end

@@ -1,13 +1,5 @@
 defmodule TunneldWeb.Layouts do
-  @moduledoc """
-  This module holds different layouts used by your application.
-
-  See the `layouts` directory for all templates available.
-  The "root" layout is a skeleton rendered as part of the
-  application router. The "app" layout is set as the default
-  layout on both `use TunneldWeb, :controller` and
-  `use TunneldWeb, :live_view`.
-  """
+  @moduledoc "Layout templates (root and app)."
   use TunneldWeb, :html
 
   embed_templates "layouts/*"

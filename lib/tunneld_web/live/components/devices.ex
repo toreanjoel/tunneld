@@ -27,12 +27,14 @@ defmodule TunneldWeb.Live.Components.Devices do
           end
 
         cache = Map.put(cache, d.mac, %{at: now, online: online})
+
         d =
           d
           |> Map.put(:expose_allowed, Tunneld.Servers.ExposeAllowed.allowed?(d.mac))
           |> Map.put(:tags, Tunneld.Servers.DeviceTags.get_tags(d.mac))
           |> Map.put(:online, online)
           |> Map.put(:egress, Tunneld.Egress.device_egress(d.ip) || "local")
+
         {[d | acc], cache}
       end)
 
@@ -60,13 +62,12 @@ defmodule TunneldWeb.Live.Components.Devices do
     {:ok, socket}
   end
 
-  @doc """
-  Render the devices connected to the network.
-  """
   def render(assigns) do
     ~H"""
     <div class="p-3 md:p-5">
-      <.section_header>Devices<.help_icon text="Devices discovered on your LAN subnet via DHCP leases. Each device automatically gets an IP from dnsmasq. Use Quick Expose to let devices create local resources via a curl command. Revoke IP to release the DHCP lease." /></.section_header>
+      <.section_header>
+        Devices<.help_icon text="Devices discovered on your LAN subnet via DHCP leases. Each device automatically gets an IP from dnsmasq. Use Quick Expose to let devices create local resources via a curl command. Revoke IP to release the DHCP lease." />
+      </.section_header>
 
       <div :if={@loading} class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         <div class="p-4 flex flex-col bg-surface rounded-lg w-full h-[130px] opacity-10">
@@ -89,17 +90,28 @@ defmodule TunneldWeb.Live.Components.Devices do
                 <span class="truncate"><%= mask(@obfuscated, device.hostname) %></span>
                 <span class={"status-dot shrink-0 #{if !@obfuscated && Map.get(device, :online, false), do: "status-dot--green", else: "status-dot--gray"}"} />
                 <%= if device.egress != "local" do %>
-                  <span class="px-1.5 py-0.5 rounded-full bg-accent/20 text-accent uppercase text-[9px] font-medium shrink-0">via exit</span>
+                  <span class="px-1.5 py-0.5 rounded-full bg-accent/20 text-accent uppercase text-[9px] font-medium shrink-0">
+                    via exit
+                  </span>
                 <% end %>
               </div>
               <div
                 phx-click="modal_open"
                 phx-value-modal_title={"Manage tags for #{device.hostname}"}
-                phx-value-modal_description={if device.tags != [], do: "Current tags: #{Enum.join(device.tags, ", ")}. Enter a new tag below to append.", else: "No tags yet. Add one below."}
+                phx-value-modal_description={
+                  if device.tags != [],
+                    do:
+                      "Current tags: #{Enum.join(device.tags, ", ")}. Enter a new tag below to append.",
+                    else: "No tags yet. Add one below."
+                }
                 phx-value-modal_body={
                   Jason.encode!(%{
                     "type" => "schema",
-                    "data" => Tunneld.Schema.data(:device_tag, %{hostname: device.hostname, current_tags: device.tags}),
+                    "data" =>
+                      Tunneld.Schema.data(:device_tag, %{
+                        hostname: device.hostname,
+                        current_tags: device.tags
+                      }),
                     "default_values" => %{
                       "mac" => device.mac
                     },
@@ -109,11 +121,20 @@ defmodule TunneldWeb.Live.Components.Devices do
                 phx-click-loading="opacity-50 cursor-wait"
                 class="cursor-pointer"
               >
-                <.icon name="hero-tag" class={if device.tags != [], do: "h-4 w-4 text-blue-400", else: "h-4 w-4 text-text-secondary"} />
+                <.icon
+                  name="hero-tag"
+                  class={
+                    if device.tags != [],
+                      do: "h-4 w-4 text-blue-400",
+                      else: "h-4 w-4 text-text-secondary"
+                  }
+                />
               </div>
               <div
                 phx-click="modal_open"
-                phx-value-modal_title={if device.expose_allowed, do: "Revoke Quick Expose?", else: "Allow Quick Expose?"}
+                phx-value-modal_title={
+                  if device.expose_allowed, do: "Revoke Quick Expose?", else: "Allow Quick Expose?"
+                }
                 phx-value-modal_body={
                   Jason.encode!(%{
                     "type" => "string",
@@ -127,9 +148,13 @@ defmodule TunneldWeb.Live.Components.Devices do
                 }
                 phx-value-modal_actions={
                   Jason.encode!(%{
-                    "title" => (if device.expose_allowed, do: "Revoke", else: "Allow"),
+                    "title" => if(device.expose_allowed, do: "Revoke", else: "Allow"),
                     "payload" => %{
-                      "type" => (if device.expose_allowed, do: "revoke_device_expose", else: "allow_device_expose"),
+                      "type" =>
+                        if(device.expose_allowed,
+                          do: "revoke_device_expose",
+                          else: "allow_device_expose"
+                        ),
                       "data" => %{
                         "mac" => device.mac
                       }
@@ -139,7 +164,14 @@ defmodule TunneldWeb.Live.Components.Devices do
                 phx-click-loading="opacity-50 cursor-wait"
                 class="cursor-pointer"
               >
-                <.icon name="hero-link" class={if device.expose_allowed, do: "h-4 w-4 text-green", else: "h-4 w-4 text-text-secondary"} />
+                <.icon
+                  name="hero-link"
+                  class={
+                    if device.expose_allowed,
+                      do: "h-4 w-4 text-green",
+                      else: "h-4 w-4 text-text-secondary"
+                  }
+                />
               </div>
 
               <div
@@ -172,7 +204,10 @@ defmodule TunneldWeb.Live.Components.Devices do
             <div class={if device.tags != [], do: "grow-0 h-1", else: "grow"} />
             <div :if={device.tags != []} class="flex flex-wrap gap-1 mb-1 pt-1">
               <%= for tag <- device.tags |> Enum.sort_by(& &1) |> Enum.take(2) do %>
-                <span class={"group px-1.5 py-0.5 text-[10px] rounded border flex items-center gap-1 shrink-0 " <> tag_classes(tag)} title={tag}>
+                <span
+                  class={"group px-1.5 py-0.5 text-[10px] rounded border flex items-center gap-1 shrink-0 " <> tag_classes(tag)}
+                  title={tag}
+                >
                   <span class="truncate max-w-[90px]"><%= tag %></span>
                   <span
                     phx-click="trigger_action"
@@ -185,7 +220,9 @@ defmodule TunneldWeb.Live.Components.Devices do
                 </span>
               <% end %>
               <%= if length(device.tags) > 2 do %>
-                <span class="px-1.5 py-0.5 text-[10px] text-text-tertiary">+<%= length(device.tags) - 2 %></span>
+                <span class="px-1.5 py-0.5 text-[10px] text-text-tertiary">
+                  +<%= length(device.tags) - 2 %>
+                </span>
               <% end %>
             </div>
             <div class="mt-auto pt-3 border-t border-border/50">
@@ -264,6 +301,7 @@ defmodule TunneldWeb.Live.Components.Devices do
 
   defp probe_online(ip) do
     mock? = Application.get_env(:tunneld, :mock_data, false)
+
     if mock? do
       true
     else

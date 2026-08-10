@@ -1,21 +1,5 @@
 defmodule TunneldWeb do
-  @moduledoc """
-  The entrypoint for defining your web interface, such
-  as controllers, components, and so on.
-
-  This can be used in your application as:
-
-      use TunneldWeb, :controller
-      use TunneldWeb, :html
-
-  The definitions below will be executed for every controller,
-  component, etc, so keep them short and clean, focused
-  on imports, uses and aliases.
-
-  Do NOT define functions inside the quoted expressions
-  below. Instead, define additional modules and import
-  those modules here.
-  """
+  @moduledoc "Phoenix web interface entry point. Defines :controller, :live_view, etc."
 
   def static_paths, do: ~w(assets images fonts favicon.ico robots.txt)
 
@@ -99,9 +83,6 @@ defmodule TunneldWeb do
     end
   end
 
-  @doc """
-  When used, dispatch to the appropriate controller/live_view/etc.
-  """
   defmacro __using__(which) when is_atom(which) do
     apply(__MODULE__, which, [])
   end

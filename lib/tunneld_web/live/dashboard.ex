@@ -245,11 +245,9 @@ defmodule TunneldWeb.Live.Dashboard do
         id="enrollment_wizard"
         open={@enroll_wizard_open}
       />
-
-          </div>
+    </div>
     """
   end
-
 
   defp services_list do
     status = Tunneld.Servers.Services.get_status()
@@ -395,8 +393,6 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, assign(socket, :devices_expanded, !socket.assigns.devices_expanded)}
   end
 
-  # --- Machines ---
-
   def handle_event("enroll_machine_modal", _params, socket) do
     {:noreply, assign(socket, :enroll_wizard_open, true)}
   end
@@ -487,7 +483,7 @@ defmodule TunneldWeb.Live.Dashboard do
               "mkdir -p ~/.ssh && echo '#{String.trim(pub)}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
           },
           %{
-            "title" => "3. Give #{ssh_user} passwordless sudo (required for Incus install)",
+            "title" => "3. Give #{ssh_user} passwordless sudo (required for service management)",
             "code" =>
               "echo '#{ssh_user} ALL=(ALL) NOPASSWD: ALL' | sudo tee /etc/sudoers.d/#{ssh_user} && sudo chmod 440 /etc/sudoers.d/#{ssh_user}"
           }
@@ -497,7 +493,7 @@ defmodule TunneldWeb.Live.Dashboard do
           show: true,
           title: "SSH key & setup",
           description:
-            "Run these on the target machine so tunneld can connect over SSH and install Incus.",
+            "Run these on the target machine so tunneld can connect over SSH and configure services.",
           body: %{"type" => "code_blocks", "data" => blocks},
           actions: nil,
           type: :default
@@ -506,9 +502,6 @@ defmodule TunneldWeb.Live.Dashboard do
         {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal))}
     end
   end
-
-
-
 
   def handle_event("add_pool_member_modal", %{"id" => id}, socket) do
     modal_data = %{
@@ -521,7 +514,12 @@ defmodule TunneldWeb.Live.Dashboard do
           "title" => "Add Backend",
           "type" => "object",
           "properties" => %{
-            "id" => %{"type" => "string", "ui:widget" => "hidden", "readOnly" => true, "default" => id},
+            "id" => %{
+              "type" => "string",
+              "ui:widget" => "hidden",
+              "readOnly" => true,
+              "default" => id
+            },
             "backend" => %{
               "type" => "string",
               "pattern" => "^[^\s:]+:[0-9]{1,5}$",
@@ -540,7 +538,11 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal_data))}
   end
 
-  def handle_event("make_listener_resource", %{"machine_id" => id, "addr" => addr, "port" => port, "proc" => proc} = _params, socket) do
+  def handle_event(
+        "make_listener_resource",
+        %{"machine_id" => id, "addr" => addr, "port" => port, "proc" => proc} = _params,
+        socket
+      ) do
     name = sanitize_resource_name("#{proc}-#{port}")
 
     # The pool should point at the address tunneld can actually route to: for
@@ -833,7 +835,7 @@ defmodule TunneldWeb.Live.Dashboard do
     end
   end
 
-def sidebar(%{sidebar: sidebar, uri_info: uri_info} = assigns) do
+  def sidebar(%{sidebar: sidebar, uri_info: uri_info} = assigns) do
     assigns =
       assigns
       |> assign(:sidebar, sidebar)
@@ -1071,6 +1073,7 @@ def sidebar(%{sidebar: sidebar, uri_info: uri_info} = assigns) do
           end
 
         machine = enrich_overlay(machine)
+
         sidebar = %{
           is_open: true,
           view: :machine,
@@ -1086,8 +1089,7 @@ def sidebar(%{sidebar: sidebar, uri_info: uri_info} = assigns) do
     end
   end
 
-  # After a container action (create/start/stop/delete/expose), re-fetch the
-  # list reflects live state without the user re-opening the sidebar.
+  # After a machine action, re-fetch so the sidebar reflects live state.
   defp maybe_refresh_machine_sidebar(socket, pending) do
     case Map.get(pending, :data, %{}) do
       %{"machine_id" => id} -> refresh_machine_sidebar(socket, id)
@@ -1172,7 +1174,4 @@ def sidebar(%{sidebar: sidebar, uri_info: uri_info} = assigns) do
   defp machine_error("enroll_machine", reason), do: "enrollment failed: #{inspect(reason)}"
 
   defp machine_error(_action, reason), do: inspect(reason)
-
-
-
 end

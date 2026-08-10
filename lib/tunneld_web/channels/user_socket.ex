@@ -6,7 +6,6 @@ defmodule TunneldWeb.UserSocket do
   """
   use Phoenix.Socket
 
-
   def connect(%{"client_id" => client_id}, socket, _connect_info) do
     if client_id && Tunneld.Servers.Session.valid?(client_id) do
       {:ok, assign(socket, :client_id, client_id)}

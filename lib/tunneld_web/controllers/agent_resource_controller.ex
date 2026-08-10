@@ -37,12 +37,20 @@ defmodule TunneldWeb.AgentResourceController do
     pool = params["pool"] || []
 
     if is_binary(name) and is_list(pool) do
-      result = Resources.add_share(%{"name" => name, "description" => params["description"], "pool" => pool})
+      result =
+        Resources.add_share(%{
+          "name" => name,
+          "description" => params["description"],
+          "pool" => pool
+        })
+
       _ = result
 
       case Enum.find(Resources.fetch_shares(), &(&1.name == name)) do
         nil ->
-          conn |> put_status(422) |> json(%{error: "could not create resource (name conflict or invalid pool)"})
+          conn
+          |> put_status(422)
+          |> json(%{error: "could not create resource (name conflict or invalid pool)"})
 
         r ->
           conn

@@ -31,9 +31,6 @@ defmodule Tunneld.Servers.Updater do
     GenServer.cast(__MODULE__, :check_now)
   end
 
-  @doc """
-  Init Updater
-  """
   @impl true
   def init(_) do
     send(self(), :check_updates)
@@ -41,7 +38,6 @@ defmodule Tunneld.Servers.Updater do
     {:ok, %{is_latest: false, new_version: nil}}
   end
 
-  # get the data and restart sync
   @impl true
   def handle_info(:check_updates, state) do
     {status, data} = fetch_latest()
@@ -77,12 +73,10 @@ defmodule Tunneld.Servers.Updater do
     {:noreply, state}
   end
 
-  # The job that will start interval sync
   defp check_version() do
     :timer.send_after(@interval, :check_updates)
   end
 
-  # Get the latest from the repo
   defp fetch_latest() do
     case HTTPoison.get(@metadata_url) do
       {:ok, %HTTPoison.Response{status_code: 200, body: body}} ->
@@ -93,7 +87,6 @@ defmodule Tunneld.Servers.Updater do
     end
   end
 
-  # Send notification to the dashboard
   defp notify(update_available, new_version) do
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "component:welcome", %{
       id: "welcome",

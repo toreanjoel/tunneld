@@ -29,9 +29,12 @@ defmodule Mix.Tasks.Version do
 
     Enum.each(@version_files, fn {path, regex} ->
       content = File.read!(path)
-      updated = Regex.replace(regex, content, fn full, _old ->
-        String.replace(full, current, next)
-      end)
+
+      updated =
+        Regex.replace(regex, content, fn full, _old ->
+          String.replace(full, current, next)
+        end)
+
       File.write!(path, updated)
     end)
 
@@ -61,8 +64,11 @@ defmodule Mix.Tasks.Version do
 
   defp next_version(_current, explicit) do
     case Regex.match?(~r/^\d+\.\d+\.\d+$/, explicit) do
-      true -> explicit
-      false -> Mix.raise("Invalid version: #{explicit}. Use major|minor|patch or a semver like 1.2.3")
+      true ->
+        explicit
+
+      false ->
+        Mix.raise("Invalid version: #{explicit}. Use major|minor|patch or a semver like 1.2.3")
     end
   end
 

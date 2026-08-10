@@ -9,12 +9,19 @@ defmodule Tunneld.DisenrollTest do
     File.mkdir_p!(tmp)
     prev_root = Application.get_env(:tunneld, :fs, []) |> Keyword.get(:root)
     Application.put_env(:tunneld, :fs, root: tmp, auth: "auth.json", resources: "resources.json")
-    on_exit(fn -> File.rm_rf!(tmp); Application.put_env(:tunneld, :fs, root: prev_root) end)
+
+    on_exit(fn ->
+      File.rm_rf!(tmp)
+      Application.put_env(:tunneld, :fs, root: prev_root)
+    end)
+
     :ok
   end
 
   test "disenroll removes the machine from the registry" do
-    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "vps", "address" => "203.0.113.9", "location" => "remote"})
+    {:ok, %{"id" => id}} =
+      Machines.enroll(%{"name" => "vps", "address" => "203.0.113.9", "location" => "remote"})
+
     assert {:ok, _} = Machines.get(id)
     assert :ok = Disenroll.disenroll(id)
     assert {:error, :not_found} = Machines.get(id)
@@ -25,7 +32,9 @@ defmodule Tunneld.DisenrollTest do
   end
 
   test "disenroll removes the ssh key files" do
-    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "vps2", "address" => "203.0.113.10", "location" => "remote"})
+    {:ok, %{"id" => id}} =
+      Machines.enroll(%{"name" => "vps2", "address" => "203.0.113.10", "location" => "remote"})
+
     ssh_dir = Path.join(Application.get_env(:tunneld, :fs)[:root], "ssh")
     assert File.exists?(Path.join(ssh_dir, id))
     Disenroll.disenroll(id)

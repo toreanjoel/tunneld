@@ -25,8 +25,20 @@ defmodule Tunneld.Geolocation do
     "https://api.ipify.org"
   ]
   @geo_endpoints [
-    {"https://ipapi.co/%s/json/", %{"country" => "country_name", "country_code" => "country_code", "latitude" => "latitude", "longitude" => "longitude"}},
-    {"https://ipinfo.io/%s/json", %{"country" => "country", "country_code" => "country", "latitude" => "loc", "longitude" => "loc"}}
+    {"https://ipapi.co/%s/json/",
+     %{
+       "country" => "country_name",
+       "country_code" => "country_code",
+       "latitude" => "latitude",
+       "longitude" => "longitude"
+     }},
+    {"https://ipinfo.io/%s/json",
+     %{
+       "country" => "country",
+       "country_code" => "country",
+       "latitude" => "loc",
+       "longitude" => "loc"
+     }}
   ]
   @ip_timeout 3_000
 
@@ -34,31 +46,17 @@ defmodule Tunneld.Geolocation do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
   end
 
-  @doc """
-  Returns the current location status.
-
-  ## Return values
-    - `{:ok, location}` - location is available and fresh
-    - `:stale` - location is cached but hasn't been refreshed recently
-    - `:unavailable` - no location data was ever obtained
-  """
+  @doc "Returns the current location status: `{:ok, location}`, `:stale`, or `:unavailable`."
   def get_location do
     GenServer.call(__MODULE__, :get_location)
   end
 
-  @doc """
-  Triggers an immediate refresh of the geolocation data.
-  Returns immediately; the result will be broadcast via PubSub.
-  """
+  @doc "Trigger an immediate geolocation refresh. Result broadcast via PubSub."
   def refresh do
     GenServer.cast(__MODULE__, :refresh)
   end
 
-  @doc """
-  Best-effort geolocation of an arbitrary IP (used for remote machine pins on
-  the map card). Returns `{:ok, %{latitude, longitude, country_code, ...}}` or
-  `:error`. In mock mode returns a fixed location so the map renders.
-  """
+  @doc "Geolocate an IP address. Returns `{:ok, location}` or `:error`."
   def geolocate(ip) when is_binary(ip) do
     if mock?() do
       {:ok,
@@ -87,14 +85,31 @@ defmodule Tunneld.Geolocation do
         latitude: 37.7749,
         longitude: -122.4194
       }
+
       ref = Process.send_after(self(), :do_refresh, @refresh_interval_ms)
-      state = %{location: location, status: :ok, last_updated: System.monotonic_time(), error_count: 0, refresh_timer: ref}
+
+      state = %{
+        location: location,
+        status: :ok,
+        last_updated: System.monotonic_time(),
+        error_count: 0,
+        refresh_timer: ref
+      }
+
       broadcast({:location_updated, location})
       {:ok, state}
     else
       caller = self()
       Task.start(fn -> initial_fetch(caller) end)
-      {:ok, %{location: nil, status: :unavailable, last_updated: nil, error_count: 0, refresh_timer: nil}}
+
+      {:ok,
+       %{
+         location: nil,
+         status: :unavailable,
+         last_updated: nil,
+         error_count: 0,
+         refresh_timer: nil
+       }}
     end
   end
 
@@ -122,20 +137,32 @@ defmodule Tunneld.Geolocation do
   def handle_info({:initial_fetch_done, result}, state) do
     case result do
       {:ok, location} ->
-        state = %{state | location: location, status: :ok, last_updated: System.monotonic_time(), error_count: 0}
+        state = %{
+          state
+          | location: location,
+            status: :ok,
+            last_updated: System.monotonic_time(),
+            error_count: 0
+        }
+
         broadcast({:location_updated, location})
         {:noreply, %{state | refresh_timer: schedule_refresh(state)}}
 
       {:error, :ip_ok_no_geo} ->
         broadcast(:geo_failed)
-        {:noreply, %{state | error_count: state.error_count + 1, refresh_timer: retry_timer(state)}}
+
+        {:noreply,
+         %{state | error_count: state.error_count + 1, refresh_timer: retry_timer(state)}}
 
       {:error, :all_exhausted} ->
         broadcast(:location_unavailable)
-        {:noreply, %{state | error_count: state.error_count + 1, refresh_timer: retry_timer(state)}}
+
+        {:noreply,
+         %{state | error_count: state.error_count + 1, refresh_timer: retry_timer(state)}}
 
       _ ->
-        {:noreply, %{state | error_count: state.error_count + 1, refresh_timer: retry_timer(state)}}
+        {:noreply,
+         %{state | error_count: state.error_count + 1, refresh_timer: retry_timer(state)}}
     end
   end
 
@@ -149,7 +176,14 @@ defmodule Tunneld.Geolocation do
 
     case fetch_location() do
       {:ok, location} ->
-        new_state = %{state | location: location, status: :ok, last_updated: System.monotonic_time(), error_count: 0}
+        new_state = %{
+          state
+          | location: location,
+            status: :ok,
+            last_updated: System.monotonic_time(),
+            error_count: 0
+        }
+
         broadcast({:location_updated, location})
         {:noreply, %{new_state | refresh_timer: ref}}
 
@@ -220,6 +254,7 @@ defmodule Tunneld.Geolocation do
     {lat, lng} =
       if is_nil(lat) and is_nil(lng) do
         loc = Map.get(data, "loc") || Map.get(data, "latitude")
+
         case loc do
           str when is_binary(str) -> parse_loc(str)
           _ -> {nil, nil}
@@ -255,6 +290,7 @@ defmodule Tunneld.Geolocation do
 
   defp parse_float(nil), do: nil
   defp parse_float(n) when is_number(n), do: n
+
   defp parse_float(str) when is_binary(str) do
     case Float.parse(String.trim(str)) do
       {val, _} -> val
@@ -263,6 +299,7 @@ defmodule Tunneld.Geolocation do
   end
 
   defp try_endpoints([], _fun), do: {:error, :all_exhausted}
+
   defp try_endpoints([ep | rest], fun) do
     case fun.(ep) do
       {:ok, result} -> {:ok, result}
@@ -279,7 +316,7 @@ defmodule Tunneld.Geolocation do
   end
 
   defp retry_timer(state) do
-    delay = min(300_000, 30_000 * :math.pow(2, min(state.error_count, 4)) |> round())
+    delay = min(300_000, (30_000 * :math.pow(2, min(state.error_count, 4))) |> round())
     Process.send_after(self(), :do_refresh, delay)
   end
 

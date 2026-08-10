@@ -187,18 +187,4 @@ defmodule Tunneld.GeoData.WorldMap do
   def paths do
     @path_ds
   end
-
-  def world_map(assigns) do
-    assigns = assign(assigns, :path_ds, @path_ds)
-    ~H"""
-    <defs>
-      <clipPath id="world-clip">
-        <rect x="0" y="0" width="800" height="450" />
-      </clipPath>
-    </defs>
-    <g fill="#1C1B26" stroke="#1C1B26" stroke-width="0.5" stroke-linejoin="round" clip-path="url(#world-clip)">
-      <path :for={d <- @path_ds} d={d} />
-    </g>
-    """
-  end
 end

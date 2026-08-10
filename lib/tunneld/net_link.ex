@@ -3,9 +3,8 @@ defmodule Tunneld.NetLink do
   Ethernet link state helpers for the gateway's upstream and downstream
   interfaces.
 
-  Replaces the former `Tunneld.Servers.Wlan.connected?/0` checks. Interface
-  names come from app config (`:tunneld, :network` -> `:upstream` / `:downstream`)
-  and are never hardcoded here.
+  Interface names come from app config (`:tunneld, :network` -> `:upstream` /
+  `:downstream`) and are never hardcoded here.
 
   Link state is read from `/sys/class/net/<iface>/operstate`:
     - `"up"`        -> connected

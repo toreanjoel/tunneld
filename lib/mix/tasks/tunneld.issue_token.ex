@@ -33,7 +33,11 @@ defmodule Mix.Tasks.Tunneld.IssueToken do
         IO.puts("TOKEN: #{raw}")
         IO.puts("SCOPES: #{Enum.join(granted, ", ")}")
         IO.puts("")
-        IO.puts("Use: curl -H 'Authorization: Bearer #{raw}' http://<gateway>/api/v1/agent/machines")
+
+        IO.puts(
+          "Use: curl -H 'Authorization: Bearer #{raw}' http://<gateway>/api/v1/agent/machines"
+        )
+
         IO.puts("")
 
       _ ->

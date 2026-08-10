@@ -28,7 +28,10 @@ defmodule Mix.Tasks.Tunneld.Agent do
     token = System.get_env("TUNNELD_TOKEN")
 
     if is_nil(token) do
-      IO.puts("TUNNELD_TOKEN required (issue via: mix tunneld.issue_token machines:read,resources:write)")
+      IO.puts(
+        "TUNNELD_TOKEN required (issue via: mix tunneld.issue_token machines:read,resources:write)"
+      )
+
       exit({:shutdown, 1})
     end
 
@@ -43,22 +46,43 @@ defmodule Mix.Tasks.Tunneld.Agent do
 
   defp dispatch(base, token, [cmd | rest]) do
     case cmd do
-      "machines" -> api(base, token, :get, "/api/v1/agent/machines")
-      "machine" -> api(base, token, :get, "/api/v1/agent/machines/#{hd(rest)}")
-      "listeners" -> api(base, token, :get, "/api/v1/agent/machines/#{hd(rest)}/listeners")
-      "probe" -> api(base, token, :post, "/api/v1/agent/machines/#{hd(rest)}/probe")
-      "exec" -> api(base, token, :post, "/api/v1/agent/machines/#{hd(rest)}/exec", %{"cmd" => Enum.join(tl(rest), " ")})
-      "job" -> api(base, token, :get, "/api/v1/agent/jobs/#{hd(rest)}")
-      "resources" -> api(base, token, :get, "/api/v1/agent/resources")
+      "machines" ->
+        api(base, token, :get, "/api/v1/agent/machines")
+
+      "machine" ->
+        api(base, token, :get, "/api/v1/agent/machines/#{hd(rest)}")
+
+      "listeners" ->
+        api(base, token, :get, "/api/v1/agent/machines/#{hd(rest)}/listeners")
+
+      "probe" ->
+        api(base, token, :post, "/api/v1/agent/machines/#{hd(rest)}/probe")
+
+      "exec" ->
+        api(base, token, :post, "/api/v1/agent/machines/#{hd(rest)}/exec", %{
+          "cmd" => Enum.join(tl(rest), " ")
+        })
+
+      "job" ->
+        api(base, token, :get, "/api/v1/agent/jobs/#{hd(rest)}")
+
+      "resources" ->
+        api(base, token, :get, "/api/v1/agent/resources")
+
       "add-resource" ->
         [name | pool] = rest
         api(base, token, :post, "/api/v1/agent/resources", %{"name" => name, "pool" => pool})
-      "rm-resource" -> api(base, token, :delete, "/api/v1/agent/resources/#{hd(rest)}")
-      _ -> {{%{"error" => "unknown command: #{cmd}"}, :json}}
+
+      "rm-resource" ->
+        api(base, token, :delete, "/api/v1/agent/resources/#{hd(rest)}")
+
+      _ ->
+        {{%{"error" => "unknown command: #{cmd}"}, :json}}
     end
   end
 
-  defp dispatch(_base, _token, []), do: {{%{"error" => "usage: tunneld.agent <command> [args]"}, :json}}
+  defp dispatch(_base, _token, []),
+    do: {{%{"error" => "usage: tunneld.agent <command> [args]"}, :json}}
 
   defp api(base, token, method, path, body \\ nil) do
     url = base <> path

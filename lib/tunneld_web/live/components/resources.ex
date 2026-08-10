@@ -25,9 +25,6 @@ defmodule TunneldWeb.Live.Components.Resources do
     {:ok, socket}
   end
 
-  @doc """
-  Render the resources.
-  """
   def render(assigns) do
     assigns =
       assigns
@@ -38,20 +35,45 @@ defmodule TunneldWeb.Live.Components.Resources do
       <.section_header>
         Resources
         <:actions>
-          <button phx-click="modal_open" phx-value-modal_title="Quick Expose" phx-value-modal_body={Jason.encode!(%{"type" => "code_blocks", "data" => quick_expose_blocks()})} class="ghost-btn">
+          <button
+            phx-click="modal_open"
+            phx-value-modal_title="Quick Expose"
+            phx-value-modal_body={
+              Jason.encode!(%{"type" => "code_blocks", "data" => quick_expose_blocks()})
+            }
+            class="ghost-btn"
+          >
             Quick Expose
           </button>
-          <button phx-click="modal_open" phx-value-modal_title="Add Resource" phx-value-modal_body={Jason.encode!(%{"type" => "schema", "data" => Tunneld.Schema.Resource.data(:add_public), "default_values" => %{"ip" => "127.0.0.1", "port" => "18000", "pool" => []}, "action" => "add_share"})} class="ghost-btn">
+          <button
+            phx-click="modal_open"
+            phx-value-modal_title="Add Resource"
+            phx-value-modal_body={
+              Jason.encode!(%{
+                "type" => "schema",
+                "data" => Tunneld.Schema.Resource.data(:add_public),
+                "default_values" => %{"ip" => "127.0.0.1", "port" => "18000", "pool" => []},
+                "action" => "add_share"
+              })
+            }
+            class="ghost-btn"
+          >
             Add Resource
           </button>
         </:actions>
       </.section_header>
 
-      <div :if={Enum.empty?(@resources)} class="w-[60px] h-[60px] bg-surface flex items-center justify-center rounded-md opacity-10">
+      <div
+        :if={Enum.empty?(@resources)}
+        class="w-[60px] h-[60px] bg-surface flex items-center justify-center rounded-md opacity-10"
+      >
         <.icon class="w-8 h-8 text-text-primary" name="hero-cpu-chip" />
       </div>
 
-      <div :if={!Enum.empty?(@resources)} class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div
+        :if={!Enum.empty?(@resources)}
+        class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"
+      >
         <%= for resource <- @resources do %>
           <% kind = resource.kind || "host" %>
           <div
@@ -64,7 +86,9 @@ defmodule TunneldWeb.Live.Components.Resources do
             <div class="flex items-center gap-2 grow">
               <.icon class="w-5 h-5 shrink-0" name={kind_icon(kind)} />
               <div class="grow">
-                <div class="text-xs font-semibold truncate"><%= mask(@obfuscated, resource.name) %></div>
+                <div class="text-xs font-semibold truncate">
+                  <%= mask(@obfuscated, resource.name) %>
+                </div>
               </div>
             </div>
             <div class="flex items-center justify-between text-xs flex-shrink-0">
@@ -74,10 +98,13 @@ defmodule TunneldWeb.Live.Components.Resources do
                 </span>
                 <%= if kind == "host" do %>
                   <% health = Map.get(resource, :health) || Map.get(resource, "health") || %{} %>
-                  <span class={"w-[13px] h-[13px] rounded-full inline-block #{pool_health_dot(health[:status])}"}></span>
+                  <span class={"w-[13px] h-[13px] rounded-full inline-block #{pool_health_dot(health[:status])}"}>
+                  </span>
                 <% end %>
                 <%= if Map.get(resource, :expose_source) == "device" do %>
-                  <span class="px-2 py-0.5 rounded-full bg-text-primary/10 text-text-secondary uppercase text-[10px] font-medium">QE</span>
+                  <span class="px-2 py-0.5 rounded-full bg-text-primary/10 text-text-secondary uppercase text-[10px] font-medium">
+                    QE
+                  </span>
                 <% end %>
               </div>
             </div>
@@ -105,12 +132,13 @@ defmodule TunneldWeb.Live.Components.Resources do
         [
           %{
             "title" => "Create a share",
-            "code" => """
-            curl -X POST http://#{host}/api/v1/expose \
-              -H 'Content-Type: application/json' \
-              -d '{"port": 3000, "name": "myapp"}'
-            """
-            |> String.trim_trailing()
+            "code" =>
+              """
+              curl -X POST http://#{host}/api/v1/expose \
+                -H 'Content-Type: application/json' \
+                -d '{"port": 3000, "name": "myapp"}'
+              """
+              |> String.trim_trailing()
           },
           %{
             "title" => "List your shares",

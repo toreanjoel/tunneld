@@ -10,7 +10,12 @@ defmodule TunneldWeb.Live.Components.DnsCard do
 
   def dns_card(assigns) do
     ~H"""
-    <div class="hero-card px-6 py-5 flex flex-col gap-3.5 cursor-pointer" phx-click="show_details" phx-value-type="dns_server" phx-value-id="_">
+    <div
+      class="hero-card px-6 py-5 flex flex-col gap-3.5 cursor-pointer"
+      phx-click="show_details"
+      phx-value-type="dns_server"
+      phx-value-id="_"
+    >
       <div class="flex justify-between items-center">
         <div class="text-[11px] tracking-[0.08em] uppercase text-text-secondary font-medium">
           DNS SERVER

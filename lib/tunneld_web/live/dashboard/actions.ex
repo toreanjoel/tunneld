@@ -21,7 +21,6 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
     data = decode_if_needed(data)
 
     case action do
-      # Device management
       "revoke_release_ip" ->
         if mac = data["mac"], do: Devices.revoke_lease(mac)
 
@@ -47,7 +46,6 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
         tag = data["tag"]
         if mac && tag, do: Tunneld.Servers.DeviceTags.remove_tag(mac, tag)
 
-      # Auth
       "revoke_login_creds" ->
         File.rm(Auth.path())
         send(parent, :revoke_login_creds)
@@ -55,12 +53,10 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       "logout" ->
         send(parent, :do_logout)
 
-      # DNS
       "set_dns_server" ->
         ip = data["server"]
         Tunneld.Servers.DnsConfig.set_dns_server(ip)
 
-      # Resources
       "add_share" ->
         Resources.add_share(data)
 
@@ -75,7 +71,6 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       "tunneld_settings" ->
         Resources.update_share(data, :resource)
 
-      # Machines
       "remove_machine" ->
         %{"id" => id} = data
         Tunneld.Machines.remove(id)
@@ -98,7 +93,6 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
             {:ok, %{id: id, pool: pool}}
         end
 
-      # Device restart
       "restart_device" ->
         if @mock do
           require Logger

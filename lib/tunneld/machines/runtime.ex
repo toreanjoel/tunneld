@@ -53,7 +53,8 @@ defmodule Tunneld.Machines.Runtime do
          {:ok, mem} <- run(machine, "free -m | awk '/^Mem:/ {print $2}'") do
       {:ok,
        %{
-         "os" => os |> String.replace_prefix("PRETTY_NAME=", "") |> String.trim() |> String.trim("\""),
+         "os" =>
+           os |> String.replace_prefix("PRETTY_NAME=", "") |> String.trim() |> String.trim("\""),
          "kernel" => String.trim(kernel),
          "arch" => String.trim(arch),
          "cpu_count" => String.trim(cpus) |> String.to_integer(),
@@ -82,7 +83,10 @@ defmodule Tunneld.Machines.Runtime do
   # Tolerates failure so discovery never depends on a runtime.
   defp container_runtime_map(machine) do
     container_list =
-      case run(machine, "incus list --format json 2>/dev/null || docker ps --format json 2>/dev/null") do
+      case run(
+             machine,
+             "incus list --format json 2>/dev/null || docker ps --format json 2>/dev/null"
+           ) do
         {:ok, raw} ->
           case Jason.decode(raw) do
             {:ok, list} when is_list(list) -> list
@@ -144,7 +148,9 @@ defmodule Tunneld.Machines.Runtime do
   # Parse "0.0.0.0:3000", "[::]:80", "127.0.0.53:53", "*:22"
   defp parse_local(local) do
     case Regex.run(~r/^([^:]+):(\d+)$/, local) do
-      [_, addr, port] -> {addr, String.to_integer(port)}
+      [_, addr, port] ->
+        {addr, String.to_integer(port)}
+
       _ ->
         case Regex.run(~r/^[^\]]*\](?::(\d+))?$/, local) do
           [_, port] -> {"[::]", if(port, do: String.to_integer(port), else: nil)}

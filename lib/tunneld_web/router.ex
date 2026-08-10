@@ -51,14 +51,26 @@ defmodule TunneldWeb.Router do
 
         get "/machines", MachineController, :index, private: %{agent_scope: "machines:read"}
         get "/machines/:id", MachineController, :show, private: %{agent_scope: "machines:read"}
-        get "/machines/:id/listeners", MachineController, :listeners, private: %{agent_scope: "machines:read"}
-        post "/machines/:id/probe", MachineController, :probe_job, private: %{agent_scope: "machines:write"}
-        post "/machines/:id/exec", MachineController, :exec, private: %{agent_scope: "exec"}
-        delete "/machines/:id", MachineController, :delete, private: %{agent_scope: "machines:write"}
 
-        get "/resources", AgentResourceController, :index, private: %{agent_scope: "resources:read"}
-        post "/resources", AgentResourceController, :create, private: %{agent_scope: "resources:write"}
-        delete "/resources/:id", AgentResourceController, :delete, private: %{agent_scope: "resources:write"}
+        get "/machines/:id/listeners", MachineController, :listeners,
+          private: %{agent_scope: "machines:read"}
+
+        post "/machines/:id/probe", MachineController, :probe_job,
+          private: %{agent_scope: "machines:write"}
+
+        post "/machines/:id/exec", MachineController, :exec, private: %{agent_scope: "exec"}
+
+        delete "/machines/:id", MachineController, :delete,
+          private: %{agent_scope: "machines:write"}
+
+        get "/resources", AgentResourceController, :index,
+          private: %{agent_scope: "resources:read"}
+
+        post "/resources", AgentResourceController, :create,
+          private: %{agent_scope: "resources:write"}
+
+        delete "/resources/:id", AgentResourceController, :delete,
+          private: %{agent_scope: "resources:write"}
 
         get "/jobs/:id", AgentResourceController, :job, private: %{agent_scope: "any"}
       end
@@ -73,7 +85,6 @@ defmodule TunneldWeb.Router do
     end
   end
 
-  # These are the open routes
   scope "/", TunneldWeb do
     pipe_through [:browser, :set_client_id]
 
@@ -83,11 +94,6 @@ defmodule TunneldWeb.Router do
   end
 
   if Application.compile_env(:tunneld, :dev_routes) do
-    # If you want to use the LiveDashboard in production, you should put
-    # it behind authentication and allow only admins to access it.
-    # If your application does not have an admins-only section yet,
-    # you can use Plug.BasicAuth to set up some basic authentication
-    # as long as you are also using SSL (which you should anyway).
     import Phoenix.LiveDashboard.Router
 
     scope "/dev" do
@@ -96,7 +102,6 @@ defmodule TunneldWeb.Router do
     end
   end
 
-  # Fallback for any unknown routes
   scope "/*path", TunneldWeb do
     pipe_through [:browser]
 

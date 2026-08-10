@@ -47,10 +47,7 @@ defmodule Tunneld.Overlay do
   @doc "The gateway's own overlay IP."
   def gateway_overlay_ip, do: @gateway_overlay_ip
 
-  @doc """
-  The address tunneld should use to reach a machine: its LAN IP when it sits on
-  the gateway's own subnet, otherwise its overlay IP (over WireGuard).
-  """
+  @doc "Return the address to reach a machine: LAN IP or overlay IP."
   def address_for(machine) do
     if same_subnet?(machine["address"]) do
       machine["address"]
@@ -59,13 +56,7 @@ defmodule Tunneld.Overlay do
     end
   end
 
-  @doc """
-  Ensure a machine is a WireGuard peer of the gateway. Idempotent - re-running
-  converges to the same state. Returns `{:ok, %{overlay_ip: ip}}` or
-  `{:error, reason}`.
-
-  In mock mode, no SSH is performed and the machine gets a stable overlay IP.
-  """
+  @doc "Ensure a machine is a WireGuard peer. Idempotent."
   def ensure_peer(machine) do
     if @mock do
       {:ok, %{overlay_ip: mock_overlay_ip(machine)}}
@@ -86,7 +77,11 @@ defmodule Tunneld.Overlay do
   @doc "Remove a machine's overlay IP allocation (called on disenroll/delete)."
   def remove_overlay_ip(machine) do
     map = overlay_ips() |> Map.delete(machine["id"])
-    Tunneld.Persistence.write_json(Path.join(Tunneld.Config.fs_root(), "overlay.json"), %{"peers" => map})
+
+    Tunneld.Persistence.write_json(Path.join(Tunneld.Config.fs_root(), "overlay.json"), %{
+      "peers" => map
+    })
+
     :ok
   end
 
@@ -99,8 +94,6 @@ defmodule Tunneld.Overlay do
     end
   end
 
-  # --- Mock ---
-
   # Stable mock overlay IP derived from the machine id (last octet from the
   # uuid hash) so address_for is deterministic within a session.
   defp mock_overlay_ip(machine) do
@@ -108,11 +101,10 @@ defmodule Tunneld.Overlay do
     "10.88.0.#{octet + 2}"
   end
 
-  # --- Real implementation ---
-
   defp real_ensure_peer(machine) do
     id = machine["id"]
     iface = iface_name(id)
+
     with {:ok, target_pub} <- exchange_keys(machine),
          :ok <- install_target(machine, target_pub, iface),
          {:ok, _} <- configure_gateway(machine, target_pub, iface) do
@@ -166,21 +158,25 @@ defmodule Tunneld.Overlay do
   defp install_target(machine, target_pub, iface) do
     _ = target_pub
     # Install wireguard-tools if missing (apt/dnf/apk), so wg-quick exists.
-    run(machine,
+    run(
+      machine,
       "command -v wg-quick >/dev/null 2>&1 || " <>
         "(command -v apt-get >/dev/null 2>&1 && apt-get update -qq && apt-get install -y -qq wireguard-tools) || " <>
         "(command -v dnf >/dev/null 2>&1 && dnf install -y wireguard-tools) || " <>
         "(command -v apk >/dev/null 2>&1 && apk add wireguard-tools) || true"
     )
+
     # Enable + start the wg-quick service for this peer (config file is
     # /etc/wireguard/<iface>.conf, so the unit is wg-quick@<iface>).
     run(machine, "systemctl enable --now wg-quick@#{iface} 2>/dev/null || true")
     # Open the overlay port on the target's firewall (ufw or iptables) so the
     # gateway's dial-out handshake can reach it.
-    run(machine,
+    run(
+      machine,
       "ufw allow #{@wg_port}/udp 2>/dev/null || " <>
         "iptables -I INPUT 1 -p udp --dport #{@wg_port} -j ACCEPT 2>/dev/null || true"
     )
+
     :ok
   end
 
@@ -227,6 +223,7 @@ defmodule Tunneld.Overlay do
 
   defp real_status(machine) do
     id = machine["id"]
+
     case run_gateway("wg show #{iface_name(id)} 2>/dev/null") do
       {:ok, ""} -> {:ok, %{interface: iface_name(id), up: false, handshake: nil, tx: 0, rx: 0}}
       {:ok, out} -> parse_wg_show(out, iface_name(id))
@@ -251,8 +248,6 @@ defmodule Tunneld.Overlay do
 
     {:ok, %{interface: iface, up: handshake != nil, handshake: handshake, tx: 0, rx: 0}}
   end
-
-  # --- helpers ---
 
   @doc "WireGuard interface name for a machine. wg-quick caps names at 15 chars,\n  so use a short hash of the machine id rather than the full UUID."
   def iface_name(id) do
@@ -300,11 +295,15 @@ defmodule Tunneld.Overlay do
 
   defp put_overlay_ip(id, ip) do
     map = overlay_ips() |> Map.put(id, ip)
-    Tunneld.Persistence.write_json(Path.join(Tunneld.Config.fs_root(), "overlay.json"), %{"peers" => map})
+
+    Tunneld.Persistence.write_json(Path.join(Tunneld.Config.fs_root(), "overlay.json"), %{
+      "peers" => map
+    })
   end
 
   defp allocate_overlay_ip do
     used = Map.values(overlay_ips())
+
     2..254
     |> Enum.find(fn n -> "10.88.0.#{n}" not in used end)
     |> then(&"10.88.0.#{&1}")
@@ -353,7 +352,10 @@ defmodule Tunneld.Overlay do
     # Write a file on the target via a heredoc over SSH (no SCP dependency).
     # Create the parent dir first: the target may not have /etc/wireguard yet.
     dir = Path.dirname(path)
-    cmd = "mkdir -p #{dir} && cat > #{path} <<'TUNNELD_EOF'\n#{content}\nTUNNELD_EOF\nchmod 600 #{path}"
+
+    cmd =
+      "mkdir -p #{dir} && cat > #{path} <<'TUNNELD_EOF'\n#{content}\nTUNNELD_EOF\nchmod 600 #{path}"
+
     case run(machine, cmd) do
       {:ok, _} -> :ok
       err -> err

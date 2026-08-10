@@ -24,9 +24,6 @@ defmodule TunneldWeb.Live.Components.Services do
     {:ok, socket}
   end
 
-  @doc """
-  Render the services and their status
-  """
   def render(assigns) do
     data = Map.get(assigns, :data)
     status = Map.get(data, :status, %{})
@@ -68,7 +65,6 @@ defmodule TunneldWeb.Live.Components.Services do
     """
   end
 
-  # The status of the services on the operating system
   defp status_class(true), do: "bg-green"
   defp status_class(_), do: "bg-red"
 end

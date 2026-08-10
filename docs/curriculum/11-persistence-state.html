@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Persistence &amp; State — Tunneld Curriculum</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav>
+    <a href="index.html">← Back to Curriculum</a>
+  </nav>
+
+  <div class="container">
+    <h1>11 — Persistence &amp; State</h1>
+
+    <p class="file-ref">Key source: <code>lib/tunneld/persistence.ex</code>, <code>lib/tunneld/reconcile.ex</code></p>
+
+    <section id="what-it-is">
+      <h2>What Persistence Is</h2>
+
+      <p>
+        Persistence is how an application saves state across restarts. Most applications use 
+        databases (PostgreSQL, SQLite) to store data durably. Tunneld takes a simpler approach: 
+        JSON files on disk. Each domain has its own file: <code>machines.json</code>, 
+        <code>resources.json</code>, <code>auth.json</code>, etc.
+      </p>
+
+      <p>
+        The key principle is: <strong>remote state is authoritative, disk is a hint</strong>. 
+        The machines themselves know what is running (via <code>ss -tlnp</code>). Tunneld's 
+        JSON files record what was configured, but reconciliation reads live state and 
+        converges toward it.
+      </p>
+
+      <p>
+        This model trades query flexibility for simplicity. You cannot do complex queries 
+        across data. But the data is small (hundreds of records at most), reads are infrequent, 
+        and the operational complexity of a database on a resource-constrained SBC is avoided.
+      </p>
+    </section>
+
+    <section id="how-it-works">
+      <h2>How JSON Persistence Works</h2>
+
+      <h3>Atomic Writes</h3>
+
+      <p>
+        A naive <code>File.write!</code> can corrupt data: if the process crashes mid-write, 
+        the file is truncated. Tunneld uses atomic writes: write to a temp file, then rename. 
+        The rename is atomic on POSIX filesystems — either the old or new file exists, never 
+        a partial write.
+      </p>
+
+<pre>
+# From lib/tunneld/persistence.ex:
+def write_json(path, data) do
+  encoded = Jason.encode!(data)
+  tmp_path = path <> ".tmp"
+  backup_path = path <> ".bak"
+
+  # Backup current file if it exists
+  if File.exists?(path) do
+    File.copy(path, backup_path)
+  end
+
+  # Write to temp file, then atomic rename
+  case File.write(tmp_path, encoded) do
+    :ok ->
+      File.rename(tmp_path, path)
+    {:error, reason} ->
+      File.rm(tmp_path)
+      {:error, reason}
+  end
+end
+</pre>
+
+      <h3>Backup Recovery</h3>
+
+      <p>
+        On read, if the main file is missing or corrupted, <code>read_json/1</code> falls 
+        back to the <code>.bak</code> file. This handles cases where the main file is 
+        empty (disk full) or contains invalid JSON (cosmic ray?).
+      </p>
+
+<pre>
+# From lib/tunneld/persistence.ex:
+def read_json(path) do
+  case read_and_decode(path) do
+    {:ok, data} -> {:ok, data}
+    {:error, _} ->
+      backup = path <> ".bak"
+      case read_and_decode(backup) do
+        {:ok, data} ->
+          File.copy(backup, path)  # Restore from backup
+          {:ok, data}
+        error -> error
+      end
+  end
+end
+</pre>
+
+      <h3>Data Layout</h3>
+
+      <p>
+        All data lives under <code>TUNNELD_DATA</code> (prod: <code>/var/lib/tunneld</code>, 
+        dev: <code>data/</code>):
+      </p>
+
+<pre>
+/var/lib/tunneld/
+├── auth.json           # Admin credentials, onboarding flag
+├── resources.json      # Resource definitions (name, pool, kind)
+├── machines.json       # Enrolled machines
+├── dns.json            # Upstream DNS server
+├── device_tags.json    # Device friendly names
+├── expose_allowed.json # Quick Expose allowlist
+├── overlay.json        # Machine → overlay IP mapping
+├── egress_tables.json  # Machine → routing table ID
+├── device_egress.json  # Device → exit machine mapping
+├── tokens.json         # Agent API tokens (hashed)
+├── ssh/                # Per-machine SSH keys
+│   ├── abc123-def456
+│   └── abc123-def456.pub
+└── wg/                 # Per-machine WireGuard keys
+    ├── abc123-def456
+    └── abc123-def456.pub
+</pre>
+    </section>
+
+    <section id="how-tunneld-uses-it">
+      <h2>How Tunneld Uses Persistence</h2>
+
+      <h3>Reading State at Startup</h3>
+
+      <p>
+        GenServers load their state in <code>init/1</code> by reading from disk:
+      </p>
+
+<pre>
+# From a typical GenServer:
+def init(_) do
+  state = %{
+    resources: load_resources(),
+    last_check: nil
+  }
+  {:ok, state}
+end
+
+defp load_resources do
+  case Persistence.read_json(Path.join(Config.fs_root(), "resources.json")) do
+    {:ok, %{"resources" => list}} -> list
+    _ -> []
+  end
+end
+</pre>
+
+      <h3>Writing State on Change</h3>
+
+      <p>
+        When state changes (e.g., resource created), the GenServer writes immediately:
+      </p>
+
+<pre>
+def handle_call({:create, params}, _from, state) do
+  new_resource = Map.put(params, "id", UUID.uuid4())
+  new_list = [new_resource | state.resources]
+
+  write_resources(new_list)   # Persist to disk
+  Caddy.sync(new_list)        # Update Caddy config
+  broadcast(:resources_update, new_list)
+
+  {:reply, {:ok, new_resource}, %{state | resources: new_list}}
+end
+
+defp write_resources(list) do
+  Persistence.write_json(
+    Path.join(Config.fs_root(), "resources.json"),
+    %{"resources" => list}
+  )
+end
+</pre>
+
+      <h3>Reconciliation</h3>
+
+      <p>
+        <code>lib/tunneld/reconcile.ex</code> reads live state from machines and compares 
+        against what Tunneld expects. This handles drift (manual changes on the machine) 
+        and recovery (after a crash).
+      </p>
+
+<pre>
+# From lib/tunneld/reconcile.ex:
+def reconcile(machine, opts \\ []) do
+  repair? = Keyword.get(opts, :repair, false)
+
+  %{
+    wireguard: reconcile_wireguard(machine, repair?),
+    caddy: reconcile_caddy(machine, repair?),
+    ssh: reconcile_ssh(machine),
+    resources: reconcile_resources(machine)
+  }
+end
+
+defp reconcile_wireguard(machine, repair?) do
+  case Overlay.status(machine) do
+    {:ok, %{up: true}} -> :ok
+    _ ->
+      if repair? do
+        case Overlay.ensure_peer(machine) do
+          {:ok, _} -> {:repaired, :wireguard}
+          {:error, reason} -> {:drift, {:wireguard_down, reason}}
+        end
+      else
+        {:drift, :wireguard_down}
+      end
+  end
+end
+</pre>
+    </section>
+
+    <section id="why">
+      <h2>Why JSON Files</h2>
+
+      <h3>No Database Complexity</h3>
+
+      <p>
+        A database adds operational burden: backups, migrations, connection pooling, 
+        crash recovery. On an SBC with 2GB RAM, SQLite or PostgreSQL would compete 
+        with the application for resources. You would need to configure WAL mode, 
+        set up vacuum schedules, and handle migration failures gracefully.
+      </p>
+
+      <p>
+        PostgreSQL in particular requires a separate process (the postmaster) that 
+        consumes memory even when idle. SQLite is lighter but still requires careful 
+        handling of concurrent writes. JSON files with atomic rename have no concurrency 
+        issues because each write is a complete replacement of the file contents.
+      </p>
+
+      <h3>Human-Readable</h3>
+
+      <p>
+        JSON files can be inspected with <code>cat</code> and edited with a text editor. 
+        This is useful for debugging and manual recovery. When something goes wrong, you 
+        can SSH into the gateway, open <code>resources.json</code> in vim, and see exactly 
+        what the system thinks is configured. You can fix a typo, restart, and be done.
+      </p>
+
+      <p>
+        Try doing that with a PostgreSQL database. You would need to connect with psql, 
+        write SQL queries, and hope you understand the schema. The JSON approach makes 
+        the state completely transparent to operators.
+      </p>
+
+      <h3>The Data Is Small</h3>
+
+      <p>
+        A fleet of 100 machines is ~50KB of JSON. There is no performance reason for 
+        a database. Parsing 50KB takes milliseconds, and it happens only at startup 
+        and on writes. The overhead of a database connection pool would exceed the 
+        time saved on reads.
+      </p>
+
+      <h3>Remote State Is Authoritative</h3>
+
+      <p>
+        The most important reason is philosophical: disk state is a hint, not the truth. 
+        The real source of truth is the machines themselves. A machine knows what processes 
+        it is running via <code>ss -tlnp</code>. Tunneld's JSON records what was configured, 
+        but reconciliation always reads live state and converges toward it. If the JSON 
+        file is lost, Tunneld can re-probe machines and reconstruct most of the state.
+      </p>
+
+      <p>
+        This is different from an application where the database IS the truth. An e-commerce 
+        site cannot reconstruct orders from external systems. Tunneld can, because the 
+        external systems (the machines) have the real state.
+      </p>
+    </section>
+
+    <section id="examples">
+      <h2>Examples</h2>
+
+      <h3>View persisted state</h3>
+
+<pre>
+# On the gateway:
+$ cat /var/lib/tunneld/resources.json | jq .
+{
+  "resources": [
+    {"id": "abc123", "name": "ollama", "pool": ["10.0.0.50:11434"], "kind": "local"}
+  ]
+}
+
+$ cat /var/lib/tunneld/machines.json | jq '.machines[0]'
+{
+  "id": "def456",
+  "name": "NUC",
+  "address": "10.0.0.50",
+  "ssh_port": 22,
+  "location": "local"
+}
+</pre>
+
+      <h3>Manually fix corrupted state</h3>
+
+<pre>
+# If a JSON file is corrupted, restore from backup:
+$ cp /var/lib/tunneld/resources.json.bak /var/lib/tunneld/resources.json
+
+# Or manually fix and restart:
+$ vim /var/lib/tunneld/resources.json
+$ systemctl restart tunneld
+</pre>
+
+      <h3>Force reconciliation</h3>
+
+<pre>
+# In IEx:
+iex> machine = Tunneld.Machines.get("def456")
+iex> Tunneld.Reconcile.reconcile(machine, repair: true)
+%{wireguard: :ok, caddy: :ok, ssh: :ok, resources: :ok}
+
+# Or if something is broken:
+%{wireguard: {:repaired, :wireguard}, ...}
+</pre>
+    </section>
+
+    <footer>
+      <a href="10-phoenix-liveview.html">← Previous: Phoenix LiveView</a> · 
+      <a href="index.html">Curriculum Index</a> · 
+      <a href="12-agent-api-auth.html">Next: Agent API &amp; Auth →</a>
+    </footer>
+  </div>
+</body>
+</html>

@@ -8,7 +8,12 @@ defmodule Tunneld.AgentTokenControllerTest do
     File.mkdir_p!(tmp)
     prev_root = Application.get_env(:tunneld, :fs, []) |> Keyword.get(:root)
     Application.put_env(:tunneld, :fs, root: tmp, auth: "auth.json", resources: "resources.json")
-    on_exit(fn -> File.rm_rf!(tmp); Application.put_env(:tunneld, :fs, root: prev_root) end)
+
+    on_exit(fn ->
+      File.rm_rf!(tmp)
+      Application.put_env(:tunneld, :fs, root: prev_root)
+    end)
+
     :ok
   end
 
@@ -19,7 +24,12 @@ defmodule Tunneld.AgentTokenControllerTest do
 
   test "token endpoints are NOT reachable via a bearer token scope" do
     {:ok, raw, _id, _s} = AgentTokens.issue(["machines:read"])
-    conn = build_conn() |> put_req_header("authorization", "Bearer #{raw}") |> post("/api/v1/agent/tokens", %{"scopes" => ["exec"]})
+
+    conn =
+      build_conn()
+      |> put_req_header("authorization", "Bearer #{raw}")
+      |> post("/api/v1/agent/tokens", %{"scopes" => ["exec"]})
+
     # requires admin session, so a token alone is insufficient
     assert response(conn, 401)
   end

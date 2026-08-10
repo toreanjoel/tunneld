@@ -61,7 +61,6 @@ defmodule TunneldWeb.DeviceController do
     end
   end
 
-
   def resources(conn, _params) do
     with {:ok, _ip, _mac} <- resolve_device(conn) do
       resources =
@@ -103,8 +102,6 @@ defmodule TunneldWeb.DeviceController do
     end
   end
 
-  # --- Device resolution (same model as Quick Expose) ---
-
   defp resolve_device(conn) do
     device_ip =
       :inet.ntoa(conn.remote_ip)
@@ -114,7 +111,10 @@ defmodule TunneldWeb.DeviceController do
 
     case Enum.find(devices, &(&1.ip == device_ip)) do
       nil ->
-        {:error, 403, %{error: "device not recognised on subnet - ensure it has a DHCP lease from this gateway"}}
+        {:error, 403,
+         %{
+           error: "device not recognised on subnet - ensure it has a DHCP lease from this gateway"
+         }}
 
       %{mac: mac} ->
         {:ok, device_ip, mac}

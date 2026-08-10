@@ -120,7 +120,11 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
     <div id="enrollment-wizard-root">
       <div :if={@open} class="fixed inset-0 bg-black/70 flex items-center justify-center z-[100]">
         <div class="bg-surface rounded-2xl p-6 max-w-[560px] w-full relative border border-border max-h-[90vh] overflow-y-auto">
-          <div phx-click="wizard_close" phx-target={@myself} class="absolute top-0 right-0 p-3 cursor-pointer text-text-tertiary hover:text-text-primary">
+          <div
+            phx-click="wizard_close"
+            phx-target={@myself}
+            class="absolute top-0 right-0 p-3 cursor-pointer text-text-tertiary hover:text-text-primary"
+          >
             <.icon name="hero-x-mark-solid" class="h-5 w-5" />
           </div>
           <h2 class="text-xl font-medium mb-1">Enroll Machine</h2>
@@ -154,7 +158,9 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
             <option value="remote">remote</option>
           </select>
         </div>
-        <button type="submit" class="w-full bg-accent p-2 rounded-md text-white text-sm">Generate keypair →</button>
+        <button type="submit" class="w-full bg-accent p-2 rounded-md text-white text-sm">
+          Generate keypair →
+        </button>
       </form>
       <p :if={@error} class="text-xs text-red"><%= @error %></p>
     </div>
@@ -168,13 +174,31 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
         <b>This step blocks.</b> You must act outside Tunneld: install the public key on the target
         before continuing.
       </div>
-      <p class="text-sm text-text-secondary">Install this public key on the target's <code>~/.ssh/authorized_keys</code>:</p>
+      <p class="text-sm text-text-secondary">
+        Install this public key on the target's <code>~/.ssh/authorized_keys</code>:
+      </p>
       <pre class="bg-code border border-border rounded p-2 text-[10px] overflow-x-auto"><%= @public_key %></pre>
       <div class="flex items-center gap-2">
-        <code class="text-[10px] bg-code border border-border rounded p-1 flex-1 overflow-x-auto">echo '<%= @public_key %>' &gt;&gt; ~/.ssh/authorized_keys</code>
-        <button type="button" id="wizard_copy_key" phx-hook="CopyToClipboard" data-copy-text={"echo '#{@public_key}' >> ~/.ssh/authorized_keys"} class="ghost-btn !px-2 !py-1 text-[10px]">copy</button>
+        <code class="text-[10px] bg-code border border-border rounded p-1 flex-1 overflow-x-auto">
+          echo '<%= @public_key %>' &gt;&gt; ~/.ssh/authorized_keys
+        </code>
+        <button
+          type="button"
+          id="wizard_copy_key"
+          phx-hook="CopyToClipboard"
+          data-copy-text={"echo '#{@public_key}' >> ~/.ssh/authorized_keys"}
+          class="ghost-btn !px-2 !py-1 text-[10px]"
+        >
+          copy
+        </button>
       </div>
-      <button phx-click="wizard_test_connection" phx-target={@myself} class="w-full bg-accent p-2 rounded-md text-white text-sm">I've installed the key — test connection →</button>
+      <button
+        phx-click="wizard_test_connection"
+        phx-target={@myself}
+        class="w-full bg-accent p-2 rounded-md text-white text-sm"
+      >
+        I've installed the key — test connection →
+      </button>
     </div>
     """
   end
@@ -185,7 +209,14 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
       <p class="text-sm text-text-secondary">Testing the SSH connection to the target...</p>
       <p :if={@probing} class="text-xs text-text-tertiary">Probing...</p>
       <p :if={@error} class="text-xs text-red"><%= @error %></p>
-      <button :if={@error} phx-click="wizard_test_connection" phx-target={@myself} class="w-full bg-accent p-2 rounded-md text-white text-sm">Retry</button>
+      <button
+        :if={@error}
+        phx-click="wizard_test_connection"
+        phx-target={@myself}
+        class="w-full bg-accent p-2 rounded-md text-white text-sm"
+      >
+        Retry
+      </button>
     </div>
     """
   end
@@ -203,15 +234,39 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
         <div><b>Kernel:</b> <%= @caps["kernel"] %></div>
         <div><b>Arch:</b> <%= @caps["arch"] %></div>
         <div><b>CPU:</b> <%= @caps["cpu_count"] %> · <b>RAM:</b> <%= @caps["memory_mb"] %> MB</div>
-        <div><b>Runtimes:</b> <%= if @runtimes == [], do: "none detected", else: Enum.join(@runtimes, ", ") %></div>
+        <div>
+          <b>Runtimes:</b> <%= if @runtimes == [],
+            do: "none detected",
+            else: Enum.join(@runtimes, ", ") %>
+        </div>
       </div>
       <div class="flex flex-col gap-2 pt-2">
-        <button phx-click="wizard_install_wg" phx-target={@myself} class="w-full bg-surface p-2 rounded-md text-sm hover:bg-surface-2">Install WireGuard (overlay)</button>
-        <button phx-click="wizard_make_exit" phx-target={@myself} class="w-full bg-surface p-2 rounded-md text-sm hover:bg-surface-2">Make Exit Node</button>
-        <button phx-click="wizard_close" phx-target={@myself} class="w-full bg-accent p-2 rounded-md text-white text-sm">Done</button>
+        <button
+          phx-click="wizard_install_wg"
+          phx-target={@myself}
+          class="w-full bg-surface p-2 rounded-md text-sm hover:bg-surface-2"
+        >
+          Install WireGuard (overlay)
+        </button>
+        <button
+          phx-click="wizard_make_exit"
+          phx-target={@myself}
+          class="w-full bg-surface p-2 rounded-md text-sm hover:bg-surface-2"
+        >
+          Make Exit Node
+        </button>
+        <button
+          phx-click="wizard_close"
+          phx-target={@myself}
+          class="w-full bg-accent p-2 rounded-md text-white text-sm"
+        >
+          Done
+        </button>
       </div>
       <p :if={@wg_result} class="text-xs text-text-tertiary">WireGuard: <%= inspect(@wg_result) %></p>
-      <p :if={@exit_result} class="text-xs text-text-tertiary">Exit node: <%= inspect(@exit_result) %></p>
+      <p :if={@exit_result} class="text-xs text-text-tertiary">
+        Exit node: <%= inspect(@exit_result) %>
+      </p>
     </div>
     """
   end

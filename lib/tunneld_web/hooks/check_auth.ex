@@ -7,9 +7,6 @@ defmodule TunneldWeb.Hooks.CheckAuth do
   alias TunneldWeb.Router.Helpers, as: Routes
   alias Tunneld.Servers.Session
 
-  @doc """
-  Mount the hook and check against the relevant views.
-  """
   def on_mount(:default, _params, session, socket) do
     check_blocked_routes(session, socket)
   end

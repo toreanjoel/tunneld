@@ -58,14 +58,6 @@ defmodule Tunneld.Servers.DeviceTags do
     Map.get(map, mac, [])
   end
 
-  @doc """
-  Get the full tags map for all devices.
-  """
-  def all_tags() do
-    path = tags_path()
-    read_or_empty(path)
-  end
-
   defp tags_path do
     Path.join(Tunneld.Config.fs_root(), "device_tags.json")
   end

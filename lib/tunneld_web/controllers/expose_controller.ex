@@ -12,8 +12,6 @@ defmodule TunneldWeb.ExposeController do
   use TunneldWeb, :controller
   require Logger
 
-  # --- Actions ---
-
   def create(conn, params) do
     with {:ok, device_ip, mac} <- resolve_device(conn),
          :ok <- check_allowed(mac),
@@ -67,8 +65,6 @@ defmodule TunneldWeb.ExposeController do
     end
   end
 
-  # --- Helpers ---
-
   defp resolve_device(conn) do
     device_ip =
       :inet.ntoa(conn.remote_ip)
@@ -80,8 +76,7 @@ defmodule TunneldWeb.ExposeController do
       nil ->
         {:error, 403,
          %{
-           error:
-             "device not recognised on subnet - ensure it has a DHCP lease from this gateway"
+           error: "device not recognised on subnet - ensure it has a DHCP lease from this gateway"
          }}
 
       %{mac: mac} ->
@@ -167,7 +162,9 @@ defmodule TunneldWeb.ExposeController do
       |> put_status(500)
       |> json(%{error: "share was not created - please retry"})
     else
-      lan_url = resource.lan_url || "http://#{Tunneld.Caddy.lan_hostname(name)}:#{Tunneld.Caddy.public_port()}"
+      lan_url =
+        resource.lan_url ||
+          "http://#{Tunneld.Caddy.lan_hostname(name)}:#{Tunneld.Caddy.public_port()}"
 
       json(conn, %{
         name: name,

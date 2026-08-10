@@ -161,7 +161,11 @@ defmodule Tunneld.Servers.Resources do
             end
           end)
 
-        case persist_and_broadcast(updated_shares, "Resource updated successfully", "Failed to update resource") do
+        case persist_and_broadcast(
+               updated_shares,
+               "Resource updated successfully",
+               "Failed to update resource"
+             ) do
           {:ok, _} ->
             _ = Caddy.sync(updated_shares)
 
@@ -187,7 +191,11 @@ defmodule Tunneld.Servers.Resources do
     updated_nodes = Enum.reject(resources, fn resource -> resource["id"] === id end)
 
     update_state =
-      case persist_and_broadcast(updated_nodes, "resource removed successfully", "Failed to remove resource") do
+      case persist_and_broadcast(
+             updated_nodes,
+             "resource removed successfully",
+             "Failed to remove resource"
+           ) do
         {:ok, _} ->
           _ = Caddy.sync(updated_nodes)
 
@@ -364,7 +372,7 @@ defmodule Tunneld.Servers.Resources do
       |> Enum.map(& &1["loopback_port"])
       |> Enum.reject(&is_nil/1)
 
-    (Caddy.loopback_start()..Caddy.loopback_end())
+    Caddy.loopback_start()..Caddy.loopback_end()
     |> Enum.find(fn p -> p not in used end)
   end
 
@@ -388,8 +396,6 @@ defmodule Tunneld.Servers.Resources do
 
   @doc "Returns the full path to the resources JSON file."
   def path(), do: Path.join(Tunneld.Config.fs(:root), Tunneld.Config.fs(:resources))
-
-  # --- Pool health checking ---
 
   @doc "Check the health of a pool of backend servers."
   def pool_health(pool, true) when is_list(pool) do
@@ -452,10 +458,12 @@ defmodule Tunneld.Servers.Resources do
     |> Enum.map(fn entry ->
       case String.split(entry, ":", parts: 2) do
         [ip, port_str] ->
-          up = case Integer.parse(port_str) do
-            {port, _} -> backend_up?(ip, port)
-            _ -> false
-          end
+          up =
+            case Integer.parse(port_str) do
+              {port, _} -> backend_up?(ip, port)
+              _ -> false
+            end
+
           {entry, up}
 
         _ ->

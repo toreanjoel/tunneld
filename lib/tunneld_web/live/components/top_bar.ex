@@ -19,8 +19,16 @@ defmodule TunneldWeb.Live.Components.TopBar do
 
   def top_bar(assigns) do
     ~H"""
-    <div id="top-bar" class="relative flex items-center justify-between h-[72px] px-8" phx-hook="ObfuscationToggle">
-      <div :if={@services_popover_open} class="fixed inset-0 z-60" phx-click="toggle_services_popover" />
+    <div
+      id="top-bar"
+      class="relative flex items-center justify-between h-[72px] px-8"
+      phx-hook="ObfuscationToggle"
+    >
+      <div
+        :if={@services_popover_open}
+        class="fixed inset-0 z-60"
+        phx-click="toggle_services_popover"
+      />
       <%= if @settings_menu_open do %>
         <div class="fixed inset-0 z-40" phx-click="close_settings_menu" />
       <% end %>
@@ -28,7 +36,13 @@ defmodule TunneldWeb.Live.Components.TopBar do
         <span class="text-lg font-medium text-text-primary -tracking-[0.01em]">Tunneld</span>
         <div class="flex items-center gap-2 ml-2">
           <span class="text-xs text-text-secondary font-mono"><%= @version %></span>
-          <span class="cursor-pointer text-text-tertiary hover:text-accent transition-colors" phx-click="trigger_action" phx-value-action="check_updates" phx-value-data="{}" title="Check for updates">
+          <span
+            class="cursor-pointer text-text-tertiary hover:text-accent transition-colors"
+            phx-click="trigger_action"
+            phx-value-action="check_updates"
+            phx-value-data="{}"
+            title="Check for updates"
+          >
             <.refresh size={12} />
           </span>
           <span
@@ -43,7 +57,7 @@ defmodule TunneldWeb.Live.Components.TopBar do
       <div class="flex items-center gap-1 sm:gap-2 relative flex-shrink-0">
         <div class="relative">
           <button class="services-chip" phx-click="toggle_services_popover">
-            <% up_count = Enum.count(@services, & Map.get(&1, :up, true)) %>
+            <% up_count = Enum.count(@services, &Map.get(&1, :up, true)) %>
             <% total = length(@services) %>
             <% dot_class = services_dot_class(up_count, total) %>
             <span class={"status-dot #{dot_class}"} />
@@ -68,7 +82,12 @@ defmodule TunneldWeb.Live.Components.TopBar do
           </div>
         </div>
 
-        <button class="btn-primary text-xs sm:text-[13px] px-2 sm:px-4" phx-click="show_details" phx-value-type="ethernet" phx-value-id="_">
+        <button
+          class="btn-primary text-xs sm:text-[13px] px-2 sm:px-4"
+          phx-click="show_details"
+          phx-value-type="ethernet"
+          phx-value-id="_"
+        >
           <span class="hidden sm:inline">Network</span>
           <span class="inline sm:hidden">Network</span>
         </button>

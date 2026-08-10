@@ -28,8 +28,7 @@ if config_env() == :prod do
   downstream = System.get_env("DOWNSTREAM_INTERFACE") || raise "Missing ENV: DOWNSTREAM_INTERFACE"
   device_id = System.get_env("DEVICE_ID") || raise "Missing ENV: DEVICE_ID"
 
-  config :tunneld, :metadata,
-    device_id: device_id
+  config :tunneld, :metadata, device_id: device_id
 
   config :tunneld, :network,
     gateway: gateway,
@@ -47,7 +46,14 @@ if config_env() == :prod do
 
   gateway_origin = System.get_env("GATEWAY", "")
   hostname = System.get_env("HOSTNAME", "")
-  check_origins = ["http://#{gateway_origin}", "http://localhost", "http://#{hostname}", "http://tunneld.local", "https://tunneld.local"]
+
+  check_origins = [
+    "http://#{gateway_origin}",
+    "http://localhost",
+    "http://#{hostname}",
+    "http://tunneld.local",
+    "https://tunneld.local"
+  ]
 
   config :tunneld, TunneldWeb.Endpoint,
     url: [host: host, port: 80, scheme: "http"],

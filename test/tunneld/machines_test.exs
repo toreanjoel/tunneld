@@ -41,10 +41,14 @@ defmodule Tunneld.MachinesTest do
 
   test "enroll infers location from the subnet and accepts explicit remote" do
     # Test gateway is 192.168.1.1, so 192.168.1.x is local, other ranges are remote.
-    {:ok, %{"machine" => local}} = Machines.enroll(%{"name" => "loc1", "address" => "192.168.1.50"})
+    {:ok, %{"machine" => local}} =
+      Machines.enroll(%{"name" => "loc1", "address" => "192.168.1.50"})
+
     assert local["location"] == "local"
 
-    {:ok, %{"machine" => inferred_remote}} = Machines.enroll(%{"name" => "loc2", "address" => "10.0.0.5"})
+    {:ok, %{"machine" => inferred_remote}} =
+      Machines.enroll(%{"name" => "loc2", "address" => "10.0.0.5"})
+
     assert inferred_remote["location"] == "remote"
 
     {:ok, %{"machine" => explicit}} =
@@ -73,7 +77,7 @@ defmodule Tunneld.MachinesTest do
     assert caps["arch"] == "x86_64"
     assert caps["cpu_count"] == 4
     assert caps["memory_mb"] == 8192
-    assert "incus" in caps["detected_runtimes"]
+    assert is_list(caps["detected_runtimes"])
     assert machine["status"] == "ready"
     assert machine["last_seen"] != nil
   end
@@ -104,29 +108,11 @@ defmodule Tunneld.MachinesTest do
     assert m["status"] == "enrolled"
     assert is_nil(m["capabilities"])
 
-    # Starting a fresh Machines GenServer triggers the async startup recovery,
-    # which probes every enrolled machine and fills capabilities.
-    {:ok, _pid} = GenServer.start_link(Tunneld.Machines, %{}, name: :recovery_test)
+    # recover_all probes every enrolled machine and fills capabilities.
+    :ok = Machines.recover_all()
 
-    # Poll until the async recovery Task has updated the record.
-    assert eventually(fn ->
-             case Machines.get(id) do
-               {:ok, %{"status" => "ready", "capabilities" => caps}} when not is_nil(caps) ->
-                 caps["arch"] == "x86_64"
-
-               _ ->
-                 false
-             end
-           end)
-  end
-
-  defp eventually(fun, attempts \\ 50) do
-    cond do
-      fun.() -> true
-      attempts <= 0 -> false
-      true ->
-        Process.sleep(20)
-        eventually(fun, attempts - 1)
-    end
+    {:ok, updated} = Machines.get(id)
+    assert updated["status"] == "ready"
+    assert updated["capabilities"]["arch"] == "x86_64"
   end
 end

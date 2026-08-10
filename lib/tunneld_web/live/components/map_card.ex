@@ -25,7 +25,13 @@ defmodule TunneldWeb.Live.Components.MapCard do
             <rect x="0" y="0" width="800" height="450" />
           </clipPath>
         </defs>
-        <g fill="#1C1B26" stroke="#1C1B26" stroke-width="0.5" stroke-linejoin="round" clip-path="url(#world-clip)">
+        <g
+          fill="#1C1B26"
+          stroke="#1C1B26"
+          stroke-width="0.5"
+          stroke-linejoin="round"
+          clip-path="url(#world-clip)"
+        >
           <%= for d <- WorldMap.paths() do %>
             <path d={d} />
           <% end %>
@@ -44,6 +50,7 @@ defmodule TunneldWeb.Live.Components.MapCard do
   attr :geo, :map, required: true
   attr :label, :string, default: "node"
   attr :color, :string, default: "#06b6d4"
+
   def pin(assigns) do
     {x, y} = project(assigns.geo.longitude, assigns.geo.latitude)
     assigns = assign(assigns, :x, x) |> assign(:y, y)

@@ -25,20 +25,15 @@ defmodule Tunneld.Machines do
 
   SSH is shelled out to `ssh` with ControlMaster multiplexing so repeated
   commands (list, exec, probe) reuse one master connection per machine.
-  In mock mode (`:mock_data`), no SSH is performed and a fake Incus is
-  simulated so the full enroll -> probe -> list loop works on a laptop.
+  In mock mode (`:mock_data`), no SSH is performed and probe responses are
+  stubbed so the full enroll -> probe -> list loop works on a laptop.
   """
 
-  use GenServer
   require Logger
 
   alias Tunneld.Machines.{Store, SSH, Runtime}
 
   @pubsub_topic "component:machines"
-
-  def start_link(_) do
-    GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
-  end
 
   @doc "List all enrolled machines (from disk; status is a hint)."
   def list, do: Store.all()
@@ -62,8 +57,6 @@ defmodule Tunneld.Machines do
     end
   end
 
-  # Same subnet heuristic: two IPv4 addresses share the /24 prefix of the
-  # gateway. Falls back to :remote when either address can't be parsed.
   defp same_subnet?(address, gateway) do
     with {:ok, a} <- parse_ip4(address),
          {:ok, g} <- parse_ip4(gateway) do
@@ -90,51 +83,6 @@ defmodule Tunneld.Machines do
   operator has installed the key.
   """
   def enroll(params) when is_map(params) do
-    GenServer.call(__MODULE__, {:enroll, params})
-  end
-
-  @doc "Return the public key string the operator must install on the target."
-  def public_key(id), do: GenServer.call(__MODULE__, {:public_key, id})
-
-  @doc """
-  Probe a machine's capabilities over SSH (or mock). Stores the result
-  against the machine record and broadcasts an update.
-  """
-  def probe(id), do: GenServer.call(__MODULE__, {:probe, id}, 30_000)
-
-  @doc "List listening sockets on a machine (runtime-agnostic, live over SSH or mock)."
-  def listeners(id), do: GenServer.call(__MODULE__, {:listeners, id}, 30_000)
-
-  @doc "Remove a machine from the registry and delete its keypair."
-  def remove(id), do: GenServer.call(__MODULE__, {:remove, id})
-
-  @doc "Subscribe to machine updates (PubSub)."
-  def subscribe do
-    Phoenix.PubSub.subscribe(Tunneld.PubSub, @pubsub_topic)
-  end
-
-  defp broadcast(event, payload) do
-    Phoenix.PubSub.broadcast(Tunneld.PubSub, @pubsub_topic, %{
-      id: "machines",
-      event: event,
-      data: payload
-    })
-  end
-
-  # --- GenServer ---
-
-  @impl true
-  def init(_) do
-    # On startup, asynchronously probe every enrolled machine, install Incus
-    # where it is missing, and refresh status so the dashboard reflects live
-    # state without a manual probe. Runs in a Task so the supervision tree is
-    # not blocked by slow SSH round-trips on a cold boot.
-    Task.start(fn -> recover_machines() end)
-    {:ok, %{}}
-  end
-
-  @impl true
-  def handle_call({:enroll, params}, _from, _state) do
     name = String.trim(params["name"] || "")
     address = String.trim(params["address"] || "")
     ssh_port = params["ssh_port"] || 22
@@ -144,13 +92,13 @@ defmodule Tunneld.Machines do
 
     cond do
       name == "" ->
-        {:reply, {:error, "name is required"}, %{}}
+        {:error, "name is required"}
 
       address == "" ->
-        {:reply, {:error, "address is required"}, %{}}
+        {:error, "address is required"}
 
       location not in ["local", "remote"] ->
-        {:reply, {:error, "location must be local or remote"}, %{}}
+        {:error, "location must be local or remote"}
 
       true ->
         id = UUID.uuid4()
@@ -173,57 +121,46 @@ defmodule Tunneld.Machines do
 
         :ok = Store.put(record)
         broadcast(:added, record)
-        {:reply, {:ok, %{"id" => id, "public_key" => pub, "machine" => record}}, %{}}
+        {:ok, %{"id" => id, "public_key" => pub, "machine" => record}}
     end
   end
 
-  @impl true
-  def handle_call({:public_key, id}, _from, state) do
-    reply =
-      case Store.get(id) do
-        {:ok, machine} ->
-          {:ok, SSH.public_key_string(machine["id"])}
+  @doc "Return the public key string the operator must install on the target."
+  def public_key(id) do
+    case Store.get(id) do
+      {:ok, machine} ->
+        {:ok, SSH.public_key_string(machine["id"])}
 
-        {:error, :not_found} ->
-          {:error, "not found"}
-      end
-
-    {:reply, reply, state}
+      {:error, :not_found} ->
+        {:error, "not found"}
+    end
   end
 
-  @impl true
-  def handle_call({:probe, id}, _from, state) do
-    reply =
-      with {:ok, machine} <- Store.get(id) do
-        do_probe(machine)
-      end
-
-    {:reply, reply, state}
+  @doc """
+  Probe a machine's capabilities over SSH (or mock). Stores the result
+  against the machine record and broadcasts an update.
+  """
+  def probe(id) do
+    with {:ok, machine} <- Store.get(id) do
+      do_probe(machine)
+    end
   end
 
-  def handle_call({:listeners, id}, _from, state) do
-    reply =
-      with {:ok, machine} <- Store.get(id),
-           {:ok, listeners} <- Runtime.listeners(machine) do
-        {:ok, listeners}
-      end
-
-    {:reply, reply, state}
+  @doc "List listening sockets on a machine (runtime-agnostic, live over SSH or mock)."
+  def listeners(id) do
+    with {:ok, machine} <- Store.get(id),
+         {:ok, listeners} <- Runtime.listeners(machine) do
+      {:ok, listeners}
+    end
   end
 
-
-
-
-
-
-
-  def handle_call({:remove, id}, _from, state) do
+  @doc "Remove a machine from the registry and delete its keypair."
+  def remove(id) do
     case Store.get(id) do
       {:error, :not_found} ->
-        {:reply, {:error, "not found"}, state}
+        {:error, "not found"}
 
       {:ok, machine} ->
-        # Clean up egress + overlay state so no stale tables/rules/IPs remain.
         _ = Tunneld.Egress.cleanup_machine(machine)
         _ = Tunneld.Overlay.remove_overlay_ip(machine)
         _ = Tunneld.Overlay.remove_peer(machine)
@@ -231,8 +168,33 @@ defmodule Tunneld.Machines do
         :ok = Store.delete(id)
         SSH.delete_key(id)
         broadcast(:removed, %{"id" => id})
-        {:reply, :ok, state}
+        :ok
     end
+  end
+
+  @doc "Subscribe to machine updates (PubSub)."
+  def subscribe do
+    Phoenix.PubSub.subscribe(Tunneld.PubSub, @pubsub_topic)
+  end
+
+  @doc "Startup recovery: probe all enrolled machines and mark unreachable ones."
+  def recover_all do
+    for machine <- Store.all() do
+      case do_probe(machine) do
+        {:ok, _} -> :ok
+        {:error, reason} -> mark_unreachable(machine, reason)
+      end
+    end
+
+    :ok
+  end
+
+  defp broadcast(event, payload) do
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, @pubsub_topic, %{
+      id: "machines",
+      event: event,
+      data: payload
+    })
   end
 
   defp do_probe(machine) do
@@ -247,22 +209,6 @@ defmodule Tunneld.Machines do
       broadcast(:updated, updated)
       {:ok, updated}
     end
-  end
-
-  # Startup recovery: probe every enrolled machine, install Incus where it is
-  # missing, and mark unreachable machines so the dashboard reflects live state
-  # without a manual probe.
-  # Incus itself (tunneld sets `boot.autostart true` on creation); reverse SSH
-
-  defp recover_machines do
-    for machine <- Store.all() do
-      case do_probe(machine) do
-        {:ok, _} -> :ok
-        {:error, reason} -> mark_unreachable(machine, reason)
-      end
-    end
-
-    :ok
   end
 
   defp mark_unreachable(machine, reason) do

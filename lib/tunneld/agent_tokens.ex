@@ -42,8 +42,14 @@ defmodule Tunneld.AgentTokens do
 
   @doc "Scopes that can never be granted to an agent token (privilege escalation)."
   def forbidden_scopes do
-    ["tokens:issue", "tokens:revoke", "machines:enroll", "iptables:admin",
-     "dns:provider", "wireguard:keys"]
+    [
+      "tokens:issue",
+      "tokens:revoke",
+      "machines:enroll",
+      "iptables:admin",
+      "dns:provider",
+      "wireguard:keys"
+    ]
   end
 
   @doc """
@@ -80,8 +86,6 @@ defmodule Tunneld.AgentTokens do
   def authorize_any(token) do
     GenServer.call(__MODULE__, {:authorize_any, token})
   end
-
-  # --- GenServer ---
 
   @impl true
   def handle_call({:issue, scopes}, _from, state) do
@@ -146,8 +150,6 @@ defmodule Tunneld.AgentTokens do
 
     {:reply, list, state}
   end
-
-  # --- helpers ---
 
   defp find_by_hash(h) do
     Enum.find_value(read(), fn {id, rec} ->

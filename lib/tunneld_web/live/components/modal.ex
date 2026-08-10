@@ -25,9 +25,6 @@ defmodule TunneldWeb.Live.Components.Modal do
     """
   end
 
-  @doc """
-    Render the different modal content data type
-  """
   def content_type(assigns, :default) do
     pending_actions = Map.get(assigns, :pending_actions, %{})
 

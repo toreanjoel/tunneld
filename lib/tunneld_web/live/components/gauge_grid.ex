@@ -49,11 +49,13 @@ defmodule TunneldWeb.Live.Components.GaugeGrid do
     id = "gauge-#{assigns.label}"
     is_temp = assigns.label == "TEMP"
     danger_pct = if max_val > 0, do: val / max_val, else: 0
-    danger_class = cond do
-      is_temp and danger_pct >= 1.0 -> "text-red"
-      is_temp and danger_pct >= 0.875 -> "text-orange-500"
-      true -> "text-accent"
-    end
+
+    danger_class =
+      cond do
+        is_temp and danger_pct >= 1.0 -> "text-red"
+        is_temp and danger_pct >= 0.875 -> "text-orange-500"
+        true -> "text-accent"
+      end
 
     assigns = assign(assigns, val: val, shown: shown, id: id, danger_class: danger_class)
 
@@ -61,12 +63,18 @@ defmodule TunneldWeb.Live.Components.GaugeGrid do
     <div class="h-full flex flex-col items-stretch justify-center gap-2 p-4">
       <div class="flex items-center gap-1.5 text-text-secondary">
         <%= case @icon do %>
-          <% :cpu -> %><.cpu size={12} />
-          <% :hard_drive -> %><.hard_drive size={12} />
-          <% :database -> %><.database size={12} />
-          <% :thermometer -> %><.thermometer size={12} />
+          <% :cpu -> %>
+            <.cpu size={12} />
+          <% :hard_drive -> %>
+            <.hard_drive size={12} />
+          <% :database -> %>
+            <.database size={12} />
+          <% :thermometer -> %>
+            <.thermometer size={12} />
         <% end %>
-        <span class="text-[10px] tracking-[0.08em] uppercase font-medium text-text-secondary"><%= @label %></span>
+        <span class="text-[10px] tracking-[0.08em] uppercase font-medium text-text-secondary">
+          <%= @label %>
+        </span>
       </div>
 
       <div
@@ -80,9 +88,14 @@ defmodule TunneldWeb.Live.Components.GaugeGrid do
         <svg width="120" height="120" style="transform: rotate(-90deg)">
           <circle cx="60" cy="60" r="55" fill="none" stroke="#1F1E2A" stroke-width="6" />
           <circle
-            cx="60" cy="60" r="55"
-            fill="none" stroke="currentColor" class={@danger_class}
-            stroke-width="6" stroke-linecap="round"
+            cx="60"
+            cy="60"
+            r="55"
+            fill="none"
+            stroke="currentColor"
+            class={@danger_class}
+            stroke-width="6"
+            stroke-linecap="round"
             stroke-dasharray="345.6"
             stroke-dashoffset="345.6"
             data-ref="gauge-fg"

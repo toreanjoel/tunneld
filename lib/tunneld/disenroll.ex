@@ -53,7 +53,11 @@ defmodule Tunneld.Disenroll do
     _ = SSH.run(machine, "rm -f /etc/wireguard/#{id}.conf /etc/wireguard/#{iface}.conf")
 
     # 2. iptables: remove the TUNNELD chain references then flush it.
-    _ = SSH.run(machine, "iptables -D INPUT -j TUNNELD 2>/dev/null; iptables -F TUNNELD 2>/dev/null; iptables -X TUNNELD 2>/dev/null; true")
+    _ =
+      SSH.run(
+        machine,
+        "iptables -D INPUT -j TUNNELD 2>/dev/null; iptables -F TUNNELD 2>/dev/null; iptables -X TUNNELD 2>/dev/null; true"
+      )
 
     # 3. authorized_keys: remove the tunneld key entry (idempotent).
     _ =

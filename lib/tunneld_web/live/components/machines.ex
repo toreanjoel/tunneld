@@ -76,11 +76,17 @@ defmodule TunneldWeb.Live.Components.Machines do
         </:actions>
       </.section_header>
 
-      <div :if={Enum.empty?(@machines)} class="w-[60px] h-[60px] bg-surface flex items-center justify-center rounded-md opacity-10">
+      <div
+        :if={Enum.empty?(@machines)}
+        class="w-[60px] h-[60px] bg-surface flex items-center justify-center rounded-md opacity-10"
+      >
         <.icon class="w-8 h-8 text-text-primary" name="hero-server-stack" />
       </div>
 
-      <div :if={not Enum.empty?(@machines)} class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div
+        :if={not Enum.empty?(@machines)}
+        class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"
+      >
         <%= for machine <- @machines do %>
           <div
             phx-click="select_machine"
@@ -97,7 +103,8 @@ defmodule TunneldWeb.Live.Components.Machines do
             </div>
             <div class="flex items-center justify-between text-xs">
               <span class="flex items-center gap-1.5">
-                <span class={"w-[9px] h-[9px] rounded-full inline-block #{status_dot(machine["status"])}"}></span>
+                <span class={"w-[9px] h-[9px] rounded-full inline-block #{status_dot(machine["status"])}"}>
+                </span>
                 <span class="px-2 py-0.5 rounded-full bg-text-primary/10 text-text-secondary uppercase text-[10px] font-medium">
                   <%= machine["kind"] %>
                 </span>
@@ -111,7 +118,8 @@ defmodule TunneldWeb.Live.Components.Machines do
                 <span class="font-mono"><%= machine["overlay_ip"] %></span>
               <% end %>
               <%= if machine["overlay_status"] do %>
-                <span class={"w-[7px] h-[7px] rounded-full inline-block #{wg_dot(machine["overlay_status"])}"}></span>
+                <span class={"w-[7px] h-[7px] rounded-full inline-block #{wg_dot(machine["overlay_status"])}"}>
+                </span>
                 <span>WG <%= machine["overlay_status"] %></span>
               <% end %>
               <%= if machine["detected_runtimes"] != [] do %>

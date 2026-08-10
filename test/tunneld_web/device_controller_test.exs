@@ -27,7 +27,8 @@ defmodule TunneldWeb.DeviceControllerTest do
   end
 
   test "machines list returns enrolled machines" do
-    {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "vps", "address" => "203.0.113.5", "location" => "remote"})
+    {:ok, %{"id" => id}} =
+      Machines.enroll(%{"name" => "vps", "address" => "203.0.113.5", "location" => "remote"})
 
     conn = build_conn() |> device_conn() |> get("/api/v1/device/machines")
     assert %{"machines" => [m]} = json_response(conn, 200)

@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pooling &amp; Load Balancing — Tunneld Curriculum</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav>
+    <a href="index.html">← Back to Curriculum</a>
+  </nav>
+
+  <div class="container">
+    <h1>16 — Pooling &amp; Load Balancing</h1>
+
+    <p class="file-ref">Key source: <code>lib/tunneld/caddy.ex</code>, <code>lib/tunneld/servers/resources.ex</code></p>
+
+    <section id="what-it-is">
+      <h2>What Pooling Is</h2>
+
+      <p>
+        A pool is a set of backend servers that can handle requests for a resource. Instead 
+        of pointing a resource at a single server, you point it at a pool. The reverse proxy 
+        (Caddy) distributes requests across pool members, providing redundancy and increased 
+        capacity.
+      </p>
+
+      <p>
+        Load balancing is the strategy for distributing requests. Common strategies include 
+        round-robin (rotate through backends), least-connections (send to the least busy), 
+        and random. Caddy defaults to round-robin, which is sufficient for most cases.
+      </p>
+
+      <p>
+        Health checking monitors pool members and removes unhealthy ones from rotation. If 
+        a backend stops responding, requests stop going to it until it recovers. This is 
+        essential for high availability.
+      </p>
+    </section>
+
+    <section id="how-it-works">
+      <h2>How Load Balancing Works</h2>
+
+      <h3>Pool Configuration</h3>
+
+      <p>
+        In Caddy, a pool is a list of "upstreams" in the reverse_proxy handler:
+      </p>
+
+<pre>
+{
+  "handler": "reverse_proxy",
+  "upstreams": [
+    {"dial": "10.0.0.50:11434"},
+    {"dial": "10.0.0.51:11434"},
+    {"dial": "10.88.0.5:11434"}
+  ]
+}
+
+# Caddy distributes requests across all three backends
+# If one fails, it is temporarily removed from rotation
+</pre>
+
+      <h3>Round-Robin</h3>
+
+      <p>
+        The default load-balancing policy. Each request goes to the next backend in order:
+      </p>
+
+<pre>
+Request 1 → 10.0.0.50
+Request 2 → 10.0.0.51
+Request 3 → 10.88.0.5
+Request 4 → 10.0.0.50 (wraps around)
+...
+</pre>
+
+      <h3>Load Balancing Policies</h3>
+
+      <p>
+        Caddy supports several load balancing policies via <code>lb_policy</code>:
+      </p>
+
+      <ul>
+        <li><code>round_robin</code> (default) — rotate through backends in order</li>
+        <li><code>random</code> — pick a backend at random</li>
+        <li><code>least_conn</code> — send to the backend with fewest active connections</li>
+        <li><code>first</code> — always use the first healthy backend (failover mode)</li>
+        <li><code>ip_hash</code> — hash the client IP to pick a backend (sticky sessions)</li>
+        <li><code>uri_hash</code> — hash the request URI to pick a backend (cache-friendly)</li>
+        <li><code>header</code> — hash a specific header value</li>
+        <li><code>cookie</code> — use a cookie for sticky sessions</li>
+      </ul>
+
+      <p>
+        Tunneld uses the default <code>round_robin</code>. For AI inference backends like 
+        Ollama, <code>least_conn</code> might be better because inference requests have 
+        varying duration — a 30-second generation should not block other requests on that 
+        backend while others are idle.
+      </p>
+
+      <h3>Passive vs Active Health Checks</h3>
+
+      <p>
+        <strong>Passive health checks</strong> (Caddy's default) detect failures from real 
+        traffic. If a request to a backend times out or returns a 5xx error, that backend 
+        is marked unhealthy. No extra probes are sent; the check is "passive" because it 
+        observes real requests.
+      </p>
+
+      <p>
+        The downside: the first user after a backend dies gets an error. You do not discover 
+        the failure until someone hits it.
+      </p>
+
+      <p>
+        <strong>Active health checks</strong> send periodic probe requests (e.g., 
+        <code>GET /health</code> every 10 seconds) even when no user traffic is flowing. 
+        This detects failures before users hit them, at the cost of extra network traffic.
+      </p>
+
+<pre>
+# Caddy config with active health checks:
+{
+  "handler": "reverse_proxy",
+  "upstreams": [{"dial": "10.0.0.50:11434"}, {"dial": "10.0.0.51:11434"}],
+  "health_checks": {
+    "active": {
+      "uri": "/api/tags",
+      "interval": "10s",
+      "timeout": "5s"
+    }
+  }
+}
+</pre>
+
+      <p>
+        Tunneld currently uses only passive checks because most resources do not have a 
+        dedicated health endpoint. Ollama's <code>/api/tags</code> could work, but a 
+        generic web app might not have an obvious probe path.
+      </p>
+    </section>
+
+    <section id="how-tunneld-uses-it">
+      <h2>How Tunneld Uses Pooling</h2>
+
+      <h3>Resource Pool Definition</h3>
+
+      <p>
+        Each resource has a <code>pool</code> field: a list of <code>IP:port</code> strings:
+      </p>
+
+<pre>
+# In resources.json:
+{
+  "id": "abc123",
+  "name": "ollama",
+  "pool": [
+    "10.0.0.50:11434",
+    "10.88.0.5:11434"
+  ]
+}
+
+# This resource has two backends: one local, one remote (over WireGuard)
+</pre>
+
+      <h3>Building Caddy Config</h3>
+
+      <p>
+        <code>lib/tunneld/caddy.ex</code> transforms the pool into Caddy upstreams:
+      </p>
+
+<pre>
+# From lib/tunneld/caddy.ex:
+defp reverse_proxy(pool) do
+  upstreams =
+    pool
+    |> Enum.reject(&(r_empty(&1)))
+    |> Enum.map(fn entry ->
+      case String.split(entry, ":", parts: 2) do
+        [ip, port] -> %{"dial" => "#{ip}:#{port}"}
+        _ -> %{"dial" => entry}
+      end
+    end)
+
+  %{"handler" => "reverse_proxy", "upstreams" => upstreams}
+end
+</pre>
+
+      <h3>Mixing Local and Remote Backends</h3>
+
+      <p>
+        This is the power of the WireGuard overlay: <code>Overlay.address_for/1</code> 
+        returns the correct reachable IP for any machine. A local machine returns its 
+        LAN IP; a remote machine returns its overlay IP. From Caddy's perspective, both 
+        are just IP addresses on routable networks.
+      </p>
+
+<pre>
+# From lib/tunneld/overlay.ex:
+def address_for(machine) do
+  if same_subnet?(machine["address"]) do
+    machine["address"]         # Local: LAN IP (10.0.0.50)
+  else
+    overlay_ip_for(machine)    # Remote: overlay IP (10.88.0.5)
+  end
+end
+</pre>
+
+      <p>
+        This collapses the local/remote distinction at the network layer. A pool can 
+        include both types transparently:
+      </p>
+
+<pre>
+# Creating a resource with mixed backends:
+machine1 = Machines.get("local-nuc")    # address: 10.0.0.50 (LAN)
+machine2 = Machines.get("remote-vps")   # address: 45.76.183.185 (public)
+                                        # overlay: 10.88.0.5 (WireGuard)
+
+backend1 = "#{Overlay.address_for(machine1)}:11434"  # "10.0.0.50:11434"
+backend2 = "#{Overlay.address_for(machine2)}:11434"  # "10.88.0.5:11434"
+
+Resources.create_resource(%{
+  "name" => "ollama",
+  "pool" => [backend1, backend2]
+})
+
+# Caddy sees two backends:
+# - 10.0.0.50:11434 (direct LAN traffic)
+# - 10.88.0.5:11434 (encrypted WireGuard traffic to VPS)
+</pre>
+
+      <p>
+        The practical use case: run Ollama on a local GPU box for fast inference, with a 
+        cloud VM as fallback when the local box is busy or down. Requests round-robin 
+        between them, or use <code>least_conn</code> to prefer whichever has capacity.
+      </p>
+
+      <p>
+        This was impossible with the old SSH-tunnel architecture. SSH tunnels created 
+        local ports (<code>localhost:20001</code>), but you could not mix a local 
+        <code>10.0.0.50:11434</code> with a tunneled <code>localhost:20001</code> in 
+        the same Caddy upstream — Caddy would route to different interfaces. The overlay 
+        makes both backends look like regular IPs on routable networks.
+      </p>
+
+      <h3>Pool Health in the Dashboard</h3>
+
+      <p>
+        <code>lib/tunneld/servers/resources.ex</code> checks pool health every 10 seconds 
+        using TCP connection probes. The <code>pool_health/2</code> function tests each 
+        backend:
+      </p>
+
+<pre>
+# From lib/tunneld/servers/resources.ex:
+def pool_health(pool, false) when is_list(pool) do
+  totals =
+    pool
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.reduce(%{total: 0, up: 0}, fn entry, acc ->
+      case String.split(entry, ":", parts: 2) do
+        [ip, port_str] ->
+          total = acc.total + 1
+          up = case Integer.parse(port_str) do
+            {port, _} -> if backend_up?(ip, port), do: acc.up + 1, else: acc.up
+            _ -> acc.up
+          end
+          %{acc | total: total, up: up}
+        _ -> acc
+      end
+    end)
+
+  status = cond do
+    totals.total == 0 -> :empty
+    totals.up == 0 -> :none
+    totals.up == totals.total -> :all_up
+    true -> :partial
+  end
+
+  Map.put(totals, :status, status)
+end
+
+defp backend_up?(ip, port) do
+  case :gen_tcp.connect(String.to_charlist(ip), port, [:binary, active: false], 1500) do
+    {:ok, socket} -> :gen_tcp.close(socket); true
+    _ -> false
+  end
+end
+</pre>
+
+      <p>
+        The health check uses raw TCP connects (via <code>:gen_tcp.connect/4</code>), not 
+        HTTP requests. This is more reliable: a backend might serve HTTP on a non-root 
+        path, but if the port is open, traffic can flow. The 1500ms timeout keeps the 
+        check fast.
+      </p>
+    </section>
+
+    <section id="why">
+      <h2>Why Pooling</h2>
+
+      <h3>Redundancy</h3>
+
+      <p>
+        If one backend dies, others continue serving. A single Ollama instance crashing 
+        does not take down the whole service.
+      </p>
+
+      <h3>Scaling</h3>
+
+      <p>
+        Add more backends to handle more load. If three Raspberry Pis each run Ollama, 
+        pool them together and each handles 1/3 of requests.
+      </p>
+
+      <h3>Geographic Distribution</h3>
+
+      <p>
+        A pool can include a local machine and a cloud VM. Fast requests go local; the 
+        cloud provides backup when local is overloaded or down.
+      </p>
+    </section>
+
+    <section id="examples">
+      <h2>Examples</h2>
+
+      <h3>Create a pooled resource</h3>
+
+<pre>
+# Via the dashboard:
+# 1. Go to Resources
+# 2. Click "Create Resource"
+# 3. Enter name: "ollama"
+# 4. Add backends: "10.0.0.50:11434", "10.0.0.51:11434"
+# 5. Save
+
+# Via the API:
+$ curl -X POST http://10.0.0.1/api/v1/resources \
+    -H "Authorization: Bearer $TOKEN" \
+    -H "Content-Type: application/json" \
+    -d '{
+      "name": "ollama",
+      "pool": ["10.0.0.50:11434", "10.0.0.51:11434"]
+    }'
+</pre>
+
+      <h3>Add a backend to an existing pool</h3>
+
+<pre>
+# Get current resource:
+$ curl http://10.0.0.1/api/v1/resources/abc123
+{"pool": ["10.0.0.50:11434"]}
+
+# Update with new backend:
+$ curl -X PATCH http://10.0.0.1/api/v1/resources/abc123 \
+    -H "Authorization: Bearer $TOKEN" \
+    -d '{"pool": ["10.0.0.50:11434", "10.88.0.5:11434"]}'
+</pre>
+
+      <h3>Verify load balancing</h3>
+
+<pre>
+# Make multiple requests and check which backend served them:
+$ for i in {1..6}; do
+    curl -s http://ollama.tunneld.lan:18000/api/tags | head -1
+  done
+
+# With debug logging, you'd see requests distributed across backends
+</pre>
+
+      <h3>Check pool health</h3>
+
+<pre>
+# In the dashboard, each resource shows health status:
+# - Green: all backends healthy
+# - Yellow: some backends unhealthy (degraded)
+# - Red: all backends unhealthy
+
+# Via API:
+$ curl http://10.0.0.1/api/v1/resources
+[{"name": "ollama", "health": "degraded", "pool": [...]}]
+</pre>
+    </section>
+
+    <footer>
+      <a href="15-systemd-service-lifecycle.html">← Previous: systemd Service Lifecycle</a> · 
+      <a href="index.html">Curriculum Index</a> · 
+      <a href="17-glossary.html">Next: Glossary →</a>
+    </footer>
+  </div>
+</body>
+</html>

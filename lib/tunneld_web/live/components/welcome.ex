@@ -18,9 +18,6 @@ defmodule TunneldWeb.Live.Components.Welcome do
     {:ok, socket |> assign(data: data)}
   end
 
-  @doc """
-  Show the message and subtext that could be used as subtext information
-  """
   def render(assigns) do
     assigns =
       assigns

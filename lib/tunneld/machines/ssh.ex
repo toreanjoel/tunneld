@@ -152,8 +152,6 @@ defmodule Tunneld.Machines.SSH do
     Path.join(System.tmp_dir!(), "tunneld_ssh_#{machine_id}")
   end
 
-  # --- Mock ---
-
   @doc false
   def mock?, do: @mock
 end

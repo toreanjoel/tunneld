@@ -72,9 +72,10 @@ defmodule Tunneld.Jobs do
 
   @impl true
   def handle_cast({:complete, id, result}, state) do
-    state = Map.update(state, id, %{status: :done, result: result}, fn job ->
-      Map.merge(job, %{status: :done, result: result})
-    end)
+    state =
+      Map.update(state, id, %{status: :done, result: result}, fn job ->
+        Map.merge(job, %{status: :done, result: result})
+      end)
 
     {:noreply, state}
   end

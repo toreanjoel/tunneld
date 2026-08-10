@@ -189,11 +189,6 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
     {:noreply, assign(socket, changeset: changeset, errors: nil)}
   end
 
-  @doc """
-  Submits the form after validation.
-  """
-  @spec handle_event(String.t(), map(), Phoenix.LiveView.Socket.t()) ::
-          {:noreply, Phoenix.LiveView.Socket.t()}
   def handle_event("submit", %{"form" => raw_params}, socket) do
     if socket.assigns.loading do
       {:noreply, socket}
