@@ -39,27 +39,27 @@ if grep -A8 'xterm-viewport' "$CSS" | grep -q '#25232f'; then
 else bad "terminal scrollbar does not match the app's #25232f thumb"; fi
 
 # --- 2. Render performance --------------------------------------------------
-# xterm 5.x defaults to the DOM renderer, which is markedly slower than
-# WebGL/canvas for scrolling output.
-# NB: `ls a* b*` exits 0 if EITHER glob matches, so check each separately.
-for a in webgl canvas; do
-  if ls assets/vendor/*"$a"* >/dev/null 2>&1; then ok "vendored: $a renderer"
-  else bad "no $a renderer vendored"; fi
-done
-if grep -qE 'WebglAddon|CanvasAddon' "$HOOK"; then ok "hook loads an accelerated renderer"
-else bad "hook does not load a webgl/canvas renderer"; fi
-# WebGL can fail on some GPUs/headless; there must be a fallback rather than a blank screen
-if grep -qE 'catch|try' "$HOOK" && grep -qE 'CanvasAddon|dom' "$HOOK"; then
-  ok "renderer has a fallback path"
-else bad "no fallback if WebGL fails - terminal could render nothing"; fi
-# resize thrash
+# REVERSAL, and this IS a relaxation of an earlier requirement. This gate used to
+# REQUIRE a vendored WebGL/canvas renderer. Shipping that produced a completely
+# blank terminal in the browser - strictly worse than the "working but slow" DOM
+# renderer it replaced. Most likely cause: the addon was activated against a
+# container that still had zero dimensions inside a freshly-rendered modal (fit()
+# is deferred to a setTimeout), which the DOM renderer tolerates and a GPU
+# renderer does not. It was reverted rather than shipped a third time unverified,
+# because none of it can be checked without a real browser.
+# What remains required are the safe wins that need no GPU:
 if grep -qE 'setTimeout|requestAnimationFrame|debounce' "$HOOK"; then
   ok "resize is debounced"
 else bad "ResizeObserver calls fit()+sendResize() unthrottled on every frame"; fi
-# unbounded scrollback costs memory on a 1GB SBC client-side too
 if grep -qE 'scrollback:\s*(1[0-9]{4}|[2-9][0-9]{4})' "$HOOK"; then
   bad "scrollback is very large - trims responsiveness and memory"
 else ok "scrollback is bounded sensibly"; fi
+# no orphaned vendored payload: every vendor file must be imported by something
+for vf in assets/vendor/*.js; do
+  b=$(basename "$vf"); stem="${b%.js}"   # imports may omit the .js extension
+  if grep -rqE "vendor/${stem}(\.js)?[\"']" assets/js/ ; then ok "vendor in use: $b"
+  else bad "orphaned vendored file (dead weight in every bundle): $b"; fi
+done
 
 # --- 3. Still no runtime CDN ------------------------------------------------
 if grep -rqE 'https?://[^"]*(xterm|addon)' assets/js "$CSS" lib/ 2>/dev/null; then
