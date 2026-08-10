@@ -99,6 +99,23 @@ if grep -qE '@mock|mock_data' "$SESS" 2>/dev/null; then
   ok "session has a mock path"
 else bad "session has NO mock path - MOCK_DATA=true will attempt a real SSH dial"; fi
 
+# --- 12. Socket auth must come from the signed session, not from JS ----------
+# Verified on the live gateway: the session cookie is HttpOnly, so a frontend
+# that lifts client_id out of document.cookie always sends "" and EVERY browser
+# connection is refused. Reading connect_info's session is both the working path
+# and the safer one (no shell-granting credential exposed to page scripts).
+if grep -qE 'connect\(_?params, socket, %\{session:' lib/tunneld_web/channels/user_socket.ex; then
+  ok "socket authenticates from the signed session (connect_info)"
+else bad "socket does not authenticate from connect_info session"; fi
+# ignore comment lines - a note explaining the absence is not an exposure
+if grep -rnE 'client_id' assets/js/*.js | grep -vE ':\s*(//|\*)' | grep -q .; then
+  bad "SECURITY: client_id referenced in frontend JS - it grants a root shell"
+  grep -rnE 'client_id' assets/js/*.js | grep -vE ':\s*(//|\*)' | head -3
+else ok "no client_id exposed to frontend JS"; fi
+if grep -q 'def id(_socket), do: nil' lib/tunneld_web/channels/user_socket.ex; then
+  bad "socket id/1 returns nil - sessions cannot be force-disconnected on logout"
+else ok "socket id/1 allows targeted disconnect"; fi
+
 echo "-----------------------------------------------"
 [ "$FAIL" -eq 0 ] && echo "TERMINAL GATE: PASS" || echo "TERMINAL GATE: FAIL"
 exit $FAIL

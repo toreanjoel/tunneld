@@ -131,13 +131,9 @@ const TerminalHook = {
   connectChannel() {
     this.setStatus("connecting", "Connecting...");
 
-    // Get the client_id from cookie for auth
-    const clientId = window.__clientId || "";
-
-    // Create socket connection
-    const socket = new window.Phoenix.Socket("/ws", {
-      params: { client_id: clientId }
-    });
+    // No credentials in JS: the server authenticates this socket from the
+    // signed HttpOnly session cookie (connect_info), not from params.
+    const socket = new window.Phoenix.Socket("/ws", {});
 
     socket.connect();
 

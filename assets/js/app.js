@@ -47,6 +47,6 @@ liveSocket.connect()
 // >> liveSocket.disableLatencySim()
 window.liveSocket = liveSocket
 
-// Read client_id from cookie for the terminal hook's separate socket
-window.__clientId = (document.cookie.match(/_tunneld_key=([^;]+)/) || [])[1] || ""
+// NOTE: no client_id is exposed to JS. The terminal socket authenticates from
+// the signed HttpOnly session cookie via connect_info on the server.
 

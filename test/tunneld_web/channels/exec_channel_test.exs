@@ -6,10 +6,24 @@ defmodule TunneldWeb.ExecChannelTest do
   describe "authorization" do
     test "rejects join without valid session" do
       # Connect without a valid client_id
-      assert :error = connect(UserSocket, %{})
-      assert :error = connect(UserSocket, %{"client_id" => nil})
-      assert :error = connect(UserSocket, %{"client_id" => ""})
-      assert :error = connect(UserSocket, %{"client_id" => "invalid-session-id"})
+      # no session at all
+      assert :error = connect(UserSocket, %{}, connect_info: %{session: %{}})
+      assert :error = connect(UserSocket, %{}, connect_info: %{})
+      # a session that is not a live one
+      assert :error =
+               connect(UserSocket, %{},
+                 connect_info: %{session: %{"client_id" => "not-a-session"}}
+               )
+
+      assert :error = connect(UserSocket, %{}, connect_info: %{session: %{"client_id" => ""}})
+
+      # REGRESSION: a client_id supplied as a socket PARAM must never authenticate,
+      # even if it is a genuinely valid session id. Auth comes from the signed
+      # HttpOnly session cookie only - params are attacker-controlled.
+      valid = UUID.uuid4()
+      Tunneld.Servers.Session.create(valid)
+      assert :error = connect(UserSocket, %{"client_id" => valid})
+      assert :error = connect(UserSocket, %{"client_id" => valid}, connect_info: %{session: %{}})
     end
 
     test "accepts connection with valid session" do
@@ -18,7 +32,9 @@ defmodule TunneldWeb.ExecChannelTest do
       {:ok, _} = Tunneld.Servers.Session.create(client_id)
 
       # Connect with valid client_id
-      {:ok, socket} = connect(UserSocket, %{"client_id" => client_id})
+      {:ok, socket} =
+        connect(UserSocket, %{}, connect_info: %{session: %{"client_id" => client_id}})
+
       assert socket.assigns.client_id == client_id
     end
 
@@ -27,7 +43,8 @@ defmodule TunneldWeb.ExecChannelTest do
       client_id = "test-client-#{System.unique_integer([:positive])}"
       {:ok, _} = Tunneld.Servers.Session.create(client_id)
 
-      {:ok, socket} = connect(UserSocket, %{"client_id" => client_id})
+      {:ok, socket} =
+        connect(UserSocket, %{}, connect_info: %{session: %{"client_id" => client_id}})
 
       # Try to join a channel for a machine that doesn't exist
       assert {:error, %{reason: "Machine not found"}} =

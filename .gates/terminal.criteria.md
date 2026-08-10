@@ -13,3 +13,6 @@
 - The ssh session / exec channel have test coverage
 - Key auth uses user_dir (empirically verified against the real gateway); no bespoke key_cb, which was verified to fail userauth
 - The session module has a mock path so MOCK_DATA=true does not dial a real host (TODO principle 6)
+- Socket auth reads the signed HttpOnly session via connect_info, never a socket param
+- No client_id (a shell-granting credential) is exposed to frontend JS
+- socket id/1 permits force-disconnect on logout
