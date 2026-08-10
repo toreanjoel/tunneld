@@ -1,0 +1,22 @@
+{
+  "_comment": "Per-project override. Real selectors verified against rlm.find_models().",
+  "roles": {
+    "planner": {
+      "model": "anthropic/claude-opus-4-6",
+      "does": "planning, gate authoring, verification"
+    },
+    "executor": {
+      "model": "anthropic/claude-opus-4-5",
+      "does": "implementation, loops against the gate"
+    },
+    "scout": {
+      "model": "anthropic/claude-haiku-4-5",
+      "does": "read-only recon"
+    }
+  },
+  "defaults": {
+    "require_gate_fails_first": true,
+    "verify_in_snapshot": false,
+    "max_executor_turns": 40
+  }
+}

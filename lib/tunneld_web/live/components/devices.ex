@@ -233,7 +233,18 @@ defmodule TunneldWeb.Live.Components.Devices do
     # no reliable parent_pid.
     result =
       if egress == "local" do
-        :ok
+        # Revert to the gateway's own upstream: unroute the device from its
+        # current exit machine (if any).
+        case Tunneld.Egress.device_egress(ip) do
+          nil ->
+            :ok
+
+          mid ->
+            case Tunneld.Machines.get(mid) do
+              {:ok, machine} -> Tunneld.Egress.unroute_device(machine, ip)
+              _ -> :ok
+            end
+        end
       else
         case Tunneld.Machines.get(egress) do
           {:ok, machine} -> Tunneld.Egress.route_device(machine, ip)

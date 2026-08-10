@@ -218,11 +218,11 @@ defmodule Tunneld.Egress do
     overlay_ip = Tunneld.Overlay.address_for(machine)
 
     with :ok <- assert_gateway_role(device_ip),
-         :ok <- add_rule(device_ip, table),
-         :ok <- add_default_route(overlay_ip, iface, table),
-         :ok <- add_lan_route(table),
+         {:ok, _} <- add_rule(device_ip, table),
+         {:ok, _} <- add_default_route(overlay_ip, iface, table),
+         {:ok, _} <- add_lan_route(table),
          :ok <- add_forward_rules(iface),
-         :ok <- add_vm_device_route(machine, device_ip, iface),
+         {:ok, _} <- add_vm_device_route(machine, device_ip, iface),
          :ok <- maybe_set_dns(device_ip, machine, dns) do
       {:ok, %{device_ip: device_ip, machine: id, table: table, dns: dns}}
     end
@@ -264,12 +264,12 @@ defmodule Tunneld.Egress do
   defp add_forward_rules(iface) do
     lan = lan_iface()
 
-    with :ok <-
+    with {:ok, _} <-
            run_gateway(
              "iptables -C FORWARD -i #{lan} -o #{iface} -j ACCEPT 2>/dev/null || " <>
                "iptables -A FORWARD -i #{lan} -o #{iface} -j ACCEPT"
            ),
-         :ok <-
+         {:ok, _} <-
            run_gateway(
              "iptables -C FORWARD -i #{iface} -o #{lan} -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || " <>
                "iptables -A FORWARD -i #{iface} -o #{lan} -m state --state RELATED,ESTABLISHED -j ACCEPT"

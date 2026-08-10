@@ -115,7 +115,7 @@ defmodule Tunneld.Overlay do
     iface = iface_name(id)
     with {:ok, target_pub} <- exchange_keys(machine),
          :ok <- install_target(machine, target_pub, iface),
-         :ok <- configure_gateway(machine, target_pub, iface) do
+         {:ok, _} <- configure_gateway(machine, target_pub, iface) do
       {:ok, %{overlay_ip: overlay_ip_for(machine)}}
     end
   end
@@ -165,6 +165,13 @@ defmodule Tunneld.Overlay do
 
   defp install_target(machine, target_pub, iface) do
     _ = target_pub
+    # Install wireguard-tools if missing (apt/dnf/apk), so wg-quick exists.
+    run(machine,
+      "command -v wg-quick >/dev/null 2>&1 || " <>
+        "(command -v apt-get >/dev/null 2>&1 && apt-get update -qq && apt-get install -y -qq wireguard-tools) || " <>
+        "(command -v dnf >/dev/null 2>&1 && dnf install -y wireguard-tools) || " <>
+        "(command -v apk >/dev/null 2>&1 && apk add wireguard-tools) || true"
+    )
     # Enable + start the wg-quick service for this peer (config file is
     # /etc/wireguard/<iface>.conf, so the unit is wg-quick@<iface>).
     run(machine, "systemctl enable --now wg-quick@#{iface} 2>/dev/null || true")
@@ -344,7 +351,9 @@ defmodule Tunneld.Overlay do
 
   defp write_remote(machine, path, content) do
     # Write a file on the target via a heredoc over SSH (no SCP dependency).
-    cmd = "cat > #{path} <<'TUNNELD_EOF'\n#{content}\nTUNNELD_EOF\nchmod 600 #{path}"
+    # Create the parent dir first: the target may not have /etc/wireguard yet.
+    dir = Path.dirname(path)
+    cmd = "mkdir -p #{dir} && cat > #{path} <<'TUNNELD_EOF'\n#{content}\nTUNNELD_EOF\nchmod 600 #{path}"
     case run(machine, cmd) do
       {:ok, _} -> :ok
       err -> err

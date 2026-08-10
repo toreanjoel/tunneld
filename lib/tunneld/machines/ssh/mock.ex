@@ -131,10 +131,6 @@ defmodule Tunneld.Machines.SSH.Mock do
     "x86_64\n"
   end
 
-  defp mock_output("test -x /usr/bin/incus && echo yes || echo no") do
-    "yes\n"
-  end
-
   defp mock_output("test -x /usr/bin/docker && echo yes || echo no") do
     "no\n"
   end
