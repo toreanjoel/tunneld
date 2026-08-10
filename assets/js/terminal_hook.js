@@ -12,10 +12,15 @@
  * performed server-side by the gateway - no secrets reach the browser.
  */
 
-// xterm.js is loaded as UMD and exports to window or module.exports
-// We import the vendored files which will set window.Terminal and window.FitAddon
-import "../vendor/xterm.js";
-import "../vendor/xterm-addon-fit.js";
+// The vendored xterm builds are UMD:
+//   if (typeof exports === "object" && typeof module === "object") module.exports = t()
+// esbuild bundles them as CommonJS, so that first branch wins and the globals
+// branch (e.global.Terminal = ...) never runs. A bare `import "..."` therefore
+// leaves window.Terminal undefined. Bind the module exports directly instead.
+// NB: both builds set __esModule:true but export NO `default`, so a default
+// import yields undefined. A namespace import is required to reach .Terminal.
+import * as XtermMod from "../vendor/xterm.js";
+import * as FitMod from "../vendor/xterm-addon-fit.js";
 
 // Theme matching the Tunneld dashboard
 const THEME = {
@@ -73,9 +78,12 @@ const TerminalHook = {
       return;
     }
 
-    // Access Terminal class from window (UMD export)
-    const Terminal = window.Terminal;
-    const FitAddon = window.FitAddon?.FitAddon;
+    // Prefer the bundled module exports; fall back to globals if a future build
+    // is loaded via a plain <script> tag.
+    const Terminal =
+      XtermMod?.Terminal || XtermMod?.default?.Terminal || window.Terminal;
+    const FitAddon =
+      FitMod?.FitAddon || FitMod?.default?.FitAddon || window.FitAddon?.FitAddon;
 
     if (!Terminal) {
       console.error("Terminal: xterm.js not loaded");
@@ -131,9 +139,18 @@ const TerminalHook = {
   connectChannel() {
     this.setStatus("connecting", "Connecting...");
 
-    // No credentials in JS: the server authenticates this socket from the
-    // signed HttpOnly session cookie (connect_info), not from params.
-    const socket = new window.Phoenix.Socket("/ws", {});
+    // Phoenix only populates connect_info[:session] when a VALID _csrf_token
+    // param is present (phoenix/lib/phoenix/socket/transport.ex:492). Without it
+    // the session is nil server-side and every connect is refused with 403.
+    // This is the same thing LiveView's own socket does. The CSRF token is not a
+    // credential - auth still comes from the signed HttpOnly session cookie.
+    const csrfToken = document
+      .querySelector("meta[name='csrf-token']")
+      ?.getAttribute("content");
+
+    const socket = new window.Phoenix.Socket("/ws", {
+      params: { _csrf_token: csrfToken },
+    });
 
     socket.connect();
 
