@@ -186,6 +186,7 @@ defmodule Tunneld.Egress do
          :ok <- add_rule(device_ip, table),
          :ok <- add_default_route(overlay_ip, iface, table),
          :ok <- add_lan_route(table),
+         :ok <- add_forward_rules(iface),
          :ok <- add_vm_device_route(machine, device_ip, iface),
          :ok <- maybe_set_dns(device_ip, machine, dns) do
       {:ok, %{device_ip: device_ip, machine: id, table: table, dns: dns}}
@@ -204,10 +205,13 @@ defmodule Tunneld.Egress do
     run_gateway("ip rule add from #{device_ip} lookup #{table} 2>/dev/null || true")
   end
 
-  defp add_default_route(overlay_ip, iface, table) do
-    # `ip route replace` is idempotent and reports real failures (no `|| true`),
-    # so a broken route surfaces as an error instead of a false success.
-    run_gateway("ip route replace default via #{overlay_ip} dev #{iface} table #{table}")
+  defp add_default_route(_overlay_ip, iface, table) do
+    # The exit-node interface has AllowedIPs = 0.0.0.0/0, so a link-scope
+    # `dev <iface>` default route is correct. A `via <overlay_ip>` next-hop
+    # does not resolve inside the policy table (returns "Network is
+    # unreachable"), which silently broke egress. `ip route replace` is
+    # idempotent and reports real failures.
+    run_gateway("ip route replace default dev #{iface} table #{table}")
   end
 
   # Keep the device's LAN traffic local (to the gateway) instead of sending it
@@ -216,6 +220,27 @@ defmodule Tunneld.Egress do
     gw = gateway_ip()
     iface = lan_iface()
     run_gateway("ip route replace #{lan_subnet(gw)} dev #{iface} table #{table}")
+  end
+
+  # The gateway's FORWARD chain defaults to DROP and only allows eth1<->eth0.
+  # Without explicit rules, a device's traffic routed to the WG tunnel is
+  # dropped before it ever reaches the exit machine. Add idempotent rules to
+  # allow LAN <-> WG-tunnel forwarding (per exit interface, not per device).
+  defp add_forward_rules(iface) do
+    lan = lan_iface()
+
+    with :ok <-
+           run_gateway(
+             "iptables -C FORWARD -i #{lan} -o #{iface} -j ACCEPT 2>/dev/null || " <>
+               "iptables -A FORWARD -i #{lan} -o #{iface} -j ACCEPT"
+           ),
+         :ok <-
+           run_gateway(
+             "iptables -C FORWARD -i #{iface} -o #{lan} -m state --state RELATED,ESTABLISHED -j ACCEPT 2>/dev/null || " <>
+               "iptables -A FORWARD -i #{iface} -o #{lan} -m state --state RELATED,ESTABLISHED -j ACCEPT"
+           ) do
+      :ok
+    end
   end
 
   # The VM must route the device's return traffic back through the tunnel.

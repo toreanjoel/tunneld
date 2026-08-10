@@ -85,7 +85,9 @@ defmodule TunneldWeb.Live.Components.Devices do
             style="animation: fadeIn 0.5s ease-out forwards;"
           >
             <div class="flex flex-row gap-2">
-              <div class="flex-1 truncate ellipsis flex items-center gap-1.5"><%= mask(@obfuscated, device.hostname) %><span class={"status-dot shrink-0 #{if !@obfuscated && Map.get(device, :online, false), do: "status-dot--green", else: "status-dot--gray"}"} />
+              <div class="flex-1 flex items-center gap-1.5 min-w-0">
+                <span class="truncate"><%= mask(@obfuscated, device.hostname) %></span>
+                <span class={"status-dot shrink-0 #{if !@obfuscated && Map.get(device, :online, false), do: "status-dot--green", else: "status-dot--gray"}"} />
                 <%= if device.egress != "local" do %>
                   <span class="px-1.5 py-0.5 rounded-full bg-accent/20 text-accent uppercase text-[9px] font-medium shrink-0">via exit</span>
                 <% end %>
@@ -186,8 +188,8 @@ defmodule TunneldWeb.Live.Components.Devices do
                 <span class="px-1.5 py-0.5 text-[10px] text-text-tertiary">+<%= length(device.tags) - 2 %></span>
               <% end %>
             </div>
-            <div class="mt-auto">
-              <div class="flex items-center justify-between gap-2 mb-1">
+            <div class="mt-auto pt-3 border-t border-border/50">
+              <div class="flex items-center justify-between gap-2 mb-1.5 px-1">
                 <span class="flex items-center text-[10px] uppercase tracking-wide text-text-tertiary">
                   Egress
                   <.help_icon
@@ -209,10 +211,10 @@ defmodule TunneldWeb.Live.Components.Devices do
                   </select>
                 </form>
               </div>
-              <div class="text-xs text-text-tertiary flex items-center gap-1.5 justify-between">
+              <div class="text-xs text-text-tertiary flex items-center gap-1.5 justify-between px-1">
                 <span><%= mask(@obfuscated, device.ip) %></span>
               </div>
-              <div class="text-xs text-text-tertiary"><%= mask(@obfuscated, device.mac) %></div>
+              <div class="text-xs text-text-tertiary px-1"><%= mask(@obfuscated, device.mac) %></div>
             </div>
           </div>
         <% end %>
@@ -240,7 +242,7 @@ defmodule TunneldWeb.Live.Components.Devices do
       end
 
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
-      type: if(match?({:ok, _}, result), do: :info, else: :error),
+      type: if(result == :ok or match?({:ok, _}, result), do: :info, else: :error),
       message: "Egress for #{ip}: #{inspect(result)}"
     })
 
