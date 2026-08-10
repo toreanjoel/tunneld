@@ -200,7 +200,7 @@ defmodule TunneldWeb.Live.Components.Devices do
                   <select
                     name="egress"
                     title="Route this device's traffic through an exit machine"
-                    class="cursor-pointer pl-2 pr-1 py-1 text-[10px] rounded border bg-surface-2 text-text-secondary border-border"
+                    class="cursor-pointer pl-2 pr-6 py-1 text-[10px] rounded border bg-surface-2 text-text-secondary border-border"
                   >
                     <option value="local" selected={device.egress == "local"}>Local</option>
                     <%= for {mid, mname} <- @egress_machines do %>
