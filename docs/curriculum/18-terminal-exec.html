@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terminal Exec — Tunneld Curriculum</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav>
+    <a href="index.html">← Back to Curriculum</a>
+  </nav>
+
+  <div class="container">
+    <h1>18 — Terminal Exec</h1>
+
+    <p class="file-ref">Key sources: <code>lib/tunneld_web/channels/exec_channel.ex</code>, <code>lib/tunneld/machines/ssh/session.ex</code>, <code>lib/tunneld_web/channels/user_socket.ex</code></p>
+
+    <section id="what-it-is">
+      <h2>What Terminal Exec Is</h2>
+
+      <p>
+        Terminal Exec is Tunneld's interactive SSH terminal feature. It streams a full
+        PTY session from a managed machine directly into the browser, letting operators
+        type commands and see output in real time. The architecture is: browser →
+        Phoenix channel → gateway → Erlang :ssh → target machine. The browser never
+        touches the SSH connection directly; all credentials stay on the gateway.
+      </p>
+
+      <p>
+        Unlike the <code>POST /machines/:id/exec</code> API endpoint which runs a single
+        command and returns output, the terminal maintains a persistent interactive
+        session. The operator sees a real shell prompt, can run <code>htop</code>,
+        <code>vim</code>, or any interactive program. Resize events propagate through
+        the channel so the PTY dimensions stay in sync with the browser window.
+      </p>
+
+      <p>
+        The frontend uses xterm.js, a terminal emulator written in TypeScript. The
+        gateway uses Erlang's built-in <code>:ssh</code> module (shipped with OTP)
+        to open a connection and allocate a PTY. Data flows bidirectionally over a
+        Phoenix channel: keystrokes from the browser are sent as <code>"data"</code>
+        pushes, and output from the remote shell is base64-encoded and pushed as
+        <code>"data"</code> events to the browser.
+      </p>
+
+      <p>
+        Security is enforced at two points: socket connect and channel join. The
+        operator must have a valid dashboard session (verified from the HttpOnly
+        cookie). The SSH keys that authenticate to the target machine never leave
+        the gateway; the browser only sees terminal I/O. Session open and close
+        events are logged to the audit log, but individual commands within the
+        session are not captured — an honest limitation documented below.
+      </p>
+    </section>
+
+    <section id="how-it-works">
+      <h2>How It Works</h2>
+
+      <h3>The Channel Flow</h3>
+
+      <p>
+        When the operator clicks "Terminal" on a machine card, the LiveView renders
+        a hook element with <code>data-machine-id</code>. The <code>TerminalHook</code>
+        JavaScript mounts, creates an xterm.js terminal, and opens a Phoenix socket
+        to <code>/ws</code>. It then joins the channel <code>exec:&lt;machine_id&gt;</code>.
+      </p>
+
+      <p>
+        On the server, <code>TunneldWeb.ExecChannel.join/3</code> verifies the session,
+        looks up the machine, and starts a linked <code>Tunneld.Machines.SSH.Session</code>
+        GenServer. That GenServer calls <code>:ssh.connect/4</code> to the target (via
+        the WireGuard overlay address), allocates a PTY, and starts a shell. The channel
+        pushes <code>"connected"</code> to the browser, which focuses the terminal.
+      </p>
+
+      <p>
+        From then on, keystrokes flow browser → channel → GenServer → SSH connection,
+        and output flows SSH connection → GenServer → channel → browser. The GenServer
+        receives <code>{:ssh_cm, conn, {:data, channel_id, type, data}}</code> messages
+        from the Erlang SSH library and forwards them to the channel via <code>send/2</code>.
+      </p>
+
+      <h3>PTY and Window Change</h3>
+
+      <p>
+        When the terminal resizes (the user drags the modal or browser window), the
+        frontend sends a <code>"resize"</code> push with <code>cols</code> and <code>rows</code>.
+        The channel calls <code>Session.resize/3</code>, which issues a
+        <code>:ssh_connection.window_change/6</code> to the target. This keeps the remote
+        PTY in sync with the browser terminal, so full-screen programs render correctly.
+      </p>
+
+<pre>
+# From lib/tunneld/machines/ssh/session.ex:
+def handle_cast({:resize, cols, rows}, %{connection: conn, channel_id: channel_id} = state)
+    when not is_nil(conn) do
+  # Send window change (resize) to the PTY
+  :ssh_connection.window_change(conn, channel_id, cols, rows, 0, 0)
+  {:noreply, %{state | cols: cols, rows: rows}}
+end
+</pre>
+
+      <h3>Cleanup</h3>
+
+      <p>
+        When the channel terminates (user closes the modal, navigates away, or the
+        connection drops), the <code>ExecChannel.terminate/2</code> callback stops
+        the SSH session GenServer. The GenServer's <code>terminate/2</code> closes
+        the SSH connection and removes the temporary <code>user_dir</code> containing
+        the private key copy.
+      </p>
+    </section>
+
+    <section id="how-tunneld-uses-it">
+      <h2>How Tunneld Uses It</h2>
+
+      <h3>Authentication: Two Layers</h3>
+
+      <p>
+        The socket (<code>TunneldWeb.UserSocket</code>) requires a valid session.
+        The channel (<code>TunneldWeb.ExecChannel</code>) re-checks the session and
+        verifies the machine exists. Both layers must pass. A terminal is remote
+        code execution as root; skipping either check would be catastrophic.
+      </p>
+
+<pre>
+# From lib/tunneld_web/channels/exec_channel.ex:
+def join("exec:" <> machine_id, params, socket) do
+  client_id = socket.assigns[:client_id]
+
+  # SECURITY: Verify the operator has a valid dashboard session.
+  # This is critical - a terminal is remote code execution as root.
+  unless client_id && AuthSession.valid?(client_id) do
+    Logger.warning("Unauthorized exec channel join attempt for machine #{machine_id}")
+    {:error, %{reason: "unauthorized"}}
+  else
+    ...
+  end
+end
+</pre>
+
+      <h3>SSH via user_dir</h3>
+
+      <p>
+        Erlang's <code>:ssh.connect/4</code> authenticates using keys in a
+        <code>user_dir</code> directory. The Session GenServer creates a temporary
+        directory with the machine's private key copied in as <code>id_ed25519</code>
+        (mode 0600). This is cleaned up on termination.
+      </p>
+
+<pre>
+# From lib/tunneld/machines/ssh/session.ex:
+defp setup_user_dir(key_path) do
+  nonce = :crypto.strong_rand_bytes(8) |> Base.encode16(case: :lower)
+  user_dir = Path.join(System.tmp_dir!(), "tunneld_ssh_#{nonce}")
+
+  try do
+    File.mkdir_p!(user_dir)
+    File.chmod!(user_dir, 0o700)
+
+    # Copy the private key as id_ed25519
+    dest = Path.join(user_dir, "id_ed25519")
+    File.cp!(key_path, dest)
+    File.chmod!(dest, 0o600)
+
+    {:ok, user_dir}
+  rescue
+    e -> {:error, {:user_dir_setup_failed, Exception.message(e)}}
+  end
+end
+</pre>
+
+      <h3>Audit Logging</h3>
+
+      <p>
+        Every session open and close is logged via <code>Tunneld.Audit.log/4</code>.
+        The log includes the machine ID, result (started/closed/failed), and the
+        operator's client ID. This creates an audit trail of who had shell access
+        to which machine and when.
+      </p>
+
+      <p>
+        <strong>Honest limitation:</strong> Individual commands within the PTY session
+        are not captured. Unlike <code>POST /machines/:id/exec</code>, where the
+        command string is logged, an interactive session streams raw terminal I/O.
+        Logging that would require parsing escape sequences and reconstructing lines,
+        which is fragile and privacy-invasive. Tunneld logs session boundaries only.
+      </p>
+    </section>
+
+    <section id="why">
+      <h2>Why (And Three Bugs Found in Production)</h2>
+
+      <h3>Why a Browser Terminal</h3>
+
+      <p>
+        The dashboard already manages machines. Adding a terminal means operators
+        never leave the browser to SSH in manually. They do not need to know the
+        overlay IP, do not need the private key on their laptop, and do not need
+        to punch through firewall rules. The gateway handles all of that.
+      </p>
+
+      <h3>Bug 1: user_dir vs. Key Callback</h3>
+
+      <p>
+        An earlier version used a custom <code>:key_cb</code> callback to provide
+        the private key to Erlang's :ssh client. It negotiated SSH fine, then
+        failed during userauth for OpenSSH-format ed25519 keys. The error was
+        cryptic: <code>:no_auth_method</code>. Switching to <code>user_dir</code>
+        containing <code>id_ed25519</code> (mode 0600) worked immediately.
+      </p>
+
+      <p>
+        <strong>Lesson:</strong> Prefer the library's standard mechanism over a
+        bespoke callback. The key_cb interface is designed for HSMs and custom
+        key formats, not for reading a file that the library already knows how
+        to read. The user_dir path is battle-tested and handles OpenSSH format
+        correctly.
+      </p>
+
+      <h3>Bug 2: _csrf_token Required for Session</h3>
+
+      <p>
+        Phoenix only populates <code>connect_info[:session]</code> when the socket
+        handshake includes a valid <code>_csrf_token</code> parameter. Without it,
+        <code>connect_info.session</code> is <code>nil</code>, and the socket
+        connect function refused with 403 (no client_id to validate).
+      </p>
+
+      <p>
+        The fix was simple: pass the CSRF token from the meta tag when creating
+        the socket. LiveView's own socket does the same thing; this is documented
+        behaviour, just easy to overlook.
+      </p>
+
+<pre>
+// From assets/js/terminal_hook.js:
+const csrfToken = document
+  .querySelector("meta[name='csrf-token']")
+  ?.getAttribute("content");
+
+const socket = new window.Phoenix.Socket("/ws", {
+  params: { _csrf_token: csrfToken },
+});
+</pre>
+
+      <p>
+        <strong>Lesson:</strong> A unit test that hand-builds <code>connect_info</code>
+        tests your function, not the framework's delivery of it. The real socket
+        transport populates session only under specific conditions. Integration
+        tests through the actual websocket handshake catch this; unit tests do not.
+      </p>
+
+      <h3>Bug 3: phx-update="ignore"</h3>
+
+      <p>
+        xterm.js injects its own DOM into the hook element: a viewport, a canvas,
+        cursor layers. Without <code>phx-update="ignore"</code> on the container,
+        LiveView's next diff reconciled that subtree back to the empty
+        server-rendered div. The terminal silently vanished a few seconds after
+        mounting.
+      </p>
+
+      <p>
+        <strong>Lesson:</strong> Any JS-managed DOM subtree must be excluded from
+        LiveView patching. The <code>phx-update="ignore"</code> attribute tells
+        LiveView to leave the element alone after the initial render. This is
+        required for any third-party library that manipulates the DOM: maps,
+        charts, editors, terminals.
+      </p>
+    </section>
+
+    <section id="examples">
+      <h2>Examples</h2>
+
+      <h3>Opening a terminal from the dashboard</h3>
+
+<pre>
+# 1. User clicks the terminal icon on a machine card
+# 2. LiveView renders a modal with this hook element:
+&lt;div id="terminal-abc123"
+     phx-hook="Terminal"
+     data-machine-id="abc123"
+     phx-update="ignore"&gt;
+  &lt;div class="terminal-container"&gt;&lt;/div&gt;
+&lt;/div&gt;
+
+# 3. TerminalHook.mounted() runs:
+#    - Creates xterm.js terminal
+#    - Loads WebGL renderer (with canvas/DOM fallback)
+#    - Opens Phoenix socket to /ws with _csrf_token
+#    - Joins exec:abc123 channel with cols/rows
+#
+# 4. Server-side ExecChannel.join/3:
+#    - Verifies session
+#    - Looks up machine abc123
+#    - Starts SSH.Session GenServer
+#    - GenServer connects to 10.100.0.5 (overlay IP)
+#    - Allocates PTY, starts shell
+#    - Pushes {:ssh_connected} to channel
+#    - Channel pushes "connected" to browser
+</pre>
+
+      <h3>Viewing audit logs for terminal sessions</h3>
+
+<pre>
+# In the audit log (lib/tunneld/audit.ex):
+# Each session open/close is recorded:
+
+2024-08-10T14:23:45Z terminal_open  machine=abc123 result=started  client=client_xyz
+2024-08-10T14:25:12Z terminal_close machine=abc123 result=closed   client=client_xyz
+
+# Note: Individual commands within the session are NOT logged.
+# The audit trail shows WHO had access WHEN, not WHAT they typed.
+</pre>
+
+      <h3>Debugging SSH connection issues</h3>
+
+<pre>
+# Common errors and their meanings:
+
+# 1. "Connection refused"
+#    - sshd not running on target, or wrong port
+#    - Check: ssh -p 22 root@10.100.0.5
+
+# 2. "Host unreachable"
+#    - WireGuard overlay not established
+#    - Check: ping 10.100.0.5 from gateway
+
+# 3. "SSH key not found for this machine"
+#    - Key file missing in TUNNELD_DATA/ssh/&lt;machine_id&gt;
+#    - Re-enroll the machine to regenerate keys
+
+# 4. "Failed to allocate PTY"
+#    - Target sshd configured with "PermitTTY no"
+#    - Check /etc/ssh/sshd_config on target
+
+# 5. Session connects but terminal is blank:
+#    - Check browser console for WebGL errors
+#    - The renderer falls back to canvas, then DOM
+#    - If all fail, check xterm.js version compatibility
+</pre>
+
+      <h3>Terminal hook initialization with accelerated rendering</h3>
+
+<pre>
+// The terminal hook attempts WebGL first, then canvas, then DOM:
+
+loadAcceleratedRenderer() {
+  if (!this.term) return;
+
+  const WebglAddon = WebglMod?.WebglAddon || WebglMod?.default?.WebglAddon;
+  const CanvasAddon = CanvasMod?.CanvasAddon || CanvasMod?.default?.CanvasAddon;
+
+  // Try WebGL first for best performance
+  if (WebglAddon) {
+    try {
+      const webglAddon = new WebglAddon();
+      webglAddon.onContextLoss(() => {
+        console.warn("Terminal: WebGL context lost, falling back to canvas");
+        webglAddon.dispose();
+        this.loadCanvasRenderer(CanvasAddon);
+      });
+      this.term.loadAddon(webglAddon);
+      this.rendererAddon = webglAddon;
+      return;
+    } catch (e) {
+      console.warn("Terminal: WebGL not available:", e.message);
+    }
+  }
+
+  // Fall back to canvas, then DOM (the default)
+  this.loadCanvasRenderer(CanvasAddon);
+}
+</pre>
+    </section>
+
+    <footer>
+      <a href="17-glossary.html">← Previous: Glossary</a> · 
+      <a href="index.html">Curriculum Index</a>
+    </footer>
+  </div>
+</body>
+</html>

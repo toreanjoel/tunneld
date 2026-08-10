@@ -224,13 +224,23 @@
   .system-scroll {
     overflow-y: auto;
     overflow-x: hidden;
+  }
+
+  /* Shared scrollbar theme for app and xterm terminal viewport */
+  .system-scroll,
+  .xterm-viewport {
     scrollbar-color: #25232f transparent;
     scrollbar-width: thin;
   }
 
-  .system-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
-  .system-scroll::-webkit-scrollbar-thumb { background: #25232f; border-radius: 8px; }
-  .system-scroll::-webkit-scrollbar-track { background: transparent; }
+  .system-scroll::-webkit-scrollbar,
+  .xterm-viewport::-webkit-scrollbar { width: 8px; height: 8px; }
+
+  .system-scroll::-webkit-scrollbar-thumb,
+  .xterm-viewport::-webkit-scrollbar-thumb { background: #25232f; border-radius: 8px; }
+
+  .system-scroll::-webkit-scrollbar-track,
+  .xterm-viewport::-webkit-scrollbar-track { background: transparent; }
 
   .animate-dashoffset {
     transition: stroke-dashoffset 1s ease-in-out;

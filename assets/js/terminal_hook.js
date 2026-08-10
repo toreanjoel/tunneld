@@ -8,6 +8,8 @@
  * - Sends resize events when the terminal dimensions change
  * - Cleans up properly on disconnect
  *
+ * Performance: Uses WebGL renderer with canvas/DOM fallback, debounced resize.
+ *
  * Security: This module handles terminal I/O only. All authentication is
  * performed server-side by the gateway - no secrets reach the browser.
  */
@@ -21,6 +23,8 @@
 // import yields undefined. A namespace import is required to reach .Terminal.
 import * as XtermMod from "../vendor/xterm.js";
 import * as FitMod from "../vendor/xterm-addon-fit.js";
+import * as WebglMod from "../vendor/xterm-addon-webgl.js";
+import * as CanvasMod from "../vendor/xterm-addon-canvas.js";
 
 // Theme matching the Tunneld dashboard
 const THEME = {
@@ -61,7 +65,9 @@ const TerminalHook = {
     this.channel = null;
     this.term = null;
     this.fitAddon = null;
+    this.rendererAddon = null;
     this.resizeObserver = null;
+    this.resizeTimeout = null;
 
     this.initTerminal();
     this.connectChannel();
@@ -91,7 +97,7 @@ const TerminalHook = {
       return;
     }
 
-    // Create terminal instance
+    // Create terminal instance with bounded scrollback for responsiveness
     this.term = new Terminal({
       theme: THEME,
       fontFamily: '"JetBrains Mono", "Fira Code", "Monaco", monospace',
@@ -99,7 +105,7 @@ const TerminalHook = {
       lineHeight: 1.2,
       cursorBlink: true,
       cursorStyle: 'block',
-      scrollback: 10000,
+      scrollback: 5000,
       allowProposedApi: true,
     });
 
@@ -111,6 +117,9 @@ const TerminalHook = {
 
     // Open the terminal in the container
     this.term.open(container);
+
+    // Load accelerated renderer: try WebGL first, fall back to canvas, then DOM
+    this.loadAcceleratedRenderer();
 
     // Initial fit
     setTimeout(() => {
@@ -126,14 +135,68 @@ const TerminalHook = {
       }
     });
 
-    // Resize observer for terminal container
+    // Debounced resize observer to avoid flooding fit()+sendResize() on every frame
     this.resizeObserver = new ResizeObserver(() => {
-      if (this.fitAddon && this.term) {
-        this.fitAddon.fit();
-        this.sendResize();
+      if (this.resizeTimeout) {
+        clearTimeout(this.resizeTimeout);
       }
+      this.resizeTimeout = setTimeout(() => {
+        if (this.fitAddon && this.term) {
+          this.fitAddon.fit();
+          this.sendResize();
+        }
+      }, 50);
     });
     this.resizeObserver.observe(container);
+  },
+
+  loadAcceleratedRenderer() {
+    if (!this.term) return;
+
+    // Extract addon constructors with the same namespace import pattern
+    const WebglAddon =
+      WebglMod?.WebglAddon || WebglMod?.default?.WebglAddon;
+    const CanvasAddon =
+      CanvasMod?.CanvasAddon || CanvasMod?.default?.CanvasAddon;
+
+    // Try WebGL first for best performance
+    if (WebglAddon) {
+      try {
+        const webglAddon = new WebglAddon();
+
+        // Handle WebGL context loss by falling back to canvas or DOM
+        webglAddon.onContextLoss(() => {
+          console.warn("Terminal: WebGL context lost, falling back to canvas");
+          webglAddon.dispose();
+          this.loadCanvasRenderer(CanvasAddon);
+        });
+
+        this.term.loadAddon(webglAddon);
+        this.rendererAddon = webglAddon;
+        return;
+      } catch (e) {
+        console.warn("Terminal: WebGL not available, trying canvas:", e.message);
+      }
+    }
+
+    // Fall back to canvas renderer
+    this.loadCanvasRenderer(CanvasAddon);
+  },
+
+  loadCanvasRenderer(CanvasAddon) {
+    if (!this.term) return;
+
+    if (CanvasAddon) {
+      try {
+        const canvasAddon = new CanvasAddon();
+        this.term.loadAddon(canvasAddon);
+        this.rendererAddon = canvasAddon;
+        return;
+      } catch (e) {
+        console.warn("Terminal: Canvas renderer not available, using DOM:", e.message);
+      }
+    }
+    // DOM renderer is the default, no addon needed
   },
 
   connectChannel() {
@@ -244,6 +307,11 @@ const TerminalHook = {
   },
 
   cleanup() {
+    if (this.resizeTimeout) {
+      clearTimeout(this.resizeTimeout);
+      this.resizeTimeout = null;
+    }
+
     if (this.resizeObserver) {
       this.resizeObserver.disconnect();
       this.resizeObserver = null;
@@ -257,6 +325,11 @@ const TerminalHook = {
     if (this.socket) {
       this.socket.disconnect();
       this.socket = null;
+    }
+
+    if (this.rendererAddon) {
+      this.rendererAddon.dispose();
+      this.rendererAddon = null;
     }
 
     if (this.term) {

@@ -28,14 +28,15 @@ REQUIRED_PAGES="index.html
 14-testing-mock-mode.html
 15-systemd-service-lifecycle.html
 16-pooling-load-balancing.html
-17-glossary.html"
+17-glossary.html
+18-terminal-exec.html"
 for p in $REQUIRED_PAGES; do
   if [ -f "$DOCS/$p" ]; then ok "page: $p"; else bad "missing page: $DOCS/$p"; fi
 done
 
 # --- 2. Depth: subsystem pages must be substantial ----------------------------
 # A page that merely names a tool teaches nothing. Require real word count.
-for f in "$DOCS"/0[2-9]-*.html "$DOCS"/1[0-6]-*.html; do
+for f in "$DOCS"/0[2-9]-*.html "$DOCS"/1[0-68]-*.html; do
   [ -f "$f" ] || continue
   words=$(sed -e 's/<[^>]*>/ /g' "$f" | tr -s '[:space:]' ' ' | wc -w | tr -d ' ')
   if [ "$words" -ge 900 ]; then ok "depth $(basename "$f"): ${words}w"
@@ -44,7 +45,7 @@ done
 
 # --- 3. Every subsystem page answers the four required questions --------------
 # The user asked for: what it is, how it works, what we used it for, why, examples.
-for f in "$DOCS"/0[2-9]-*.html "$DOCS"/1[0-6]-*.html; do
+for f in "$DOCS"/0[2-9]-*.html "$DOCS"/1[0-68]-*.html; do
   [ -f "$f" ] || continue
   b=$(basename "$f"); miss=""
   grep -qi 'id="what-it-is"'      "$f" || miss="$miss what-it-is"
@@ -56,7 +57,7 @@ for f in "$DOCS"/0[2-9]-*.html "$DOCS"/1[0-6]-*.html; do
 done
 
 # --- 4. Examples must be real commands, not prose -----------------------------
-for f in "$DOCS"/0[2-9]-*.html "$DOCS"/1[0-6]-*.html; do
+for f in "$DOCS"/0[2-9]-*.html "$DOCS"/1[0-68]-*.html; do
   [ -f "$f" ] || continue
   n=$(grep -c '<pre' "$f")
   if [ "$n" -ge 3 ]; then ok "code blocks $(basename "$f"): $n"
@@ -65,7 +66,7 @@ done
 
 # --- 5. Citations into the real codebase --------------------------------------
 # A curriculum about THIS system must point at THIS system's files.
-for f in "$DOCS"/0[1-9]-*.html "$DOCS"/1[0-6]-*.html; do
+for f in "$DOCS"/0[1-9]-*.html "$DOCS"/1[0-68]-*.html; do
   [ -f "$f" ] || continue
   if grep -qE 'lib/tunneld[a-z_/]*\.ex' "$f"; then ok "cites source $(basename "$f")"
   else bad "$(basename "$f") cites no lib/tunneld/*.ex file"; fi

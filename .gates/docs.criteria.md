@@ -10,3 +10,4 @@
 - No external CDN dependencies the curriculum works fully offline
 - Every page is valid parseable HTML with a doctype and a title
 - Every `def` shown in a code block attributed to lib/tunneld/*.ex actually exists in the codebase
+- A 18-terminal-exec.html page documents the interactive terminal subsystem to the same depth as the others
