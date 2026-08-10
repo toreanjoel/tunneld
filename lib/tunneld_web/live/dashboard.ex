@@ -99,6 +99,7 @@ defmodule TunneldWeb.Live.Dashboard do
       |> assign(:map_status, :loading)
       |> assign(:geo_location, nil)
       |> assign(:enroll_wizard_open, false)
+      |> assign(:terminal_modal, nil)
       |> assign(:map_nodes, map_nodes())
 
     socket =
@@ -249,6 +250,36 @@ defmodule TunneldWeb.Live.Dashboard do
         id="enrollment_wizard"
         open={@enroll_wizard_open}
       />
+
+      <%= if @terminal_modal do %>
+        <div class="fixed inset-0 bg-black/80 z-[60]" phx-click="close_terminal" />
+        <div class="fixed inset-4 md:inset-8 lg:inset-16 z-[70] flex flex-col bg-[#0B0A14] rounded-xl border border-border overflow-hidden">
+          <div class="flex items-center justify-between px-4 py-3 border-b border-border">
+            <div class="flex items-center gap-3">
+              <.icon name="hero-command-line" class="w-5 h-5 text-accent" />
+              <span class="text-sm font-medium">Terminal: <%= @terminal_modal.machine_name %></span>
+              <div class="terminal-status flex items-center gap-2 text-xs text-text-tertiary">
+                <span class="terminal-status-icon"></span>
+                <span class="terminal-status-text">Initializing...</span>
+              </div>
+            </div>
+            <button
+              phx-click="close_terminal"
+              class="ghost-icon w-8 h-8 flex items-center justify-center"
+            >
+              <.icon name="hero-x-mark" class="w-4 h-4" />
+            </button>
+          </div>
+          <div
+            id="terminal"
+            phx-hook="Terminal"
+            data-machine-id={@terminal_modal.machine_id}
+            class="flex-1 flex flex-col"
+          >
+            <div class="terminal-container flex-1 p-2"></div>
+          </div>
+        </div>
+      <% end %>
     </div>
     """
   end
@@ -531,6 +562,25 @@ defmodule TunneldWeb.Live.Dashboard do
       _ ->
         {:noreply, put_flash(socket, :error, "Machine not found")}
     end
+  end
+
+  def handle_event("open_terminal", %{"id" => id}, socket) do
+    case Tunneld.Machines.get(id) do
+      {:ok, machine} ->
+        terminal_modal = %{
+          machine_id: id,
+          machine_name: machine["name"] || id
+        }
+
+        {:noreply, assign(socket, :terminal_modal, terminal_modal)}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Machine not found")}
+    end
+  end
+
+  def handle_event("close_terminal", _params, socket) do
+    {:noreply, assign(socket, :terminal_modal, nil)}
   end
 
   def handle_event("add_pool_member_modal", %{"id" => id}, socket) do

@@ -78,6 +78,27 @@ if ls test/tunneld/machines/ssh/session_test.exs test/tunneld_web/channels/*_tes
   ok "terminal has test coverage"
 else bad "no tests for the ssh session or exec channel"; fi
 
+# --- 10. Key auth must use the PROVEN-WORKING mechanism ----------------------
+# Verified empirically against the real gateway 2026-08-10: a bespoke key_cb
+# module negotiated SSH then FAILED userauth ("Unable to connect using the
+# available authentication methods"), while the SAME key authenticated fine via
+# the openssh client. Passing `user_dir` (a dir containing id_ed25519) to
+# :ssh.connect/4 was confirmed to open a real shell on the same host.
+if grep -q 'user_dir' "$SESS" 2>/dev/null; then
+  ok "session uses user_dir for key auth (empirically verified to work)"
+else
+  bad "session does not use user_dir - bespoke key_cb was verified NOT to authenticate"
+fi
+if [ -f lib/tunneld/machines/ssh/session_key_callback.ex ]; then
+  bad "session_key_callback.ex still present - it fails userauth against a real host"
+else ok "no bespoke key callback"; fi
+
+# --- 11. Mock mode must not attempt a real SSH connection --------------------
+# TODO principle 6: "Mock mode must keep working. Every new module needs a mock path."
+if grep -qE '@mock|mock_data' "$SESS" 2>/dev/null; then
+  ok "session has a mock path"
+else bad "session has NO mock path - MOCK_DATA=true will attempt a real SSH dial"; fi
+
 echo "-----------------------------------------------"
 [ "$FAIL" -eq 0 ] && echo "TERMINAL GATE: PASS" || echo "TERMINAL GATE: FAIL"
 exit $FAIL

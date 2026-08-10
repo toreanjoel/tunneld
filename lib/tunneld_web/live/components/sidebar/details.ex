@@ -342,13 +342,13 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           </div>
 
           <div
-            phx-click="ssh_connect"
+            phx-click="open_terminal"
             phx-value-id={mget(@machine, "id")}
-            class="flex items-center justify-center gap-1.5 w-full h-9 bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
-            title="Show SSH command to connect to this machine"
+            class="flex items-center justify-center gap-1.5 w-full h-9 bg-accent p-2 cursor-pointer rounded-md hover:bg-accent-light"
+            title="Open an interactive terminal to this machine"
           >
             <.icon name="hero-command-line" class="h-4 w-4 shrink-0" />
-            <div class="truncate text-xs">SSH</div>
+            <div class="truncate text-xs">Terminal</div>
           </div>
 
           <div

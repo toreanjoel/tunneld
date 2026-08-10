@@ -27,7 +27,7 @@ defmodule Tunneld.MixProject do
   def application do
     [
       mod: {Tunneld.Application, []},
-      extra_applications: [:logger, :runtime_tools, :os_mon]
+      extra_applications: [:logger, :runtime_tools, :os_mon, :ssh, :public_key]
     ]
   end
 
