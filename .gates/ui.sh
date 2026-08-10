@@ -27,8 +27,16 @@ else bad "sidebar has no real loading state (phx-click-loading does not count)";
 
 # --- 2. LISTENERS: infrastructure ports filtered out --------------------------
 if grep -qE 'sshd|caddy|systemd-resolve|dnsmasq' lib/tunneld/machines/runtime.ex; then
-  ok "runtime.ex filters/classifies infrastructure listeners"
-else bad "runtime.ex still passes raw ss -tlnp through with no infra filtering"; fi
+  ok "runtime.ex classifies infrastructure listeners"
+else bad "runtime.ex still passes raw ss -tlnp through with no infra classification"; fi
+# Classifying is not filtering. The UI must actually ACT on the flag, and must let
+# the operator reveal the hidden rows on demand.
+if grep -q 'infrastructure' $D/sidebar/details.ex; then
+  ok "sidebar acts on the infrastructure flag"
+else bad "sidebar ignores the infrastructure flag - still lists sshd/caddy by default"; fi
+if grep -qE 'show_infra|toggle_infra' $D/sidebar/details.ex; then
+  ok "sidebar has a show-infrastructure toggle"
+else bad "no show-infrastructure toggle - infra listeners would be unreachable"; fi
 
 # --- 3. EXIT wording: redundant description removed ---------------------------
 if grep -q 'Route specific devices through this exit from the' $D/sidebar/details.ex; then
@@ -76,10 +84,14 @@ else ok "section_header underline bar removed"; fi
 if grep -qE 'max-w-' lib/tunneld_web/components/core_components.ex; then
   ok "flash toast width is bounded"
 else bad "flash has no max-width - long messages span the viewport"; fi
-LEAK=$(grep -rnE '(message|flash).*#\{inspect\(' $DASH $D/devices.ex | wc -l | tr -d ' ')
+# details.ex included: an error state rendered to the user is user-facing copy too.
+# Logger.* is operator-facing diagnostics, not user copy - full term fidelity is
+# CORRECT there. Only rendered/flash copy must be humanised.
+LEAK=$(grep -rnE 'inspect\(' $DASH $D/devices.ex $D/sidebar/details.ex \
+       | grep -v 'Logger\.' | grep -vE ':[0-9]+:\s*#' | wc -l | tr -d ' ')
 if [ "$LEAK" -eq 0 ]; then ok "no raw inspect() in user-facing messages"
-else bad "$LEAK raw inspect() calls still leak into flash messages"
-     grep -rnE '(message|flash).*#\{inspect\(' $DASH $D/devices.ex | head -5; fi
+else bad "$LEAK raw inspect() calls still leak into user-facing copy"
+     grep -rnE 'inspect\(' $DASH $D/devices.ex $D/sidebar/details.ex | head -5; fi
 
 # --- 10. MAP PINS: hover metadata wired (hook exists but was dead code) -------
 if grep -q 'phx-hook="MapPinHover"' $D/map_card.ex && grep -q 'data-pin-' $D/map_card.ex; then

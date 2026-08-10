@@ -25,7 +25,7 @@ defmodule TunneldWeb.CoreComponents do
       phx-click={JS.push("lv:clear-flash", value: %{key: @kind}) |> hide("##{@id}")}
       role="alert"
       class={[
-        "fixed top-4 right-4 z-[200] rounded-xl px-5 py-3 shadow-xl border text-sm",
+        "fixed top-4 right-4 z-[200] rounded-xl px-5 py-3 shadow-xl border text-sm max-w-md",
         "font-medium -tracking-[0.005em] cursor-pointer",
         @kind == :info && "bg-green/90 border-green text-white",
         @kind == :error && "bg-red/90 border-red text-white"

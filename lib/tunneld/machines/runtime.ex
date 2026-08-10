@@ -37,9 +37,33 @@ defmodule Tunneld.Machines.Runtime do
     with {:ok, ss_out} <- run(machine, "ss -tlnp 2>/dev/null || ss -tln 2>/dev/null") do
       runtime_map = container_runtime_map(machine)
       parsed = parse_listeners(ss_out, runtime_map)
-      {:ok, parsed}
+      # Classify each listener as infrastructure or user/app
+      classified = Enum.map(parsed, &classify_listener/1)
+      {:ok, classified}
     end
   end
+
+  @infrastructure_procs ~w(sshd caddy systemd-resolve dnsmasq chronyd cupsd avahi rpcbind postfix)
+
+  defp classify_listener(listener) do
+    proc = listener["proc"] || ""
+    addr = listener["addr"] || ""
+
+    listener
+    |> Map.put("infrastructure", infrastructure?(proc))
+    |> Map.put("loopback", loopback?(addr))
+  end
+
+  defp infrastructure?(proc) do
+    Enum.any?(@infrastructure_procs, &String.contains?(proc, &1))
+  end
+
+  # The whole 127.0.0.0/8 block is loopback, not just 127.0.0.1 - systemd-resolve
+  # famously binds 127.0.0.53. A loopback-only bind is not reachable from the LAN,
+  # so it cannot be turned into a resource without extra plumbing.
+  defp loopback?("127." <> _), do: true
+  defp loopback?(addr) when addr in ["::1", "[::1]"], do: true
+  defp loopback?(_), do: false
 
   @doc """
   Generic capability probe: OS, kernel, arch, CPU, memory, detected runtimes.

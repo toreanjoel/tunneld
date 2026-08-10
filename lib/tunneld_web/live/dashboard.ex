@@ -33,7 +33,10 @@ defmodule TunneldWeb.Live.Dashboard do
     is_open: false,
     view: nil,
     selection: nil,
-    data: nil
+    data: nil,
+    listeners: [],
+    listeners_loading: false,
+    listeners_error: nil
   }
 
   @link_poll_interval 15_000
@@ -96,6 +99,7 @@ defmodule TunneldWeb.Live.Dashboard do
       |> assign(:map_status, :loading)
       |> assign(:geo_location, nil)
       |> assign(:enroll_wizard_open, false)
+      |> assign(:map_nodes, map_nodes())
 
     socket =
       case Tunneld.Geolocation.get_location() do
@@ -148,7 +152,7 @@ defmodule TunneldWeb.Live.Dashboard do
                   module={TunneldWeb.Live.Components.MapCard}
                   geo_location={@geo_location}
                   map_status={@map_status}
-                  nodes={map_nodes()}
+                  nodes={@map_nodes}
                 />
               </div>
               <div class="grid grid-rows-[auto_1fr] gap-6 h-full">
@@ -413,7 +417,7 @@ defmodule TunneldWeb.Live.Dashboard do
 
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
       type: if(match?({:ok, _}, result), do: :info, else: :error),
-      message: "Exit node: #{inspect(result)}"
+      message: format_exit_result(result, id)
     })
 
     send(self(), {:machines_changed})
@@ -436,7 +440,7 @@ defmodule TunneldWeb.Live.Dashboard do
 
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
       type: :info,
-      message: "Reconcile done: #{inspect(result)}"
+      message: format_reconcile_result(result)
     })
 
     send(self(), {:machines_changed})
@@ -500,6 +504,32 @@ defmodule TunneldWeb.Live.Dashboard do
         }
 
         {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal))}
+    end
+  end
+
+  def handle_event("ssh_connect", %{"id" => id}, socket) do
+    case Tunneld.Machines.get(id) do
+      {:ok, machine} ->
+        ssh_user = machine["ssh_user"] || "root"
+        ssh_port = machine["ssh_port"] || 22
+        address = machine["overlay_ip"] || machine["address"] || "unknown"
+        key_path = Tunneld.Machines.SSH.private_key_path(id)
+
+        ssh_cmd = "ssh -i #{key_path} -p #{ssh_port} #{ssh_user}@#{address}"
+
+        modal = %{
+          show: true,
+          title: "SSH to #{machine["name"] || id}",
+          description: "Connect to this machine via SSH. Copy the command below.",
+          body: %{"type" => "code", "data" => ssh_cmd, "label" => "SSH command:"},
+          actions: nil,
+          type: :default
+        }
+
+        {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal))}
+
+      _ ->
+        {:noreply, put_flash(socket, :error, "Machine not found")}
     end
   end
 
@@ -643,12 +673,12 @@ defmodule TunneldWeb.Live.Dashboard do
 
   def handle_info(%{id: "machines", event: _, data: _}, socket) do
     send_update(TunneldWeb.Live.Components.Machines, id: "machines", data: %{})
-    {:noreply, socket}
+    {:noreply, assign(socket, :map_nodes, map_nodes())}
   end
 
   def handle_info({:machines_changed}, socket) do
     send_update(TunneldWeb.Live.Components.Machines, id: "machines", data: %{})
-    {:noreply, socket}
+    {:noreply, assign(socket, :map_nodes, map_nodes())}
   end
 
   def handle_info(:poll_link_state, socket) do
@@ -809,6 +839,24 @@ defmodule TunneldWeb.Live.Dashboard do
     end
   end
 
+  def handle_async(:fetch_listeners, {:ok, {:ok, listeners}}, socket) do
+    sidebar = socket.assigns.sidebar
+    sidebar = %{sidebar | listeners: listeners, listeners_loading: false, listeners_error: nil}
+    {:noreply, assign(socket, :sidebar, sidebar)}
+  end
+
+  def handle_async(:fetch_listeners, {:ok, {:error, reason}}, socket) do
+    sidebar = socket.assigns.sidebar
+    sidebar = %{sidebar | listeners: [], listeners_loading: false, listeners_error: reason}
+    {:noreply, assign(socket, :sidebar, sidebar)}
+  end
+
+  def handle_async(:fetch_listeners, {:exit, reason}, socket) do
+    sidebar = socket.assigns.sidebar
+    sidebar = %{sidebar | listeners: [], listeners_loading: false, listeners_error: reason}
+    {:noreply, assign(socket, :sidebar, sidebar)}
+  end
+
   defp get_sidebar_details(type, id) do
     case type do
       "resource" ->
@@ -864,6 +912,8 @@ defmodule TunneldWeb.Live.Dashboard do
             selection={@sidebar.selection}
             data={@sidebar.data}
             listeners={@sidebar.listeners}
+            listeners_loading={Map.get(@sidebar, :listeners_loading, false)}
+            listeners_error={Map.get(@sidebar, :listeners_error)}
             obfuscated={@obfuscated}
           />
         </div>
@@ -1022,18 +1072,25 @@ defmodule TunneldWeb.Live.Dashboard do
       label = m["name"] || m["id"]
       location = m["location"] || "local"
       address = m["address"]
+      overlay_ip = Tunneld.Overlay.address_for(m)
 
-      geo =
+      {geo, country} =
         if location == "remote" and is_binary(address) do
           case Tunneld.Geolocation.geolocate(address) do
-            {:ok, loc} -> loc
-            _ -> gateway
+            {:ok, loc} -> {loc, loc[:country] || loc[:city] || "Remote"}
+            _ -> {gateway, "Remote"}
           end
         else
-          gateway
+          {gateway, "Local"}
         end
 
-      %{latitude: geo[:latitude], longitude: geo[:longitude], label: label}
+      %{
+        latitude: geo[:latitude],
+        longitude: geo[:longitude],
+        label: label,
+        ip: overlay_ip || address || "",
+        country: country
+      }
     end)
     |> Enum.reject(fn n -> is_nil(n.latitude) or is_nil(n.longitude) end)
   end
@@ -1060,29 +1117,36 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   defp sidebar_open(view, selection) when is_atom(view) do
-    %{is_open: true, view: view, selection: selection, data: nil, listeners: []}
+    %{
+      is_open: true,
+      view: view,
+      selection: selection,
+      data: nil,
+      listeners: [],
+      listeners_loading: false,
+      listeners_error: nil
+    }
   end
 
   defp open_machine_sidebar(socket, id) do
     case Tunneld.Machines.get(id) do
       {:ok, machine} ->
-        listeners =
-          case Tunneld.Machines.listeners(id) do
-            {:ok, l} -> l
-            _ -> []
-          end
-
         machine = enrich_overlay(machine)
 
+        # Open sidebar immediately with machine data, mark listeners as loading
         sidebar = %{
           is_open: true,
           view: :machine,
           selection: %{type: :machine, id: id},
           data: machine,
-          listeners: listeners
+          listeners: [],
+          listeners_loading: true,
+          listeners_error: nil
         }
 
-        assign(socket, :sidebar, sidebar)
+        socket
+        |> assign(:sidebar, sidebar)
+        |> start_async(:fetch_listeners, fn -> Tunneld.Machines.listeners(id) end)
 
       _ ->
         assign(socket, :sidebar, @sidebar_default)
@@ -1117,7 +1181,15 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   defp sidebar_close(sidebar) when is_map(sidebar) do
-    %{is_open: false, view: Map.get(sidebar, :view), selection: nil, data: nil, listeners: []}
+    %{
+      is_open: false,
+      view: Map.get(sidebar, :view),
+      selection: nil,
+      data: nil,
+      listeners: [],
+      listeners_loading: false,
+      listeners_error: nil
+    }
   end
 
   defp machine_action_flash(socket, "enroll_machine", %{"public_key" => pub})
@@ -1171,7 +1243,48 @@ defmodule TunneldWeb.Live.Dashboard do
   defp unwrap_result({:error, reason}), do: {:error, reason}
   defp unwrap_result(other), do: {:ok, other}
 
-  defp machine_error("enroll_machine", reason), do: "enrollment failed: #{inspect(reason)}"
+  defp machine_error("enroll_machine", reason), do: "enrollment failed: #{error_message(reason)}"
 
-  defp machine_error(_action, reason), do: inspect(reason)
+  defp machine_error(_action, reason), do: error_message(reason)
+
+  # One formatter for both flash copy and logs. Users must never see a raw
+  # Elixir term, and a readable sentence carrying the exit code plus ssh's own
+  # stderr is more useful in the log than a nested tuple anyway.
+  defp error_message({:ssh_failed, code, out}), do: "SSH exited #{code}: #{first_line(out)}"
+  defp error_message({:ssh_failed, out}), do: "SSH failed: #{first_line(out)}"
+  defp error_message(reason) when is_binary(reason), do: first_line(reason)
+  defp error_message(:timeout), do: "the machine did not respond in time"
+  defp error_message(reason) when is_atom(reason), do: to_string(reason)
+  defp error_message(%{__exception__: true} = e), do: first_line(Exception.message(e))
+  defp error_message({kind, _reason}) when is_atom(kind), do: "unexpected #{kind} failure"
+  defp error_message(_), do: "unexpected failure"
+
+  defp first_line(text) when is_binary(text) do
+    text
+    |> String.split("\n", trim: true)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> List.first()
+    |> case do
+      nil -> "no details reported"
+      line -> String.slice(line, 0, 120)
+    end
+  end
+
+  defp first_line(_), do: "no details reported"
+
+  defp format_exit_result({:ok, "already exit-capable"}, id),
+    do: "Machine #{id} is already exit-capable"
+
+  defp format_exit_result({:ok, _}, id), do: "Machine #{id} is now exit-capable"
+
+  defp format_exit_result({:error, reason}, _id) when is_binary(reason),
+    do: "Exit setup failed: #{reason}"
+
+  defp format_exit_result({:error, _reason}, _id), do: "Exit setup failed"
+  defp format_exit_result(_, id), do: "Exit node configured for #{id}"
+
+  defp format_reconcile_result(%{error: reason}), do: "Reconcile failed: #{reason}"
+  defp format_reconcile_result(%{overlay: _, probe: _, reconcile: _}), do: "Reconcile complete"
+  defp format_reconcile_result(_), do: "Reconcile complete"
 end

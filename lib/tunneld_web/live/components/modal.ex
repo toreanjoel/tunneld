@@ -35,7 +35,7 @@ defmodule TunneldWeb.Live.Components.Modal do
       class="fixed inset-0 bg-black/70 flex items-center justify-center z-[100]"
       style="animation: fadeIn 180ms ease-out"
     >
-      <div class="bg-surface rounded-2xl p-6 max-w-[500px] lg:w-1/3 relative border border-border max-h-[90vh] overflow-y-auto overflow-x-hidden">
+      <div class="bg-surface rounded-2xl p-6 max-w-[500px] lg:w-1/3 relative border border-border max-h-[90vh] overflow-y-auto overflow-x-hidden system-scroll">
         <div
           phx-click="modal_close"
           class="absolute top-0 right-0 p-3 cursor-pointer text-text-tertiary hover:text-text-primary"

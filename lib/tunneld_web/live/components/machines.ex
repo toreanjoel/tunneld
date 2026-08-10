@@ -102,11 +102,8 @@ defmodule TunneldWeb.Live.Components.Machines do
               </div>
             </div>
             <div class="flex items-center justify-between text-xs">
-              <span class="flex items-center gap-1.5">
-                <span class={"w-[9px] h-[9px] rounded-full inline-block #{status_dot(machine["status"])}"}>
-                </span>
-                <span class="px-2 py-0.5 rounded-full bg-text-primary/10 text-text-secondary uppercase text-[10px] font-medium">
-                  <%= machine["kind"] %>
+              <span class="flex items-center gap-1.5" title={combined_status_tooltip(machine)}>
+                <span class={"w-[9px] h-[9px] rounded-full inline-block #{combined_status_dot(machine)}"}>
                 </span>
               </span>
               <span class={"px-2 py-0.5 rounded-full uppercase text-[10px] font-medium #{location_chip(machine["location"])}"}>
@@ -116,11 +113,6 @@ defmodule TunneldWeb.Live.Components.Machines do
             <div class="flex items-center gap-1.5 text-[10px] text-text-tertiary">
               <%= if machine["overlay_ip"] do %>
                 <span class="font-mono"><%= machine["overlay_ip"] %></span>
-              <% end %>
-              <%= if machine["overlay_status"] do %>
-                <span class={"w-[7px] h-[7px] rounded-full inline-block #{wg_dot(machine["overlay_status"])}"}>
-                </span>
-                <span>WG <%= machine["overlay_status"] %></span>
               <% end %>
               <%= if machine["detected_runtimes"] != [] do %>
                 <span class="truncate">· <%= Enum.join(machine["detected_runtimes"], ",") %></span>
@@ -139,14 +131,27 @@ defmodule TunneldWeb.Live.Components.Machines do
 
   defp machine_detail(_assigns), do: nil
 
-  defp wg_dot("up"), do: "bg-green"
-  defp wg_dot(_), do: "bg-red"
+  # Combined status: unreachable (red) / reachable but overlay down (yellow) / fully up (green)
+  defp combined_status_dot(machine) do
+    status = machine["status"]
+    wg = machine["overlay_status"]
 
-  defp status_dot("ready"), do: "bg-green"
-  defp status_dot("enrolled"), do: "bg-yellow"
-  defp status_dot("probing"), do: "bg-yellow"
-  defp status_dot("unreachable"), do: "bg-red"
-  defp status_dot(_), do: "bg-gray-500"
+    cond do
+      status == "unreachable" -> "bg-red"
+      status in ["ready"] and wg == "up" -> "bg-green"
+      status in ["ready"] and wg != "up" -> "bg-yellow"
+      status in ["enrolled", "probing"] -> "bg-yellow"
+      true -> "bg-gray-500"
+    end
+  end
+
+  defp combined_status_tooltip(machine) do
+    status = machine["status"]
+    wg = machine["overlay_status"]
+
+    wg_detail = if wg, do: ", WG #{wg}", else: ""
+    "Status: #{status}#{wg_detail}"
+  end
 
   defp location_chip("remote"), do: "bg-blue-500/15 text-blue-400"
   defp location_chip(_), do: "bg-emerald-500/15 text-emerald-400"

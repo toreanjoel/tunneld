@@ -15,7 +15,6 @@ defmodule TunneldWeb.Live.Components.SectionHeader do
         <h2 class="text-[22px] font-normal text-text-primary -tracking-[0.01em] m-0">
           <%= render_slot(@inner_block) %>
         </h2>
-        <div class="h-px w-6 bg-accent mt-2" />
       </div>
       <div :if={@actions != []} class="flex gap-1">
         <%= render_slot(@actions) %>

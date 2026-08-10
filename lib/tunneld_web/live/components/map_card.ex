@@ -37,10 +37,16 @@ defmodule TunneldWeb.Live.Components.MapCard do
           <% end %>
         </g>
         <%= if @map_status == :ready and @geo_location do %>
-          <.pin geo={@geo_location} label="gateway" color="#06b6d4" />
+          <.pin geo={@geo_location} label="gateway" color="#06b6d4" ip="" country="Gateway location" />
         <% end %>
         <%= for node <- @nodes do %>
-          <.pin geo={node} label={Map.get(node, :label, "node")} color="#a78bfa" />
+          <.pin
+            geo={node}
+            label={Map.get(node, :label, "node")}
+            color="#a78bfa"
+            ip={Map.get(node, :ip, "")}
+            country={Map.get(node, :country, "")}
+          />
         <% end %>
       </svg>
     </div>
@@ -50,13 +56,22 @@ defmodule TunneldWeb.Live.Components.MapCard do
   attr :geo, :map, required: true
   attr :label, :string, default: "node"
   attr :color, :string, default: "#06b6d4"
+  attr :ip, :string, default: ""
+  attr :country, :string, default: ""
 
   def pin(assigns) do
     {x, y} = project(assigns.geo.longitude, assigns.geo.latitude)
     assigns = assign(assigns, :x, x) |> assign(:y, y)
 
     ~H"""
-    <g transform={"translate(#{@x} #{@y})"}>
+    <g
+      transform={"translate(#{@x} #{@y})"}
+      phx-hook="MapPinHover"
+      id={"pin-#{@label}"}
+      data-pin-name={@label}
+      data-pin-country={@country}
+      data-pin-ip={@ip}
+    >
       <circle r="6" fill="none" stroke={@color} stroke-width="2" opacity="0.6">
         <animate attributeName="r" values="4;12" dur="1.5s" repeatCount="indefinite" />
         <animate attributeName="opacity" values="0.6;0" dur="1.5s" repeatCount="indefinite" />

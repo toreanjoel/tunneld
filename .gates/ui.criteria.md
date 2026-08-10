@@ -14,3 +14,5 @@
 - Uppercase kind chip (HOST) removed from the machines list; location tags remain
 - No JS hook registered in hooks.js is left unused in markup
 - 
+- Sidebar FILTERS infrastructure listeners by default and offers a toggle to reveal them
+- No inspect() in RENDERED user-facing copy incl. error states; Logger.* diagnostics may keep full term fidelity

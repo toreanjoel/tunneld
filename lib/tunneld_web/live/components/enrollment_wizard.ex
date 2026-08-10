@@ -119,7 +119,7 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
     ~H"""
     <div id="enrollment-wizard-root">
       <div :if={@open} class="fixed inset-0 bg-black/70 flex items-center justify-center z-[100]">
-        <div class="bg-surface rounded-2xl p-6 max-w-[560px] w-full relative border border-border max-h-[90vh] overflow-y-auto">
+        <div class="bg-surface rounded-2xl p-6 max-w-[560px] w-full relative border border-border max-h-[90vh] overflow-y-auto system-scroll">
           <div
             phx-click="wizard_close"
             phx-target={@myself}

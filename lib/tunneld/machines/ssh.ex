@@ -140,6 +140,11 @@ defmodule Tunneld.Machines.SSH do
     end
   end
 
+  @doc "Return the path to the private key file for a machine."
+  def private_key_path(machine_id) do
+    key_path(machine_id)
+  end
+
   defp ssh_dir do
     Path.join(Tunneld.Config.fs_root(), "ssh")
   end

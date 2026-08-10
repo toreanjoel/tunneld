@@ -17,13 +17,24 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   import TunneldWeb.Live.Components.HelpIcon
 
   def mount(socket) do
-    {:ok, assign(socket, listeners_expanded: false)}
+    {:ok,
+     assign(socket,
+       listeners_expanded: false,
+       listeners_loading: false,
+       listeners_error: nil,
+       show_infra: false
+     )}
   end
 
   def update(assigns, socket) do
     view = Map.get(assigns, :view, socket.assigns[:view] || :system_overview)
     data = Map.get(assigns, :data, %{})
     listeners = Map.get(assigns, :listeners, socket.assigns[:listeners] || [])
+
+    listeners_loading =
+      Map.get(assigns, :listeners_loading, socket.assigns[:listeners_loading] || false)
+
+    listeners_error = Map.get(assigns, :listeners_error, socket.assigns[:listeners_error])
     selection = Map.get(assigns, :selection, socket.assigns[:selection] || nil)
     obfuscated = Map.get(assigns, :obfuscated, false)
 
@@ -33,6 +44,8 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(:view, view)
       |> assign(:data, data)
       |> assign(:listeners, listeners)
+      |> assign(:listeners_loading, listeners_loading)
+      |> assign(:listeners_error, listeners_error)
       |> assign(:selection, selection)
       |> assign(:obfuscated, obfuscated)
 
@@ -41,6 +54,10 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
   def handle_event("toggle_listeners", _params, socket) do
     {:noreply, assign(socket, :listeners_expanded, !socket.assigns.listeners_expanded)}
+  end
+
+  def handle_event("toggle_infra", _params, socket) do
+    {:noreply, assign(socket, :show_infra, !socket.assigns.show_infra)}
   end
 
   @spec render(%{:view => :system_overview, optional(any()) => any()}) ::
@@ -259,11 +276,19 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           Phoenix.LiveView.Rendered.t()
   def render(%{view: :machine} = assigns) do
     machine = Map.get(assigns, :data, %{})
+    all_listeners = Map.get(assigns, :listeners, [])
+
+    # The operator asked not to see sshd/caddy/resolved by default. Split rather
+    # than discard: infrastructure stays one click away behind the toggle.
+    {infra, app} = Enum.split_with(all_listeners, & &1["infrastructure"])
+    visible = if Map.get(assigns, :show_infra, false), do: all_listeners, else: app
 
     assigns =
       assigns
       |> assign(:machine, machine)
-      |> assign(:listeners, Map.get(assigns, :listeners, []))
+      |> assign(:listeners, all_listeners)
+      |> assign(:visible_listeners, visible)
+      |> assign(:infra_count, length(infra))
 
     ~H"""
     <div class="p-4 space-y-5 min-h-full">
@@ -317,9 +342,19 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           </div>
 
           <div
+            phx-click="ssh_connect"
+            phx-value-id={mget(@machine, "id")}
+            class="flex items-center justify-center gap-1.5 w-full h-9 bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
+            title="Show SSH command to connect to this machine"
+          >
+            <.icon name="hero-command-line" class="h-4 w-4 shrink-0" />
+            <div class="truncate text-xs">SSH</div>
+          </div>
+
+          <div
             phx-click="remove_machine"
             phx-value-id={mget(@machine, "id")}
-            class="flex items-center justify-center gap-1.5 w-full h-9 bg-red p-2 cursor-pointer rounded-md hover:opacity-80"
+            class="flex items-center justify-center gap-1.5 w-full h-9 bg-red p-2 cursor-pointer rounded-md hover:opacity-80 col-span-2"
           >
             <.icon name="hero-trash" class="h-4 w-4 shrink-0" />
             <div class="truncate text-xs">Remove</div>
@@ -369,9 +404,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               <%= if mget(@machine, "exit_capable"), do: "capable", else: "not set" %>
             </span>
           </div>
-          <div class="text-[11px] text-text-tertiary leading-snug">
-            Route specific devices through this exit from the <b>Devices</b> list.
-          </div>
           <%= if mget(@machine, "last_seen") do %>
             <div class="flex items-center justify-between text-sm">
               <span class="text-text-tertiary">Last seen</span>
@@ -385,46 +417,121 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         <div class="mt-4">
           <div class="flex items-center justify-between mb-2">
             <div class="text-sm font-semibold">Listeners</div>
-            <button
-              phx-click="toggle_listeners"
-              phx-target={@myself}
-              class="ghost-btn !px-2 !py-0.5 text-[10px]"
-            >
-              <%= if @listeners_expanded, do: "Hide", else: "Show #{length(@listeners)}" %>
-            </button>
+            <div class="flex items-center gap-1">
+              <button
+                :if={not @listeners_loading and @infra_count > 0}
+                phx-click="toggle_infra"
+                phx-target={@myself}
+                class="ghost-btn !px-2 !py-0.5 text-[10px]"
+                title="Infrastructure services (sshd, caddy, resolved and friends) are hidden by default"
+              >
+                <%= if @show_infra,
+                  do: "hide infrastructure",
+                  else: "show infrastructure (#{@infra_count})" %>
+              </button>
+              <button
+                :if={not @listeners_loading}
+                phx-click="toggle_listeners"
+                phx-target={@myself}
+                class="ghost-btn !px-2 !py-0.5 text-[10px]"
+              >
+                <%= if @listeners_expanded,
+                  do: "Hide",
+                  else: "Show #{length(@visible_listeners)}" %>
+              </button>
+            </div>
           </div>
-          <%= if Enum.empty?(@listeners) do %>
-            <div class="text-xs text-gray-400 italic">No listeners discovered</div>
+          <%= if @listeners_loading do %>
+            <div class="flex items-center gap-2 text-xs text-gray-400" role="status">
+              <svg
+                class="animate-spin h-4 w-4 text-accent"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                >
+                </circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                >
+                </path>
+              </svg>
+              <span>Loading listeners...</span>
+            </div>
           <% else %>
-            <%= if @listeners_expanded do %>
-              <div class="space-y-1">
-                <%= for l <- @listeners do %>
-                  <div class="bg-surface rounded p-2 text-xs flex items-center justify-between">
-                    <div class="flex items-center gap-2 min-w-0">
-                      <span class="w-2 h-2 rounded-full bg-green shrink-0"></span>
-                      <span class="font-mono truncate"><%= l["addr"] %>:<%= l["port"] %></span>
-                      <span class="text-gray-400 truncate"><%= l["proc"] %> (<%= l["pid"] %>)</span>
-                      <span :if={l["container"]} class="text-accent truncate">
-                        · <%= l["container"] %>
-                      </span>
-                    </div>
-                    <button
-                      phx-click="make_listener_resource"
-                      phx-value-machine_id={mget(@machine, "id")}
-                      phx-value-addr={l["addr"]}
-                      phx-value-port={l["port"]}
-                      phx-value-proc={l["proc"]}
-                      class="ghost-btn !px-2 !py-0.5 text-[10px] shrink-0"
-                    >
-                      make resource
-                    </button>
-                  </div>
-                <% end %>
+            <%= if @listeners_error do %>
+              <div class="text-xs text-red italic">
+                Could not read listeners — <%= listener_error_message(@listeners_error) %>
               </div>
             <% else %>
-              <div class="text-xs text-gray-400 italic">
-                Collapsed — click Show to see listening processes.
-              </div>
+              <%= if Enum.empty?(@visible_listeners) do %>
+                <div class="text-xs text-gray-400 italic">
+                  <%= if @infra_count > 0 do %>
+                    No app listeners — <%= @infra_count %> infrastructure <%= if @infra_count == 1,
+                      do: "service is",
+                      else: "services are" %> hidden.
+                  <% else %>
+                    No listeners discovered
+                  <% end %>
+                </div>
+              <% else %>
+                <%= if @listeners_expanded do %>
+                  <div class="space-y-1">
+                    <%= for l <- @visible_listeners do %>
+                      <div class="bg-surface rounded p-2 text-xs flex items-center justify-between">
+                        <div class="flex items-center gap-2 min-w-0">
+                          <span class={"w-2 h-2 rounded-full shrink-0 #{if l["infrastructure"], do: "bg-gray-500", else: "bg-green"}"}>
+                          </span>
+                          <span class="font-mono truncate"><%= l["addr"] %>:<%= l["port"] %></span>
+                          <span class="text-gray-400 truncate">
+                            <%= l["proc"] %> (<%= l["pid"] %>)
+                          </span>
+                          <span
+                            :if={l["infrastructure"]}
+                            class="px-1.5 py-0.5 rounded-full bg-text-primary/10 text-text-tertiary text-[9px] shrink-0"
+                          >
+                            infra
+                          </span>
+                          <span
+                            :if={l["loopback"]}
+                            class="px-1.5 py-0.5 rounded-full bg-text-primary/10 text-text-tertiary text-[9px] shrink-0"
+                            title="Bound to loopback only - not reachable from the LAN"
+                          >
+                            loopback
+                          </span>
+                          <span :if={l["container"]} class="text-accent truncate">
+                            · <%= l["container"] %>
+                          </span>
+                        </div>
+                        <button
+                          :if={not l["loopback"]}
+                          phx-click="make_listener_resource"
+                          phx-value-machine_id={mget(@machine, "id")}
+                          phx-value-addr={l["addr"]}
+                          phx-value-port={l["port"]}
+                          phx-value-proc={l["proc"]}
+                          class="ghost-btn !px-2 !py-0.5 text-[10px] shrink-0"
+                        >
+                          make resource
+                        </button>
+                      </div>
+                    <% end %>
+                  </div>
+                <% else %>
+                  <div class="text-xs text-gray-400 italic">
+                    Collapsed — click Show to see listening processes.
+                  </div>
+                <% end %>
+              <% end %>
             <% end %>
           <% end %>
         </div>
@@ -627,6 +734,37 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     </div>
     """
   end
+
+  # User-facing copy: never render a raw Elixir term. Keep the diagnostic detail
+  # (exit code, ssh's own stderr) but as a readable sentence.
+  defp listener_error_message({:ssh_failed, code, out}) do
+    "SSH exited #{code}: #{first_line(out)}"
+  end
+
+  defp listener_error_message({:ssh_failed, out}), do: "SSH failed: #{first_line(out)}"
+  defp listener_error_message(reason) when is_binary(reason), do: first_line(reason)
+  defp listener_error_message(:timeout), do: "the machine did not respond in time"
+  defp listener_error_message(reason) when is_atom(reason), do: to_string(reason)
+
+  defp listener_error_message(%{message: message}) when is_binary(message),
+    do: first_line(message)
+
+  defp listener_error_message(_), do: "the machine could not be reached"
+
+  # ssh dumps multi-line stderr; the first non-empty line is the useful part.
+  defp first_line(text) when is_binary(text) do
+    text
+    |> String.split("\n", trim: true)
+    |> Enum.map(&String.trim/1)
+    |> Enum.reject(&(&1 == ""))
+    |> List.first()
+    |> case do
+      nil -> "no details reported"
+      line -> String.slice(line, 0, 120)
+    end
+  end
+
+  defp first_line(_), do: "no details reported"
 
   defp human_health(:all_up), do: "healthy"
   defp human_health(:none), do: "down"

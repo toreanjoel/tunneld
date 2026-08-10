@@ -66,7 +66,7 @@ defmodule TunneldWeb.Live.Components.Devices do
     ~H"""
     <div class="p-3 md:p-5">
       <.section_header>
-        Devices<.help_icon text="Devices discovered on your LAN subnet via DHCP leases. Each device automatically gets an IP from dnsmasq. Use Quick Expose to let devices create local resources via a curl command. Revoke IP to release the DHCP lease." />
+        Devices<.help_icon text="Devices discovered on your LAN subnet via DHCP leases. Each device automatically gets an IP from dnsmasq. Use Quick Expose to let devices create local resources via a curl command. Revoke IP to release the DHCP lease. Egress routes traffic through an exit machine instead of the gateway's upstream; pick 'Local' to use the gateway directly." />
       </.section_header>
 
       <div :if={@loading} class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
@@ -227,12 +227,8 @@ defmodule TunneldWeb.Live.Components.Devices do
             </div>
             <div class="mt-auto pt-3 border-t border-border/50">
               <div class="flex items-center justify-between gap-2 mb-1.5 px-1">
-                <span class="flex items-center text-[10px] uppercase tracking-wide text-text-tertiary">
+                <span class="text-[10px] uppercase tracking-wide text-text-tertiary">
                   Egress
-                  <.help_icon
-                    class="ml-1"
-                    text="Route this device's internet traffic out through an exit machine (e.g. a VM) instead of the gateway's own upstream. Pick 'Local' to use the gateway directly."
-                  />
                 </span>
                 <form phx-change="set_device_egress" phx-target={@myself}>
                   <input type="hidden" name="ip" value={device.ip} />
@@ -291,7 +287,7 @@ defmodule TunneldWeb.Live.Components.Devices do
 
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
       type: if(result == :ok or match?({:ok, _}, result), do: :info, else: :error),
-      message: "Egress for #{ip}: #{inspect(result)}"
+      message: format_egress_result(result, ip, egress)
     })
 
     {:noreply, socket}
@@ -313,4 +309,15 @@ defmodule TunneldWeb.Live.Components.Devices do
   rescue
     _ -> false
   end
+
+  defp format_egress_result(:ok, ip, "local"), do: "Routing #{ip} through gateway"
+  defp format_egress_result(:ok, ip, egress), do: "Routing #{ip} through #{egress}"
+  defp format_egress_result({:ok, _}, ip, "local"), do: "Routing #{ip} through gateway"
+  defp format_egress_result({:ok, _}, ip, egress), do: "Routing #{ip} through #{egress}"
+
+  defp format_egress_result({:error, reason}, ip, _) when is_binary(reason),
+    do: "Could not route #{ip}: #{reason}"
+
+  defp format_egress_result({:error, _}, ip, _), do: "Could not route #{ip}"
+  defp format_egress_result(_, ip, _), do: "Egress updated for #{ip}"
 end
