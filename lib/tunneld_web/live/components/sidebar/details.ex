@@ -123,9 +123,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(data: data)
       |> assign(health: Map.get(data || %{}, :health) || Map.get(data || %{}, "health") || %{})
       |> assign(publish: data && Tunneld.Publish.get(Map.get(data, :id)))
-      |> assign(
-        publish_machines: Enum.map(Tunneld.Machines.list(), &{&1["id"], &1["name"] || &1["id"]})
-      )
+      |> assign(publish_machines: Tunneld.Machines.list())
 
     ~H"""
     <div class="p-4 space-y-6 min-h-full">
@@ -184,7 +182,10 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             "machine_id" => %{
               "type" => "string",
               "description" => "Machine that will front this resource on its public IP.",
-              "ui:enum" => Enum.map(@publish_machines, &elem(&1, 0)),
+              "ui:enum" =>
+                Enum.map(@publish_machines, fn m ->
+                  %{"value" => m["id"], "label" => "#{m["name"]} — #{m["address"]}"}
+                end),
               "ui:help" =>
                 "Traffic goes internet -> machine -> WireGuard -> this gateway -> the backend. " <>
                   "Pick a machine near the gateway; every request makes that round trip."
@@ -272,14 +273,28 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             <div :if={@data[:lan_url]} class="text-sm truncate">
               <span class="font-bold">LAN URL:</span>
               <span class="ml-1 font-mono text-xs"><%= @data[:lan_url] %></span>
+              <span class="ml-1 text-xs text-gray-400">(this subnet only)</span>
+            </div>
+            <div :if={@publish} class="text-sm truncate">
+              <span class="font-bold">Public URL:</span>
+              <span class="ml-1 font-mono text-xs"><%= @publish["url"] %></span>
+              <span class="ml-1 text-xs text-gray-400">(share this)</span>
             </div>
             <div :if={@publish} class="text-sm">
               <span class="font-bold">Published:</span>
               <span class={"ml-1 w-[13px] h-[13px] rounded-full inline-block align-middle #{publish_dot(@publish["status"])}"}>
               </span>
               <span class="ml-1"><%= publish_label(@publish["status"]) %></span>
-              <div class="ml-1 font-mono text-xs text-text-secondary truncate">
-                <%= @publish["url"] %>
+              <div class="relative mt-1">
+                <pre class="bg-black/60 p-2 pr-14 rounded text-xs font-mono text-green-400 whitespace-pre-wrap break-all border border-gray-700"><%= @publish["url"] %></pre>
+                <button
+                  type="button"
+                  id={"copy_public_url_#{@data.id}"}
+                  phx-hook="CopyToClipboard"
+                  class="absolute top-1.5 right-1.5 text-[10px] bg-surface-2 hover:bg-surface border border-border rounded px-2 py-1 text-text-secondary"
+                >
+                  Copy
+                </button>
               </div>
               <div class="ml-1 text-xs text-gray-400">
                 via <%= @publish["machine_name"] || @publish["machine_id"] %>
@@ -387,12 +402,12 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             "#{mget(@machine, "address")} · #{mget(@machine, "kind")} · #{location_label(mget(@machine, "location"))}"
         }) %>
 
-        <div class="grid grid-cols-2 gap-1.5 my-2 items-stretch">
+        <div class="grid grid-cols-6 gap-1.5 my-2 items-stretch">
           <div
             phx-click="reconcile_machine"
             phx-value-id={mget(@machine, "id")}
             phx-click-loading="opacity-50 cursor-wait"
-            class="flex items-center justify-center gap-1.5 w-full h-9 bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
+            class="col-span-2 flex items-center justify-center gap-1.5 w-full h-9 bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
           >
             <.icon name="hero-arrow-path" class="h-4 w-4 shrink-0" />
             <div class="truncate text-xs">Reconcile</div>
@@ -406,7 +421,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             phx-click="make_exit_node"
             phx-value-id={mget(@machine, "id")}
             phx-click-loading="opacity-50 cursor-wait"
-            class="flex items-center justify-center gap-1.5 w-full h-9 bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
+            class="col-span-2 flex items-center justify-center gap-1.5 w-full h-9 bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
           >
             <.icon name="hero-arrow-up-tray" class="h-4 w-4 shrink-0" />
             <div class="truncate text-xs">Exit Node</div>
@@ -419,7 +434,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <div
             phx-click="view_ssh_key"
             phx-value-id={mget(@machine, "id")}
-            class="flex items-center justify-center gap-1.5 w-full h-9 bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
+            class="col-span-2 flex items-center justify-center gap-1.5 w-full h-9 bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
           >
             <.icon name="hero-key" class="h-4 w-4 shrink-0" />
             <div class="truncate text-xs">SSH Key</div>
@@ -428,7 +443,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <div
             phx-click="open_terminal"
             phx-value-id={mget(@machine, "id")}
-            class="flex items-center justify-center gap-1.5 w-full h-9 bg-accent p-2 cursor-pointer rounded-md hover:bg-accent-light"
+            class="col-span-3 flex items-center justify-center gap-1.5 w-full h-9 bg-accent p-2 cursor-pointer rounded-md hover:bg-accent-light"
             title="Open an interactive terminal to this machine"
           >
             <.icon name="hero-command-line" class="h-4 w-4 shrink-0" />
@@ -438,7 +453,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <div
             phx-click="remove_machine"
             phx-value-id={mget(@machine, "id")}
-            class="flex items-center justify-center gap-1.5 w-full h-9 bg-red p-2 cursor-pointer rounded-md hover:opacity-80 col-span-2"
+            class="col-span-3 flex items-center justify-center gap-1.5 w-full h-9 bg-red p-2 cursor-pointer rounded-md hover:opacity-80"
           >
             <.icon name="hero-trash" class="h-4 w-4 shrink-0" />
             <div class="truncate text-xs">Remove</div>
@@ -500,7 +515,18 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
         <div class="mt-4">
           <div class="flex items-center justify-between mb-2">
-            <div class="text-sm font-semibold">Listeners</div>
+            <div class="text-sm font-semibold">
+              Listeners
+              <.help_icon
+                class="ml-0.5"
+                text={"What is listening on this machine right now (ss -tlnp), so you never have to guess. " <>
+                      "\"make resource\" is for the reverse of Publish: it gives a service running HERE a " <>
+                      "name on your subnet (<name>.tunneld.lan:18000) so devices at home can reach it " <>
+                      "without knowing this machine's IP. If you only want to expose something from your " <>
+                      "own subnet outwards, you do not need this section - create the resource from the " <>
+                      "Resources panel and use Publish instead."}
+              />
+            </div>
             <div class="flex items-center gap-1">
               <button
                 :if={not @listeners_loading and @infra_count > 0}
@@ -604,8 +630,9 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                           phx-value-port={l["port"]}
                           phx-value-proc={l["proc"]}
                           class="ghost-btn !px-2 !py-0.5 text-[10px] shrink-0"
+                          title={"Give this a name on your subnet: #{l["proc"]}-#{l["port"]}.tunneld.lan:18000"}
                         >
-                          make resource
+                          name on LAN
                         </button>
                       </div>
                     <% end %>

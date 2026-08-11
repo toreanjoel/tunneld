@@ -115,10 +115,24 @@ defmodule Tunneld.PublishTest do
     resource: r
   } do
     {:ok, rec} = Publish.publish(r, m, 8001)
-    text = Publish.manual_steps(rec) |> Enum.map_join(" ", & &1["code"])
+    steps = Publish.manual_steps(rec)
+    text = Enum.map_join(steps, " ", & &1["code"])
+    titles = Enum.map_join(steps, " ", & &1["title"])
 
-    assert text =~ "TCP/8001"
+    # the port and the machine, named concretely enough to act on
+    assert text =~ "8001"
     assert text =~ "203.0.113.9"
     assert text =~ "http://203.0.113.9:8001"
+
+    # the provider step must be first and must say it cannot be done here
+    assert hd(steps)["title"] =~ "CLOUD PROVIDER"
+    assert hd(steps)["code"] =~ "SSH cannot change it"
+
+    # a command the operator can actually run to check for themselves
+    assert text =~ "curl -v http://203.0.113.9:8001"
+
+    # and what was already done on their behalf, so nothing looks unexplained
+    assert titles =~ "ALREADY DONE"
+    assert text =~ "ufw allow 8001/tcp"
   end
 end

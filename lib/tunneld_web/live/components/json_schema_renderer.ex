@@ -87,8 +87,9 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
                 phx-target={if has_custom, do: @myself, else: nil}
               >
                 <%= for option <- field.enum do %>
-                  <option value={option} selected={current_value == option}>
-                    <%= option %>
+                  <% {value, label} = enum_option(option) %>
+                  <option value={value} selected={current_value == value}>
+                    <%= label %>
                   </option>
                 <% end %>
               </select>
@@ -260,6 +261,14 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
       end
     end
   end
+
+  # An enum entry is either a bare string (label == value) or
+  # `%{"value" => v, "label" => l}`. The second form exists because a select
+  # whose options are UUIDs is unusable - you cannot pick the right machine out
+  # of four identical-looking ids.
+  defp enum_option(%{"value" => value, "label" => label}), do: {value, label}
+  defp enum_option(%{value: value, label: label}), do: {value, label}
+  defp enum_option(option), do: {option, option}
 
   defp array_to_text(value) when is_list(value), do: Enum.join(value, "\n")
   defp array_to_text(value) when is_binary(value), do: value

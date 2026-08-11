@@ -113,26 +113,59 @@ defmodule Tunneld.Publish do
     end
   end
 
-  @doc "The operator steps that tunneld cannot perform itself."
+  @doc """
+  What the operator still has to do, as copy-pasteable commands.
+
+  Everything here is either impossible for tunneld (the cloud provider's
+  firewall lives outside the machine) or a check the operator should be able to
+  run themselves rather than trust a badge for.
+  """
   def manual_steps(record) do
+    port = record["port"]
+    addr = record["address"]
+    name = record["machine_name"] || addr
+
     [
       %{
-        "title" => "1. Open the port in your provider firewall",
-        "code" =>
-          "Allow inbound TCP/#{record["port"]} to #{record["address"]} in the machine's " <>
-            "cloud-provider firewall (e.g. a Vultr firewall group). This cannot be done over " <>
-            "SSH - it is the same kind of step as UDP/51821 for WireGuard."
+        "title" => "1. IN YOUR CLOUD PROVIDER'S CONSOLE (this is the step tunneld cannot do)",
+        "code" => """
+        Vultr:  Products > Firewall > (the group on "#{name}") > add rule
+                  Protocol: TCP   Port: #{port}   Source: Anywhere (0.0.0.0/0)
+        AWS:    EC2 > Security Groups > Inbound rules > Add rule
+                  Type: Custom TCP   Port: #{port}   Source: 0.0.0.0/0
+        Hetzner: Firewalls > (the firewall on "#{name}") > add inbound rule TCP #{port}
+
+        There is no command for this - it is enforced outside the machine, so
+        SSH cannot change it. Same step you did for UDP 51821 for WireGuard.
+        """
       },
       %{
-        "title" => "2. Your service is now at",
+        "title" => "2. YOUR PUBLIC URL - share this",
         "code" => record["url"]
       },
       %{
-        "title" => "3. To add a domain or TLS, do it yourself on the machine",
-        "code" =>
-          "Open Terminal on this machine from the dashboard, then edit " <>
-            "#{@config_path} (or run your own Caddy/nginx alongside). Tunneld only " <>
-            "manages the plain IP:port listener above."
+        "title" => "3. CHECK IT YOURSELF (from any machine that is not on this subnet)",
+        "code" => "curl -v #{record["url"]}"
+      },
+      %{
+        "title" =>
+          "4. ALREADY DONE FOR YOU ON #{String.upcase(to_string(name))} (no action needed)",
+        "code" => """
+        caddy installed        /usr/local/bin/caddy
+        config written         #{@config_path}
+        service enabled        systemctl status #{@unit}
+        machine firewall       ufw allow #{port}/tcp
+
+        To inspect or change it, open Terminal on the machine from the dashboard.
+        """
+      },
+      %{
+        "title" => "5. TO ADD YOUR OWN DOMAIN OR TLS",
+        "code" => """
+        Point an A record at #{addr}, then on the machine edit #{@config_path}
+        (or run your own Caddy/nginx alongside it). Tunneld only manages the
+        plain IP:port listener above and will not overwrite other config files.
+        """
       }
     ]
   end
