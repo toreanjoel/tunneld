@@ -18,10 +18,16 @@ Hooks.CopyToClipboard = {
   mounted() {
     this.el.addEventListener("click", (e) => {
       e.preventDefault();
-      const pre = this.el.closest(".relative")?.querySelector("pre");
+      // An explicit data-copy-text always wins. Previously the sibling <pre>
+      // took precedence, so what got copied depended on where the nearest
+      // ancestor carrying the PURELY VISUAL .relative class happened to be -
+      // adding or removing that class for styling silently changed the copied
+      // value. Explicit intent beats DOM proximity.
       // Use textContent, not innerText: innerText inserts soft line breaks at
       // visual wrap points, which would corrupt a wrapped SSH key on copy.
-      const text = pre ? pre.textContent : this.el.dataset.copyText || "";
+      const explicit = this.el.dataset.copyText;
+      const pre = explicit ? null : this.el.closest(".relative")?.querySelector("pre");
+      const text = explicit || (pre ? pre.textContent : "");
       if (!text) return;
 
       const flash = () => {

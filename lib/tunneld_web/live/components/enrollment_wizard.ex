@@ -86,6 +86,8 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
     # The parent owns the open state (it re-renders this component from
     # @enroll_wizard_open). Tell the parent to close so the modal stays
     # closed instead of being re-opened on the next parent re-render.
+    # Cancel any running async task to avoid messages after close.
+    socket = cancel_async(socket, :install_overlay, :close)
     send(socket.parent_pid, :wizard_closed)
     {:noreply, assign(socket, open: false)}
   end
@@ -109,18 +111,19 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
   def handle_info(_msg, socket), do: {:noreply, socket}
 
   # Handle async overlay installation results
+  # ensure_peer returns {:ok, %{overlay_ip: ...}} on success, {:error, reason} on failure
   @impl true
-  def handle_async(:install_overlay, {:ok, :ok}, socket) do
+  def handle_async(:install_overlay, {:ok, {:ok, _result}}, socket) do
     {:noreply, assign(socket, overlay_status: :success, overlay_error: nil)}
   end
 
-  def handle_async(:install_overlay, {:ok, {:ok, _}}, socket) do
+  def handle_async(:install_overlay, {:ok, :ok}, socket) do
     {:noreply, assign(socket, overlay_status: :success, overlay_error: nil)}
   end
 
   def handle_async(:install_overlay, {:ok, {:error, reason}}, socket) do
     # Overlay install failed - enrollment still succeeds, but record the failure
-    {:noreply, assign(socket, overlay_status: :failed, overlay_error: inspect(reason))}
+    {:noreply, assign(socket, overlay_status: :failed, overlay_error: format_error(reason))}
   end
 
   def handle_async(:install_overlay, {:exit, reason}, socket) do
@@ -128,6 +131,26 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
     {:noreply,
      assign(socket, overlay_status: :failed, overlay_error: "Task failed: #{inspect(reason)}")}
   end
+
+  # Catch-all for unexpected results. Treat UNKNOWN as FAILURE, never as success.
+  # lib/TODO.md sections 11-13 record exactly this failure mode: ensure_peer
+  # returned {:ok, ""} from a short-circuited `with` chain while installing
+  # nothing at all, and the green result hid it. An unrecognised shape means we
+  # do not know whether the overlay is up, and claiming success would send the
+  # operator away with a machine that cannot be reached.
+  def handle_async(:install_overlay, {:ok, other}, socket) do
+    require Logger
+    Logger.warning("Unexpected overlay install result: #{inspect(other)}")
+
+    {:noreply,
+     assign(socket,
+       overlay_status: :failed,
+       overlay_error: "Unrecognised result - verify the overlay from the machine panel"
+     )}
+  end
+
+  defp format_error(reason) when is_binary(reason), do: reason
+  defp format_error(reason), do: inspect(reason)
 
   @impl true
   def render(assigns) do
