@@ -50,3 +50,8 @@ docs-site/
 
 __pycache__/
 *.pyc
+
+# Agent/session scratch: verification probes and findings. These have
+# embedded live-host credentials before, so they stay out of the repo.
+/.notes/
+/showcase/_probe.js
