@@ -94,20 +94,6 @@ defmodule Tunneld.PublishTest do
     assert rec["port"] == 8001
   end
 
-  test "status starts pending and verify stamps a checked time", %{machine: m, resource: r} do
-    {:ok, rec} = Publish.publish(r, m, 8001)
-    assert rec["status"] == "pending"
-    assert rec["last_checked"] == nil
-
-    assert {:ok, checked} = Publish.verify("r1")
-    assert checked["status"] in ["live", "unreachable"]
-    assert checked["last_checked"] != nil
-  end
-
-  test "verify on an unpublished resource is an error, not a false negative" do
-    assert {:error, :not_published} = Publish.verify("nope")
-  end
-
   # The provider firewall is the one step tunneld cannot do, so it must be
   # stated, with the port and address in it - not left as a generic hint.
   test "manual steps name the port and address the operator must open", %{

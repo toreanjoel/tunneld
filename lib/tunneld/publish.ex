@@ -26,11 +26,12 @@ defmodule Tunneld.Publish do
   gateway out of every later push.
 
   The one step this cannot do is the **provider firewall** (Vultr and friends).
-  That is surfaced to the operator as an explicit instruction, and then
-  `verify/1` checks the result from the gateway's own internet connection -
-  the machine's public IP routes out the upstream NIC, not through the tunnel
-  (`Table = off` means only /32s are installed), so that curl is a genuine
-  round trip in from the outside.
+  That is surfaced to the operator as an explicit instruction by
+  `manual_steps/1`, which also hands them the `curl` to confirm it themselves
+  from somewhere off this subnet. Tunneld deliberately does not render a
+  "published and healthy" badge: it cannot see the provider's firewall, and a
+  green dot that only means "we wrote some config" is the exact failure this
+  module is shaped to avoid.
   """
 
   require Logger
@@ -88,29 +89,6 @@ defmodule Tunneld.Publish do
     end
 
     :ok
-  end
-
-  @doc """
-  Check the published URL from the gateway's own internet connection.
-
-  Updates and returns the record with `status` of `"live"` or `"unreachable"`.
-  """
-  def verify(resource_id) do
-    case get(resource_id) do
-      nil ->
-        {:error, :not_published}
-
-      record ->
-        status = if reachable?(record), do: "live", else: "unreachable"
-
-        updated =
-          record
-          |> Map.put("status", status)
-          |> Map.put("last_checked", DateTime.utc_now() |> DateTime.to_iso8601())
-
-        put_record(resource_id, updated)
-        {:ok, updated}
-    end
   end
 
   @doc """
@@ -181,9 +159,7 @@ defmodule Tunneld.Publish do
       "address" => machine["address"],
       "port" => port,
       "lan_host" => Tunneld.Caddy.lan_hostname(name),
-      "url" => "http://#{machine["address"]}:#{port}",
-      "status" => "pending",
-      "last_checked" => nil
+      "url" => "http://#{machine["address"]}:#{port}"
     }
   end
 
@@ -311,21 +287,6 @@ defmodule Tunneld.Publish do
     end
 
     :ok
-  end
-
-  defp reachable?(record) do
-    if @mock, do: true, else: real_reachable?(record)
-  end
-
-  defp real_reachable?(record) do
-    cmd =
-      "curl -s -o /dev/null -w '%{http_code}' --max-time 8 " <>
-        "http://#{record["address"]}:#{record["port"]}/"
-
-    case System.cmd("sh", ["-c", cmd], stderr_to_stdout: true) do
-      {code, 0} -> String.trim(code) not in ["", "000"]
-      _ -> false
-    end
   end
 
   defp write_remote(machine, path, content) do

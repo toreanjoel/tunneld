@@ -191,9 +191,10 @@ machine**.
    `tunneld-caddy` unit, and runs `ufw allow <port>/tcp`.
 4. **Open inbound TCP `<port>` in the machine's cloud-provider firewall.** Tunneld cannot do
    this — same class of step as UDP/51821 for WireGuard. The modal shows the exact rule.
-5. Click **Re-check**. The gateway fetches the public URL over its own uplink (the machine's
-   public IP routes out the upstream NIC, not through the tunnel), so `live` means genuinely
-   reachable from outside — not "we pushed some config".
+5. Confirm it yourself from somewhere off this subnet — the modal gives you the exact
+   command: `curl -v http://<machine_ip>:<port>`. Tunneld shows no "healthy" badge for a
+   published resource on purpose: it cannot see your provider's firewall, so a green dot
+   would only ever mean "we wrote some config".
 
 > Published means public: plain HTTP, no authentication unless the service provides its own.
 
