@@ -203,7 +203,19 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         } %>
 
         <div
-          :if={@data.kind == "host" and @publish_machines != []}
+          :if={@data.kind == "host" and @publish}
+          phx-click="unpublish_resource"
+          phx-value-id={@data.id}
+          phx-click-loading="opacity-50 cursor-wait"
+          class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
+          title={"Stop serving this at #{@publish["url"]}"}
+        >
+          <.icon name="hero-globe-alt" class="h-5 w-5" />
+          <div class="truncate text-xs">Unpublish</div>
+        </div>
+
+        <div
+          :if={@data.kind == "host" and is_nil(@publish) and @publish_machines != []}
           phx-click="modal_open"
           phx-value-modal_title="Publish Resource"
           phx-value-modal_body={
@@ -279,58 +291,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               <span class="font-bold">Public URL:</span>
               <span class="ml-1 font-mono text-xs"><%= @publish["url"] %></span>
               <span class="ml-1 text-xs text-gray-400">(share this)</span>
-            </div>
-            <div :if={@publish} class="text-sm">
-              <span class="font-bold">Published:</span>
-              <span class={"ml-1 w-[13px] h-[13px] rounded-full inline-block align-middle #{publish_dot(@publish["status"])}"}>
-              </span>
-              <span class="ml-1"><%= publish_label(@publish["status"]) %></span>
-              <div class="relative mt-1">
-                <pre class="bg-black/60 p-2 pr-14 rounded text-xs font-mono text-green-400 whitespace-pre-wrap break-all border border-gray-700"><%= @publish["url"] %></pre>
-                <button
-                  type="button"
-                  id={"copy_public_url_#{@data.id}"}
-                  phx-hook="CopyToClipboard"
-                  class="absolute top-1.5 right-1.5 text-[10px] bg-surface-2 hover:bg-surface border border-border rounded px-2 py-1 text-text-secondary"
-                >
-                  Copy
-                </button>
-              </div>
-              <div class="ml-1 text-xs text-gray-400">
-                via <%= @publish["machine_name"] || @publish["machine_id"] %>
-                <%= if @publish[
-                                                                                      "last_checked"
-                                                                                    ] do %>
-                  , checked <%= @publish[
-                    "last_checked"
-                  ] %>
-                <% end %>
-              </div>
-              <div class="flex gap-1 mt-1">
-                <button
-                  phx-click="verify_publish"
-                  phx-value-id={@data.id}
-                  class="text-[10px] bg-surface-2 hover:bg-surface border border-border rounded px-2 py-1"
-                >
-                  Re-check
-                </button>
-                <button
-                  phx-click="unpublish_resource"
-                  phx-value-id={@data.id}
-                  class="text-[10px] bg-surface-2 hover:bg-surface border border-border rounded px-2 py-1"
-                >
-                  Unpublish
-                </button>
-              </div>
-            </div>
-            <div :if={@data[:loopback_port]} class="text-sm truncate">
-              <span class="font-bold">Manual exposure:</span>
-              <span class="ml-1 font-mono text-xs">
-                <%= Tunneld.Config.gateway_ip() || "127.0.0.1" %>:<%= @data[:loopback_port] %>
-              </span>
-              <span class="ml-1 text-xs text-gray-400">
-                (point zrok/cloudflared here from any subnet machine)
-              </span>
             </div>
           </div>
 
@@ -884,17 +844,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   defp human_health(:empty), do: "no backends"
   defp human_health(:not_applicable), do: "n/a"
   defp human_health(_), do: "unknown"
-
-  # Publish status is deliberately three-valued. "pending" means tunneld did its
-  # half and is waiting on the provider firewall, which it cannot open itself -
-  # reporting that as success is the exact lie this feature exists to avoid.
-  defp publish_dot("live"), do: "bg-green"
-  defp publish_dot("unreachable"), do: "bg-red"
-  defp publish_dot(_), do: "bg-yellow"
-
-  defp publish_label("live"), do: "live (verified from the internet)"
-  defp publish_label("unreachable"), do: "not reachable - check the provider firewall"
-  defp publish_label(_), do: "awaiting provider firewall"
 
   defp pool_health_dot(:all_up), do: "bg-green"
   defp pool_health_dot(:none), do: "bg-red"

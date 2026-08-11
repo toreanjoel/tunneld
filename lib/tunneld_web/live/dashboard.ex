@@ -608,24 +608,6 @@ defmodule TunneldWeb.Live.Dashboard do
     end
   end
 
-  def handle_event("verify_publish", %{"id" => id}, socket) do
-    case Tunneld.Publish.verify(id) do
-      {:ok, %{"status" => "live"} = rec} ->
-        notify(:info, "Reachable from the internet at #{rec["url"]}")
-
-      {:ok, rec} ->
-        notify(
-          :error,
-          "Not reachable at #{rec["url"]} - is inbound TCP/#{rec["port"]} open in the provider firewall?"
-        )
-
-      {:error, :not_published} ->
-        notify(:error, "That resource is not published")
-    end
-
-    {:noreply, refresh_resource_sidebar(socket, id)}
-  end
-
   def handle_event("unpublish_resource", %{"id" => id}, socket) do
     machine =
       case Tunneld.Publish.get(id) do
