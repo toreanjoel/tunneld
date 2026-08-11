@@ -76,6 +76,7 @@ defmodule TunneldWeb.Live.Dashboard do
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:system_resources")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "geolocation:device")
       Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:machines")
+      Phoenix.PubSub.subscribe(Tunneld.PubSub, "publish:steps")
     end
 
     uri_info = get_connect_info(socket, :uri)
@@ -607,6 +608,36 @@ defmodule TunneldWeb.Live.Dashboard do
     end
   end
 
+  def handle_event("verify_publish", %{"id" => id}, socket) do
+    case Tunneld.Publish.verify(id) do
+      {:ok, %{"status" => "live"} = rec} ->
+        notify(:info, "Reachable from the internet at #{rec["url"]}")
+
+      {:ok, rec} ->
+        notify(
+          :error,
+          "Not reachable at #{rec["url"]} - is inbound TCP/#{rec["port"]} open in the provider firewall?"
+        )
+
+      {:error, :not_published} ->
+        notify(:error, "That resource is not published")
+    end
+
+    {:noreply, refresh_resource_sidebar(socket, id)}
+  end
+
+  def handle_event("unpublish_resource", %{"id" => id}, socket) do
+    machine =
+      case Tunneld.Publish.get(id) do
+        %{"machine_id" => mid} -> Tunneld.Machines.get(mid) |> elem(1)
+        _ -> nil
+      end
+
+    Tunneld.Publish.unpublish(id, machine)
+    notify(:info, "Resource unpublished")
+    {:noreply, refresh_resource_sidebar(socket, id)}
+  end
+
   def handle_event("close_terminal", _params, socket) do
     {:noreply, assign(socket, :terminal_modal, nil)}
   end
@@ -779,6 +810,27 @@ defmodule TunneldWeb.Live.Dashboard do
   # The sidebar is refreshed in place rather than through
   # `refresh_machine_sidebar/2`: that one also re-fetches listeners, which is an
   # SSH round trip per machine and has no business running on a timer.
+  # Publishing succeeded on our side. Show the operator the one step tunneld
+  # cannot do, with the port and address already filled in.
+  def handle_info({:publish_steps, record}, socket) do
+    modal = %{
+      show: true,
+      title: "Published - one step left",
+      description:
+        "Tunneld installed the listener, wrote its config and opened the machine's own " <>
+          "firewall. The cloud provider's firewall is the only part it cannot reach.",
+      body: %{
+        "type" => "code_blocks",
+        "intro" => "Do this in your provider's console, then use Re-check on the resource:",
+        "data" => Tunneld.Publish.manual_steps(record)
+      },
+      actions: nil,
+      type: :default
+    }
+
+    {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal))}
+  end
+
   def handle_info(:poll_overlay_state, socket) do
     :timer.send_after(@overlay_poll_interval, :poll_overlay_state)
 
@@ -1244,6 +1296,25 @@ defmodule TunneldWeb.Live.Dashboard do
       _ ->
         assign(socket, :sidebar, @sidebar_default)
     end
+  end
+
+  defp notify(type, message) do
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{type: type, message: message})
+  end
+
+  # Re-render an open resource panel so a publish/unpublish/re-check shows up
+  # immediately instead of on the next poll. `get_resource/1` is a cast that
+  # broadcasts the fresh record on "component:details" - it does not return it,
+  # so assigning its result would put `:ok` in the panel.
+  defp refresh_resource_sidebar(socket, id) do
+    sidebar = Map.get(socket.assigns, :sidebar, %{})
+
+    if Map.get(sidebar, :view) == :resource and
+         match?(%{type: :resource, id: ^id}, Map.get(sidebar, :selection)) do
+      Tunneld.Servers.Resources.get_resource(id)
+    end
+
+    socket
   end
 
   # Refresh only the overlay fields of an open machine sidebar, leaving

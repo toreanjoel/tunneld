@@ -38,6 +38,9 @@ defmodule Tunneld.Overlay do
   # already uses 51820 on the gateway/VM).
   @wg_port Application.compile_env(:tunneld, :overlay_port, 51_821)
 
+  @doc "The gateway's own overlay IP - the address managed machines dial back to."
+  def gateway_overlay_ip, do: @gateway_overlay_ip
+
   @doc "Return the address to reach a machine: LAN IP or overlay IP."
   def address_for(machine) do
     if same_subnet?(machine["address"]) do

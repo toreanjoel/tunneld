@@ -122,6 +122,10 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(gateway: Application.get_env(:tunneld, :network)[:gateway])
       |> assign(data: data)
       |> assign(health: Map.get(data || %{}, :health) || Map.get(data || %{}, "health") || %{})
+      |> assign(publish: data && Tunneld.Publish.get(Map.get(data, :id)))
+      |> assign(
+        publish_machines: Enum.map(Tunneld.Machines.list(), &{&1["id"], &1["name"] || &1["id"]})
+      )
 
     ~H"""
     <div class="p-4 space-y-6 min-h-full">
@@ -169,6 +173,51 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         >
           <.icon name="hero-pencil-square" class="h-5 w-5" />
           <div class="truncate text-xs">Edit</div>
+        </div>
+
+        <% publish_schema = %{
+          "title" => "Publish on a machine",
+          "type" => "object",
+          "ui:order" => ["id", "machine_id", "port"],
+          "properties" => %{
+            "id" => %{"type" => "string", "ui:widget" => "hidden", "readOnly" => true},
+            "machine_id" => %{
+              "type" => "string",
+              "description" => "Machine that will front this resource on its public IP.",
+              "ui:enum" => Enum.map(@publish_machines, &elem(&1, 0)),
+              "ui:help" =>
+                "Traffic goes internet -> machine -> WireGuard -> this gateway -> the backend. " <>
+                  "Pick a machine near the gateway; every request makes that round trip."
+            },
+            "port" => %{
+              "type" => "string",
+              "default" => "8001",
+              "description" => "TCP port to listen on, on the machine's public IP.",
+              "ui:help" =>
+                "You must also allow inbound TCP on this port in the machine's cloud-provider " <>
+                  "firewall. Tunneld opens the machine's own firewall but cannot touch the provider's."
+            }
+          },
+          "required" => ["id", "machine_id", "port"]
+        } %>
+
+        <div
+          :if={@data.kind == "host" and @publish_machines != []}
+          phx-click="modal_open"
+          phx-value-modal_title="Publish Resource"
+          phx-value-modal_body={
+            Jason.encode!(%{
+              "type" => "schema",
+              "data" => publish_schema,
+              "default_values" => %{"id" => @data.id, "port" => "8001"},
+              "action" => "publish_resource"
+            })
+          }
+          phx-click-loading="opacity-50 cursor-wait"
+          class="flex items-center justify-center gap-1 w-full bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
+        >
+          <.icon name="hero-globe-alt" class="h-5 w-5" />
+          <div class="truncate text-xs">Publish</div>
         </div>
 
         <div
@@ -223,6 +272,41 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             <div :if={@data[:lan_url]} class="text-sm truncate">
               <span class="font-bold">LAN URL:</span>
               <span class="ml-1 font-mono text-xs"><%= @data[:lan_url] %></span>
+            </div>
+            <div :if={@publish} class="text-sm">
+              <span class="font-bold">Published:</span>
+              <span class={"ml-1 w-[13px] h-[13px] rounded-full inline-block align-middle #{publish_dot(@publish["status"])}"}>
+              </span>
+              <span class="ml-1"><%= publish_label(@publish["status"]) %></span>
+              <div class="ml-1 font-mono text-xs text-text-secondary truncate">
+                <%= @publish["url"] %>
+              </div>
+              <div class="ml-1 text-xs text-gray-400">
+                via <%= @publish["machine_name"] || @publish["machine_id"] %>
+                <%= if @publish[
+                                                                                      "last_checked"
+                                                                                    ] do %>
+                  , checked <%= @publish[
+                    "last_checked"
+                  ] %>
+                <% end %>
+              </div>
+              <div class="flex gap-1 mt-1">
+                <button
+                  phx-click="verify_publish"
+                  phx-value-id={@data.id}
+                  class="text-[10px] bg-surface-2 hover:bg-surface border border-border rounded px-2 py-1"
+                >
+                  Re-check
+                </button>
+                <button
+                  phx-click="unpublish_resource"
+                  phx-value-id={@data.id}
+                  class="text-[10px] bg-surface-2 hover:bg-surface border border-border rounded px-2 py-1"
+                >
+                  Unpublish
+                </button>
+              </div>
             </div>
             <div :if={@data[:loopback_port]} class="text-sm truncate">
               <span class="font-bold">Manual exposure:</span>
@@ -773,6 +857,17 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   defp human_health(:empty), do: "no backends"
   defp human_health(:not_applicable), do: "n/a"
   defp human_health(_), do: "unknown"
+
+  # Publish status is deliberately three-valued. "pending" means tunneld did its
+  # half and is waiting on the provider firewall, which it cannot open itself -
+  # reporting that as success is the exact lie this feature exists to avoid.
+  defp publish_dot("live"), do: "bg-green"
+  defp publish_dot("unreachable"), do: "bg-red"
+  defp publish_dot(_), do: "bg-yellow"
+
+  defp publish_label("live"), do: "live (verified from the internet)"
+  defp publish_label("unreachable"), do: "not reachable - check the provider firewall"
+  defp publish_label(_), do: "awaiting provider firewall"
 
   defp pool_health_dot(:all_up), do: "bg-green"
   defp pool_health_dot(:none), do: "bg-red"

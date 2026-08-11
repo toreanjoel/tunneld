@@ -165,7 +165,44 @@ field catch up on their own once the handshake lands.
 
 ---
 
-## 4. Per-device egress (M6)
+## 4. Publish a resource on a machine's public IP
+
+Serve a subnet service on the internet through a managed machine. Plain `IP:port` only —
+no domain, no TLS. For those, open a Terminal on the machine and configure it yourself.
+
+**How it routes:**
+
+```
+internet -> <machine_public_ip>:<port> -> WireGuard -> gateway 10.88.0.1:18000 -> the pool
+```
+
+The machine's Caddy proxies to the **gateway's** Caddy, rewriting `Host` to
+`<name>.tunneld.lan` so the gateway's existing route matches. Traffic terminates on the
+gateway (`INPUT`, where tcp/18000 is already open on every interface) and the gateway then
+opens its own connection to the backend (`OUTPUT`). It never crosses the gateway's `FORWARD`
+chain, so **publishing needs no new gateway firewall rules and exposes no LAN device to the
+machine**.
+
+**Steps:**
+
+1. Create the resource as usual (its pool points at a LAN device, e.g. `10.0.0.44:8000`).
+2. Dashboard → resource → **Publish**: pick a machine and a TCP port.
+3. Tunneld installs Caddy on the machine, writes `/etc/tunneld-caddy.json`, enables the
+   `tunneld-caddy` unit, and runs `ufw allow <port>/tcp`.
+4. **Open inbound TCP `<port>` in the machine's cloud-provider firewall.** Tunneld cannot do
+   this — same class of step as UDP/51821 for WireGuard. The modal shows the exact rule.
+5. Click **Re-check**. The gateway fetches the public URL over its own uplink (the machine's
+   public IP routes out the upstream NIC, not through the tunnel), so `live` means genuinely
+   reachable from outside — not "we pushed some config".
+
+> Published means public: plain HTTP, no authentication unless the service provides its own.
+
+**Pick a machine near the gateway.** Every request makes the full round trip, so a machine on
+another continent adds that latency to every page load.
+
+---
+
+## 5. Per-device egress (M6)
 
 Route a subnet device's traffic out through an exit machine.
 
@@ -190,5 +227,7 @@ Route a subnet device's traffic out through an exit machine.
 | `systemctl restart tunneld` fails | `sudo journalctl -u tunneld -n 50` |
 | WireGuard handshake won't establish | Open inbound UDP/**51821** in the **provider** firewall (not the OS). `0 B received` with non-zero `sent` in `wg show` is this, every time |
 | Machine reads `ready` but Terminal times out | Only the terminal uses the overlay IP; probe/listeners/exit use the public IP. So `ready` says nothing about the tunnel — check the `WireGuard` field |
+| Published URL times out | Inbound TCP on that port is not open in the **provider** firewall. Tunneld opens the machine's own firewall, never the provider's |
+| Published URL returns 502 | The gateway's Caddy has no route for that resource, or the pool backend is down. Check the resource's LAN URL works first |
 | Remote service not reachable | Confirm the machine is a WG peer (`wg show`) and the resource pool uses the overlay IP |
 | Egress routes but times out | Confirm ip_forward + MASQUERADE on the exit and FORWARD allow on its WG iface |

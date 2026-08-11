@@ -69,6 +69,9 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       "add_share" ->
         Resources.add_share(data)
 
+      "publish_resource" ->
+        publish_resource(data)
+
       "update_share" ->
         Resources.update_share(data, :resource)
 
@@ -137,6 +140,45 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
           message: "Action doesnt exist and cant be handled"
         })
     end
+  end
+
+  # Publishing is a remote install + config push, so it is reported the way
+  # enrollment is: the parts that worked, and the one part the operator must do
+  # themselves. It never claims the service is reachable - only `verify/1`,
+  # which actually fetches the URL from the gateway's own uplink, can say that.
+  defp publish_resource(%{"id" => id, "machine_id" => machine_id} = data) do
+    resource = Resources.fetch_shares() |> Enum.find(&(&1.id == id))
+
+    with {:ok, machine} <- Tunneld.Machines.get(machine_id),
+         false <- is_nil(resource),
+         {:ok, record} <-
+           Tunneld.Publish.publish(
+             %{"id" => resource.id, "name" => resource.name},
+             machine,
+             data["port"]
+           ) do
+      Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+        type: :info,
+        message: "#{resource.name} published on #{record["machine_name"]} at #{record["url"]}"
+      })
+
+      Phoenix.PubSub.broadcast(Tunneld.PubSub, "publish:steps", {:publish_steps, record})
+    else
+      {:error, :invalid_port} ->
+        notify_error("Port must be a number between 1 and 65535")
+
+      true ->
+        notify_error("Resource not found")
+
+      {:error, reason} ->
+        notify_error("Could not publish: #{inspect(reason)}")
+    end
+  end
+
+  defp publish_resource(_), do: notify_error("Pick a machine and a port")
+
+  defp notify_error(message) do
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{type: :error, message: message})
   end
 
   defp decode_if_needed(%{} = data), do: data
