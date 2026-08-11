@@ -161,48 +161,79 @@ defmodule Tunneld.Egress do
     end
   end
 
-  @doc "Enable IP forwarding and MASQUERADE on a machine's egress interface."
+  @doc """
+  Make a machine exit-capable: persistent IP forwarding, MASQUERADE on its
+  egress interface, and FORWARD rules for its WireGuard interface.
+
+  Returns `{:ok, %{iface: egress_iface, table: table_id}}` or `{:error, reason}`.
+
+  Three things this function used to get wrong, all of which presented to the
+  operator as the same shrug:
+
+  * It returned a bare `:ok`, which does not match a caller's `{:ok, _}`, so
+    a fully successful setup was rendered by a catch-all clause as an error
+    toast quoting a raw UUID.
+  * Every iptables result was discarded with `_ =`, so a machine with no
+    iptables at all reported exactly the same `:ok` as one that worked.
+  * It never allocated the routing table, and `exit_capable?/1` is defined as
+    "has a table allocated" - so the machine stayed "not set" in the UI
+    forever no matter how many times you clicked.
+
+  Now every step is checked and the table allocation is what marks success, so
+  the badge reflects state that actually exists. Re-running is idempotent and
+  is the supported repair path: iptables rules do not survive a reboot of the
+  target, so "already capable" must never short-circuit the real work.
+  """
   def ensure_exit_capable(machine) do
     if @mock do
-      :ok
+      {:ok, %{iface: "eth0", table: table_for(machine)}}
     else
-      with {:ok, _} <-
-             SSH.run(
-               machine,
-               "sysctl -w net.ipv4.ip_forward=1 && (grep -q 'net.ipv4.ip_forward=1' /etc/sysctl.conf || echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf)"
-             ),
-           {:ok, iface} <- default_iface(machine) do
-        # NAT for egressed traffic.
-        _ =
-          SSH.run(
-            machine,
-            "iptables -t nat -C POSTROUTING -o #{iface} -j MASQUERADE 2>/dev/null || iptables -t nat -A POSTROUTING -o #{iface} -j MASQUERADE"
-          )
-
-        # FORWARD-allow the WireGuard interface to/from the egress interface.
-        # Without this the exit drops forwarded device traffic (UFW/FORWARD
-        # default is DROP) even though ip_forward is on. This was found in
-        # live egress testing.
-        wg_iface = Tunneld.Overlay.iface_name(machine["id"])
-
-        _ =
-          SSH.run(
-            machine,
-            "iptables -C FORWARD -i #{wg_iface} -o #{iface} -j ACCEPT 2>/dev/null || " <>
-              "iptables -I FORWARD 1 -i #{wg_iface} -o #{iface} -j ACCEPT"
-          )
-
-        _ =
-          SSH.run(
-            machine,
-            "iptables -C FORWARD -i #{iface} -o #{wg_iface} -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || " <>
-              "iptables -I FORWARD 1 -i #{iface} -o #{wg_iface} -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT"
-          )
-
-        :ok
-      end
+      real_ensure_exit_capable(machine)
     end
   end
+
+  defp real_ensure_exit_capable(machine) do
+    wg_iface = Tunneld.Overlay.iface_name(machine["id"])
+
+    with {:ok, _} <- SSH.run(machine, ip_forward_cmd()),
+         {:ok, iface} <- default_iface(machine),
+         :ok <- assert_iface(iface),
+         {:ok, _} <- SSH.run(machine, masquerade_cmd(iface)),
+         {:ok, _} <- SSH.run(machine, forward_cmd(wg_iface, iface)),
+         {:ok, _} <- SSH.run(machine, forward_return_cmd(iface, wg_iface)) do
+      {:ok, %{iface: iface, table: table_for(machine)}}
+    end
+  end
+
+  defp ip_forward_cmd do
+    "sysctl -w net.ipv4.ip_forward=1 && " <>
+      "(grep -q 'net.ipv4.ip_forward=1' /etc/sysctl.conf || echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf)"
+  end
+
+  # NAT for egressed traffic.
+  defp masquerade_cmd(iface) do
+    "iptables -t nat -C POSTROUTING -o #{iface} -j MASQUERADE 2>/dev/null || " <>
+      "iptables -t nat -A POSTROUTING -o #{iface} -j MASQUERADE"
+  end
+
+  # FORWARD-allow the WireGuard interface to/from the egress interface. Without
+  # this the exit drops forwarded device traffic (UFW/FORWARD default is DROP)
+  # even though ip_forward is on. This was found in live egress testing.
+  defp forward_cmd(wg_iface, iface) do
+    "iptables -C FORWARD -i #{wg_iface} -o #{iface} -j ACCEPT 2>/dev/null || " <>
+      "iptables -I FORWARD 1 -i #{wg_iface} -o #{iface} -j ACCEPT"
+  end
+
+  defp forward_return_cmd(iface, wg_iface) do
+    "iptables -C FORWARD -i #{iface} -o #{wg_iface} -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || " <>
+      "iptables -I FORWARD 1 -i #{iface} -o #{wg_iface} -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT"
+  end
+
+  # A machine with no default route yields an empty interface name, which would
+  # build `iptables -o  -j MASQUERADE`. Fail with a name the operator can act on.
+  defp assert_iface(""), do: {:error, :no_default_route_on_target}
+  defp assert_iface(iface) when is_binary(iface), do: :ok
+  defp assert_iface(_), do: {:error, :no_default_route_on_target}
 
   # --- Real implementation ---
 

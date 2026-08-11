@@ -10,11 +10,18 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
        This step blocks; the user must act outside Tunneld. Say so plainly.
     3. Test connection → success or a specific error (auth failed / unreachable /
        host key changed), never a generic failure.
-    4. Probe → show discovered OS, arch, resources, runtimes; auto-install
-       the WireGuard overlay for remote machines.
+    4. Probe → show discovered OS, arch, resources, runtimes; then set the
+       machine up: install the WireGuard overlay, then make it exit-capable.
 
   Every step shows what will happen on the remote machine before it happens.
-  Exit node capability is managed from the machine panel, not the wizard.
+
+  Enrolling a machine *is* asking for it to be usable, so both setup steps run
+  here rather than hiding behind a separate "Exit Node" button: the overlay and
+  the exit rules are the deps, not options. The machine panel keeps the button
+  as an explicit repair path, because the target's iptables rules do not
+  survive its reboot. The two steps are reported separately - a machine with a
+  working overlay and failed exit rules is a real, useful state, and collapsing
+  them into one verdict would misdescribe it.
   """
 
   use TunneldWeb, :live_component
@@ -31,7 +38,9 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
        error: nil,
        probing: false,
        overlay_status: nil,
-       overlay_error: nil
+       overlay_error: nil,
+       exit_status: nil,
+       exit_error: nil
      )}
   end
 
@@ -72,8 +81,8 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
         socket =
           socket
           |> assign(step: 4, machine: machine, probing: false, error: nil)
-          |> assign(overlay_status: :installing)
-          |> start_async(:install_overlay, fn -> install_overlay(machine) end)
+          |> assign(overlay_status: :installing, exit_status: :installing)
+          |> start_async(:setup_machine, fn -> setup_machine(machine) end)
 
         {:noreply, socket}
 
@@ -87,15 +96,28 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
     # @enroll_wizard_open). Tell the parent to close so the modal stays
     # closed instead of being re-opened on the next parent re-render.
     # Cancel any running async task to avoid messages after close.
-    socket = cancel_async(socket, :install_overlay, :close)
+    socket = cancel_async(socket, :setup_machine, :close)
     send(socket.parent_pid, :wizard_closed)
     {:noreply, assign(socket, open: false)}
   end
 
-  defp install_overlay(machine) do
-    # Run ensure_peer which SSHes to target and installs wireguard-tools
-    # This can take tens of seconds, hence the async execution
-    Tunneld.Overlay.ensure_peer(machine)
+  # Both setup steps, in one task: SSH to the target, install wireguard-tools
+  # and bring the peer up, then enable IP forwarding + NAT so the machine can
+  # act as an exit. Tens of seconds, hence async.
+  #
+  # Exit setup is skipped when the overlay failed, and says so. It depends on
+  # the WireGuard interface name, so running it anyway would install FORWARD
+  # rules for an interface that does not exist and call that success.
+  defp setup_machine(machine) do
+    overlay = Tunneld.Overlay.ensure_peer(machine)
+
+    exit_result =
+      case overlay do
+        {:ok, _} -> Tunneld.Egress.ensure_exit_capable(machine)
+        _ -> :skipped
+      end
+
+    %{overlay: overlay, exit: exit_result}
   end
 
   def handle_info({:wizard_probe_result, result}, socket) do
@@ -110,47 +132,139 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
 
   def handle_info(_msg, socket), do: {:noreply, socket}
 
-  # Handle async overlay installation results
-  # ensure_peer returns {:ok, %{overlay_ip: ...}} on success, {:error, reason} on failure
+  # Handle async setup results. Each step is classified on its own, so a
+  # working overlay with failed exit rules reads as exactly that.
   @impl true
-  def handle_async(:install_overlay, {:ok, {:ok, _result}}, socket) do
-    {:noreply, assign(socket, overlay_status: :success, overlay_error: nil)}
-  end
+  def handle_async(:setup_machine, {:ok, %{overlay: overlay, exit: exit_result}}, socket) do
+    {overlay_status, overlay_error} = classify(overlay, "overlay")
+    {exit_status, exit_error} = classify(exit_result, "exit routing")
 
-  def handle_async(:install_overlay, {:ok, :ok}, socket) do
-    {:noreply, assign(socket, overlay_status: :success, overlay_error: nil)}
-  end
-
-  def handle_async(:install_overlay, {:ok, {:error, reason}}, socket) do
-    # Overlay install failed - enrollment still succeeds, but record the failure
-    {:noreply, assign(socket, overlay_status: :failed, overlay_error: format_error(reason))}
-  end
-
-  def handle_async(:install_overlay, {:exit, reason}, socket) do
-    # Task crashed - enrollment still succeeds, but record the failure
     {:noreply,
-     assign(socket, overlay_status: :failed, overlay_error: "Task failed: #{inspect(reason)}")}
+     assign(socket,
+       overlay_status: overlay_status,
+       overlay_error: overlay_error,
+       exit_status: exit_status,
+       exit_error: exit_error
+     )}
+  end
+
+  def handle_async(:setup_machine, {:exit, reason}, socket) do
+    # Task crashed - enrollment still succeeds, but record the failure.
+    msg = "Task failed: #{inspect(reason)}"
+
+    {:noreply,
+     assign(socket,
+       overlay_status: :failed,
+       overlay_error: msg,
+       exit_status: :failed,
+       exit_error: msg
+     )}
   end
 
   # Catch-all for unexpected results. Treat UNKNOWN as FAILURE, never as success.
   # lib/TODO.md sections 11-13 record exactly this failure mode: ensure_peer
   # returned {:ok, ""} from a short-circuited `with` chain while installing
   # nothing at all, and the green result hid it. An unrecognised shape means we
-  # do not know whether the overlay is up, and claiming success would send the
-  # operator away with a machine that cannot be reached.
-  def handle_async(:install_overlay, {:ok, other}, socket) do
+  # do not know whether the machine is set up, and claiming success would send
+  # the operator away with a machine that cannot be reached.
+  def handle_async(:setup_machine, {:ok, other}, socket) do
     require Logger
-    Logger.warning("Unexpected overlay install result: #{inspect(other)}")
+    Logger.warning("Unexpected machine setup result: #{inspect(other)}")
+    msg = "Unrecognised result - verify from the machine panel"
 
     {:noreply,
      assign(socket,
        overlay_status: :failed,
-       overlay_error: "Unrecognised result - verify the overlay from the machine panel"
+       overlay_error: msg,
+       exit_status: :failed,
+       exit_error: msg
      )}
+  end
+
+  # {:ok, _} is the only success. A bare :ok is accepted for the mock path.
+  defp classify({:ok, _}, _label), do: {:success, nil}
+  defp classify(:ok, _label), do: {:success, nil}
+  defp classify(:skipped, _label), do: {:skipped, nil}
+  defp classify({:error, reason}, _label), do: {:failed, format_error(reason)}
+
+  defp classify(other, label) do
+    require Logger
+    Logger.warning("Unexpected #{label} result: #{inspect(other)}")
+    {:failed, "Unrecognised result - verify #{label} from the machine panel"}
   end
 
   defp format_error(reason) when is_binary(reason), do: reason
   defp format_error(reason), do: inspect(reason)
+
+  # One setup step's status line. Both steps render identically, so the shapes
+  # cannot drift apart and quietly start meaning different things.
+  attr :status, :atom, default: nil
+  attr :error, :string, default: nil
+  attr :pending, :string, required: true
+  attr :done, :string, required: true
+  attr :failed, :string, required: true
+  attr :skipped, :string, required: true
+
+  defp setup_row(assigns) do
+    ~H"""
+    <div>
+      <div class="flex items-center gap-2">
+        <%= case @status do %>
+          <% :installing -> %>
+            <svg
+              class="animate-spin h-4 w-4 text-accent shrink-0"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+            >
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4">
+              </circle>
+              <path
+                class="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+              >
+              </path>
+            </svg>
+            <span class="text-text-secondary"><%= @pending %></span>
+          <% :success -> %>
+            <svg
+              class="h-4 w-4 text-green-500 shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7">
+              </path>
+            </svg>
+            <span class="text-green-500"><%= @done %></span>
+          <% :failed -> %>
+            <svg
+              class="h-4 w-4 text-red-500 shrink-0"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M6 18L18 6M6 6l12 12"
+              >
+              </path>
+            </svg>
+            <span class="text-red-500"><%= @failed %></span>
+          <% :skipped -> %>
+            <span class="h-4 w-4 shrink-0 text-center text-text-tertiary">-</span>
+            <span class="text-text-tertiary"><%= @skipped %></span>
+          <% _ -> %>
+            <span class="text-text-tertiary"><%= @pending %></span>
+        <% end %>
+      </div>
+      <p :if={@error} class="mt-1 ml-6 text-red-400 text-[10px]"><%= @error %></p>
+    </div>
+    """
+  end
 
   @impl true
   def render(assigns) do
@@ -289,68 +403,30 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
         </div>
       </div>
 
-      <%!-- WireGuard overlay installation status --%>
-      <div class="bg-surface rounded-lg p-3 text-xs">
-        <div class="flex items-center gap-2">
-          <%= case @overlay_status do %>
-            <% :installing -> %>
-              <svg
-                class="animate-spin h-4 w-4 text-accent"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  class="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  stroke-width="4"
-                >
-                </circle>
-                <path
-                  class="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                >
-                </path>
-              </svg>
-              <span class="text-text-secondary">Installing WireGuard overlay...</span>
-            <% :success -> %>
-              <svg
-                class="h-4 w-4 text-green-500"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M5 13l4 4L19 7"
-                >
-                </path>
-              </svg>
-              <span class="text-green-500">WireGuard overlay installed</span>
-            <% :failed -> %>
-              <svg class="h-4 w-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width="2"
-                  d="M6 18L18 6M6 6l12 12"
-                >
-                </path>
-              </svg>
-              <span class="text-red-500">WireGuard installation failed</span>
-            <% _ -> %>
-              <span class="text-text-tertiary">Preparing overlay...</span>
-          <% end %>
-        </div>
-        <p :if={@overlay_error} class="mt-2 text-red-400 text-[10px]"><%= @overlay_error %></p>
-        <p :if={@overlay_status == :failed} class="mt-1 text-text-tertiary text-[10px]">
-          Machine enrolled successfully. You can install the overlay later from the machine panel.
+      <%!-- Setup: overlay, then exit routing. Reported per step. --%>
+      <div class="bg-surface rounded-lg p-3 text-xs space-y-2">
+        <.setup_row
+          status={@overlay_status}
+          error={@overlay_error}
+          pending="Installing WireGuard overlay..."
+          done="WireGuard overlay installed"
+          failed="WireGuard installation failed"
+          skipped="Overlay skipped"
+        />
+        <.setup_row
+          status={@exit_status}
+          error={@exit_error}
+          pending="Enabling exit routing (IP forwarding + NAT)..."
+          done="Exit routing enabled"
+          failed="Exit routing failed"
+          skipped="Exit routing skipped - the overlay must be up first"
+        />
+        <p
+          :if={@overlay_status == :failed or @exit_status == :failed}
+          class="text-text-tertiary text-[10px]"
+        >
+          The machine is enrolled. You can retry setup from the machine panel with Sync,
+          or Exit Node for the routing rules on their own.
         </p>
       </div>
 

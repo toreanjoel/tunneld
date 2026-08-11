@@ -444,22 +444,22 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   def handle_event("make_exit_node", %{"id" => id}, socket) do
-    result =
+    # Always re-apply. The old code short-circuited on exit_capable?, which is a
+    # local JSON flag, while the rules it stands for live in the target's
+    # iptables and do not survive a reboot. ensure_exit_capable/1 is idempotent,
+    # so re-running is also the repair path.
+    {result, label} =
       case Tunneld.Machines.get(id) do
         {:ok, machine} ->
-          if Tunneld.Egress.exit_capable?(machine) do
-            {:ok, "already exit-capable"}
-          else
-            Tunneld.Egress.ensure_exit_capable(machine)
-          end
+          {Tunneld.Egress.ensure_exit_capable(machine), machine["name"] || id}
 
         _ ->
-          {:error, "machine not found"}
+          {{:error, "machine not found"}, id}
       end
 
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
       type: if(match?({:ok, _}, result), do: :info, else: :error),
-      message: format_exit_result(result, id)
+      message: format_exit_result(result, label)
     })
 
     send(self(), {:machines_changed})
@@ -470,11 +470,19 @@ defmodule TunneldWeb.Live.Dashboard do
     result =
       case Tunneld.Machines.get(id) do
         {:ok, machine} ->
-          # One "sync" action: ensure the overlay is up, probe, then check drift.
+          # One "sync" action: ensure the overlay is up, re-apply the exit
+          # rules (they are lost on the target's reboot), probe, check drift.
           overlay = Tunneld.Overlay.ensure_peer(machine)
+
+          exit_result =
+            case overlay do
+              {:ok, _} -> Tunneld.Egress.ensure_exit_capable(machine)
+              _ -> :skipped
+            end
+
           probe = Tunneld.Machines.probe(id)
           reconcile = Tunneld.Reconcile.reconcile(machine, repair: true)
-          %{overlay: overlay, probe: probe, reconcile: reconcile}
+          %{overlay: overlay, exit: exit_result, probe: probe, reconcile: reconcile}
 
         _ ->
           %{error: "machine not found"}
@@ -1334,18 +1342,48 @@ defmodule TunneldWeb.Live.Dashboard do
 
   defp first_line(_), do: "no details reported"
 
-  defp format_exit_result({:ok, "already exit-capable"}, id),
-    do: "Machine #{id} is already exit-capable"
+  defp format_exit_result({:ok, %{iface: iface}}, label),
+    do: "#{label} is now exit-capable (IP forwarding + NAT on #{iface})"
 
-  defp format_exit_result({:ok, _}, id), do: "Machine #{id} is now exit-capable"
+  defp format_exit_result({:ok, _}, label), do: "#{label} is now exit-capable"
 
-  defp format_exit_result({:error, reason}, _id) when is_binary(reason),
-    do: "Exit setup failed: #{reason}"
+  defp format_exit_result({:error, :no_default_route_on_target}, label),
+    do: "Exit setup failed: #{label} has no default route, so there is no interface to NAT out of"
 
-  defp format_exit_result({:error, _reason}, _id), do: "Exit setup failed"
-  defp format_exit_result(_, id), do: "Exit node configured for #{id}"
+  defp format_exit_result({:error, reason}, label) when is_binary(reason),
+    do: "Exit setup failed for #{label}: #{reason}"
+
+  defp format_exit_result({:error, {:ssh_failed, code, out}}, label),
+    do: "Exit setup failed for #{label}: SSH exited #{code}: #{first_line(out)}"
+
+  defp format_exit_result({:error, reason}, label),
+    do: "Exit setup failed for #{label}: #{inspect(reason)}"
+
+  # An unrecognised shape means we do not know whether the exit is configured.
+  # The previous catch-all rendered exactly this case as "Exit node configured
+  # for <uuid>" - a success sentence, quoting an internal id, for a result we
+  # could not classify. Unknown is reported as unknown.
+  defp format_exit_result(other, label) do
+    require Logger
+    Logger.warning("Unexpected ensure_exit_capable result: #{inspect(other)}")
+    "Exit setup for #{label} returned an unrecognised result - verify from the machine panel"
+  end
 
   defp format_reconcile_result(%{error: reason}), do: "Reconcile failed: #{reason}"
-  defp format_reconcile_result(%{overlay: _, probe: _, reconcile: _}), do: "Reconcile complete"
-  defp format_reconcile_result(_), do: "Reconcile complete"
+
+  # Name the parts that did not work. "Reconcile complete" over a failed
+  # overlay is the same lie as an error toast over a working exit node.
+  defp format_reconcile_result(%{overlay: overlay, exit: exit_result}) do
+    failed =
+      [{"overlay", overlay}, {"exit routing", exit_result}]
+      |> Enum.reject(fn {_name, res} -> match?({:ok, _}, res) or res in [:ok, :skipped] end)
+      |> Enum.map(&elem(&1, 0))
+
+    case failed do
+      [] -> "Sync complete: overlay up, exit routing applied"
+      names -> "Sync finished with problems: #{Enum.join(names, " and ")} failed"
+    end
+  end
+
+  defp format_reconcile_result(_), do: "Sync complete"
 end

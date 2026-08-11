@@ -314,7 +314,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             <div class="truncate text-xs">Reconcile</div>
             <.help_icon
               class="ml-0.5"
-              text="Sync this machine: ensure the WireGuard overlay is up, re-probe its OS/runtimes/listeners, and check for drift."
+              text="Sync this machine: ensure the WireGuard overlay is up, re-apply exit routing, re-probe its OS/runtimes/listeners, and check for drift."
             />
           </div>
 
@@ -328,7 +328,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             <div class="truncate text-xs">Exit Node</div>
             <.help_icon
               class="ml-0.5"
-              text="Make this machine exit-capable (enables IP forwarding + NAT on it). Then route specific devices through it from the Devices list."
+              text="Re-apply exit routing on this machine (IP forwarding + NAT). Enrolling already does this; use it to repair after the machine reboots, since its iptables rules are not persistent. Route specific devices through it from the Devices list."
             />
           </div>
 
