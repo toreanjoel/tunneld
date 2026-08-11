@@ -99,9 +99,22 @@ via a WireGuard overlay. The gateway dials out to each machine.
 ### 3.1 Prerequisites on the target machine
 
 - A Linux host reachable over SSH (Debian/Ubuntu recommended).
-- **Inbound UDP on the WireGuard port (default `51820`) must be allowed** in the target's
-  firewall. For a cloud VPS this is a provider security-group rule (e.g. Vultr "inbound UDP
-  51820"). This is **not** the OS firewall — open it in the provider console.
+- **Inbound UDP `51821` must be allowed** in the target's firewall. For a cloud VPS this is a
+  provider security-group rule (e.g. Vultr "inbound UDP 51821"). This is **not** the OS
+  firewall — tunneld already opens that itself (`ufw allow 51821/udp`, see
+  `Overlay.install_target/3`) — you must open it in the **provider console**.
+
+  > The port is **51821**, not 51820. `51820` is the legacy standalone `wgtest` tunnel.
+  > Per-machine overlays use `51821` (`@wg_port` in `lib/tunneld/overlay.ex`). Opening 51820
+  > looks correct and changes nothing.
+
+  Exactly two inbound ports are needed on a managed machine: **TCP 22** (tunneld's control
+  plane — `SSH.run/3` dials the machine's *public* address, not the overlay) and **UDP 51821**
+  (the overlay). Anything else is opt-in: the TCP port a public resource `listen`s on. Caddy's
+  admin API (`2019`) must **never** be public — tunneld reaches it through the tunnel.
+
+  The gateway itself needs **no** inbound rules. It dials out and holds the NAT mapping open
+  with `PersistentKeepalive = 25`, which is what lets it sit behind NAT and move.
 - The operator installs tunneld's public key into the target's `~/.ssh/authorized_keys`.
 
 ### 3.2 Enroll
@@ -122,6 +135,21 @@ machine gets an overlay IP (e.g. `10.88.0.2`) and its services become reachable 
 wg show            # handshake present
 ip -o addr show wg-*  # overlay iface up
 ```
+
+Read `wg show` on the **gateway** as follows — it separates "blocked" from "misconfigured":
+
+| Symptom | Meaning |
+|---|---|
+| `transfer: 0 B received`, non-zero sent, no `latest handshake` line | Handshakes are leaving and nothing is coming back. The port is blocked **upstream of the VM** — almost always the provider firewall. Confirm with `tcpdump -ni any udp port 51821` on the target: zero captured packets proves they never arrive. |
+| `latest handshake` present, traffic both ways | Overlay is healthy. |
+
+The gateway retries every 25s, so after opening the provider rule the tunnel comes up on its
+own within about half a minute — **no re-enrollment needed**. Re-enrolling instead of waiting
+mints a *new* machine id, hence a new `wg-<hash>` interface, and leaves the previous one
+behind `systemctl enable`d on both hosts.
+
+The dashboard polls overlay state every 15s, so the status dot and the panel's `WireGuard`
+field catch up on their own once the handshake lands.
 
 ### 3.4 Expose a service over the overlay
 
@@ -168,7 +196,8 @@ Route a subnet device's traffic out through an exit machine.
 | `docker: command not found` | Install Docker (see 1.1) |
 | `Permission denied` on deploy | Wrong SSH user/key; use the device's real user |
 | `systemctl restart tunneld` fails | `sudo journalctl -u tunneld -n 50` |
-| WireGuard handshake won't establish | Open inbound UDP/51820 in the **provider** firewall (not the OS) |
+| WireGuard handshake won't establish | Open inbound UDP/**51821** in the **provider** firewall (not the OS). `0 B received` with non-zero `sent` in `wg show` is this, every time |
+| Machine reads `ready` but Terminal times out | Only the terminal uses the overlay IP; probe/listeners/exit use the public IP. So `ready` says nothing about the tunnel — check the `WireGuard` field |
 | Remote service not reachable | Confirm the machine is a WG peer (`wg show`) and the resource pool uses the overlay IP |
 | Public port times out | Open the exposed TCP port in the provider firewall |
 | Egress routes but times out | Confirm ip_forward + MASQUERADE on the exit and FORWARD allow on its WG iface |

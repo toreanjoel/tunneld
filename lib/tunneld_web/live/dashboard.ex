@@ -41,6 +41,14 @@ defmodule TunneldWeb.Live.Dashboard do
 
   @link_poll_interval 15_000
 
+  # WireGuard comes up (or drops) entirely out of band - a provider firewall
+  # rule, a handshake finally completing, a VM reboot. None of those produce a
+  # tunneld event, so nothing re-renders and the UI keeps showing whatever the
+  # overlay looked like the last time a machine was created or edited. That is
+  # why an overlay that had come up still read "down" until the panel was
+  # closed and reopened, and why the machine list never went green. Poll it.
+  @overlay_poll_interval 15_000
+
   on_mount TunneldWeb.Hooks.CheckAuth
 
   def mount(_params, %{"client_id" => client_id} = _session, socket) do
@@ -111,6 +119,7 @@ defmodule TunneldWeb.Live.Dashboard do
 
     if connected?(socket) do
       :timer.send_after(@link_poll_interval, :poll_link_state)
+      :timer.send_after(@overlay_poll_interval, :poll_overlay_state)
     end
 
     {:ok, socket}
@@ -763,6 +772,21 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, assign(socket, status: %{internet: status})}
   end
 
+  # Re-render whatever displays overlay state. `send_update` re-runs the
+  # machines component's update/2, which re-reads `wg show` per machine, so the
+  # status dot settles on its own once a tunnel comes up.
+  #
+  # The sidebar is refreshed in place rather than through
+  # `refresh_machine_sidebar/2`: that one also re-fetches listeners, which is an
+  # SSH round trip per machine and has no business running on a timer.
+  def handle_info(:poll_overlay_state, socket) do
+    :timer.send_after(@overlay_poll_interval, :poll_overlay_state)
+
+    send_update(TunneldWeb.Live.Components.Machines, id: "machines", data: %{})
+
+    {:noreply, refresh_sidebar_overlay(socket)}
+  end
+
   def handle_info(%{type: :internet, status: _status}, socket) do
     # Link state is polled locally via :poll_link_state; ignore any stray
     # legacy broadcasts on this topic.
@@ -1219,6 +1243,21 @@ defmodule TunneldWeb.Live.Dashboard do
 
       _ ->
         assign(socket, :sidebar, @sidebar_default)
+    end
+  end
+
+  # Refresh only the overlay fields of an open machine sidebar, leaving
+  # `listeners` untouched so polling never triggers SSH. A no-op unless a
+  # machine panel is actually open.
+  defp refresh_sidebar_overlay(socket) do
+    sidebar = Map.get(socket.assigns, :sidebar, %{})
+
+    with :machine <- Map.get(sidebar, :view),
+         %{type: :machine, id: id} <- Map.get(sidebar, :selection),
+         {:ok, machine} <- Tunneld.Machines.get(id) do
+      assign(socket, :sidebar, %{sidebar | data: enrich_overlay(machine)})
+    else
+      _ -> socket
     end
   end
 
