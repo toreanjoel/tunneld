@@ -28,25 +28,46 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
 
   alias Tunneld.Machines
 
+  # Every assign the wizard mutates while enrolling. Kept in one place because
+  # `mount/1` and the reopen-reset below must agree: a field that is set during
+  # enrollment but missing here would silently survive into the next one.
+  defp initial_state do
+    [
+      step: 1,
+      machine: nil,
+      machine_id: nil,
+      public_key: nil,
+      error: nil,
+      probing: false,
+      overlay_status: nil,
+      overlay_error: nil,
+      exit_status: nil,
+      exit_error: nil
+    ]
+  end
+
   @impl true
   def mount(socket) do
-    {:ok,
-     assign(socket,
-       step: 1,
-       machine: nil,
-       public_key: nil,
-       error: nil,
-       probing: false,
-       overlay_status: nil,
-       overlay_error: nil,
-       exit_status: nil,
-       exit_error: nil
-     )}
+    {:ok, assign(socket, initial_state())}
   end
 
   @impl true
   def update(assigns, socket) do
-    {:ok, assign(socket, open: Map.get(assigns, :open, false))}
+    open = Map.get(assigns, :open, false)
+    was_open = Map.get(socket.assigns, :open, false)
+
+    # A live_component is mounted once per id and then reused, so `mount/1`
+    # does NOT run again when the modal is reopened. Without this reset the
+    # wizard reopens on step 4 still showing the *previous* machine's success
+    # screen, which reads as "the new machine is already enrolled". Only a full
+    # page refresh cleared it, because that remounts the parent LiveView.
+    #
+    # Reset on the closed -> open edge, not on every update/2: the component is
+    # re-rendered by the parent constantly, and resetting on each pass would
+    # wipe the wizard's progress mid-enrollment.
+    socket = if open and not was_open, do: assign(socket, initial_state()), else: socket
+
+    {:ok, assign(socket, :open, open)}
   end
 
   @impl true
@@ -96,8 +117,14 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
     # @enroll_wizard_open). Tell the parent to close so the modal stays
     # closed instead of being re-opened on the next parent re-render.
     # Cancel any running async task to avoid messages after close.
+    #
+    # `self()` is the parent LiveView process: a live_component has no process
+    # of its own, so its callbacks run inside the parent's channel process.
+    # `socket.parent_pid` is NOT that pid - it is the *nested LiveView* parent,
+    # which is nil when the enclosing LiveView is a root one (Dashboard is
+    # routed directly), so sending there crashed with "invalid destination".
     socket = cancel_async(socket, :setup_machine, :close)
-    send(socket.parent_pid, :wizard_closed)
+    send(self(), :wizard_closed)
     {:noreply, assign(socket, open: false)}
   end
 

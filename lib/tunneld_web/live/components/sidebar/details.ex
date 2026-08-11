@@ -322,7 +322,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             phx-click="make_exit_node"
             phx-value-id={mget(@machine, "id")}
             phx-click-loading="opacity-50 cursor-wait"
-            class={"flex items-center justify-center gap-1.5 w-full h-9 p-2 cursor-pointer rounded-md #{if @machine["exit_capable"], do: "bg-accent/20 text-accent hover:bg-accent/30", else: "bg-surface hover:bg-surface-2"}"}
+            class="flex items-center justify-center gap-1.5 w-full h-9 bg-surface p-2 cursor-pointer rounded-md hover:bg-surface-2"
           >
             <.icon name="hero-arrow-up-tray" class="h-4 w-4 shrink-0" />
             <div class="truncate text-xs">Exit Node</div>

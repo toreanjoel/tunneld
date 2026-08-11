@@ -13,9 +13,14 @@ defmodule Mix.Tasks.Version do
   """
   use Mix.Task
 
+  # These regexes must match ONLY the application version. A bare
+  # `version: "x.y.z"` also matches tool pins like `config :esbuild, version:
+  # "0.19.0"` — and when the app version coincides with a tool version (it did:
+  # both were 0.19.0), bumping the app silently retargeted esbuild to a release
+  # that was never tested. Anchor on surrounding context so that cannot recur.
   @version_files [
-    {"mix.exs", ~r/version:\s*"(\d+\.\d+\.\d+)"/},
-    {"config/config.exs", ~r/version:\s*"(\d+\.\d+\.\d+)"/}
+    {"mix.exs", ~r/(app:\s*:tunneld,\s*\n\s*version:\s*")(\d+\.\d+\.\d+)(")/},
+    {"config/config.exs", ~r/(config :tunneld, version: ")(\d+\.\d+\.\d+)(")/}
   ]
 
   @impl Mix.Task
@@ -30,10 +35,17 @@ defmodule Mix.Tasks.Version do
     Enum.each(@version_files, fn {path, regex} ->
       content = File.read!(path)
 
-      updated =
-        Regex.replace(regex, content, fn full, _old ->
-          String.replace(full, current, next)
+      {updated, hits} =
+        Regex.replace(regex, content, fn _full, pre, _old, post ->
+          pre <> next <> post
         end)
+        |> then(&{&1, length(Regex.scan(regex, content))})
+
+      # Silence here means the anchor drifted and the file was left on the old
+      # version, which only shows up later as a release tagged wrongly.
+      if hits != 1 do
+        Mix.raise("Expected exactly 1 version match in #{path}, found #{hits}")
+      end
 
       File.write!(path, updated)
     end)
@@ -43,7 +55,8 @@ defmodule Mix.Tasks.Version do
 
   defp current_version do
     content = File.read!("mix.exs")
-    [_, version] = Regex.run(~r/version:\s*"(\d+\.\d+\.\d+)"/, content)
+    {_path, regex} = List.keyfind(@version_files, "mix.exs", 0)
+    [_, _pre, version, _post] = Regex.run(regex, content)
     version
   end
 
