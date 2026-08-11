@@ -65,7 +65,10 @@ Key patterns:
 
 - Use conventional commit prefixes: `feat:`, `fix:`, `refactor:`, `docs:`, `test:`, `security:`, `chore:`
 - Keep commits focused - one concern per commit
-- Write commit messages that explain _why_, not just _what_
+- **One line. No body.** A commit message is a single subject line and nothing else
+- The _why_ belongs in the code, as a comment next to the thing that needs explaining, where it stays next to the code as it changes. A commit body is read once and then never again
+- If a change needs paragraphs to justify, that is usually a sign it should be more than one commit
+- `.githooks/commit-msg` enforces this. Enable it once per clone with `git config core.hooksPath .githooks`. Bypass a single commit with `git commit --no-verify` (merges, reverts and cherry-picks are exempt automatically)
 
 ### Testing
 

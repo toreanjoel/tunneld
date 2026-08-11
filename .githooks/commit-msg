@@ -1,0 +1,49 @@
+#!/bin/sh
+# tunneld: a commit message is one line. No body.
+#
+# Installed via `git config core.hooksPath .githooks`, so it is versioned with
+# the repo rather than living only in one clone's .git/hooks.
+#
+# Why this exists: the log drifted from one-line subjects into multi-paragraph
+# essays, and 66 commits had to be rewritten to get it back. A rule nothing
+# enforces is a rule that decays.
+#
+# Bypass for a single commit with `git commit --no-verify`.
+
+msg_file="$1"
+git_dir=$(git rev-parse --git-dir)
+
+# Merges, reverts and cherry-picks generate their own bodies. They are not the
+# thing this rule is about, and rejecting them would just teach you to pass
+# --no-verify by reflex.
+for in_progress in MERGE_HEAD REVERT_HEAD CHERRY_PICK_HEAD; do
+  if [ -f "$git_dir/$in_progress" ]; then
+    exit 0
+  fi
+done
+
+# Reduce the file to what git will actually record: drop the verbose-diff
+# scissors section, then comment lines, then blank lines.
+content=$(sed -e '/>8 ---/,$d' -e '/^#/d' "$msg_file" | grep -v '^[[:space:]]*$')
+
+lines=$(printf '%s\n' "$content" | grep -c .)
+
+if [ "$lines" -gt 1 ]; then
+  subject=$(printf '%s\n' "$content" | head -n 1)
+  extra=$(printf '%s\n' "$content" | tail -n +2)
+
+  printf '\n' >&2
+  printf 'Commit rejected: commit messages in this repo are a single line.\n' >&2
+  printf '\n' >&2
+  printf '  keeping:  %s\n' "$subject" >&2
+  printf '\n' >&2
+  printf '  drop these %s line(s):\n' "$(printf '%s\n' "$extra" | grep -c .)" >&2
+  printf '%s\n' "$extra" | sed 's/^/    /' >&2
+  printf '\n' >&2
+  printf 'Put the detail in the code, a comment, or the PR. If this commit\n' >&2
+  printf 'genuinely needs a body, bypass with: git commit --no-verify\n' >&2
+  printf '\n' >&2
+  exit 1
+fi
+
+exit 0
