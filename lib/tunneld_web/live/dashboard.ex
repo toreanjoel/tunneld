@@ -754,6 +754,20 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, assign(socket, :system_resources, resources)}
   end
 
+  # Resources broadcasts a bare `%{id: id}` when a resource is deleted. If that
+  # is the one on screen, close the panel rather than forwarding a half-map
+  # into a view that expects a whole resource.
+  def handle_info(%{id: "sidebar_details", module: _m, data: %{id: gone_id} = data}, socket)
+      when map_size(data) == 1 do
+    sidebar = socket.assigns.sidebar
+
+    if match?(%{type: :resource, id: ^gone_id}, Map.get(sidebar, :selection)) do
+      {:noreply, assign(socket, :sidebar, sidebar_close(sidebar))}
+    else
+      {:noreply, socket}
+    end
+  end
+
   def handle_info(%{id: id, module: module, data: data}, socket) do
     if not is_nil(id) do
       send_update(module, id: id, data: data, obfuscated: socket.assigns.obfuscated)

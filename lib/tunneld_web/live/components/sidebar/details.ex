@@ -118,7 +118,11 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
     assigns =
       assigns
-      |> assign(has_data: is_map(data) and map_size(data) > 0)
+      # `:name` is the minimum this view can render. On delete, Resources
+      # broadcasts a bare `%{id: id}` sentinel meaning "this one is gone", and
+      # the dashboard's generic handler forwards it here - rendering that as a
+      # resource raised KeyError and took the whole LiveView down.
+      |> assign(has_data: is_map(data) and Map.has_key?(data, :name))
       |> assign(gateway: Application.get_env(:tunneld, :network)[:gateway])
       |> assign(data: data)
       |> assign(health: Map.get(data || %{}, :health) || Map.get(data || %{}, "health") || %{})
