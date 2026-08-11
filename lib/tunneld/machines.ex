@@ -154,21 +154,55 @@ defmodule Tunneld.Machines do
     end
   end
 
-  @doc "Remove a machine from the registry and delete its keypair."
+  # Timeout for remote teardown operations (seconds)
+  @teardown_timeout_ms 5_000
+
+  @doc """
+  Remove a machine from the registry and delete its keypair.
+
+  Remote cleanup (egress, overlay) is attempted with a timeout. If the target
+  host is unreachable, local state is still deleted - a dead host cannot block
+  machine removal.
+  """
   def remove(id) do
     case Store.get(id) do
       {:error, :not_found} ->
         {:error, "not found"}
 
       {:ok, machine} ->
-        _ = Tunneld.Egress.cleanup_machine(machine)
-        _ = Tunneld.Overlay.remove_overlay_ip(machine)
-        _ = Tunneld.Overlay.remove_peer(machine)
+        # Attempt remote teardown with a timeout - do not block on dead hosts
+        teardown_result = attempt_remote_teardown(machine)
 
+        # Always delete local state, regardless of remote teardown outcome
         :ok = Store.delete(id)
         SSH.delete_key(id)
         broadcast(:removed, %{"id" => id})
-        :ok
+
+        case teardown_result do
+          :ok -> :ok
+          {:error, reason} -> {:ok, %{warning: "Remote cleanup failed: #{reason}"}}
+        end
+    end
+  end
+
+  defp attempt_remote_teardown(machine) do
+    task =
+      Task.async(fn ->
+        try do
+          _ = Tunneld.Egress.cleanup_machine(machine)
+          _ = Tunneld.Overlay.remove_overlay_ip(machine)
+          _ = Tunneld.Overlay.remove_peer(machine)
+          :ok
+        rescue
+          e -> {:error, Exception.message(e)}
+        catch
+          :exit, reason -> {:error, "Exit: #{inspect(reason)}"}
+        end
+      end)
+
+    case Task.yield(task, @teardown_timeout_ms) || Task.shutdown(task, :brutal_kill) do
+      {:ok, result} -> result
+      nil -> {:error, "timeout - host unreachable"}
     end
   end
 

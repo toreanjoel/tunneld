@@ -197,11 +197,20 @@ const TerminalHook = {
     });
 
     this.channel.on("closed", ({ reason }) => {
-      this.setStatus("disconnected", reason || "Connection closed");
+      const msg = reason || "Connection closed";
+      this.setStatus("disconnected", msg);
+      // Write to terminal so the user sees why the session ended
+      if (this.term) {
+        this.term.writeln('\x1b[33m');  // Yellow for closed/disconnected
+        this.term.writeln(`\r\n[Session closed: ${msg}]`);
+        this.term.writeln('\x1b[0m');
+      }
     });
 
     this.channel.on("error", ({ reason }) => {
-      this.setStatus("error", reason || "Connection error");
+      const msg = reason || "Connection error";
+      this.setStatus("error", msg);
+      this.writeTerminalError(msg);
     });
 
     this.channel.join()
@@ -209,10 +218,14 @@ const TerminalHook = {
         // Wait for the "connected" event from SSH
       })
       .receive("error", ({ reason }) => {
-        this.setStatus("error", reason || "Failed to join channel");
+        const msg = reason || "Failed to join channel";
+        this.setStatus("error", msg);
+        this.writeTerminalError(msg);
       })
       .receive("timeout", () => {
-        this.setStatus("error", "Connection timeout");
+        const msg = "Connection timeout";
+        this.setStatus("error", msg);
+        this.writeTerminalError(msg);
       });
 
     this.socket = socket;
@@ -228,9 +241,11 @@ const TerminalHook = {
   },
 
   setStatus(state, message) {
-    const statusEl = this.el.querySelector('.terminal-status');
-    const statusTextEl = this.el.querySelector('.terminal-status-text');
-    const statusIconEl = this.el.querySelector('.terminal-status-icon');
+    // Status elements are in the modal header, a SIBLING of the hook element,
+    // not a descendant. Find them via document.getElementById / querySelector.
+    const statusEl = document.getElementById('terminal-status');
+    const statusTextEl = statusEl?.querySelector('.terminal-status-text');
+    const statusIconEl = statusEl?.querySelector('.terminal-status-icon');
 
     if (statusTextEl) {
       statusTextEl.textContent = message;
@@ -253,6 +268,23 @@ const TerminalHook = {
           statusIconEl.innerHTML = `<svg class="h-4 w-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>`;
           break;
       }
+    }
+  },
+
+  // Write error messages into the terminal surface so users see WHY it's empty
+  writeTerminalError(message) {
+    if (this.term) {
+      // Use ANSI red color for error messages
+      this.term.writeln('\x1b[31m');
+      this.term.writeln('═'.repeat(60));
+      this.term.writeln('  Connection Error');
+      this.term.writeln('═'.repeat(60));
+      this.term.writeln('');
+      this.term.writeln(`  ${message}`);
+      this.term.writeln('');
+      this.term.writeln('  Check the machine panel for troubleshooting options.');
+      this.term.writeln('═'.repeat(60));
+      this.term.writeln('\x1b[0m');
     }
   },
 

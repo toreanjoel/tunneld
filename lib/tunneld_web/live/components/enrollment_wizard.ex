@@ -10,10 +10,11 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
        This step blocks; the user must act outside Tunneld. Say so plainly.
     3. Test connection → success or a specific error (auth failed / unreachable /
        host key changed), never a generic failure.
-    4. Probe → show discovered OS, arch, resources, runtimes.
-    5. Optional: install WireGuard / mark as exit node.
+    4. Probe → show discovered OS, arch, resources, runtimes; auto-install
+       the WireGuard overlay for remote machines.
 
   Every step shows what will happen on the remote machine before it happens.
+  Exit node capability is managed from the machine panel, not the wizard.
   """
 
   use TunneldWeb, :live_component
@@ -29,8 +30,8 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
        public_key: nil,
        error: nil,
        probing: false,
-       wg_result: nil,
-       exit_result: nil
+       overlay_status: nil,
+       overlay_error: nil
      )}
   end
 
@@ -67,23 +68,18 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
 
     case result do
       {:ok, machine} ->
-        {:noreply, assign(socket, step: 4, machine: machine, probing: false, error: nil)}
+        # Probe succeeded - transition to step 4 and start async overlay installation
+        socket =
+          socket
+          |> assign(step: 4, machine: machine, probing: false, error: nil)
+          |> assign(overlay_status: :installing)
+          |> start_async(:install_overlay, fn -> install_overlay(machine) end)
+
+        {:noreply, socket}
 
       {:error, reason} ->
         {:noreply, assign(socket, step: 3, probing: false, error: reason)}
     end
-  end
-
-  def handle_event("wizard_install_wg", _params, socket) do
-    id = socket.assigns.machine_id
-    result = with {:ok, m} <- Machines.get(id), do: Tunneld.Overlay.ensure_peer(m)
-    {:noreply, assign(socket, wg_result: result)}
-  end
-
-  def handle_event("wizard_make_exit", _params, socket) do
-    id = socket.assigns.machine_id
-    result = with {:ok, m} <- Machines.get(id), do: Tunneld.Egress.ensure_exit_capable(m)
-    {:noreply, assign(socket, exit_result: result)}
   end
 
   def handle_event("wizard_close", _params, socket) do
@@ -92,6 +88,12 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
     # closed instead of being re-opened on the next parent re-render.
     send(socket.parent_pid, :wizard_closed)
     {:noreply, assign(socket, open: false)}
+  end
+
+  defp install_overlay(machine) do
+    # Run ensure_peer which SSHes to target and installs wireguard-tools
+    # This can take tens of seconds, hence the async execution
+    Tunneld.Overlay.ensure_peer(machine)
   end
 
   def handle_info({:wizard_probe_result, result}, socket) do
@@ -104,15 +106,28 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
     end
   end
 
-  def handle_info({:wizard_wg_result, result}, socket) do
-    {:noreply, assign(socket, wg_result: result)}
-  end
-
-  def handle_info({:wizard_exit_result, result}, socket) do
-    {:noreply, assign(socket, exit_result: result)}
-  end
-
   def handle_info(_msg, socket), do: {:noreply, socket}
+
+  # Handle async overlay installation results
+  @impl true
+  def handle_async(:install_overlay, {:ok, :ok}, socket) do
+    {:noreply, assign(socket, overlay_status: :success, overlay_error: nil)}
+  end
+
+  def handle_async(:install_overlay, {:ok, {:ok, _}}, socket) do
+    {:noreply, assign(socket, overlay_status: :success, overlay_error: nil)}
+  end
+
+  def handle_async(:install_overlay, {:ok, {:error, reason}}, socket) do
+    # Overlay install failed - enrollment still succeeds, but record the failure
+    {:noreply, assign(socket, overlay_status: :failed, overlay_error: inspect(reason))}
+  end
+
+  def handle_async(:install_overlay, {:exit, reason}, socket) do
+    # Task crashed - enrollment still succeeds, but record the failure
+    {:noreply,
+     assign(socket, overlay_status: :failed, overlay_error: "Task failed: #{inspect(reason)}")}
+  end
 
   @impl true
   def render(assigns) do
@@ -138,7 +153,7 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
             <.icon name="hero-x-mark-solid" class="h-5 w-5" />
           </div>
           <h2 class="text-xl font-medium mb-1">Enroll Machine</h2>
-          <div class="text-xs text-text-tertiary mb-4">Step <%= @step %> of 5</div>
+          <div class="text-xs text-text-tertiary mb-4">Step <%= @step %> of 4</div>
 
           <%= render_step(assigns) %>
         </div>
@@ -250,21 +265,73 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
             else: Enum.join(@runtimes, ", ") %>
         </div>
       </div>
+
+      <%!-- WireGuard overlay installation status --%>
+      <div class="bg-surface rounded-lg p-3 text-xs">
+        <div class="flex items-center gap-2">
+          <%= case @overlay_status do %>
+            <% :installing -> %>
+              <svg
+                class="animate-spin h-4 w-4 text-accent"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  class="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  stroke-width="4"
+                >
+                </circle>
+                <path
+                  class="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                >
+                </path>
+              </svg>
+              <span class="text-text-secondary">Installing WireGuard overlay...</span>
+            <% :success -> %>
+              <svg
+                class="h-4 w-4 text-green-500"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M5 13l4 4L19 7"
+                >
+                </path>
+              </svg>
+              <span class="text-green-500">WireGuard overlay installed</span>
+            <% :failed -> %>
+              <svg class="h-4 w-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M6 18L18 6M6 6l12 12"
+                >
+                </path>
+              </svg>
+              <span class="text-red-500">WireGuard installation failed</span>
+            <% _ -> %>
+              <span class="text-text-tertiary">Preparing overlay...</span>
+          <% end %>
+        </div>
+        <p :if={@overlay_error} class="mt-2 text-red-400 text-[10px]"><%= @overlay_error %></p>
+        <p :if={@overlay_status == :failed} class="mt-1 text-text-tertiary text-[10px]">
+          Machine enrolled successfully. You can install the overlay later from the machine panel.
+        </p>
+      </div>
+
       <div class="flex flex-col gap-2 pt-2">
-        <button
-          phx-click="wizard_install_wg"
-          phx-target={@myself}
-          class="w-full bg-surface p-2 rounded-md text-sm hover:bg-surface-2"
-        >
-          Install WireGuard (overlay)
-        </button>
-        <button
-          phx-click="wizard_make_exit"
-          phx-target={@myself}
-          class="w-full bg-surface p-2 rounded-md text-sm hover:bg-surface-2"
-        >
-          Make Exit Node
-        </button>
         <button
           phx-click="wizard_close"
           phx-target={@myself}
@@ -273,10 +340,6 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
           Done
         </button>
       </div>
-      <p :if={@wg_result} class="text-xs text-text-tertiary">WireGuard: <%= inspect(@wg_result) %></p>
-      <p :if={@exit_result} class="text-xs text-text-tertiary">
-        Exit node: <%= inspect(@exit_result) %>
-      </p>
     </div>
     """
   end
