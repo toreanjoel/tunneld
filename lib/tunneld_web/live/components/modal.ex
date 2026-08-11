@@ -122,12 +122,21 @@ defmodule TunneldWeb.Live.Components.Modal do
     """
   end
 
-  defp render_body(assigns, %{"type" => "code_blocks", "data" => blocks}) when is_list(blocks) do
-    assigns = assign(assigns, :blocks, blocks)
+  # `intro` says WHERE these commands are meant to be run. It used to be
+  # hardcoded to "From any allowed device on the subnet:", which is true only
+  # for Quick Expose - the other three callers tell you to run the block on the
+  # target machine over SSH, and the modal then contradicted its own
+  # description. Callers that omit it get no caption.
+  defp render_body(assigns, %{"type" => "code_blocks", "data" => blocks} = body)
+       when is_list(blocks) do
+    assigns =
+      assigns
+      |> assign(:blocks, blocks)
+      |> assign(:intro, Map.get(body, "intro"))
 
     ~H"""
     <div class="mt-2 space-y-3">
-      <p class="text-xs text-gray-300">From any allowed device on the subnet:</p>
+      <p :if={@intro} class="text-xs text-gray-300"><%= @intro %></p>
       <%= for {block, i} <- Enum.with_index(@blocks) do %>
         <div class="relative">
           <p class="text-[10px] uppercase font-medium text-gray-400 mb-0.5"><%= block["title"] %></p>

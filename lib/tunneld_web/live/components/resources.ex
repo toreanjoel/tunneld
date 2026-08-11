@@ -39,7 +39,11 @@ defmodule TunneldWeb.Live.Components.Resources do
             phx-click="modal_open"
             phx-value-modal_title="Quick Expose"
             phx-value-modal_body={
-              Jason.encode!(%{"type" => "code_blocks", "data" => quick_expose_blocks()})
+              Jason.encode!(%{
+                "type" => "code_blocks",
+                "intro" => "From any allowed device on the subnet:",
+                "data" => quick_expose_blocks()
+              })
             }
             class="ghost-btn"
           >
