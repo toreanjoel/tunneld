@@ -1316,7 +1316,7 @@ defmodule TunneldWeb.Live.Dashboard do
       %{
         "title" => "3. (Remote machines) Open the WireGuard port in the provider firewall",
         "code" =>
-          "Allow inbound UDP/51820 in the target's cloud-provider firewall (e.g. a Vultr security group) so the gateway can bring up the WireGuard overlay."
+          "Allow inbound UDP/51821 in the target's cloud-provider firewall (e.g. a Vultr security group) so the gateway can bring up the WireGuard overlay."
       }
     ]
 

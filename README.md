@@ -5,9 +5,9 @@
 ![Caddy](https://img.shields.io/badge/Caddy-2.x-green)![WireGuard](https://img.shields.io/badge/WireGuard-1.x-blue)
 ![Platform](https://img.shields.io/badge/platform-debian-red)
 
-Software for a dual-NIC ARM64 single-board computer that turns it into a wired edge gateway for a private subnet. The core idea is **a resource is an address, not a container**: tunneld discovers what is *listening* on any Linux host (`ss -tlnp`) and exposes it — over the LAN or the public internet — via **Caddy** and **WireGuard**. It installs exactly two things on a target: **WireGuard and Caddy.**
+Software for a dual-NIC ARM64 single-board computer that turns it into a wired edge gateway for a private subnet. The core idea is **a resource is an address, not a container**: tunneld discovers what is *listening* on any Linux host (`ss -tlnp`) and exposes it — on the LAN and over a WireGuard overlay — via **Caddy** and **WireGuard**. It installs exactly one thing on a target: **WireGuard** (`wireguard-tools`). Caddy runs on the gateway only.
 
-Each node is self-contained (no database — just atomic JSON files) and runs on a small ARM64 SBC. Plug devices into the downstream port, manage them from a real-time LiveView dashboard, and expose services on machines you've enrolled over SSH — locally, remotely over WireGuard, or publicly on the internet.
+Each node is self-contained (no database — just atomic JSON files) and runs on a small ARM64 SBC. Plug devices into the downstream port, manage them from a real-time LiveView dashboard, and expose services on machines you've enrolled over SSH — locally, or remotely over WireGuard.
 
 > **Prerequisites**
 >
@@ -23,7 +23,7 @@ Each node is self-contained (no database — just atomic JSON files) and runs on
 Tunneld is one box that does two jobs:
 
 1. **It is the network.** It runs DHCP and DNS for your subnet, NATs your upstream connection, and gives every device and service a name (`*.tunneld.lan`). Nothing on the subnet needs configuring — it just works.
-2. **It exposes what's listening.** Over SSH it reaches other machines (local boxes on the subnet, or remote VPSes), enumerates their listening sockets (`ss -tlnp`), and turns any of them into a named resource fronted by Caddy — on the LAN, over a WireGuard overlay, or on the public internet.
+2. **It exposes what's listening.** Over SSH it reaches other machines (local boxes on the subnet, or remote VPSes), enumerates their listening sockets (`ss -tlnp`), and turns any of them into a named resource fronted by Caddy on the gateway — on the LAN, or over a WireGuard overlay.
 
 Everything is reachable by name from anything on the subnet. No cloud, no accounts, no per-device setup. It works fully offline — local networking, DHCP, and name resolution keep functioning without internet.
 
@@ -43,31 +43,31 @@ No Wi-Fi. No overlay network. No control-plane dependency.
 These are the scenarios the architecture actually enables today.
 
 ### Self-hosted AI lab, no cloud bill
-Spin up an Ollama container on every spare box in your house (old laptops, NUCs, SBCs). Tunneld gives each one a `*.tunneld.lan` name and load-balances across them. Open `http://chat.tunneld.lan:18000` from your phone — no internet, no API key, no per-token charge.
+Run an Ollama container on every spare box in your house (old laptops, NUCs, SBCs) — you start them, tunneld discovers the listener. Tunneld gives each one a `*.tunneld.lan` name and load-balances across them. Open `http://chat.tunneld.lan:18000` from your phone — no internet, no API key, no per-token charge.
 
 ### A personal cloud that survives an internet outage
 Starlink drops, fiber gets cut, the ISP has a bad day — your LAN keeps humming. DHCP, DNS, file shares, media, and dashboards all stay up because the gateway *is* the network. Add a remote VPS as a managed machine and you've got a failover dev box reachable from the same dashboard.
 
 ### Homelab in a backpack
-One ARM SBC + a few USB drives = a deployable edge node for a field site, a cabin, a boat, a pop-up event. Plug into any upstream (hotspot, Starlink, fiber) and it becomes the LAN: devices get addresses, services get names, you provision containers from the LiveView UI on your phone. Pack up, move, replant.
+One ARM SBC + a few USB drives = a deployable edge node for a field site, a cabin, a boat, a pop-up event. Plug into any upstream (hotspot, Starlink, fiber) and it becomes the LAN: devices get addresses, services get names, and you promote listeners to resources from the LiveView UI on your phone. Pack up, move, replant.
 
 ### A fleet of game servers for your friends
-Each game (Minecraft, Valheim, Factorio) runs in its own Incus container on whatever box has spare RAM. `minecraft.tunneld.lan`, `valheim.tunneld.lan` — your friends just type the name. Add a remote VPS as a managed machine and your crew plays even when your home IP changes.
+Each game (Minecraft, Valheim, Factorio) runs in its own container on whatever box has spare RAM — you run it, tunneld discovers and exposes it. `minecraft.tunneld.lan`, `valheim.tunneld.lan` — your friends just type the name. Add a remote VPS as a managed machine and your crew plays even when your home IP changes.
 
 ### Remote dev environments you SSH into from the couch
-Provision a fresh Incus container per project on any machine in the house (or a remote VPS). Open a browser shell from the LiveView dashboard, or `ssh project.tunneld.lan`. Kill the container when you're done — state lives in git, not on your laptop. Your M-series MacBook stays cool; the heavy lifting happens on the noisy box in the closet.
+Run a fresh container per project on any machine in the house (or a remote VPS); tunneld discovers what it is listening on and names it. Open a browser shell from the LiveView dashboard, or `ssh project.tunneld.lan`. Kill the container when you're done — state lives in git, not on your laptop. Your M-series MacBook stays cool; the heavy lifting happens on the noisy box in the closet.
 
 ### A "bring-your-own-device" workshop or classroom
 Walk in with the tunneld SBC, plug it in. Every attendee's laptop gets a DHCP lease and can `curl` the device API — no accounts, no onboarding. They hit `http://notes.tunneld.lan`, `http://dataset.tunneld.lan`, `http://sandbox.tunneld.lan` and you've got a self-contained workshop environment with zero cloud dependency and zero per-seat setup.
 
 ### A 3D-printer / maker farm
-Each printer host is a managed machine. Tunneld provisions an OctoPrint container per printer, exposes it as `printer-1.tunneld.lan`, load-balances a shared dashboard. Add a remote VPS as a managed machine and you can monitor the farm from anywhere — the reverse SSH tunnel makes a remote printer look local.
+Each printer host is a managed machine. You run an OctoPrint instance per printer; tunneld discovers it and exposes it as `printer-1.tunneld.lan`, load-balancing a shared dashboard. Add a remote VPS as a managed machine and you can monitor the farm from anywhere — the WireGuard overlay makes a remote printer look local.
 
 ### A privacy-first smart home with no vendor cloud
-Home Assistant, Frigate (NVR), Node-RED, MQTT — all in Incus containers on machines tunneld manages. No data leaves the LAN. The gateway's DNS interception means even chatty devices stay inside. `home.tunneld.lan`, `cams.tunneld.lan`, `automations.tunneld.lan` — reachable from any device on the subnet, nowhere else.
+Home Assistant, Frigate (NVR), Node-RED, MQTT — all in containers on machines tunneld manages (you run them; tunneld discovers and exposes them). No data leaves the LAN. The gateway's DNS interception means even chatty devices stay inside. `home.tunneld.lan`, `cams.tunneld.lan`, `automations.tunneld.lan` — reachable from any device on the subnet, nowhere else.
 
 ### A red-team / CTF training range
-Provision vulnerable containers per exercise, tear them down per session, expose them as `vuln-1.tunneld.lan`. The gateway isolates the range from the upstream. Reset the whole range with one click from the LiveView dashboard. Great for training a team without touching anything outside the subnet.
+Run vulnerable containers per exercise and tear them down per session; tunneld discovers each one and exposes it as `vuln-1.tunneld.lan`. The gateway isolates the range from the upstream. Tunneld does not create, start, stop or reset containers — it only discovers what is listening and points a name at it. Great for training a team without touching anything outside the subnet.
 
 ### An offline-first edge node for a remote site
 A cabin, a boat, a research station, a construction trailer. Tunneld on the SBC + a 4G/Starlink upstream. Local devices get DNS and DHCP, local services keep working when the uplink dies, and a remote VPS acts as your managed "always-on" machine for things that *do* need internet — all seen from one dashboard.
@@ -113,7 +113,7 @@ Enroll machines (local subnet devices or remote VPSes) that expose a Linux SSH e
 - **Host specs surfaced per target** from a generic capability probe: `os`, `kernel`, `arch`, `cpu_count`, `memory_mb`, `detected_runtimes` (no container-runtime fields).
 - **Listeners discovered live** with `ss -tlnp`; the target is the source of truth. Tunneld persists only the target list and credentials.
 - **SSH transport** uses ControlMaster multiplexing (`ControlMaster=auto`, `ControlPersist=600`) so repeated commands reuse one persistent connection per machine.
-- **Runtime-agnostic** — tunneld never asks "what runtime is this?", only "what is listening?". Incus/Docker/systemd/bare processes all work identically; it installs exactly two things on a target: **WireGuard and Caddy**.
+- **Runtime-agnostic** — tunneld never asks "what runtime is this?", only "what is listening?". Incus/Docker/systemd/bare processes all work identically; it installs exactly one thing on a target: **WireGuard** (`wireguard-tools`).
 
 ### Local vs remote machines
 The `location` field is inferred from the subnet (same `/24` as the gateway = `"local"`, otherwise
@@ -124,7 +124,7 @@ The `location` field is inferred from the subnet (same `/24` as the gateway = `"
   machines local.
 
 ### Overlay (WireGuard)
-Tunneld installs WireGuard on each enrolled machine and brings up a `wg-<id>` peer. The gateway
+Tunneld installs WireGuard (`wireguard-tools`) on each enrolled machine and brings up a `wg-<hash>` peer (`<hash>` is the first 8 hex chars of `sha256(machine_id)`; wg-quick caps interface names at 15 chars). The gateway
 dials out to each machine (`PersistentKeepalive=25`, `Table=off` with hand-installed routes), so a
 remote VPS's services become reachable as if they were on the subnet.
 
@@ -133,14 +133,14 @@ Tunneld discovers what is *listening* (`ss -tlnp`) on a machine; any listener ca
 **resource**. A resource is a named pointer to already-running backends:
 
 - Caddy load-balances across healthy backends; each resource is reachable at
-  `http://<name>.tunneld.lan:18000` (and on a per-resource loopback port `127.0.0.1:2xxxx` for
-  manual/zrok-style exposure).
+  `http://<name>.tunneld.lan:18000` (and on a per-resource loopback port bound to the gateway IP,
+  `<gateway-ip>:2xxxx`, falling back to `127.0.0.1` — for manual/zrok/cloudflared-style exposure).
 - Remote machines are reached over the overlay, so no SSH tunnel is involved and resources survive
   a gateway reboot.
-- Public exposure drives the machine's own Caddy (over the overlay) with a single `listen` field:
-  a port (`8080`, no TLS) or a hostname (`app.example.com`, auto-TLS).
 - Pool entries are validated as `IP:port` before writing the Caddy upstream config (injection-safe).
-- No public-internet exposure without an explicit public-plane action.
+- **No public-internet exposure at all.** Caddy runs on the gateway with two planes — the LAN
+  server on `0.0.0.0:18000` and the per-resource loopback listener. Putting a resource on the
+  internet is operator-managed and outside tunneld.
 
 ### Quick Expose
 A subnet device can create, list, and remove a local resource with a single `curl` — no login. The gateway resolves the caller from its DHCP lease (`conn.remote_ip` matched against `dnsmasq.leases`) and validates a per-device allowlist (`expose_allowed.json`, MAC → boolean). The operator must explicitly allowlist a MAC before that device can Quick Expose.
@@ -152,13 +152,12 @@ DELETE /api/v1/expose/:name   remove a quick-exposed resource
 ```
 
 ### Device-facing read API
-Any device with a DHCP lease from this gateway can query machine, container, health, and exposure data without logging in (same device-resolution model as Quick Expose). Useful for CLI/scripts on subnet devices:
+Any device with a DHCP lease from this gateway can query machine, resource, and health data without logging in (same device-resolution model as Quick Expose). Useful for CLI/scripts on subnet devices — these four routes are the whole device API:
 
 ```
 GET /api/v1/device/machines                  list machines + status + capabilities
 GET /api/v1/device/machines/:id              machine detail + health
-GET /api/v1/device/machines/:id/containers   list containers on a machine (live)
-GET /api/v1/device/resources                 list exposed resources (incl. remote exposures)
+GET /api/v1/device/resources                 list exposed resources
 GET /api/v1/device/health                    gateway + service status
 ```
 
@@ -174,7 +173,7 @@ The dashboard surfaces the gateway's public IP geolocation on an **offline SVG w
 Polls `raw.githubusercontent.com/toreanjoel/tunneld-installer/.../metadata.json` every 5 minutes, compares versions, and broadcasts to the dashboard when a new release is available.
 
 ### First-run setup wizard
-Guided onboarding flow after initial account creation. Shows the four capabilities this build offers (Edge gateway, Fleet management, Expose services, Health & monitoring) and marks `onboarded` in `auth.json`.
+Guided onboarding flow after initial account creation. Shows the four capabilities this build offers (Edge gateway, Machine discovery, Expose services, Health & monitoring) and marks `onboarded` in `auth.json`.
 
 ### Dashboard value obfuscation
 A dashboard-wide obfuscation toggle masks IPs, MACs, and other sensitive values in the LiveView — useful for screen-sharing or recording.
@@ -186,11 +185,11 @@ A dashboard-wide obfuscation toggle masks IPs, MACs, and other sensitive values 
 - **Wi-Fi bridging and all wireless management.** Wired only.
 - **zrok / OpenZiti integration and public/private shares.**
 - **WireGuard mesh / relay coordinator.** (A previous WireGuard mesh was removed; a per-machine WireGuard **overlay** is used instead so remote machines are reached directly.)
-- **Local PKI on the LAN.** Caddy listens on plain `http://` port 18000; no LAN TLS. (Public exposure via a hostname lets Caddy auto-provision TLS.)
+- **Local PKI on the LAN, and TLS anywhere.** Caddy listens on plain `http://` port 18000; every server tunneld emits sets `automatic_https: disable`, so nothing is ever ACME-provisioned.
 - **Automatic config generation beyond the resource pool model.** Caddy configs are reconciled only for resources in `resources.json`.
 - **CLI quick-share beyond the device-facing API.** Quick Expose is the only share endpoint.
 - **Off-LAN / internet exposure of resources.** Operator-managed, separate from tunneld.
-- **Non-Linux host management via a Linux VM.** Documented as a future direction but not implemented; only `kind: "incus"` is supported.
+- **Non-Linux host management via a Linux VM.** Documented as a future direction but not implemented; only Linux hosts reachable over SSH (`kind: "host"`) are supported.
 - **WebAuthn / passkey login.** Listed in the project structure as a future addition; auth today is bcrypt + session.
 
 ---
@@ -200,14 +199,14 @@ A dashboard-wide obfuscation toggle masks IPs, MACs, and other sensitive values 
 | Component | Role |
 |-----------|------|
 | `dnsmasq` | DHCP server + DNS resolver (forwarding + `*.tunneld.lan` named resolution) |
-| `caddy` | Reverse proxy with per-resource upstream load balancing (`0.0.0.0:18000`) + public plane |
+| `caddy` | Gateway-side reverse proxy with per-resource upstream load balancing — two planes: the LAN server on `0.0.0.0:18000` and a per-resource loopback listener |
 | `iptables` | NAT, packet forwarding, DNS interception between `:upstream` and `:downstream` |
 | `SSH` | Transport to managed machines (ControlMaster multiplexing, per-machine Ed25519 keys) |
 | `WireGuard` | Overlay so remote machines are reachable as local IPs |
 | `Elixir/Phoenix` | Application server, LiveView dashboard, GenServer process management |
 
 ### Supervision tree
-One `one_for_one` supervisor (`Tunneld.Supervisor`) starts Telemetry, DNSCluster, PubSub, the Endpoint, and the domain servers: Session, SystemResources, Services, Resources, Devices, Auth, DnsConfig, Updater, Machines, AgentTokens, Jobs, and Geolocation. In mock mode a fake SSH/Incus target is also started. In mock mode a fake Incus/SSH target is also started.
+One `one_for_one` supervisor (`Tunneld.Supervisor`) starts Telemetry, DNSCluster, PubSub, the Endpoint, and the domain servers: Session, SystemResources, Services, Resources, Devices, Auth, DnsConfig, Updater, AgentTokens, Jobs, and Geolocation. `Tunneld.Machines` is **not** a supervised child — it is a plain module, and `Machines.recover_all/0` runs once in a `Task` after the tree is up. Mock mode starts no extra process either: `Tunneld.Machines.SSH.Mock` is a plain module that `SSH.run/3` dispatches to.
 
 ### Diagrams
 Detailed architecture diagrams with Mermaid (rendered on GitHub):
@@ -241,12 +240,16 @@ All state is JSON files under `TUNNELD_DATA` (prod: `/var/lib/tunneld`, dev: `da
 | `auth.json` | bcrypt admin credentials + onboarding flag |
 | `resources.json` | Resource registry (name, pool, kind) |
 | `machines.json` | Enrolled machines (id, name, address, ssh_port, kind, location, capabilities) |
-| `expose.json` | Active remote container exposures (tunnel + resource records) |
 | `dns.json` | Upstream DNS server IP |
 | `device_tags.json` | Device friendly-name tags (MAC → labels) |
 | `expose_allowed.json` | Quick Expose per-device allowlist (MAC → boolean) |
+| `tokens.json` | Agent API tokens (SHA-256 hashes + scopes) |
+| `overlay.json` | WireGuard overlay IP allocations per machine |
+| `egress_tables.json` | Routing-table numbers assigned to exit machines |
+| `device_egress.json` | Per-device egress selections (device IP → exit machine) |
+| `audit.jsonl` | Append-only JSON-lines audit log of agent API calls |
 
-Machine SSH private keys are stored per-machine under `TUNNELD_DATA/ssh/<machine_id>` (mode 0600).
+Machine SSH private keys are stored per-machine under `TUNNELD_DATA/ssh/<machine_id>` (mode 0600); WireGuard keys live under `TUNNELD_DATA/wg/<machine_id>`.
 
 ---
 
@@ -280,11 +283,9 @@ lib/
       store.ex              # machines.json persistence
       ssh.ex                # SSH transport (Ed25519 keys, ControlMaster)
       ssh/mock.ex           # Simulated SSH target for dev
+      ssh/session.ex        # Interactive PTY over Erlang :ssh (browser terminal)
       runtime.ex            # Runtime-agnostic listeners (ss -tlnp) + generic probe
-      exec.ex               # Interactive incus exec over SSH, streamed to browser
-      expose.ex             # Reverse-SSH expose path for remote containers
     geo_data/
-      centroids.ex          # Country centroid coordinates (from Natural Earth)
       world_map.ex          # Inline SVG world map (offline, no CDN)
     schema.ex               # Schema definitions for configuration forms
     schema/                 # JSON Schema defs driving dynamic modal forms
@@ -309,7 +310,7 @@ lib/
       components/           # LiveView components (machines, resources, devices, terminal, obfuscation, etc.)
     channels/
       user_socket.ex        # Phoenix socket for the exec terminal channel
-      exec_channel.ex      # Streams incus exec to the browser terminal
+      exec_channel.ex       # Streams an interactive SSH shell to the browser terminal
     controllers/
       device_controller.ex  # Device-facing read API (/api/v1/device/*)
       expose_controller.ex  # Quick Expose API (/api/v1/expose)
@@ -323,7 +324,7 @@ lib/
 
 Run Tunneld locally with mocked hardware interactions:
 
-1. Install Elixir 1.18+ and Erlang/OTP 26+
+1. Install Elixir and Erlang/OTP — `.tool-versions` pins `elixir 1.18.3-otp-26` / `erlang 26.2.5` (CI uses the same pair); `mix.exs` requires `~> 1.17`
 2. Install dependencies: `mix deps.get`
 3. Install JS/CSS tooling: `mix assets.setup`
 4. Start the server: `mix phx.server`
@@ -338,7 +339,7 @@ In mock mode (`MOCK_DATA=true`) no system commands are executed — `systemctl`,
 mix test
 ```
 
-Tests cover the NetLink helper, machine enrollment, Runtime listeners, Overlay, Egress, Reconcile/Disenroll, and the agent API. Tests that modify Application env use `async: false`.
+Tests cover the NetLink helper, machine enrollment, Runtime listeners, Overlay, Egress, Reconcile, and the agent API. Tests that modify Application env use `async: false`.
 
 ### Version management
 

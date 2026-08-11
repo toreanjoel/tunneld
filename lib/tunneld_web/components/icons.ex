@@ -252,35 +252,6 @@ defmodule TunneldWeb.Icons do
   attr :class, :string, default: nil
   attr :rest, :global
 
-  def monitor(assigns) do
-    ~H"""
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={@size}
-      height={@size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.5"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      class={@class}
-      {@rest}
-    >
-      <rect x="2" y="3" width="20" height="14" rx="2" /><line x1="8" y1="21" x2="16" y2="21" /><line
-        x1="12"
-        y1="17"
-        x2="12"
-        y2="21"
-      />
-    </svg>
-    """
-  end
-
-  attr :size, :integer, default: 18
-  attr :class, :string, default: nil
-  attr :rest, :global
-
   def chevron_right(assigns) do
     ~H"""
     <svg
@@ -297,59 +268,6 @@ defmodule TunneldWeb.Icons do
       {@rest}
     >
       <polyline points="9 18 15 12 9 6" />
-    </svg>
-    """
-  end
-
-  attr :size, :integer, default: 18
-  attr :class, :string, default: nil
-  attr :rest, :global
-
-  def copy(assigns) do
-    ~H"""
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={@size}
-      height={@size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.5"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      class={@class}
-      {@rest}
-    >
-      <rect x="9" y="9" width="13" height="13" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-    </svg>
-    """
-  end
-
-  attr :size, :integer, default: 18
-  attr :class, :string, default: nil
-  attr :rest, :global
-
-  def tag(assigns) do
-    ~H"""
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={@size}
-      height={@size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      stroke-width="1.5"
-      stroke-linecap="round"
-      stroke-linejoin="round"
-      class={@class}
-      {@rest}
-    >
-      <path d="M20.59 13.41 13.41 20.59a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z" /><line
-        x1="7"
-        y1="7"
-        x2="7.01"
-        y2="7"
-      />
     </svg>
     """
   end

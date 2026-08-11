@@ -165,7 +165,8 @@ PersistentKeepalive = 25
       <h3>One Interface Per Machine</h3>
 
       <p>
-        Each enrolled remote machine gets its own WireGuard interface on the gateway, 
+        Each enrolled machine gets its own WireGuard interface on the gateway 
+        (reconciliation skips machines marked <code>location: "local"</code>), 
         named <code>wg-&lt;short_hash&gt;</code> (the first 8 characters of a SHA256 
         hash of the machine ID). This keeps interface names under the 15-character 
         limit imposed by Linux.

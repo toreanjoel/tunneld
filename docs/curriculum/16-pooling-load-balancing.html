@@ -222,7 +222,7 @@ machine2 = Machines.get("remote-vps")   # address: 45.76.183.185 (public)
 backend1 = "#{Overlay.address_for(machine1)}:11434"  # "10.0.0.50:11434"
 backend2 = "#{Overlay.address_for(machine2)}:11434"  # "10.88.0.5:11434"
 
-Resources.create_resource(%{
+Resources.add_share(%{
   "name" => "ollama",
   "pool" => [backend1, backend2]
 })
@@ -338,8 +338,8 @@ end
 # 4. Add backends: "10.0.0.50:11434", "10.0.0.51:11434"
 # 5. Save
 
-# Via the API:
-$ curl -X POST http://10.0.0.1/api/v1/resources \
+# Via the agent API (note the /agent segment):
+$ curl -X POST http://10.0.0.1/api/v1/agent/resources \
     -H "Authorization: Bearer $TOKEN" \
     -H "Content-Type: application/json" \
     -d '{
@@ -350,16 +350,15 @@ $ curl -X POST http://10.0.0.1/api/v1/resources \
 
       <h3>Add a backend to an existing pool</h3>
 
-<pre>
-# Get current resource:
-$ curl http://10.0.0.1/api/v1/resources/abc123
-{"pool": ["10.0.0.50:11434"]}
-
-# Update with new backend:
-$ curl -X PATCH http://10.0.0.1/api/v1/resources/abc123 \
-    -H "Authorization: Bearer $TOKEN" \
-    -d '{"pool": ["10.0.0.50:11434", "10.88.0.5:11434"]}'
-</pre>
+      <p>
+        There is no HTTP endpoint for this. The agent API exposes exactly three resource
+        routes — <code>GET /api/v1/agent/resources</code> (index),
+        <code>POST /api/v1/agent/resources</code> (create) and
+        <code>DELETE /api/v1/agent/resources/:id</code> — with no show-one and no update
+        route. Editing a pool is a dashboard action that calls
+        <code>Resources.update_share/2</code>; over HTTP the only option is to delete the
+        resource and re-create it with the full pool.
+      </p>
 
       <h3>Verify load balancing</h3>
 
@@ -380,9 +379,15 @@ $ for i in {1..6}; do
 # - Yellow: some backends unhealthy (degraded)
 # - Red: all backends unhealthy
 
-# Via API:
-$ curl http://10.0.0.1/api/v1/resources
-[{"name": "ollama", "health": "degraded", "pool": [...]}]
+# Via the agent API:
+$ curl -H "Authorization: Bearer $TOKEN" http://10.0.0.1/api/v1/agent/resources
+{"resources": [
+  {"id": "abc123", "name": "ollama", "pool": ["10.0.0.50:11434", "10.0.0.51:11434"],
+   "lan_url": "http://ollama.tunneld.lan:18000", "loopback_port": 20000,
+   "health": {"total": 2, "up": 1, "status": "partial"}}
+]}
+# health is a map from pool_health/2 - status is one of
+# :all_up | :partial | :none | :empty, not a free-form string.
 </pre>
     </section>
 

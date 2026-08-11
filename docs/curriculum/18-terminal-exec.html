@@ -28,7 +28,7 @@
       </p>
 
       <p>
-        Unlike the <code>POST /machines/:id/exec</code> API endpoint which runs a single
+        Unlike the <code>POST /api/v1/agent/machines/:id/exec</code> API endpoint which runs a single
         command and returns output, the terminal maintains a persistent interactive
         session. The operator sees a real shell prompt, can run <code>htop</code>,
         <code>vim</code>, or any interactive program. Resize events propagate through
@@ -255,7 +255,7 @@ const socket = new window.Phoenix.Socket("/ws", {
       <h3>Bug 3: phx-update="ignore"</h3>
 
       <p>
-        xterm.js injects its own DOM into the hook element: a viewport, a canvas,
+        xterm.js injects its own DOM into the hook element: a viewport, a screen,
         cursor layers. Without <code>phx-update="ignore"</code> on the container,
         LiveView's next diff reconciled that subtree back to the empty
         server-rendered div. The terminal silently vanished a few seconds after
@@ -288,7 +288,7 @@ const socket = new window.Phoenix.Socket("/ws", {
 
 # 3. TerminalHook.mounted() runs:
 #    - Creates xterm.js terminal
-#    - Loads WebGL renderer (with canvas/DOM fallback)
+#    - Loads the fit addon (xterm's default DOM renderer is the only renderer)
 #    - Opens Phoenix socket to /ws with _csrf_token
 #    - Joins exec:abc123 channel with cols/rows
 #
@@ -296,7 +296,7 @@ const socket = new window.Phoenix.Socket("/ws", {
 #    - Verifies session
 #    - Looks up machine abc123
 #    - Starts SSH.Session GenServer
-#    - GenServer connects to 10.100.0.5 (overlay IP)
+#    - GenServer connects to 10.88.0.5 (overlay IP)
 #    - Allocates PTY, starts shell
 #    - Pushes {:ssh_connected} to channel
 #    - Channel pushes "connected" to browser
@@ -322,11 +322,11 @@ const socket = new window.Phoenix.Socket("/ws", {
 
 # 1. "Connection refused"
 #    - sshd not running on target, or wrong port
-#    - Check: ssh -p 22 root@10.100.0.5
+#    - Check: ssh -p 22 root@10.88.0.5
 
 # 2. "Host unreachable"
 #    - WireGuard overlay not established
-#    - Check: ping 10.100.0.5 from gateway
+#    - Check: ping 10.88.0.5 from gateway
 
 # 3. "SSH key not found for this machine"
 #    - Key file missing in TUNNELD_DATA/ssh/&lt;machine_id&gt;
@@ -337,43 +337,12 @@ const socket = new window.Phoenix.Socket("/ws", {
 #    - Check /etc/ssh/sshd_config on target
 
 # 5. Session connects but terminal is blank:
-#    - Check browser console for WebGL errors
-#    - The renderer falls back to canvas, then DOM
-#    - If all fail, check xterm.js version compatibility
+#    - Check the browser console for xterm.js errors
+#    - There is no GPU renderer: WebGL/canvas were tried and reverted
+#      (assets/js/terminal_hook.js), so the DOM renderer is the only renderer
+#    - Check that the container has a non-zero size so fitAddon.fit() works
 </pre>
 
-      <h3>Terminal hook initialization with accelerated rendering</h3>
-
-<pre>
-// The terminal hook attempts WebGL first, then canvas, then DOM:
-
-loadAcceleratedRenderer() {
-  if (!this.term) return;
-
-  const WebglAddon = WebglMod?.WebglAddon || WebglMod?.default?.WebglAddon;
-  const CanvasAddon = CanvasMod?.CanvasAddon || CanvasMod?.default?.CanvasAddon;
-
-  // Try WebGL first for best performance
-  if (WebglAddon) {
-    try {
-      const webglAddon = new WebglAddon();
-      webglAddon.onContextLoss(() => {
-        console.warn("Terminal: WebGL context lost, falling back to canvas");
-        webglAddon.dispose();
-        this.loadCanvasRenderer(CanvasAddon);
-      });
-      this.term.loadAddon(webglAddon);
-      this.rendererAddon = webglAddon;
-      return;
-    } catch (e) {
-      console.warn("Terminal: WebGL not available:", e.message);
-    }
-  }
-
-  // Fall back to canvas, then DOM (the default)
-  this.loadCanvasRenderer(CanvasAddon);
-}
-</pre>
     </section>
 
     <footer>

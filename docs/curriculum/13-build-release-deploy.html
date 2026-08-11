@@ -51,26 +51,34 @@ $ MIX_ENV=prod mix release
 # This creates:
 # _build/prod/rel/tunneld/
 #   bin/tunneld           # Entry script
-#   lib/tunneld-0.19.0/   # Application beams
-#   releases/0.19.0/      # Boot scripts, config
+#   lib/tunneld-0.19.2/   # Application beams
+#   releases/0.19.2/      # Boot scripts, config
 #   erts-15.0/            # Erlang runtime
 </pre>
 
-      <h3>Cross-Compilation for ARM64</h3>
+      <h3>Building in a Container</h3>
 
       <p>
-        To build for ARM64 from an x86_64 machine, you need an ARM64 Erlang/Elixir toolchain. 
-        Docker is the common approach: run the build inside an ARM64 container.
+        An ERTS-bundling release is architecture- and glibc-specific, so the build has to
+        happen on the architecture you deploy to. This repo has no Dockerfile; the whole
+        build is one script, <code>./build_release.sh</code>, which runs the official
+        <code>elixir:1.17-slim</code> image (Debian Bookworm, glibc 2.36) with the repo
+        bind-mounted. There is no <code>--platform</code> flag: it builds for the host
+        architecture, so an ARM64 artifact must be produced on an ARM64 host.
       </p>
 
 <pre>
-# Using Docker for ARM64 build:
-$ docker build --platform linux/arm64 -t tunneld-builder .
-$ docker run --platform linux/arm64 tunneld-builder mix release
+# The real builder (build_release.sh:8, 33-38):
+$ ./build_release.sh
 
-# Or use QEMU for ARM emulation:
-$ docker run --platform linux/arm64 -v $(pwd):/app elixir:1.18 \
-    bash -c "cd /app && mix deps.get && MIX_ENV=prod mix release"
+# What it does, in order:
+#   1. sudo docker pull elixir:1.17-slim
+#   2. sudo docker run --rm -v "$(pwd):/app" -w /app -e MIX_ENV=prod ...
+#      inside the container: mix local.hex/local.rebar, mix deps.get --only prod,
+#      mix compile, mix assets.deploy, mix release --overwrite
+#   3. sudo chown -R "$(id -u):$(id -g)" _build deps
+#   4. copies the tarball to ~/tunneld_build/tunneld-pre-alpha.tar.gz
+#      and writes checksums.txt + metadata.json next to it
 </pre>
 
       <h3>ERTS Bundling and glibc Compatibility</h3>
@@ -100,8 +108,10 @@ ldd (Debian GLIBC 2.31-13+deb11u6) 2.31
 
 # Your build container must have glibc <= 2.31
 
-# Using an older Debian for the build:
-$ docker run --platform linux/arm64 -v $(pwd):/app debian:bullseye \
+# Generic pattern (NOT what this repo does): pin an older base image.
+# build_release.sh hard-codes elixir:1.17-slim (Bookworm, glibc 2.36) and the
+# comment at build_release.sh:5-7 explains why that satisfies the NanoPi target.
+$ docker run -v $(pwd):/app debian:bullseye \
     bash -c "apt-get update && apt-get install -y erlang elixir && \
              cd /app && mix deps.get && MIX_ENV=prod mix release"
 </pre>
@@ -123,14 +133,27 @@ $ docker run --platform linux/arm64 -v $(pwd):/app debian:bullseye \
 # config/runtime.exs:
 import Config
 
+# Only require these in PROD. Note there are NO fallback defaults - a missing
+# variable raises at boot rather than silently configuring the wrong interface.
 if config_env() == :prod do
+  gateway = System.get_env("GATEWAY") || raise "Missing ENV: GATEWAY"
+  upstream = System.get_env("UPSTREAM_INTERFACE") || raise "Missing ENV: UPSTREAM_INTERFACE"
+  downstream = System.get_env("DOWNSTREAM_INTERFACE") || raise "Missing ENV: DOWNSTREAM_INTERFACE"
+  device_id = System.get_env("DEVICE_ID") || raise "Missing ENV: DEVICE_ID"
+
+  config :tunneld, :metadata, device_id: device_id
+
   config :tunneld, :network,
-    upstream: System.get_env("UPSTREAM_INTERFACE") || "eth0",
-    downstream: System.get_env("DOWNSTREAM_INTERFACE") || "eth1",
-    gateway: System.get_env("GATEWAY") || "10.0.0.1"
+    gateway: gateway,
+    upstream: upstream,
+    downstream: downstream
+
+  secret_key_base =
+    System.get_env("SECRET_KEY_BASE") ||
+      raise "ENV SECRET_KEY_BASE is missing. Generate with: mix phx.gen.secret"
 
   config :tunneld, TunneldWeb.Endpoint,
-    secret_key_base: System.fetch_env!("SECRET_KEY_BASE"),
+    secret_key_base: secret_key_base,
     http: [port: String.to_integer(System.get_env("PORT") || "80")]
 end
 </pre>
@@ -142,42 +165,45 @@ end
       <h3>The Build Process</h3>
 
 <pre>
-# 1. Clean previous build
-$ rm -rf _build/prod
+# The supported path is the script - it does all of the below in a container:
+$ ./build_release.sh
 
-# 2. Get dependencies
-$ MIX_ENV=prod mix deps.get
+# What that runs, step by step:
+# 1. Get dependencies
+$ MIX_ENV=prod mix deps.get --only prod
 
-# 3. Compile (includes assets)
+# 2. Compile (and assets)
 $ MIX_ENV=prod mix compile
+$ MIX_ENV=prod mix assets.deploy
 
-# 4. Build release
+# 3. Build release. mix.exs declares steps: [:assemble, :tar], so `mix release`
+#    ALREADY produces the tarball - there is no manual `tar czf` step.
 $ MIX_ENV=prod mix release --overwrite
 
-# 5. Create tarball
-$ cd _build/prod/rel/tunneld
-$ tar czf ../../../tunneld-0.19.0.tar.gz .
+# 4. The script then copies the generated tarball to
+#    ~/tunneld_build/tunneld-pre-alpha.tar.gz and writes
+#    checksums.txt + metadata.json alongside it.
 </pre>
 
       <h3>Deploying to the Gateway</h3>
 
 <pre>
 # Copy the tarball:
-$ scp tunneld-0.19.0.tar.gz root@<GATEWAY_IP>:/tmp/
+$ scp ~/tunneld_build/tunneld-pre-alpha.tar.gz root@&lt;GATEWAY_IP&gt;:/tmp/
 
 # On the gateway:
 $ systemctl stop tunneld
 $ cd /opt/tunneld
-$ tar xzf /tmp/tunneld-0.19.0.tar.gz
+$ tar xzf /tmp/tunneld-pre-alpha.tar.gz
 $ systemctl start tunneld
 </pre>
 
       <blockquote class="danger">
         <p><strong>Case Study: The Stale-Beam Hazard</strong></p>
         <p>
-          A critical bug was discovered in production (documented in <code>lib/TODO.md</code> 
-          section 12): even after deleting <code>_build/prod</code> and rebuilding from scratch, 
-          <code>mix release</code> packaged an OLD beam file into the tarball.
+          A critical bug was discovered in production: even after deleting 
+          <code>_build/prod</code> and rebuilding from scratch, <code>mix release</code> 
+          packaged an OLD beam file into the tarball.
         </p>
         <p>
           The situation: <code>lib/tunneld/egress.ex</code> was fixed (a <code>with</code>-chain 
@@ -200,17 +226,17 @@ $ systemctl start tunneld
 
 <pre>
 # Step 1: Check the beam file is in the tarball
-$ tar tzf tunneld-0.19.0.tar.gz | grep Egress
-lib/tunneld-0.19.0/ebin/Elixir.Tunneld.Egress.beam
+$ tar tzf tunneld-0.19.2.tar.gz | grep Egress
+lib/tunneld-0.19.2/ebin/Elixir.Tunneld.Egress.beam
 
 # Step 2: Extract and check size matches _build
-$ tar xOf tunneld-0.19.0.tar.gz lib/tunneld-0.19.0/ebin/Elixir.Tunneld.Egress.beam | wc -c
+$ tar xOf tunneld-0.19.2.tar.gz lib/tunneld-0.19.2/ebin/Elixir.Tunneld.Egress.beam | wc -c
 8304
 $ wc -c _build/prod/lib/tunneld/ebin/Elixir.Tunneld.Egress.beam
 8304  # Should match!
 
 # Step 3: Check for expected function names/strings
-$ tar xOf tunneld-0.19.0.tar.gz lib/tunneld-0.19.0/ebin/Elixir.Tunneld.Egress.beam | strings | grep add_default_route
+$ tar xOf tunneld-0.19.2.tar.gz lib/tunneld-0.19.2/ebin/Elixir.Tunneld.Egress.beam | strings | grep add_default_route
 add_default_route   # <-- Expected function is present
 
 # If the string is MISSING, the tarball has stale code!
@@ -302,21 +328,22 @@ $ MIX_ENV=prod mix release --overwrite
 
 # Check the release version:
 $ _build/prod/rel/tunneld/bin/tunneld version
-0.19.0
+0.19.2
 
 # List included applications:
 $ ls _build/prod/rel/tunneld/lib/
-tunneld-0.19.0  phoenix-1.7.24  ...
+tunneld-0.19.2  phoenix-1.7.24  ...
 </pre>
 
       <h3>Run a release locally</h3>
 
 <pre>
-# Set required env vars:
+# Set required env vars. config/runtime.exs raises on any missing one:
 $ export SECRET_KEY_BASE=$(mix phx.gen.secret)
 $ export UPSTREAM_INTERFACE=eth0
 $ export DOWNSTREAM_INTERFACE=eth1
 $ export GATEWAY=10.0.0.1
+$ export DEVICE_ID=dev-local-1
 
 # Start in foreground:
 $ _build/prod/rel/tunneld/bin/tunneld start

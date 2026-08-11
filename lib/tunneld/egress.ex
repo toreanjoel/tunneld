@@ -82,11 +82,6 @@ defmodule Tunneld.Egress do
     Map.get(read_device_egress(), device_ip)
   end
 
-  @doc "All persisted device -> machine egress mappings."
-  def device_egress_map do
-    read_device_egress()
-  end
-
   defp set_device_egress(device_ip, machine_id) do
     write_device_egress(Map.put(read_device_egress(), device_ip, machine_id))
   end
@@ -278,7 +273,7 @@ defmodule Tunneld.Egress do
   # Keep the device's LAN traffic local (to the gateway) instead of sending it
   # through the tunnel, so the device can still reach the gateway/subnet.
   defp add_lan_route(table) do
-    gw = gateway_ip()
+    gw = Tunneld.Config.gateway_ip()
     iface = lan_iface()
     run_gateway("ip route replace #{lan_subnet(gw)} dev #{iface} table #{table}")
   end
@@ -311,7 +306,7 @@ defmodule Tunneld.Egress do
 
   # Assert tunneld is the device's default gateway (the prerequisite for egress).
   defp assert_gateway_role(device_ip) do
-    gateway = gateway_ip()
+    gateway = Tunneld.Config.gateway_ip()
 
     case run_gateway("ip route get #{device_ip} 2>/dev/null") do
       {:ok, out} ->
@@ -349,14 +344,6 @@ defmodule Tunneld.Egress do
     |> case do
       {out, 0} -> {:ok, out}
       {out, code} -> {:error, {:local, code, out}}
-    end
-  end
-
-  defp gateway_ip do
-    case Application.get_env(:tunneld, :network, []) do
-      kw when is_list(kw) -> Keyword.get(kw, :gateway)
-      map when is_map(map) -> Map.get(map, :gateway) || Map.get(map, "gateway")
-      _ -> nil
     end
   end
 

@@ -180,8 +180,8 @@ def reset() do
   System.cmd("iptables", ["-A", "INPUT", "-m", "conntrack", 
     "--ctstate", "ESTABLISHED,RELATED", "-j", "ACCEPT"])
 
-  # Allow specific ports (SSH, HTTP, Caddy)
-  for port <- [80, 22, 18000] do
+  # Allow specific ports (SSH, HTTP, Caddy's resource port)
+  for port <- [80, 22, Tunneld.Caddy.public_port()] do
     System.cmd("iptables", ["-A", "INPUT", "-p", "tcp", 
       "--dport", to_string(port), "-j", "ACCEPT"])
   end
@@ -197,6 +197,7 @@ def reset() do
   internet_forwarding()
   internet_passthrough()
   dns_forwarding()
+  set_dns_server(Tunneld.Servers.DnsConfig.get_dns_server())
 
   # NOW set DROP policies
   System.cmd("iptables", ["-P", "INPUT", "DROP"])

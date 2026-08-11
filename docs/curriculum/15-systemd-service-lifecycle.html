@@ -51,8 +51,14 @@
         <code>[Service]</code> (how to run), and <code>[Install]</code> (how to enable).
       </p>
 
+      <p>
+        The unit below is the one written by the separate <code>tunneld-installer</code>
+        repo — nothing in this codebase emits it, so treat it as illustrative of what the
+        installer lays down rather than as a file you will find in this repo.
+      </p>
+
 <pre>
-# /etc/systemd/system/tunneld.service
+# /etc/systemd/system/tunneld.service (as written by the installer)
 [Unit]
 Description=Tunneld Gateway
 After=network.target
@@ -115,7 +121,7 @@ $ systemctl enable tunneld
       </ul>
 
       <p>
-        Tunneld uses <code>exec</code>. WireGuard's <code>wg-quick@</code> uses 
+        The installer's <code>tunneld.service</code> uses <code>exec</code>. WireGuard's <code>wg-quick@</code> uses 
         <code>oneshot</code> because it sets up the interface and exits — the interface 
         persists after the script completes.
       </p>
@@ -221,23 +227,45 @@ end
       </p>
 
 <pre>
-# From lib/tunneld/overlay.ex:
-defp install_target(machine, _target_pub, iface) do
-  # Enable and start wg-quick for this interface
-  run(machine, "systemctl enable --now wg-quick@#{iface}")
+# From lib/tunneld/overlay.ex (install_target/3, abridged):
+defp install_target(machine, target_pub, iface) do
+  _ = target_pub
+
+  # 1. Install wireguard-tools if missing (apt/dnf/apk), so wg-quick exists.
+  run(
+    machine,
+    "command -v wg-quick >/dev/null 2>&1 || " <>
+      "(command -v apt-get >/dev/null 2>&1 && apt-get update -qq && apt-get install -y -qq wireguard-tools) || " <>
+      "(command -v dnf >/dev/null 2>&1 && dnf install -y wireguard-tools) || " <>
+      "(command -v apk >/dev/null 2>&1 && apk add wireguard-tools) || true"
+  )
+
+  # 2. Enable + start the wg-quick unit for this peer. The trailing
+  #    `2>/dev/null || true` keeps enrollment going on hosts without systemd.
+  run(machine, "systemctl enable --now wg-quick@#{iface} 2>/dev/null || true")
+
+  # 3. Open the overlay port on the target's own firewall.
+  run(
+    machine,
+    "ufw allow 51821/udp 2>/dev/null || " <>
+      "iptables -I INPUT 1 -p udp --dport 51821 -j ACCEPT 2>/dev/null || true"
+  )
+
   :ok
 end
 
-# This starts /etc/wireguard/wg-d4f4632f.conf
+# The config file is /etc/wireguard/wg-d4f4632f.conf, so the unit instance is
 # systemctl enable --now wg-quick@wg-d4f4632f
 </pre>
 
       <h3>Restart Policy</h3>
 
       <p>
-        The <code>tunneld.service</code> has <code>Restart=on-failure</code>: if it 
-        crashes, systemd restarts it after <code>RestartSec=5</code>. This provides 
-        automatic recovery from transient failures.
+        The <code>tunneld.service</code> unit written by the installer uses 
+        <code>Restart=on-failure</code>: if the release crashes, systemd restarts it after 
+        <code>RestartSec=5</code>. This provides automatic recovery from transient failures. 
+        (The unit lives in the installer repo, not here, so confirm the exact directives 
+        against the installed file on your gateway.)
       </p>
     </section>
 

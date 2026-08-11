@@ -74,7 +74,7 @@ defmodule MyAppWeb.DashboardLive do
   # Renders HTML
   def render(assigns) do
     ~H"""
-    <button phx-click="increment">Count: <%= @count %></button>
+    &lt;button phx-click="increment"&gt;Count: <%= @count %>&lt;/button&gt;
     """
   end
 
@@ -144,19 +144,25 @@ end
 
 <pre>
 # From lib/tunneld_web/live/dashboard.ex (simplified):
-def mount(_params, session, socket) do
+defp mount_dashboard(client_id, socket) do
   if connected?(socket) do
+    Phoenix.PubSub.subscribe(Tunneld.PubSub, "notifications")
+    Phoenix.PubSub.subscribe(Tunneld.PubSub, "show_details")
+    Phoenix.PubSub.subscribe(Tunneld.PubSub, "modal:form:action:#{client_id}")
+    Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:details")
     Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:devices")
     Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:resources")
+    Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:system_resources")
+    Phoenix.PubSub.subscribe(Tunneld.PubSub, "geolocation:device")
     Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:machines")
-    Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:services")
-    Phoenix.PubSub.subscribe(Tunneld.PubSub, "notifications")
   end
+  # NOTE: "component:services" is NOT subscribed here — the Services
+  # LiveComponent subscribes to it itself.
 
   {:ok, assign(socket, 
-    devices: Devices.list(),
-    resources: Resources.list(),
-    machines: Machines.list()
+    devices: Tunneld.Servers.Devices.fetch_devices(),
+    resources: Tunneld.Servers.Resources.fetch_shares(),
+    machines: Tunneld.Machines.list()
   )}
 end
 
@@ -174,12 +180,14 @@ end
       </p>
 
 <pre>
-# From dashboard.ex:
-def handle_event("create_resource", %{"name" => name, "port" => port}, socket) do
-  machine = socket.assigns.selected_machine
-  backend = "#{Overlay.address_for(machine)}:#{port}"
+# dashboard.ex - turning a discovered listener into a resource:
+def handle_event("make_listener_resource",
+                 %{"machine_id" => id, "addr" => addr, "port" => port, "proc" => proc}, socket) do
+  name = sanitize_resource_name("#{proc}-#{port}")
+  # Point the pool at the address tunneld can route to, never the raw bind addr
+  backend = "#{Tunneld.Overlay.address_for(machine)}:#{port}"
 
-  case Resources.create_resource(%{"name" => name, "pool" => [backend]}) do
+  case Resources.add_share(%{"name" => name, "pool" => [backend]}) do
     {:ok, _} -> 
       {:noreply, put_flash(socket, :info, "Resource created")}
     {:error, reason} -> 
@@ -188,7 +196,8 @@ def handle_event("create_resource", %{"name" => name, "port" => port}, socket) d
 end
 
 def handle_event("make_exit_node", %{"id" => id}, socket) do
-  machine = Machines.get(id)
+  # Machines.get/1 returns {:ok, machine} | {:error, :not_found}
+  {:ok, machine} = Machines.get(id)
   Egress.ensure_exit_capable(machine)
   {:noreply, socket}
 end
@@ -206,16 +215,16 @@ end
 # Function component (in dashboard.ex or a separate module):
 def device_row(assigns) do
   ~H"""
-  <tr>
-    <td><%= @device.hostname %></td>
-    <td><%= @device.ip %></td>
-    <td><%= @device.mac %></td>
-  </tr>
+  &lt;tr&gt;
+    &lt;td&gt;<%= @device.hostname %>&lt;/td&gt;
+    &lt;td&gt;<%= @device.ip %>&lt;/td&gt;
+    &lt;td&gt;<%= @device.mac %>&lt;/td&gt;
+  &lt;/tr&gt;
   """
 end
 
 # Usage:
-<.device_row device={device} />
+&lt;.device_row device={device} /&gt;
 
 # Live component (has its own process):
 defmodule MachineDetailComponent do
@@ -226,7 +235,7 @@ defmodule MachineDetailComponent do
   end
 
   def render(assigns) do
-    ~H"<div>Machine: <%= @machine.name %></div>"
+    ~H"&lt;div&gt;Machine: <%= @machine.name %>&lt;/div&gt;"
   end
 end
 </pre>
@@ -324,16 +333,17 @@ iex> Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", {:flash, :info, "
 
 <pre>
 # Template:
-<form phx-submit="create_machine">
-  <input type="text" name="name" value="" />
-  <input type="text" name="address" value="" />
-  <button type="submit">Create</button>
-</form>
+&lt;form phx-submit="create_machine"&gt;
+  &lt;input type="text" name="name" value="" /&gt;
+  &lt;input type="text" name="address" value="" /&gt;
+  &lt;button type="submit"&gt;Create&lt;/button&gt;
+&lt;/form&gt;
 
 # Handler:
 def handle_event("create_machine", %{"name" => name, "address" => addr}, socket) do
-  case Machines.create(%{"name" => name, "address" => addr}) do
-    {:ok, machine} -> 
+  # enroll/1 returns {:ok, %{"id" => id, "public_key" => pub, "machine" => record}}
+  case Machines.enroll(%{"name" => name, "address" => addr}) do
+    {:ok, %{"machine" => machine}} -> 
       {:noreply, assign(socket, machines: [machine | socket.assigns.machines])}
     {:error, reason} -> 
       {:noreply, put_flash(socket, :error, reason)}
@@ -345,7 +355,7 @@ end
 
 <pre>
 # In template:
-<.link navigate={~p"/setup"}>Go to Setup</.link>
+&lt;.link navigate={~p"/setup"}&gt;Go to Setup&lt;/.link&gt;
 
 # Or programmatically:
 def handle_event("go_setup", _, socket) do

@@ -173,16 +173,28 @@ end
 
 <pre>
 # From lib/tunneld/servers/dns_config.ex:
-def set_dns_server(ip) do
-  write_dns(%{"server" => ip})
+def set_dns_server(ip) when is_binary(ip) do
+  GenServer.call(__MODULE__, {:set_dns_server, ip})
+end
 
-  # Update iptables exemptions
-  Tunneld.Iptables.set_dns_server(ip)
+def handle_call({:set_dns_server, ip}, _from, _state) do
+  path = dns_path()
+  Tunneld.Persistence.write_json(path, %{"server" => ip})
 
-  # Reload dnsmasq
-  System.cmd("systemctl", ["restart", "dnsmasq"])
+  unless Application.get_env(:tunneld, :mock_data, false) do
+    # Update iptables exemptions, rewrite /etc/dnsmasq.conf, reload dnsmasq
+    Tunneld.Iptables.set_dns_server(ip)
+    write_dnsmasq_config(ip)
+    Tunneld.Servers.Services.restart_service(:dnsmasq, :no_notify)
+  end
 
-  broadcast(:dns_update)
+  Phoenix.PubSub.broadcast(Tunneld.PubSub, "component:details", %{
+    id: "sidebar_details",
+    module: TunneldWeb.Live.Components.Sidebar.Details,
+    data: %{dns_server: ip}
+  })
+
+  {:reply, :ok, %{"server" => ip}}
 end
 </pre>
 

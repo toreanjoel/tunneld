@@ -46,15 +46,7 @@ defmodule Tunneld.Machines do
   remote, based on the configured gateway IP.
   """
   def infer_location(address) when is_binary(address) do
-    same_subnet?(address, gateway_ip())
-  end
-
-  defp gateway_ip do
-    case Application.get_env(:tunneld, :network, []) do
-      kw when is_list(kw) -> Keyword.get(kw, :gateway)
-      map when is_map(map) -> Map.get(map, :gateway) || Map.get(map, "gateway")
-      _ -> nil
-    end
+    same_subnet?(address, Tunneld.Config.gateway_ip())
   end
 
   defp same_subnet?(address, gateway) do
@@ -122,17 +114,6 @@ defmodule Tunneld.Machines do
         :ok = Store.put(record)
         broadcast(:added, record)
         {:ok, %{"id" => id, "public_key" => pub, "machine" => record}}
-    end
-  end
-
-  @doc "Return the public key string the operator must install on the target."
-  def public_key(id) do
-    case Store.get(id) do
-      {:ok, machine} ->
-        {:ok, SSH.public_key_string(machine["id"])}
-
-      {:error, :not_found} ->
-        {:error, "not found"}
     end
   end
 

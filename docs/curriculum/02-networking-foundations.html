@@ -65,19 +65,24 @@
       </ul>
 
       <p>
-        Tunneld's default subnet is <code>10.0.0.0/24</code> with the gateway at <code>10.0.0.1</code>. 
-        The overlay subnet for WireGuard is <code>10.88.0.0/24</code>. Both are private ranges.
+        Tunneld does not hardcode a LAN subnet: the gateway's own address comes from the 
+        <code>GATEWAY</code> environment variable (<code>config/runtime.exs</code> raises in 
+        production if it is missing), and the subnet is derived from it. The examples on this 
+        page use <code>10.0.0.0/24</code> with the gateway at <code>10.0.0.1</code>. The overlay 
+        subnet for WireGuard is <code>10.88.0.0/24</code>. Both are private ranges.
       </p>
 
 <pre>
-# Example: parsing the gateway IP in lib/tunneld/overlay.ex
-defp gateway_ip do
+# Example: reading the gateway IP in lib/tunneld/config.ex
+def network(key) do
   case Application.get_env(:tunneld, :network, []) do
-    kw when is_list(kw) -> Keyword.get(kw, :gateway)  # e.g., "10.0.0.1"
-    map when is_map(map) -> Map.get(map, :gateway)
+    kw when is_list(kw) -> Keyword.get(kw, key)
+    map when is_map(map) -> Map.get(map, key) || Map.get(map, to_string(key))
     _ -> nil
   end
 end
+
+def gateway_ip, do: network(:gateway)  # e.g., "10.0.0.1"
 </pre>
 
       <h3>Subnets and CIDR Notation</h3>
@@ -108,7 +113,7 @@ end
 <pre>
 # From lib/tunneld/overlay.ex:
 defp same_subnet?(address) do
-  gw = gateway_ip()  # e.g., "10.0.0.1"
+  gw = Tunneld.Config.gateway_ip()  # e.g., "10.0.0.1"
   with {:ok, a} <- parse_ip4(address),
        {:ok, g} <- parse_ip4(gw) do
     match?({[x, y, z, _], [x, y, z, _]}, {a, g})  # First 3 octets match
@@ -210,13 +215,20 @@ LISTEN 0      128    0.0.0.0:22            0.0.0.0:*         users:(("sshd",pid=
       </p>
 
 <pre>
-# config/runtime.exs:
-config :tunneld, :network,
-  upstream: System.get_env("UPSTREAM_INTERFACE") || "eth0",
-  downstream: System.get_env("DOWNSTREAM_INTERFACE") || "eth1",
-  gateway: System.get_env("GATEWAY") || "10.0.0.1"
+# config/runtime.exs (prod only - there are NO defaults, a missing env is fatal):
+if config_env() == :prod do
+  gateway = System.get_env("GATEWAY") || raise "Missing ENV: GATEWAY"
+  upstream = System.get_env("UPSTREAM_INTERFACE") || raise "Missing ENV: UPSTREAM_INTERFACE"
+  downstream = System.get_env("DOWNSTREAM_INTERFACE") || raise "Missing ENV: DOWNSTREAM_INTERFACE"
+
+  config :tunneld, :network,
+    gateway: gateway,
+    upstream: upstream,
+    downstream: downstream
+end
 
 # lib/tunneld/iptables.ex reads these:
+def get_env(:gateway), do: Application.get_env(:tunneld, :network)[:gateway]
 def get_env(:upstream), do: Application.get_env(:tunneld, :network)[:upstream]
 def get_env(:downstream), do: Application.get_env(:tunneld, :network)[:downstream]
 </pre>
@@ -329,7 +341,7 @@ up
 $ cat /sys/class/net/eth1/operstate
 up
 
-# This is what NetLink.link_state/1 reads
+# This is what NetLink.upstream_up?/0 and NetLink.downstream_up?/0 read
 </pre>
 
       <h3>View the routing table</h3>

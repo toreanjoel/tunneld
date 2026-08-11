@@ -113,9 +113,4 @@ defmodule Tunneld.OverlayTest do
     {:ok, m} = Machines.get(id)
     assert Overlay.address_for(m) =~ "10.88.0."
   end
-
-  test "gateway_overlay_ip and overlay_subnet are sensible defaults" do
-    assert Overlay.overlay_subnet() == "10.88.0.0/24"
-    assert Overlay.gateway_overlay_ip() == "10.88.0.1"
-  end
 end

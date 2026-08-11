@@ -119,6 +119,8 @@ end
 ├── egress_tables.json  # Machine → routing table ID
 ├── device_egress.json  # Device → exit machine mapping
 ├── tokens.json         # Agent API tokens (hashed)
+├── audit.jsonl         # Append-only agent API audit log (JSON lines)
+├── error.gohtml        # Caddy error page template
 ├── ssh/                # Per-machine SSH keys
 │   ├── abc123-def456
 │   └── abc123-def456.pub
@@ -148,8 +150,9 @@ def init(_) do
 end
 
 defp load_resources do
+  # resources.json is a bare JSON array, not a wrapped object.
   case Persistence.read_json(Path.join(Config.fs_root(), "resources.json")) do
-    {:ok, %{"resources" => list}} -> list
+    {:ok, list} when is_list(list) -> list
     _ -> []
   end
 end
@@ -174,9 +177,11 @@ def handle_call({:create, params}, _from, state) do
 end
 
 defp write_resources(list) do
+  # Written as a top-level array. (machines.json, by contrast, IS wrapped:
+  # %{"machines" => [...]} — see lib/tunneld/machines/store.ex.)
   Persistence.write_json(
     Path.join(Config.fs_root(), "resources.json"),
-    %{"resources" => list}
+    list
   )
 end
 </pre>
@@ -203,6 +208,15 @@ def reconcile(machine, opts \\ []) do
 end
 
 defp reconcile_wireguard(machine, repair?) do
+  # Local machines have no overlay peer — short-circuit before probing.
+  if machine["location"] == "local" do
+    :ok
+  else
+    do_reconcile_wireguard(machine, repair?)
+  end
+end
+
+defp do_reconcile_wireguard(machine, repair?) do
   case Overlay.status(machine) do
     {:ok, %{up: true}} -> :ok
     _ ->
@@ -287,11 +301,10 @@ end
 <pre>
 # On the gateway:
 $ cat /var/lib/tunneld/resources.json | jq .
-{
-  "resources": [
-    {"id": "abc123", "name": "ollama", "pool": ["10.0.0.50:11434"], "kind": "local"}
-  ]
-}
+[
+  {"id": "abc123", "name": "ollama", "pool": ["10.0.0.50:11434"],
+   "loopback_port": 20000, "kind": "host"}
+]
 
 $ cat /var/lib/tunneld/machines.json | jq '.machines[0]'
 {
@@ -318,7 +331,7 @@ $ systemctl restart tunneld
 
 <pre>
 # In IEx:
-iex> machine = Tunneld.Machines.get("def456")
+iex> {:ok, machine} = Tunneld.Machines.get("def456")
 iex> Tunneld.Reconcile.reconcile(machine, repair: true)
 %{wireguard: :ok, caddy: :ok, ssh: :ok, resources: :ok}
 

@@ -42,9 +42,6 @@ defmodule TunneldWeb.Live.Setup do
     }
   ]
 
-  @doc "Which capabilities this build actually offers (no Wi-Fi, no zrok, no mesh)."
-  def capabilities, do: @capabilities
-
   @impl true
   def mount(_params, %{"client_id" => client_id} = _session, socket) do
     if onboarded?() do
@@ -87,7 +84,7 @@ defmodule TunneldWeb.Live.Setup do
       <div class="bg-surface border border-border rounded-lg p-4">
         <ul class="text-sm text-text-secondary space-y-3">
           <li>
-            <span class="font-medium text-text-primary">WireGuard port (default 51820/UDP)</span>
+            <span class="font-medium text-text-primary">WireGuard port (51821/UDP)</span>
             <div class="text-xs text-text-tertiary mt-0.5">
               Must be allowed <b>inbound</b>
               in the target's <b>provider firewall</b>

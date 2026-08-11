@@ -53,12 +53,12 @@ lib/tunneld/
   machines.ex          # Machine registry (enrolled hosts)
   machines/
     ssh.ex             # SSH transport (keypairs, ControlMaster)
+    ssh/session.ex     # Interactive PTY over Erlang :ssh
     runtime.ex         # Listener discovery (ss -tlnp)
   overlay.ex           # WireGuard peering (remote → local)
   egress.ex            # Per-device exit routing
   caddy.ex             # Caddy JSON config via admin API
   reconcile.ex         # Drift detection and repair
-  disenroll.ex         # Clean removal of a machine
   agent_tokens.ex      # Bearer token auth for API
   audit.ex             # Audit logging
   jobs.ex              # Long-running job registry
@@ -84,6 +84,8 @@ lib/tunneld_web/
     expose_controller.ex   # Quick Expose API
     machine_controller.ex  # Admin machine API
     health_controller.ex   # Health endpoint
+  channels/
+    exec_channel.ex    # Browser terminal channel
   router.ex            # Route definitions
 </pre>
 
@@ -100,6 +102,7 @@ lib/tunneld_web/
 # From lib/tunneld/application.ex (simplified):
 children = [
   TunneldWeb.Telemetry,
+  {DNSCluster, query: Application.get_env(:tunneld, :dns_cluster_query) || :ignore},
   {Phoenix.PubSub, name: Tunneld.PubSub},
   {Session, []},
   {SystemResources, []},
@@ -109,7 +112,6 @@ children = [
   {Auth, []},
   {DnsConfig, []},
   {Updater, []},
-  {Machines, []},
   {Tunneld.AgentTokens, []},
   {Tunneld.Jobs, []},
   {Tunneld.Geolocation, []},
@@ -164,14 +166,15 @@ Supervisor.start_link(children, opts)
           and writes it to <code>egress_tables.json</code> via <code>Tunneld.Persistence</code>.
         </li>
         <li>
-          <strong>LiveView → PubSub</strong><br>
-          The handler broadcasts an update via <code>Phoenix.PubSub.broadcast/3</code> to the 
-          <code>"component:machines"</code> topic.
+          <strong>Machines → PubSub</strong><br>
+          <code>Tunneld.Machines.broadcast/2</code> publishes on the 
+          <code>"component:machines"</code> topic. The payload is a map: 
+          <code>%{id: "machines", event: :updated, data: machine}</code>.
         </li>
         <li>
           <strong>PubSub → All Dashboards</strong><br>
           Every connected dashboard is subscribed to that topic. Their 
-          <code>handle_info({:machines_update, ...}, socket)</code> callback receives the update 
+          <code>handle_info(%{id: "machines"} = msg, socket)</code> callback receives the update 
           and re-renders the machine list.
         </li>
         <li>
@@ -247,34 +250,48 @@ Browser (WebSocket) → Phoenix Endpoint → LiveView (handle_event)
       </p>
 
 <pre>
-# 1. User selects a listener and clicks "Create Resource"
-# Browser sends: {"event": "create_resource", "value": {"name": "ollama", "port": 11434}}
+# 1. User picks a discovered listener and clicks "Create Resource"
+# Browser sends the "make_listener_resource" event with
+# %{"machine_id" => id, "addr" => addr, "port" => port, "proc" => proc}
 
 # 2. LiveView handler (in dashboard.ex):
-def handle_event("create_resource", %{"name" => name, "port" => port, ...}, socket) do
-  machine = get_selected_machine(socket)
-  backend = "#{Overlay.address_for(machine)}:#{port}"
+def handle_event("make_listener_resource",
+      %{"machine_id" => id, "addr" => addr, "port" => port, "proc" => proc}, socket) do
+  name = sanitize_resource_name("#{proc}-#{port}")
 
-  Tunneld.Servers.Resources.create_resource(%{
+  # Route to the address tunneld can actually reach: LAN IP for a same-subnet
+  # machine, overlay IP for a remote one - never the raw bind address.
+  backend_addr =
+    case Tunneld.Machines.get(id) do
+      {:ok, machine} -> Tunneld.Overlay.address_for(machine)
+      _ -> addr
+    end
+
+  _ = Tunneld.Servers.Resources.add_share(%{
     "name" => name,
-    "pool" => [backend],
-    "kind" => "local"
+    "pool" => ["#{backend_addr}:#{port}"],
+    "expose_source" => "listener",
+    "expose_machine_id" => id
   })
 
   {:noreply, socket}
 end
 
-# 3. Resources server (in servers/resources.ex):
-def create_resource(params) do
-  resources = read_resources()
-  new_resource = Map.put(params, "id", UUID.uuid4())
-  write_resources([new_resource | resources])
+# 3. Resources server (servers/resources.ex), handle_call({:add_share, resource}, ...):
+resources = read_file()
 
-  # Reconcile Caddy config
-  Tunneld.Caddy.sync(resources ++ [new_resource])
+new_resource =
+  resource
+  |> Map.put("ip", @gateway_ip)
+  |> Map.put("port", @lan_port)
+  |> Map.put("pool", normalize_pool(resource))
+  |> Map.put("loopback_port", allocate_loopback_port(resources))
+  |> Map.merge(%{"id" => ..., "kind" => "host"})
 
-  # Broadcast update
-  Phoenix.PubSub.broadcast(Tunneld.PubSub, "component:resources", {:resources_update, ...})
+with :ok <- Tunneld.Persistence.write_json(path(), resources ++ [new_resource]),
+     :ok <- Caddy.sync(resources ++ [new_resource]) do
+  # Broadcast update on "component:resources"
+  broadcast_shares()
 end
 
 # 4. Caddy.sync/1 (in caddy.ex):

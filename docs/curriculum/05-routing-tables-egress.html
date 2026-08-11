@@ -164,11 +164,21 @@ end
 def route_device(machine, device_ip, opts \\ []) do
   dns = Keyword.get(opts, :dns, "local")
 
-  if @mock do
-    {:ok, %{device_ip: device_ip, machine: machine["id"], table: table_for(machine)}}
-  else
-    real_route_device(machine, device_ip, dns)
+  result =
+    if @mock do
+      {:ok,
+       %{device_ip: device_ip, machine: machine["id"], table: table_for(machine), dns: dns}}
+    else
+      real_route_device(machine, device_ip, dns)
+    end
+
+  # Persist the device -> machine mapping so the selection survives a refresh.
+  case result do
+    {:ok, _} -> set_device_egress(device_ip, machine["id"])
+    _ -> :ok
   end
+
+  result
 end
 
 defp real_route_device(machine, device_ip, dns) do
@@ -199,9 +209,11 @@ end
           in production when devices lost internet after selecting an exit.
         </p>
         <p>
-          The fix: change patterns from <code>:ok <- add_rule(...)</code> to 
-          <code>{:ok, _} <- add_rule(...)</code>. See <code>lib/TODO.md</code> 
-          section 11 for the full investigation.
+          The fix: change patterns from <code>:ok &lt;- add_rule(...)</code> to 
+          <code>{:ok, _} &lt;- add_rule(...)</code>. The lesson: in a 
+          <code>with</code> chain, every clause pattern must match the exact shape 
+          its function returns, or the chain falls through to the else branch and 
+          the remaining steps never run.
         </p>
       </blockquote>
 
@@ -216,7 +228,7 @@ end
 <pre>
 # From lib/tunneld/egress.ex:
 defp assert_gateway_role(device_ip) do
-  gateway = gateway_ip()
+  gateway = Tunneld.Config.gateway_ip()
 
   case run_gateway("ip route get #{device_ip} 2>/dev/null") do
     {:ok, out} ->

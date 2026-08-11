@@ -86,16 +86,8 @@ defmodule Tunneld.Servers.DnsConfig do
   # Resolve any *.tunneld.lan name to the gateway so named resources and
   # exposed container services are reachable across the subnet.
   defp write_lan_domain_config do
-    gateway = gateway_ip()
+    gateway = Tunneld.Config.gateway_ip()
     File.write!(@lan_domain_conf, "address=/.tunneld.lan/#{gateway}\n")
-  end
-
-  defp gateway_ip do
-    case Application.get_env(:tunneld, :network, []) do
-      kw when is_list(kw) -> Keyword.get(kw, :gateway)
-      map when is_map(map) -> Map.get(map, :gateway) || Map.get(map, "gateway")
-      _ -> nil
-    end
   end
 
   defp read_dns_server do

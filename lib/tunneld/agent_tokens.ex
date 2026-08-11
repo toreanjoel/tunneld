@@ -37,9 +37,6 @@ defmodule Tunneld.AgentTokens do
     {:ok, %{}}
   end
 
-  @doc "The token prefix used to identify tunneld agent tokens."
-  def prefix, do: @prefix
-
   @doc "Scopes that can never be granted to an agent token (privilege escalation)."
   def forbidden_scopes do
     [

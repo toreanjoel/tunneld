@@ -33,19 +33,10 @@ defmodule Tunneld.Overlay do
 
   @mock Application.compile_env(:tunneld, :mock_data, false)
 
-  @overlay_subnet Application.compile_env(:tunneld, :overlay_subnet, "10.88.0.0/24")
   @gateway_overlay_ip Application.compile_env(:tunneld, :overlay_gateway_ip, "10.88.0.1")
   # Per-machine overlay interfaces listen on 51821 (the existing wgtest overlay
   # already uses 51820 on the gateway/VM).
   @wg_port Application.compile_env(:tunneld, :overlay_port, 51_821)
-
-  def mock?, do: @mock
-
-  @doc "The overlay subnet (CIDR)."
-  def overlay_subnet, do: @overlay_subnet
-
-  @doc "The gateway's own overlay IP."
-  def gateway_overlay_ip, do: @gateway_overlay_ip
 
   @doc "Return the address to reach a machine: LAN IP or overlay IP."
   def address_for(machine) do
@@ -310,21 +301,13 @@ defmodule Tunneld.Overlay do
   end
 
   defp same_subnet?(address) do
-    gw = gateway_ip()
+    gw = Tunneld.Config.gateway_ip()
 
     with {:ok, a} <- parse_ip4(address),
          {:ok, g} <- parse_ip4(gw) do
       match?({[x, y, z, _], [x, y, z, _]}, {a, g})
     else
       _ -> false
-    end
-  end
-
-  defp gateway_ip do
-    case Application.get_env(:tunneld, :network, []) do
-      kw when is_list(kw) -> Keyword.get(kw, :gateway)
-      map when is_map(map) -> Map.get(map, :gateway) || Map.get(map, "gateway")
-      _ -> nil
     end
   end
 

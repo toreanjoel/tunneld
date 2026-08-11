@@ -95,8 +95,9 @@ $ curl -X POST http://127.0.0.1:2019/load \
       <p>
         When Caddy sees a hostname (not an IP or port), it automatically provisions a TLS 
         certificate via Let's Encrypt's ACME protocol. This requires the hostname to be 
-        publicly resolvable to the Caddy server. For Tunneld's LAN resources, automatic 
-        HTTPS is disabled because <code>*.tunneld.lan</code> is not publicly resolvable.
+        publicly resolvable to the Caddy server. Tunneld disables automatic HTTPS on 
+        every server it emits — <code>*.tunneld.lan</code> is not publicly resolvable, and 
+        there is no public plane that would need a certificate.
       </p>
     </section>
 
@@ -105,7 +106,7 @@ $ curl -X POST http://127.0.0.1:2019/load \
 
       <p>
         Tunneld's Caddy configuration is in <code>lib/tunneld/caddy.ex</code>. It 
-        implements three "planes" of exposure:
+        implements two "planes" of exposure:
       </p>
 
       <h3>1. LAN Plane</h3>
@@ -153,7 +154,7 @@ end
 <pre>
 # From lib/tunneld/caddy.ex:
 defp loop_server(r) do
-  bind = gateway_ip() || "127.0.0.1"
+  bind = Config.gateway_ip() || "127.0.0.1"
 
   %{
     "listen" => ["#{bind}:#{r["loopback_port"]}"],
@@ -167,41 +168,14 @@ end
 # - http://10.0.0.1:20001 (via loopback port, no Host header needed)
 </pre>
 
-      <h3>3. Public Plane (Remote)</h3>
+      <h3>No Public Plane</h3>
 
       <p>
-        For resources on remote machines, Tunneld drives the machine's own Caddy 
-        (via the admin API over WireGuard) to expose the service publicly. The 
-        <code>listen</code> field can be a port (<code>"8080"</code> — no TLS) 
-        or a hostname (<code>"app.example.com"</code> — auto-TLS).
+        There is deliberately no public-internet plane. Driving a remote machine's own 
+        Caddy over the overlay was written once, wired to nothing, and removed 
+        (<code>lib/tunneld/caddy.ex</code> moduledoc). Off-LAN exposure is the operator's 
+        job — point zrok, cloudflared, or an SSH forward at the loopback listener above.
       </p>
-
-<pre>
-# From lib/tunneld/caddy.ex:
-def sync_public(machine, resources) do
-  config = build_public_config(resources)
-
-  if mock?() do
-    # Write to data/caddy/public_<id>.json
-  else
-    overlay_ip = Overlay.address_for(machine)
-    push_config(config, "http://#{overlay_ip}:2019/")
-  end
-end
-
-defp public_server(r) do
-  listen = r["listen"]
-
-  if Regex.match?(~r/^\d+$/, listen) do
-    # Port only: 8080 -> no host matcher, no TLS
-    %{"listen" => [":#{listen}"], ...}
-  else
-    # Hostname: app.example.com -> auto-TLS
-    %{"listen" => [":80", ":443"],
-      "routes" => [%{"match" => [%{"host" => [listen]}], ...}]}
-  end
-end
-</pre>
 
       <h3>The sync Function</h3>
 
@@ -222,7 +196,9 @@ def sync(resources) when is_list(resources) do
   end
 end
 
-defp push_config(config, base_url \\ "http://127.0.0.1:2019/") do
+defp push_config(config), do: push_config(config, "http://127.0.0.1:2019/")
+
+defp push_config(config, base_url) do
   body = Jason.encode!(config)
 
   case HTTPoison.post(base_url <> "load", body, 
@@ -251,16 +227,18 @@ end
       <h3>No Templates</h3>
 
       <p>
-        The old <code>nginx.ex</code> used EEx templates to generate config. Templates 
-        are error-prone (escaping issues, syntax errors). Caddy's JSON API uses Elixir 
-        maps that Jason encodes directly.
+        A templated config generator (EEx rendering an nginx config file) is error-prone: 
+        escaping issues, syntax errors, and a reload step that can fail silently. Caddy's 
+        JSON API uses Elixir maps that Jason encodes directly.
       </p>
 
       <h3>Automatic HTTPS</h3>
 
       <p>
-        For public exposure, Caddy handles Let's Encrypt automatically. nginx requires 
-        certbot, cron jobs, and manual renewal handling.
+        Where a deployment does terminate TLS, Caddy handles Let's Encrypt automatically 
+        while nginx requires certbot, cron jobs, and manual renewal handling. Tunneld 
+        itself never uses this: every server it emits sets 
+        <code>"automatic_https" =&gt; %{"disable" =&gt; true}</code>.
       </p>
 
       <h3>Single Binary</h3>
@@ -326,8 +304,8 @@ $ curl -X PATCH "http://127.0.0.1:2019/config/apps/http/servers/tunneld_lan/rout
       <h3>Check Caddy health</h3>
 
 <pre>
-# Caddy serves a health endpoint:
-$ curl http://127.0.0.1:2019/health
+# The admin API answers on /config/ — use it as a liveness check:
+$ curl -s http://127.0.0.1:2019/config/ >/dev/null && echo OK
 OK
 
 # Check if Caddy can reach a backend (via access logs):

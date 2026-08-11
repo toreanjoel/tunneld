@@ -37,7 +37,8 @@
       <p>
         Long-running operations (like probing a machine over slow SSH) use the "jobs" pattern: 
         the API returns <code>202 Accepted</code> with a job ID immediately, and the client 
-        polls <code>GET /jobs/:id</code> for the result. This prevents HTTP timeouts.
+        polls <code>GET /api/v1/agent/jobs/:id</code> for the result. This prevents HTTP 
+        timeouts.
       </p>
     </section>
 
@@ -67,9 +68,10 @@ tnld_vG7hJ2mK8nP3qR9sT...
 # The body after tnld_ is 24 random bytes, base64-encoded
 # Total: ~40 characters, plenty of entropy
 
-# Prefix makes tokens greppable:
-$ grep -r "tnld_" ~/.config/
-/home/user/.config/tunneld-cli/config.json:  "api_key": "tnld_vG7hJ..."
+# Prefix makes tokens greppable. There is no CLI config file — the CLI
+# (mix tunneld.agent) and the Python skill read env vars:
+$ grep -r "tnld_" ~/.profile ~/.config/
+/home/user/.profile:export TUNNELD_TOKEN="tnld_vG7hJ..."
 </pre>
 
       <p>
@@ -89,18 +91,20 @@ $ grep -r "tnld_" ~/.config/
 <pre>
 # From lib/tunneld/agent_tokens.ex:
 def handle_call({:issue, scopes}, _from, state) do
+  # Strip any forbidden scopes defensively.
+  clean = scopes -- forbidden_scopes()
   raw = @prefix <> Base.url_encode64(:crypto.strong_rand_bytes(24), padding: false)
   id = :crypto.strong_rand_bytes(8) |> Base.url_encode64(padding: false)
 
   record = %{
     "id" => id,
     "hash" => hash(raw),  # SHA-256, not plaintext!
-    "scopes" => scopes,
+    "scopes" => clean,
     "created_at" => DateTime.utc_now() |> DateTime.to_iso8601()
   }
 
   write(path(), read() |> Map.put(id, record))
-  {:reply, {:ok, raw, id, scopes}, state}  # raw returned once
+  {:reply, {:ok, raw, id, clean}, state}  # raw returned once
 end
 
 defp hash(raw), do: :crypto.hash(:sha256, raw) |> Base.encode16(case: :lower)
@@ -118,8 +122,13 @@ defp hash(raw), do: :crypto.hash(:sha256, raw) |> Base.encode16(case: :lower)
         <li><code>resources:read</code> — list resources</li>
         <li><code>resources:write</code> — create/delete resources</li>
         <li><code>exec</code> — run commands on machines</li>
-        <li><code>egress</code> — route devices through exits</li>
+        <li><code>any</code> — declared by <code>GET /api/v1/agent/jobs/:id</code>: any 
+        valid token may poll a job</li>
       </ul>
+
+      <p>
+        Per-device egress has no scope and no endpoint — it is dashboard-only.
+      </p>
 
       <p>
         Some scopes are forbidden and can never be granted: <code>tokens:issue</code>, 
@@ -141,31 +150,42 @@ end
 
       <h3>API Endpoints</h3>
 
+      <p>
+        The bearer-token API is mounted under <code>/api/v1/agent/*</code> 
+        (<code>lib/tunneld_web/router.ex</code>). These ten routes are the whole surface:
+      </p>
+
 <pre>
 # Machine endpoints:
-GET  /api/v1/machines           # List all machines
-GET  /api/v1/machines/:id       # Machine detail
-POST /api/v1/machines           # Enroll a machine
-DELETE /api/v1/machines/:id     # Disenroll
+GET    /api/v1/agent/machines             # machines:read  — list all machines
+GET    /api/v1/agent/machines/:id         # machines:read  — machine detail
+GET    /api/v1/agent/machines/:id/listeners  # machines:read — live ss -tlnp
+POST   /api/v1/agent/machines/:id/probe   # machines:write — 202 job
+POST   /api/v1/agent/machines/:id/exec    # exec           — 202 job
+DELETE /api/v1/agent/machines/:id         # machines:write — remove a machine
 
 # Resource endpoints:
-GET  /api/v1/resources          # List resources
-POST /api/v1/resources          # Create resource
-DELETE /api/v1/resources/:id    # Delete resource
-
-# Device endpoints:
-GET  /api/v1/devices            # List DHCP devices
-POST /api/v1/devices/:ip/egress # Route device through exit
+GET    /api/v1/agent/resources            # resources:read
+POST   /api/v1/agent/resources            # resources:write
+DELETE /api/v1/agent/resources/:id        # resources:write
 
 # Jobs:
-GET  /api/v1/jobs/:id           # Poll job status
+GET    /api/v1/agent/jobs/:id             # any valid token — poll job status
 </pre>
+
+      <p>
+        Two things are deliberately <em>not</em> here. Machine enrollment 
+        (<code>POST /api/v1/machines</code>) and token issuance 
+        (<code>POST /api/v1/agent/tokens</code>) are gated on an admin <em>session</em>, not 
+        a bearer token — there is no privilege-escalation path from a token. And there is no 
+        device or egress endpoint at all; per-device exit routing lives only in the dashboard.
+      </p>
 
       <h3>Authorization Flow</h3>
 
 <pre>
 # Request:
-GET /api/v1/machines
+GET /api/v1/agent/machines
 Authorization: Bearer tnld_vG7hJ2mK8nP3qR9sT...
 
 # Server:
@@ -189,8 +209,8 @@ Authorization: Bearer tnld_vG7hJ2mK8nP3qR9sT...
       <p>
         The jobs pattern solves this: long operations return <code>202 Accepted</code> 
         immediately with a job ID. The work runs in a background process. The client polls 
-        <code>GET /jobs/:id</code> until the status changes from <code>running</code> to 
-        <code>done</code>.
+        <code>GET /api/v1/agent/jobs/:id</code> until the status changes from 
+        <code>running</code> to <code>done</code>.
       </p>
 
 <pre>
@@ -223,18 +243,19 @@ end
 
 <pre>
 # Start a long operation:
-POST /api/v1/machines/:id/probe
--> 202 {"job_id": "12345"}    # Returns immediately!
+POST /api/v1/agent/machines/:id/probe
+-> 202 {"job_id": "12345", "status": "running"}   # Returns immediately!
 
 # Poll for completion:
-GET /api/v1/jobs/12345
--> {"status": "running"}       # Still working...
+GET /api/v1/agent/jobs/12345
+-> {"id": "12345", "status": "running", "result": null}   # Still working...
 
-GET /api/v1/jobs/12345
--> {"status": "running"}       # Still working...
+GET /api/v1/agent/jobs/12345
+-> {"id": "12345", "status": "running", "result": null}   # Still working...
 
-GET /api/v1/jobs/12345
--> {"status": "done", "result": {"os": "Debian", "kernel": "6.1.0", ...}}
+GET /api/v1/agent/jobs/12345
+-> {"id": "12345", "status": "done",
+    "result": {"os": "Debian", "kernel": "6.1.0", ...}}
 </pre>
 
       <p>
@@ -252,21 +273,22 @@ GET /api/v1/jobs/12345
       </p>
 
 <pre>
-# From lib/tunneld/audit.ex:
-def log(token_id, action, target, result) do
+# From lib/tunneld/audit.ex — note the argument order: token_id is LAST.
+def log(action, target, result, token_id) when is_binary(action) do
   entry = %{
-    timestamp: DateTime.utc_now() |> DateTime.to_iso8601(),
-    token_id: token_id,
-    action: action,
-    target: target,
-    result: result
+    "ts" => DateTime.utc_now() |> DateTime.to_iso8601(),
+    "token_id" => token_id,
+    "action" => action,
+    "target" => target,
+    "result" => result
   }
 
+  # Appended as one JSON line to audit.jsonl under the data root.
   append_to_audit_log(entry)
 end
 
 # Example log entry:
-# {"timestamp":"2024-08-10T12:34:56Z","token_id":"abc123",
+# {"ts":"2024-08-10T12:34:56Z","token_id":"abc123",
 #  "action":"machines:create","target":"def456","result":"ok"}
 </pre>
     </section>
@@ -357,12 +379,12 @@ iex> {:ok, token, id, scopes} = Tunneld.AgentTokens.issue(["machines:read", "res
 <pre>
 # List machines:
 $ curl -H "Authorization: Bearer tnld_vG7hJ2mK8nP3qR9sT..." \
-       http://10.0.0.1/api/v1/machines
+       http://10.0.0.1/api/v1/agent/machines
 [{"id":"def456","name":"NUC","address":"10.0.0.50",...}]
 
 # With wrong scope (403):
 $ curl -H "Authorization: Bearer tnld_READONLY_TOKEN..." \
-       -X POST http://10.0.0.1/api/v1/machines -d '...'
+       -X POST http://10.0.0.1/api/v1/agent/resources -d '...'
 {"error":"forbidden"}
 </pre>
 
@@ -371,15 +393,15 @@ $ curl -H "Authorization: Bearer tnld_READONLY_TOKEN..." \
 <pre>
 # Start a long operation:
 $ curl -X POST -H "Authorization: Bearer $TOKEN" \
-       http://10.0.0.1/api/v1/machines/def456/probe
-{"job_id":"12345"}
+       http://10.0.0.1/api/v1/agent/machines/def456/probe
+{"job_id":"12345","status":"running"}
 
 # Poll until done:
-$ curl -H "Authorization: Bearer $TOKEN" http://10.0.0.1/api/v1/jobs/12345
-{"status":"running"}
+$ curl -H "Authorization: Bearer $TOKEN" http://10.0.0.1/api/v1/agent/jobs/12345
+{"id":"12345","status":"running","result":null}
 
-$ curl -H "Authorization: Bearer $TOKEN" http://10.0.0.1/api/v1/jobs/12345
-{"status":"done","result":{"os":"Debian","kernel":"6.1.0",...}}
+$ curl -H "Authorization: Bearer $TOKEN" http://10.0.0.1/api/v1/agent/jobs/12345
+{"id":"12345","status":"done","result":{"os":"Debian","kernel":"6.1.0",...}}
 </pre>
     </section>
 

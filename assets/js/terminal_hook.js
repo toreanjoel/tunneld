@@ -8,7 +8,8 @@
  * - Sends resize events when the terminal dimensions change
  * - Cleans up properly on disconnect
  *
- * Performance: Uses WebGL renderer with canvas/DOM fallback, debounced resize.
+ * Performance: xterm's default DOM renderer (WebGL/canvas were tried and
+ * reverted - see the note in mounted()), debounced resize.
  *
  * Security: This module handles terminal I/O only. All authentication is
  * performed server-side by the gateway - no secrets reach the browser.

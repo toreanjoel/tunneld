@@ -227,7 +227,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             <div :if={@data[:loopback_port]} class="text-sm truncate">
               <span class="font-bold">Manual exposure:</span>
               <span class="ml-1 font-mono text-xs">
-                <%= Tunneld.Caddy.gateway_ip() || "127.0.0.1" %>:<%= @data[:loopback_port] %>
+                <%= Tunneld.Config.gateway_ip() || "127.0.0.1" %>:<%= @data[:loopback_port] %>
               </span>
               <span class="ml-1 text-xs text-gray-400">
                 (point zrok/cloudflared here from any subnet machine)

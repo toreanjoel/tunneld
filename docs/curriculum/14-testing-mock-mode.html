@@ -69,17 +69,25 @@ end
       </p>
 
 <pre>
-# From lib/tunneld/machines/ssh/mock.ex (simplified):
-def run(_machine, "ss -tlnp" <> _, _opts) do
-  {:ok, """
-  State  Recv-Q Send-Q Local Address:Port Peer Address:Port Process
-  LISTEN 0      128    0.0.0.0:22         0.0.0.0:*         users:(("sshd",pid=1))
-  LISTEN 0      128    0.0.0.0:8080       0.0.0.0:*         users:(("nginx",pid=2))
-  """}
+# From lib/tunneld/machines/ssh/mock.ex (abridged):
+# There is ONE run/3. It delegates to mock_output/1, whose clauses match the
+# command string EXACTLY - an unmatched command silently returns "".
+def run(_machine, command, _opts) do
+  {:ok, mock_output(command)}
 end
 
-def run(_machine, "cat /etc/os-release" <> _, _opts) do
-  {:ok, "PRETTY_NAME=\"Debian GNU/Linux 12\""}
+defp mock_output("cat /etc/os-release | grep ^PRETTY_NAME") do
+  "PRETTY_NAME=\"Ubuntu 24.04 LTS\"\n"
+end
+
+defp mock_output("ss -tlnp 2>/dev/null || ss -tln 2>/dev/null") do
+  "State   Recv-Q  Send-Q   Local Address:Port   Peer Address:Port   Process\n" <>
+    "LISTEN  0       4096     0.0.0.0:22           0.0.0.0:*           users:((\"sshd\",pid=1234,fd=3))\n" <>
+    "LISTEN  0       4096     0.0.0.0:8080         0.0.0.0:*           users:((\"node\",pid=5678,fd=9))\n"
+end
+
+defp mock_output(_other) do
+  ""
 end
 </pre>
 
@@ -92,15 +100,19 @@ end
 
 <pre>
 # From lib/tunneld/servers/fake_data.ex:
+# devices/0 returns a {raw_lease_file_string, exit_status} TUPLE so that
+# Devices.fetch_devices/0 parses it with the same code path as the real
+# /var/lib/misc/dnsmasq.leases file.
 def devices do
-  [
-    %{"mac" => "aa:bb:cc:dd:ee:ff", "ip" => "10.0.0.100", "hostname" => "laptop"},
-    %{"mac" => "11:22:33:44:55:66", "ip" => "10.0.0.101", "hostname" => "phone"}
-  ]
+  {
+    "1732984082 b2:11:11:11:11:11 10.0.0.59 Person1 01:11:11:11:11:11:11\n" <>
+      "1732995766 22:22:22:22:22:20 10.0.0.33 Person2 22:22:22:22:22:22:20\n",
+    0
+  }
 end
 
 def ethernet do
-  %{upstream: :up, downstream: :up}
+  %{upstream: "up", downstream: "up", speed: 1000}
 end
 </pre>
     </section>
@@ -118,12 +130,23 @@ end
 # config/test.exs:
 import Config
 
-config :tunneld,
-  mock_data: true,
-  fs_root: "test/tmp"
+config :tunneld, :mock_data, true
+
+config :tunneld, :fs,
+  root: Path.expand("../data/", __DIR__),
+  auth: "auth.json",
+  resources: "resources.json"
+
+config :tunneld, :network,
+  gateway: "192.168.1.1",
+  upstream: "eth0",
+  downstream: "eth1"
 
 config :tunneld, TunneldWeb.Endpoint,
   server: false  # Don't start HTTP server in tests
+
+# Note: there is no :fs_root key and no test/tmp directory. Tests that write
+# state override the :fs root per-test with a System.tmp_dir!() sandbox.
 </pre>
 
       <h3>Example Test: Overlay IP Allocation</h3>
@@ -133,30 +156,39 @@ config :tunneld, TunneldWeb.Endpoint,
 defmodule Tunneld.OverlayTest do
   use ExUnit.Case, async: false  # Modifies app env
 
+  alias Tunneld.Machines
   alias Tunneld.Overlay
 
   setup do
-    # Clean up overlay.json before each test
-    File.rm_rf("test/tmp/overlay.json")
+    # Each test gets its own sandbox under System.tmp_dir!() and swaps the
+    # :fs root so nothing touches the repo's data/ directory.
+    tmp = Path.join(System.tmp_dir!(), "tunneld_overlay_#{System.unique_integer([:positive])}")
+    File.mkdir_p!(tmp)
+    prev_root = Application.get_env(:tunneld, :fs, []) |> Keyword.get(:root)
+    Application.put_env(:tunneld, :fs, root: tmp, auth: "auth.json", resources: "resources.json")
+
+    on_exit(fn ->
+      File.rm_rf!(tmp)
+      Application.put_env(:tunneld, :fs, root: prev_root)
+    end)
+
     :ok
   end
 
-  test "ensure_peer allocates overlay IP" do
-    machine = %{"id" => "test-123", "address" => "45.76.183.185"}
-
-    assert {:ok, %{overlay_ip: ip}} = Overlay.ensure_peer(machine)
-    assert ip =~ ~r/^10\.88\.0\.\d+$/
-
-    # Second call returns same IP (idempotent)
-    assert {:ok, %{overlay_ip: ^ip}} = Overlay.ensure_peer(machine)
+  test "address_for returns LAN IP for same-subnet machines" do
+    # gateway is 192.168.1.1 in test config
+    assert Overlay.address_for(%{"address" => "192.168.1.50"}) == "192.168.1.50"
   end
 
-  test "address_for returns overlay IP for remote machine" do
-    machine = %{"id" => "test-456", "address" => "45.76.183.185"}
-    Overlay.ensure_peer(machine)
+  test "ensure_peer returns a stable overlay IP (mock mode)" do
+    {:ok, %{"id" => id}} =
+      Machines.enroll(%{"name" => "vps2", "address" => "203.0.113.9", "location" => "remote"})
 
-    addr = Overlay.address_for(machine)
-    assert addr =~ ~r/^10\.88\.0\.\d+$/
+    {:ok, m} = Machines.get(id)
+    {:ok, %{overlay_ip: ip}} = Overlay.ensure_peer(m)
+    {:ok, %{overlay_ip: ip2}} = Overlay.ensure_peer(m)
+    assert ip == ip2
+    assert ip =~ "10.88.0."
   end
 end
 </pre>
@@ -165,18 +197,21 @@ end
 
 <pre>
 # From test/tunneld/machines/runtime_test.exs:
-test "parse_listeners extracts address, port, and process" do
-  ss_output = """
-  State  Recv-Q Send-Q Local Address:Port Peer Address:Port Process
-  LISTEN 0      128    0.0.0.0:80         0.0.0.0:*         users:(("nginx",pid=1234,fd=6))
-  LISTEN 0      128    127.0.0.1:5432     0.0.0.0:*         users:(("postgres",pid=5678,fd=5))
-  """
+# parse_listeners/2 is private, so the test drives the PUBLIC entry point
+# Machines.listeners/1, which in mock mode parses Mock's canned `ss` output.
+test "listeners parses ss output and annotates containers (mock mode)" do
+  {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "box", "address" => "10.0.0.5"})
+  {:ok, listeners} = Machines.listeners(id)
 
-  listeners = Runtime.parse_listeners(ss_output, %{})
+  ssh = Enum.find(listeners, &(&1["port"] == 22))
+  assert ssh["proc"] == "sshd"
+  assert ssh["pid"] == 1234
+  assert ssh["addr"] == "0.0.0.0"
 
-  assert length(listeners) == 2
-  assert Enum.find(listeners, &(&1["port"] == 80))["proc"] == "nginx"
-  assert Enum.find(listeners, &(&1["port"] == 5432))["addr"] == "127.0.0.1"
+  node = Enum.find(listeners, &(&1["port"] == 8080))
+  assert node["proc"] == "node"
+  assert node["pid"] == 5678
+  assert node["container"] == nil
 end
 </pre>
     </section>
@@ -240,10 +275,12 @@ end
           functions, runs only in production.
         </li>
         <li>
-          <strong>Disenroll.teardown_remote</strong> — The disenrollment flow removes 
-          WireGuard configs, Caddy routes, and SSH keys from targets. In mock mode, 
-          these are just map deletions. The real SSH commands that delete 
-          <code>/etc/wireguard/wg-*.conf</code> on targets are never executed.
+          <strong>Remote teardown</strong> — <code>Machines.remove/1</code> runs a private 
+          <code>attempt_remote_teardown/1</code> inside a <code>Task</code> with a 5s timeout; 
+          it calls <code>Egress.cleanup_machine/1</code>, 
+          <code>Overlay.remove_overlay_ip/1</code> and <code>Overlay.remove_peer/1</code>. 
+          In mock mode these are just map deletions; the real SSH/<code>wg</code> commands 
+          that tear a peer down on the target are never executed by the test suite.
         </li>
       </ul>
 
@@ -268,13 +305,17 @@ end
       </p>
 
 <pre>
-test "parse_listeners handles IPv6 addresses" do
-  ss_output = "LISTEN 0 128 [::]:80 [::]:* users:..."
-  listeners = Runtime.parse_listeners(ss_output, %{})
-  assert Enum.find(listeners, &(&1["port"] == 80))["addr"] == "[::]"
+test "listeners parses ss output and annotates containers (mock mode)" do
+  {:ok, %{"id" => id}} = Machines.enroll(%{"name" => "box", "address" => "10.0.0.5"})
+  {:ok, listeners} = Machines.listeners(id)
+
+  ssh = Enum.find(listeners, &(&1["port"] == 22))
+  assert ssh["proc"] == "sshd"
+  assert ssh["pid"] == 1234
+  assert ssh["addr"] == "0.0.0.0"
 end
-# This tests the PARSER, which runs the same in mock and prod
-# If the regex breaks, this test fails
+# The mock only supplies the raw `ss` text; the PARSER under test runs the same
+# in mock and prod. If the parsing regex breaks, this test fails.
 </pre>
 
       <p>

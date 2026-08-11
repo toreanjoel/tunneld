@@ -70,7 +70,6 @@ defmodule Tunneld.EgressTest do
 
     {:ok, _} = Egress.route_device(m, "10.0.0.200")
     assert Egress.device_egress("10.0.0.200") == id
-    assert Egress.device_egress_map()["10.0.0.200"] == id
 
     # unroute clears it
     :ok = Egress.unroute_device(m, "10.0.0.200")

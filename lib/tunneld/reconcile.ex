@@ -12,7 +12,7 @@ defmodule Tunneld.Reconcile do
 
   Returns a map of subsystem results:
 
-      %{wireguard: :ok | {:drift, ...}, caddy: ..., egress: ..., ssh: ...}
+      %{wireguard: :ok | {:drift, ...}, caddy: ..., ssh: ..., resources: ...}
 
   In mock mode no live commands are run; the function reports the subsystems
   as present based on the machine record.

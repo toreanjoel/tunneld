@@ -1,10 +1,14 @@
 # Tunneld Build & Deploy Runbook
 
 End-to-end steps for building the release on a Mac, deploying it to a tunneld gateway, enrolling
-a remote machine over the WireGuard overlay, and exposing a service publicly.
+a remote machine over the WireGuard overlay, and exposing its services on the LAN.
 
 > **Who this is for:** a human or an agent that needs to (1) build, (2) deploy, (3) connect
-> machines, (4) expose services. Each section is self-contained.
+> machines, (4) route per-device egress. Each section is self-contained.
+>
+> Off-LAN / internet exposure is **not** part of tunneld. Resources are reachable on the LAN
+> (`<name>.tunneld.lan:18000`) and over the overlay; anything public is operator-managed and
+> lives outside this runbook.
 
 ---
 
@@ -23,7 +27,7 @@ command -v docker && docker version --client >/dev/null 2>&1   && echo "Docker O
 From the repo root:
 
 ```bash
-cd /Users/toreanjoel/work/personal/tunneld
+cd <repo-root>          # e.g. ~/work/tunneld
 ./build_release.sh
 ```
 
@@ -50,7 +54,7 @@ cd ~/tunneld_build && shasum -a 256 tunneld-pre-alpha.tar.gz && cat checksums.tx
 ### 1.4 Stage into the installer repo (optional)
 
 ```bash
-cd /Users/toreanjoel/work/personal/tunneld-installer
+cd <tunneld-installer-repo-root>
 cp ~/tunneld_build/tunneld-pre-alpha.tar.gz releases/
 cp ~/tunneld_build/checksums.txt releases/
 cp ~/tunneld_build/metadata.json releases/
@@ -110,8 +114,8 @@ via a WireGuard overlay. The gateway dials out to each machine.
 
   Exactly two inbound ports are needed on a managed machine: **TCP 22** (tunneld's control
   plane — `SSH.run/3` dials the machine's *public* address, not the overlay) and **UDP 51821**
-  (the overlay). Anything else is opt-in: the TCP port a public resource `listen`s on. Caddy's
-  admin API (`2019`) must **never** be public — tunneld reaches it through the tunnel.
+  (the overlay). Tunneld opens nothing else on a target — it does not install or drive Caddy
+  there; Caddy is gateway-side only.
 
   The gateway itself needs **no** inbound rules. It dials out and holds the NAT mapping open
   with `PersistentKeepalive = 25`, which is what lets it sit behind NAT and move.
@@ -126,7 +130,9 @@ via a WireGuard overlay. The gateway dials out to each machine.
 ### 3.3 Bring up the overlay
 
 `Tunneld.Overlay.ensure_peer/1` installs `wireguard-tools` on the target, exchanges keys,
-writes `/etc/wireguard/wg-<id>.conf` on both sides, and brings up `wg-quick@wg-<id>`. The
+writes `/etc/wireguard/wg-<hash>.conf` on both sides, and brings up `wg-quick@wg-<hash>`
+(`<hash>` is the first 8 hex chars of `sha256(machine_id)` — wg-quick caps interface names at
+15 chars). The
 machine gets an overlay IP (e.g. `10.88.0.2`) and its services become reachable as if local.
 
 **Verify on the target, not tunneld's word:**
@@ -159,21 +165,7 @@ field catch up on their own once the handshake lands.
 
 ---
 
-## 4. Public exposure (M4)
-
-Drive the **machine's own Caddy** admin API over the overlay to expose a service publicly.
-
-1. Install Caddy on the machine; bind its admin API to the **overlay address only**
-   (`admin 10.88.0.2:2019`), never `0.0.0.0` / public.
-2. Tunneld pushes a public config with the resource's `listen` field:
-   - `"8080"` → `:8080`, no domain/TLS (day one).
-   - `"app.example.com"` → `:80/:443` with auto-TLS (point DNS to the machine, change one field).
-3. **Open the exposed TCP port in the machine's provider firewall** (e.g. Vultr inbound TCP
-   `8080`) for public internet reachability.
-
----
-
-## 5. Per-device egress (M6)
+## 4. Per-device egress (M6)
 
 Route a subnet device's traffic out through an exit machine.
 
@@ -181,7 +173,7 @@ Route a subnet device's traffic out through an exit machine.
   rule on its egress interface, allow forwarding on the WireGuard interface, and set the
   gateway peer's `AllowedIPs` to include the LAN subnet.
 - **On the gateway:** give the exit machine a routing table
-  (`ip route add default dev wg-<id> table <N>`), and route a device with one rule
+  (`ip route add default dev wg-<hash> table <N>`), and route a device with one rule
   (`ip rule add from <device_ip> lookup <N>`). Removing a device is one delete.
 
 > **Important:** only ever route *device* traffic — never the gateway's own source IP, or you
@@ -199,5 +191,4 @@ Route a subnet device's traffic out through an exit machine.
 | WireGuard handshake won't establish | Open inbound UDP/**51821** in the **provider** firewall (not the OS). `0 B received` with non-zero `sent` in `wg show` is this, every time |
 | Machine reads `ready` but Terminal times out | Only the terminal uses the overlay IP; probe/listeners/exit use the public IP. So `ready` says nothing about the tunnel — check the `WireGuard` field |
 | Remote service not reachable | Confirm the machine is a WG peer (`wg show`) and the resource pool uses the overlay IP |
-| Public port times out | Open the exposed TCP port in the provider firewall |
 | Egress routes but times out | Confirm ip_forward + MASQUERADE on the exit and FORWARD allow on its WG iface |

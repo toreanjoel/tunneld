@@ -26,4 +26,21 @@ defmodule Tunneld.Config do
   def fs_root do
     fs(:root) || "/var/lib/tunneld"
   end
+
+  @doc """
+  Retrieve a `:network` config value (`:gateway`, `:upstream`, `:downstream`).
+
+  This lived as five byte-identical private copies across `Machines`,
+  `Overlay`, `Egress`, `Caddy` and `DnsConfig`. One copy, one place to fix.
+  """
+  def network(key) do
+    case Application.get_env(:tunneld, :network, []) do
+      kw when is_list(kw) -> Keyword.get(kw, key)
+      map when is_map(map) -> Map.get(map, key) || Map.get(map, to_string(key))
+      _ -> nil
+    end
+  end
+
+  @doc "The gateway's LAN IP (the downstream interface address)."
+  def gateway_ip, do: network(:gateway)
 end

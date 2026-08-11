@@ -182,9 +182,10 @@ end
           machine.
         </li>
         <li>
-          <strong>Exactly two things installed on targets.</strong> Tunneld installs WireGuard 
-          and Caddy on managed machines. That is it. If something else is needed (Docker, Incus, 
-          Node.js, whatever), the operator installs it. Tunneld just discovers the result.
+          <strong>Exactly one thing installed on targets.</strong> Tunneld installs WireGuard 
+          (<code>wireguard-tools</code>) on managed machines. That is it. If something else is 
+          needed (Docker, Incus, Node.js, whatever), the operator installs it. Tunneld just 
+          discovers the result.
         </li>
         <li>
           <strong>Reconciliation over repair.</strong> Because remote state is authoritative 

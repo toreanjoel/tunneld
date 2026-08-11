@@ -6,7 +6,7 @@ Thanks for your interest in contributing to Tunneld! This guide will help you ge
 
 ### Prerequisites
 
-- Elixir 1.18+ and Erlang/OTP 27+
+- Elixir 1.18+ and Erlang/OTP 26 (`.tool-versions` pins `elixir 1.18.3-otp-26` / `erlang 26.2.5`; CI uses the same pair)
 - Node.js (for asset compilation via esbuild/tailwind)
 
 ### Setup
@@ -44,7 +44,7 @@ MOCK_DATA=true mix compile --warnings-as-errors
 
 ### Architecture
 
-Tunneld follows a GenServer-per-concern pattern. Each server in `lib/tunneld/servers/` manages one domain (devices, services, resources, machines, DNS, etc.) and communicates with the LiveView dashboard through Phoenix PubSub.
+Tunneld follows a GenServer-per-concern pattern. Most servers in `lib/tunneld/servers/` manage one domain (devices, services, resources, DNS, etc.) and communicate with the LiveView dashboard through Phoenix PubSub. Not everything in that directory is a process (`expose_allowed.ex`, `device_tags.ex` and `fake_data.ex` are plain modules), and some GenServers live outside it (`Tunneld.AgentTokens`, `Tunneld.Jobs`, `Tunneld.Geolocation`). Machine management is a plain module at `lib/tunneld/machines.ex`, not a server.
 
 Key patterns:
 - **PubSub topics** follow `component:<name>` for UI updates and `notifications` for flash messages

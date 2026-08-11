@@ -144,6 +144,7 @@ Supervisor.start_link(children, opts)
 def start(_type, _args) do
   children = [
     TunneldWeb.Telemetry,
+    {DNSCluster, query: Application.get_env(:tunneld, :dns_cluster_query) || :ignore},
     {Phoenix.PubSub, name: Tunneld.PubSub},
     {Session, []},
     {SystemResources, []},
@@ -153,7 +154,6 @@ def start(_type, _args) do
     {Auth, []},
     {DnsConfig, []},
     {Updater, []},
-    {Machines, []},
     {Tunneld.AgentTokens, []},
     {Tunneld.Jobs, []},
     {Tunneld.Geolocation, []},
@@ -161,7 +161,17 @@ def start(_type, _args) do
   ]
 
   opts = [strategy: :one_for_one, name: Tunneld.Supervisor]
-  Supervisor.start_link(children, opts)
+
+  case Supervisor.start_link(children, opts) do
+    {:ok, pid} ->
+      # Machines is a plain module, so boot-time recovery has no init/1 to run
+      # from. Probing the fleet must not block application start.
+      Task.start(fn -> Tunneld.Machines.recover_all() end)
+      {:ok, pid}
+
+    other ->
+      other
+  end
 end
 </pre>
 
@@ -175,7 +185,6 @@ end
         <li><code>Session</code> — in-memory auth sessions (TTL-based expiry)</li>
         <li><code>Resources</code> — resource registry, Caddy sync, health checks</li>
         <li><code>Devices</code> — DHCP lease monitoring, device list</li>
-        <li><code>Machines</code> — machine registry, probe coordination</li>
         <li><code>Jobs</code> — long-running task tracking</li>
       </ul>
 
@@ -206,7 +215,8 @@ end
 
       <p>
         Not everything is a GenServer. <code>Overlay</code>, <code>Egress</code>, 
-        <code>Caddy</code>, <code>Reconcile</code> are plain modules with functions. 
+        <code>Caddy</code>, <code>Reconcile</code> and <code>Machines</code> (the machine 
+        registry and probe coordination) are plain modules with functions. 
         They do not hold state between calls — they read from disk, run commands, and 
         return. This is deliberate: GenServers serialize access, which adds latency.
       </p>

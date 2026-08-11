@@ -35,10 +35,10 @@ graph TB
         TOK[AgentTokens - scoped, revocable, hashed]
         AUD[Audit log - JSONL]
         JOBS[Jobs - 202 async]
-        CADDY[Caddy - LAN + loopback + public]
+        CADDY[Caddy - LAN + loopback]
         RUNTIME[Machines.Runtime - listeners]
         OVERLAY[Overlay - WireGuard]
-        EGR[Egress - per-device exit routing]
+        EGR[Egress - per-device exit routing, dashboard-only]
     end
 
     subgraph Fleet
@@ -55,10 +55,13 @@ graph TB
     API --> RUNTIME
     API --> CADDY
     API --> OVERLAY
-    API --> EGR
     RUNTIME --> M1
     OVERLAY --> M2
 ```
+
+Egress has no agent-API surface: no route declares an `egress` scope and the
+router exposes no egress endpoint. Per-device exit routing is reachable only
+from the dashboard LiveView.
 
 ## The API Contract
 
@@ -90,7 +93,7 @@ rules outside its own resources, DNS provider config, WireGuard key material.
 
 ### Jobs
 
-Long operations (probe, exec) return `202 {job_id}` and run in a Task; poll
+Long operations (probe, exec) return `202 {job_id}` and run in a spawned process; poll
 `GET /api/v1/agent/jobs/:id` until `status == "done"`. Results are JSON-safe.
 
 ## Harness Adapters

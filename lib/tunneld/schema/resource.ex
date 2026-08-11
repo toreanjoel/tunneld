@@ -7,40 +7,6 @@ defmodule Tunneld.Schema.Resource do
   @doc """
   The JSON schema data that will be used to render the form structure.
   """
-  def data(:add_public_plane) do
-    %{
-      "title" => "Public Exposure",
-      "description" =>
-        "Expose this resource on the public internet via the machine's own Caddy. " <>
-          "Listen is a single object: a port (8080) for no-domain/TLS, or a hostname " <>
-          "(app.example.com) for auto-TLS. Same object, one field.",
-      "type" => "object",
-      "ui:order" => ["name", "listen", "pool"],
-      "properties" => %{
-        "name" => %{
-          "type" => "string",
-          "description" => "Name of the resource (used as the LAN hostname).",
-          "minLength" => 1
-        },
-        "listen" => %{
-          "type" => "string",
-          "default" => "8080",
-          "description" => "Public listen: a port (8080) or a hostname (app.example.com).",
-          "ui:help" =>
-            "Plain port => no domain, no TLS (reachable at http://<machine-ip>:<port>). " <>
-              "Hostname => point DNS to the machine and Caddy provisions TLS automatically."
-        },
-        "pool" => %{
-          "type" => "array",
-          "description" => "Backend servers for this resource (IP:PORT per line).",
-          "items" => %{"type" => "string", "pattern" => "^[^\s:]+:[0-9]{1,5}$"},
-          "minItems" => 1
-        }
-      },
-      "required" => ["name", "listen", "pool"]
-    }
-  end
-
   def data(:add_public) do
     %{
       "title" => "Resource Add",

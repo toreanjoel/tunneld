@@ -129,10 +129,19 @@ def generate_keypair do
 end
 
 def store_key(machine_id, priv_pem) do
+  dir = ssh_dir()
+  File.mkdir_p!(dir)
   path = key_path(machine_id)
-  File.mkdir_p!(Path.dirname(path))
-  File.write!(path, priv_pem)
-  File.chmod!(path, 0o600)
+
+  # Derive the public half from the private key so it can always be read back
+  # (previously the .pub was never written, so the key vanished from the UI).
+  pub = public_from_private(priv_pem)
+
+  :ok = File.write(path, priv_pem)
+  :ok = File.chmod(path, 0o600)
+  :ok = File.write(path <> ".pub", pub)
+  :ok = File.chmod(path <> ".pub", 0o644)
+  :ok
 end
 </pre>
 
@@ -170,6 +179,15 @@ defp real_run(machine, command, _opts) do
   end
 end
 </pre>
+
+      <p>
+        Note the transport split, which is the most commonly misread fact in these docs: 
+        <code>SSH.run/3</code> dials <code>machine["address"]</code> — the machine's 
+        <strong>public</strong> address (<code>lib/tunneld/machines/ssh.ex</code>). Only the 
+        interactive browser terminal dials the overlay IP, via 
+        <code>Overlay.address_for(machine)</code> in 
+        <code>lib/tunneld/machines/ssh/session.ex</code>.
+      </p>
 
       <h3>Listener Discovery</h3>
 
@@ -212,7 +230,7 @@ end
       <p>
         SSH gives you one key, one version, one audit trail. The gateway is the chokepoint — 
         all commands flow through it. If you need exec capabilities on a machine, you 
-        <code>POST /machines/:id/exec</code> and the gateway SSHes in.
+        <code>POST /api/v1/agent/machines/:id/exec</code> and the gateway SSHes in.
       </p>
 
       <h3>Why Ed25519</h3>
