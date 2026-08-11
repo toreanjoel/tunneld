@@ -68,13 +68,41 @@ defmodule Tunneld.Publish do
   the supported repair path after the machine reboots.
   """
   def publish(resource, machine, port) when is_map(resource) and is_map(machine) do
+    id = resource["id"] || resource[:id]
+
+    # The record is persisted LAST, on purpose. It is what the UI reads to
+    # decide whether to show Publish or Unpublish, so writing it before the
+    # machine is actually serving would leave a resource that looks published,
+    # offers no way to retry, and has nothing behind it.
     with {:ok, port} <- validate_port(port),
-         :ok <- ensure_caddy(machine),
          record <- build_record(resource, machine, port),
-         :ok <- put_record(resource["id"] || resource[:id], record),
-         :ok <- sync_machine(machine),
-         :ok <- open_os_firewall(machine, port) do
+         :ok <- ensure_caddy(machine),
+         :ok <- sync_machine(machine, %{id => record}),
+         :ok <- open_os_firewall(machine, port),
+         :ok <- put_record(id, record) do
       {:ok, record}
+    end
+  end
+
+  @doc """
+  Stop serving a resource publicly, resolving the machine ourselves.
+
+  Called when a resource is deleted: without it the machine keeps a listener,
+  a firewall hole and a Caddy server for a resource that no longer exists.
+  """
+  def unpublish_resource(resource_id) do
+    case get(resource_id) do
+      nil ->
+        :ok
+
+      %{"machine_id" => machine_id} ->
+        machine =
+          case Tunneld.Machines.get(machine_id) do
+            {:ok, m} -> m
+            _ -> nil
+          end
+
+        unpublish(resource_id, machine)
     end
   end
 
@@ -208,8 +236,10 @@ defmodule Tunneld.Publish do
     }
   end
 
-  defp sync_machine(machine) do
-    config = build_config(for_machine(machine["id"]))
+  # `extra` lets a not-yet-persisted record take part in the config, so the
+  # remote can be brought up before anything is written to disk.
+  defp sync_machine(machine, extra \\ %{}) do
+    config = build_config(Map.merge(for_machine(machine["id"]), extra))
     json = Jason.encode!(config, pretty: true)
 
     if @mock do
@@ -265,16 +295,23 @@ defmodule Tunneld.Publish do
     end
   end
 
+  # Discarding this result is how you ship a machine that reports "published"
+  # while its own firewall silently drops every connection. The `|| true` keeps
+  # a missing ufw from being fatal, so a non-zero result here means SSH itself
+  # failed and the operator needs to know.
   defp open_os_firewall(machine, port) do
-    unless @mock do
-      SSH.run(
-        machine,
-        "ufw allow #{port}/tcp 2>/dev/null || " <>
-          "iptables -I INPUT 1 -p tcp --dport #{port} -j ACCEPT 2>/dev/null || true"
-      )
-    end
+    if @mock, do: :ok, else: real_open_os_firewall(machine, port)
+  end
 
-    :ok
+  defp real_open_os_firewall(machine, port) do
+    case SSH.run(
+           machine,
+           "ufw allow #{port}/tcp 2>/dev/null || " <>
+             "iptables -I INPUT 1 -p tcp --dport #{port} -j ACCEPT 2>/dev/null || true"
+         ) do
+      {:ok, _} -> :ok
+      {:error, reason} -> {:error, {:firewall_failed, reason}}
+    end
   end
 
   defp close_os_firewall(machine, port) do

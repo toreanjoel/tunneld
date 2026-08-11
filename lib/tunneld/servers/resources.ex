@@ -188,6 +188,11 @@ defmodule Tunneld.Servers.Resources do
   def handle_cast({:remove_share, id}, state) do
     resources = read_file()
 
+    # Tear down public exposure first. A deleted resource whose machine is still
+    # listening on a public port, with the firewall still open for it, is worse
+    # than a leak - the port answers, and nothing in the UI explains why.
+    _ = Tunneld.Publish.unpublish_resource(id)
+
     updated_nodes = Enum.reject(resources, fn resource -> resource["id"] === id end)
 
     update_state =

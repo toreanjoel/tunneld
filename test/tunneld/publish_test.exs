@@ -94,6 +94,29 @@ defmodule Tunneld.PublishTest do
     assert rec["port"] == 8001
   end
 
+  # A record written before the machine is actually serving leaves a resource
+  # that looks published, has nothing behind it, and offers Unpublish instead
+  # of a retry. Nothing is persisted unless every remote step succeeded.
+  test "nothing is recorded when the remote setup fails", %{machine: m, resource: r} do
+    assert {:error, :invalid_port} = Publish.publish(r, m, 70_000)
+    assert Publish.all() == %{}
+  end
+
+  # Deleting a resource used to leave the machine listening on a public port,
+  # with its firewall still open, for something that no longer existed.
+  test "unpublish_resource/1 tears down by resource id alone", %{machine: m, resource: r} do
+    {:ok, _} = Publish.publish(r, m, 8001)
+    assert Publish.get("r1")
+
+    assert :ok = Publish.unpublish_resource("r1")
+    assert Publish.get("r1") == nil
+    assert Publish.build_config(Publish.for_machine(m["id"]))["apps"]["http"]["servers"] == %{}
+  end
+
+  test "unpublish_resource/1 on an unpublished resource is a no-op" do
+    assert :ok = Publish.unpublish_resource("never-published")
+  end
+
   # The provider firewall is the one step tunneld cannot do, so it must be
   # stated, with the port and address in it - not left as a generic hint.
   test "manual steps name the port and address the operator must open", %{

@@ -1284,16 +1284,24 @@ defmodule TunneldWeb.Live.Dashboard do
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{type: type, message: message})
   end
 
-  # Re-render an open resource panel so a publish/unpublish/re-check shows up
-  # immediately instead of on the next poll. `get_resource/1` is a cast that
-  # broadcasts the fresh record on "component:details" - it does not return it,
-  # so assigning its result would put `:ok` in the panel.
+  # Re-render an open resource panel so publish/unpublish shows up immediately
+  # rather than only after closing and reopening it.
+  #
+  # This has to be an explicit `send_update`. Publishing does not change the
+  # resource itself - only `Publish.get/1`, which the component reads during
+  # render - so nothing in the component's assigns differs and LiveView has no
+  # reason to re-render it. (`Resources.get_resource/1` is no use here either:
+  # it broadcasts on "component:details", and no handler matches that shape for
+  # a resource, so it was silently doing nothing.)
   defp refresh_resource_sidebar(socket, id) do
     sidebar = Map.get(socket.assigns, :sidebar, %{})
 
-    if Map.get(sidebar, :view) == :resource and
-         match?(%{type: :resource, id: ^id}, Map.get(sidebar, :selection)) do
-      Tunneld.Servers.Resources.get_resource(id)
+    with true <- Map.get(sidebar, :is_open, false),
+         :resource <- Map.get(sidebar, :view),
+         %{type: :resource, id: ^id} <- Map.get(sidebar, :selection),
+         %{} = resource <-
+           Enum.find(Tunneld.Servers.Resources.fetch_shares(), &(&1.id == id)) do
+      send_update(SidebarDetails, id: "sidebar_details", data: resource)
     end
 
     socket
