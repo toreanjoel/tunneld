@@ -202,6 +202,14 @@ defmodule TunneldWeb.Live.Dashboard do
             </div>
 
             <div class="mt-12">
+              <.live_component
+                id="clients"
+                module={TunneldWeb.Live.Components.Clients}
+                obfuscated={@obfuscated}
+              />
+            </div>
+
+            <div class="mt-12">
               <.section_header>
                 Local devices<.help_icon text="Devices connected to this Tunneld gateway's LAN port via Ethernet. Each device gets a DHCP lease and IP address from dnsmasq. Use Quick Expose to let devices create local resources via a curl command. Revoke IP to release the DHCP lease." />
               </.section_header>
@@ -774,13 +782,11 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   def handle_info(%{id: "machines", event: _, data: _}, socket) do
-    send_update(TunneldWeb.Live.Components.Machines, id: "machines", data: %{})
-    {:noreply, assign(socket, :map_nodes, map_nodes())}
+    {:noreply, machines_changed(socket)}
   end
 
   def handle_info({:machines_changed}, socket) do
-    send_update(TunneldWeb.Live.Components.Machines, id: "machines", data: %{})
-    {:noreply, assign(socket, :map_nodes, map_nodes())}
+    {:noreply, machines_changed(socket)}
   end
 
   def handle_info(:poll_link_state, socket) do
@@ -1292,6 +1298,15 @@ defmodule TunneldWeb.Live.Dashboard do
     end
   end
 
+  # The clients panel offers every machine as an endpoint to dial home through,
+  # so it goes stale the moment a machine is added or removed - the same way
+  # the map pins did before they were fed from an assign.
+  defp machines_changed(socket) do
+    send_update(TunneldWeb.Live.Components.Machines, id: "machines", data: %{})
+    send_update(TunneldWeb.Live.Components.Clients, id: "clients", data: %{})
+    assign(socket, :map_nodes, map_nodes())
+  end
+
   defp notify(type, message) do
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{type: type, message: message})
   end
@@ -1387,9 +1402,15 @@ defmodule TunneldWeb.Live.Dashboard do
           "mkdir -p ~/.ssh && echo '#{String.trim(pub)}' >> ~/.ssh/authorized_keys && chmod 600 ~/.ssh/authorized_keys"
       },
       %{
-        "title" => "3. (Remote machines) Open the WireGuard port in the provider firewall",
+        "title" => "3. (Remote machines) Open two UDP ports in the provider firewall",
         "code" =>
-          "Allow inbound UDP/51821 in the target's cloud-provider firewall (e.g. a Vultr security group) so the gateway can bring up the WireGuard overlay."
+          "Allow inbound UDP/51821 and UDP/51822 in the target's cloud-provider firewall " <>
+            "(e.g. a Vultr firewall group).\n\n" <>
+            "  51821  the gateway's WireGuard overlay to this machine\n" <>
+            "  51822  client access - phones and laptops reaching home through this machine\n\n" <>
+            "This is the one step tunneld cannot do for you: the provider's firewall is " <>
+            "enforced outside the machine, so SSH cannot change it. Everything else on the " <>
+            "machine is already configured."
       }
     ]
 

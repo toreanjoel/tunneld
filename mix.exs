@@ -64,7 +64,9 @@ defmodule Tunneld.MixProject do
       {:bcrypt_elixir, "~> 3.0"},
       {:ex_json_schema, "~> 0.10.2"},
       {:httpoison, "~> 2.0"},
-      {:uuid, "~> 1.1"}
+      {:uuid, "~> 1.1"},
+      # QR delivery for WireGuard client configs (phone onboarding).
+      {:eqrcode, "~> 0.1"}
     ]
   end
 

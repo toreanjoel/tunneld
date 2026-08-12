@@ -203,7 +203,47 @@ another continent adds that latency to every page load.
 
 ---
 
-## 5. Per-device egress (M6)
+## 5. Client access (phones, laptops, other people)
+
+A **client** is a person's device that should reach this subnet from anywhere. It gets its own
+keypair and an address in `10.88.1.0/24`, and it **always terminates on the gateway**:
+
+```
+at home   client -> 10.0.0.1:51822                       (one hop, no VPS involved)
+away      client -> <machine>:51822 -DNAT-> 10.88.0.1:51822   (the machine is a door)
+```
+
+A machine forwards that port into the tunnel it already holds with the gateway. It never sees
+a client key and never runs a second WireGuard instance, so you can add or swap machines
+without reissuing anything. Same keypair, same address, same peer — only `Endpoint` differs.
+
+**Enrolling a client**
+
+1. Dashboard → **Clients** → name the device, choose an endpoint:
+   - *this gateway* — home network only, no VPS in the path
+   - *via `<machine>`* — reachable from anywhere
+2. Scan the QR with the WireGuard app, or copy the config.
+3. **The private key is shown once and never stored.** Lost it? Revoke and enrol again.
+
+**Roaming.** WireGuard allows one `Endpoint` per peer, so for a device that is sometimes home
+and sometimes away, either use the app's on-demand activation with your home SSID excluded
+(the tunnel is not needed at home — you are already on the LAN), or keep two profiles that
+differ only in `Endpoint`.
+
+**Access.** A new client reaches the overlay and nothing else. LAN access is granted per host
+and enforced by FORWARD rules on the gateway — never by the client's own `AllowedIPs`, which
+the client owns and can change at will.
+
+**Provider firewall.** Machines need inbound **UDP 51822** as well as 51821. Both are listed
+in the enrolment modal so it is one trip to the console.
+
+**MTU.** Client configs ship `MTU = 1360`. The away path is doubly encapsulated (the client's
+tunnel inside the gateway's tunnel to the machine); at 1420 TCP still works while UDP quietly
+blackholes.
+
+---
+
+## 6. Per-device egress (M6)
 
 Route a subnet device's traffic out through an exit machine.
 
@@ -228,6 +268,9 @@ Route a subnet device's traffic out through an exit machine.
 | `systemctl restart tunneld` fails | `sudo journalctl -u tunneld -n 50` |
 | WireGuard handshake won't establish | Open inbound UDP/**51821** in the **provider** firewall (not the OS). `0 B received` with non-zero `sent` in `wg show` is this, every time |
 | Machine reads `ready` but Terminal times out | Only the terminal uses the overlay IP; probe/listeners/exit use the public IP. So `ready` says nothing about the tunnel — check the `WireGuard` field |
+| Client connects at home but not away | Inbound **UDP 51822** is not open in that machine's provider firewall. `wg show wg-clients` on the gateway will show no handshake for that peer |
+| Client connects, LAN hosts unreachable | Expected until you grant access — a new client reaches the overlay only. Grant per host in the Clients panel |
+| Client works for SSH but the video stalls | MTU. The away path is doubly encapsulated; keep the client at 1360 |
 | Published URL times out | Inbound TCP on that port is not open in the **provider** firewall. Tunneld opens the machine's own firewall, never the provider's |
 | Published URL returns 502 | The gateway's Caddy has no route for that resource, or the pool backend is down. Check the resource's LAN URL works first |
 | Remote service not reachable | Confirm the machine is a WG peer (`wg show`) and the resource pool uses the overlay IP |

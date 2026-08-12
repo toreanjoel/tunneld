@@ -58,6 +58,22 @@ defmodule Tunneld.Iptables do
       ])
     end
 
+    # WireGuard clients (phones, laptops) dial the gateway directly on the LAN
+    # and, when away, via a machine that forwards this same port into the
+    # overlay. It lives here rather than being added ad hoc because reset/0
+    # flushes on every boot - a hand-added rule would disappear on the next
+    # restart and every roaming client would silently stop connecting.
+    System.cmd("iptables", [
+      "-A",
+      "INPUT",
+      "-p",
+      "udp",
+      "--dport",
+      to_string(Tunneld.Clients.port()),
+      "-j",
+      "ACCEPT"
+    ])
+
     # Allow DHCP requests from LAN clients
     System.cmd("iptables", [
       "-A",

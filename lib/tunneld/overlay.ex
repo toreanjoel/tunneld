@@ -41,6 +41,20 @@ defmodule Tunneld.Overlay do
   @doc "The gateway's own overlay IP - the address managed machines dial back to."
   def gateway_overlay_ip, do: @gateway_overlay_ip
 
+  @doc "The machine overlay range, e.g. `10.88.0.0/24`."
+  def overlay_subnet_value do
+    [a, b, c, _] = String.split(@gateway_overlay_ip, ".")
+    "#{a}.#{b}.#{c}.0/24"
+  end
+
+  @doc """
+  Generate a WireGuard keypair as `{public, private}`.
+
+  Shared with `Tunneld.Clients`: one implementation of the temp-file dance
+  around `wg pubkey`, which has already been the source of one collision bug.
+  """
+  def gen_keypair, do: do_gen_keypair()
+
   @doc "Return the address to reach a machine: LAN IP or overlay IP."
   def address_for(machine) do
     if same_subnet?(machine["address"]) do
@@ -118,7 +132,7 @@ defmodule Tunneld.Overlay do
       if File.exists?(priv_path) do
         {File.read!(priv_path <> ".pub") |> String.trim(), File.read!(priv_path)}
       else
-        {gpub, gpriv} = gen_keypair()
+        {gpub, gpriv} = do_gen_keypair()
         File.write!(priv_path, gpriv)
         File.chmod!(priv_path, 0o600)
         File.write!(priv_path <> ".pub", gpub <> "\n")
@@ -127,7 +141,7 @@ defmodule Tunneld.Overlay do
 
     # Generate a keypair for the target; push its private half + the gateway's
     # public half over SSH; return the target's public half.
-    {t_pub, t_priv} = gen_keypair()
+    {t_pub, t_priv} = do_gen_keypair()
 
     gw_overlay_ip = @gateway_overlay_ip
 
@@ -249,7 +263,7 @@ defmodule Tunneld.Overlay do
     "wg-#{short}"
   end
 
-  defp gen_keypair do
+  defp do_gen_keypair do
     {priv, 0} = System.cmd("wg", ["genkey"], stderr_to_stdout: true)
     priv = String.trim(priv)
 

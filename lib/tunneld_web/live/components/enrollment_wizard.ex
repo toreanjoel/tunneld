@@ -144,6 +144,16 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
         _ -> :skipped
       end
 
+    # Every enrolled machine also becomes a client door, so a phone can reach
+    # home through whichever one is closest without any further setup. It only
+    # rewrites a destination port into the tunnel that already exists - no key
+    # material and no second WireGuard instance land on the machine.
+    _ =
+      case overlay do
+        {:ok, _} -> Tunneld.Clients.ensure_door(machine)
+        _ -> :skipped
+      end
+
     %{overlay: overlay, exit: exit_result}
   end
 
