@@ -73,13 +73,16 @@ defmodule Tunneld.Overlay do
     end
   end
 
-  @doc "Remove a machine's WireGuard peer config and bring the interface down. Idempotent."
+  @doc """
+  Remove a machine's WireGuard peer config and bring the interface down.
+
+  Callers that must not block on a dead host should use `remove_peer_local/1`
+  and `remove_peer_remote/1` directly - see `Tunneld.Machines.remove/1`.
+  """
   def remove_peer(machine) do
-    if @mock do
-      :ok
-    else
-      real_remove_peer(machine)
-    end
+    remove_peer_local(machine)
+    remove_peer_remote(machine)
+    :ok
   end
 
   @doc "Remove a machine's overlay IP allocation (called on disenroll/delete)."
@@ -218,12 +221,6 @@ defmodule Tunneld.Overlay do
     run_gateway("systemctl enable --now wg-quick@#{iface} 2>/dev/null || true")
   end
 
-  defp real_remove_peer(machine) do
-    remove_peer_local(machine)
-    remove_peer_remote(machine)
-    :ok
-  end
-
   @doc """
   Tear down the gateway's half of a peer. Local only, so it always completes.
 
@@ -235,6 +232,10 @@ defmodule Tunneld.Overlay do
   interfaces for machines that no longer exist.
   """
   def remove_peer_local(machine) do
+    if @mock, do: :ok, else: real_remove_peer_local(machine)
+  end
+
+  defp real_remove_peer_local(machine) do
     id = machine["id"]
     iface = iface_name(id)
     _ = run_gateway("systemctl disable --now wg-quick@#{iface} 2>/dev/null || true")
@@ -248,6 +249,10 @@ defmodule Tunneld.Overlay do
 
   @doc "Tear down the target's half. Best-effort: the host may be gone."
   def remove_peer_remote(machine) do
+    if @mock, do: :ok, else: real_remove_peer_remote(machine)
+  end
+
+  defp real_remove_peer_remote(machine) do
     iface = iface_name(machine["id"])
     _ = run(machine, "systemctl disable --now wg-quick@#{iface} 2>/dev/null || true")
     :ok
