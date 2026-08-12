@@ -304,10 +304,14 @@ defmodule Tunneld.Clients do
     with {:ok, _} <- write_remote(machine, "/usr/local/sbin/tunneld-door", script),
          {:ok, _} <- Tunneld.Machines.SSH.run(machine, "chmod +x /usr/local/sbin/tunneld-door"),
          {:ok, _} <- write_remote(machine, "/etc/systemd/system/tunneld-door.service", unit),
+         # `enable --now` will not re-run a Type=oneshot unit that is already
+         # active with RemainAfterExit, so an updated script would be written
+         # and never applied. Restart forces it, and re-running is idempotent.
          {:ok, _} <-
            Tunneld.Machines.SSH.run(
              machine,
-             "systemctl daemon-reload && systemctl enable --now tunneld-door"
+             "systemctl daemon-reload && systemctl enable tunneld-door && " <>
+               "systemctl restart tunneld-door"
            ),
          {:ok, _} <-
            Tunneld.Machines.SSH.run(
