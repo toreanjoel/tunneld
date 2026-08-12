@@ -11,7 +11,7 @@
   :root{
     --bg:#0B0A14; --surface:#14131C; --text:#F4F4F5; --text-muted:#9CA3AF;
     --accent:#06B6D4; --border:#27272A; --code-bg:#1F1E2C;
-    --measure:76ch;              /* readable measure for prose; code spans wider */
+    --measure:76ch;              /* readable line length, not slide width */
   }
   .reveal-viewport{ background:var(--bg); }
   .reveal{
@@ -21,9 +21,6 @@
 
   /* ---- layout: every slide is eyebrow / title / body, top-aligned ---- */
   .reveal .slides section{ text-align:left; height:100%; padding:0; }
-  /* Canvas pixels, not vh: reveal scales .slides with a transform, so vh here
-     would track the browser window instead of the 800px slide and the scroll
-     area would be wrong at every window size but one. */
   .reveal .slides section > .deck-body{
     max-height:648px; overflow-y:auto; padding-right:1rem;
     scrollbar-width:thin; scrollbar-color:var(--border) transparent;
@@ -127,6 +124,15 @@
 <p class="deck-eyebrow">Tunneld Learning Curriculum</p>
 
 <div class="deck-body">
+<p style="margin:1rem 0 1.5rem">
+<a href="slides.html" style="display:inline-block;border:1px solid var(--accent);color:var(--accent);
+           padding:.55rem 1rem;border-radius:8px;text-decoration:none;font-size:.95rem">
+          ▶ Present as slides
+        </a>
+<span style="color:var(--text-muted);font-size:.85rem;margin-left:.75rem">
+          → moves between sections, ↓ moves through one. Esc for the overview.
+        </span>
+</p>
 <p>
       This curriculum teaches you how Tunneld works from the ground up. It is designed for 
       the project author to learn and re-learn the system and every subsystem it touches.
@@ -253,6 +259,11 @@
 <div class="title">Terminal Exec</div>
 <div class="desc">Interactive SSH terminals via Phoenix channels, xterm.js, and Erlang :ssh. Three bugs found in production.</div>
 </a>
+<a class="path-item" href="19-publish-and-clients.html">
+<div class="number">19</div>
+<div class="title">Publish &amp; Client Access</div>
+<div class="desc">Traffic inward: the hairpin through the gateway's Caddy, WireGuard peers for people, why AllowedIPs is not permission, and how to verify a UDP path.</div>
+</a>
 </div>
 </div>
 </section>
@@ -281,7 +292,7 @@
 <section>
 <section data-menu-title="00 — Orientation">
   <div class="deck-title">
-    <p class="deck-kicker">1 / 19</p>
+    <p class="deck-kicker">1 / 20</p>
     <h1>00 — Orientation</h1>
     <p class="deck-src">Key source: lib/tunneld/machines/runtime.ex , lib/tunneld/overlay.ex</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -538,7 +549,7 @@ curl http://webapp.tunneld.lan:18000                # -&gt; 10.88.0.2:3000 (over
 <section>
 <section data-menu-title="01 — Architecture">
   <div class="deck-title">
-    <p class="deck-kicker">2 / 19</p>
+    <p class="deck-kicker">2 / 20</p>
     <h1>01 — Architecture</h1>
     <p class="deck-src">Key source: lib/tunneld/application.ex , lib/tunneld_web/live/dashboard.ex</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -875,7 +886,7 @@ end
 <section>
 <section data-menu-title="02 — Networking Foundations">
   <div class="deck-title">
-    <p class="deck-kicker">3 / 19</p>
+    <p class="deck-kicker">3 / 20</p>
     <h1>02 — Networking Foundations</h1>
     <p class="deck-src">Key source: lib/tunneld/iptables.ex , lib/tunneld/net_link.ex , lib/tunneld/overlay.ex</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -1275,7 +1286,7 @@ LISTEN 0 128 0.0.0.0:80 0.0.0.0:* users:(("nginx",pid=1234,fd=6))
 <section>
 <section data-menu-title="03 — WireGuard">
   <div class="deck-title">
-    <p class="deck-kicker">4 / 19</p>
+    <p class="deck-kicker">4 / 20</p>
     <h1>03 — WireGuard</h1>
     <p class="deck-src">Key source: lib/tunneld/overlay.ex</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -1662,7 +1673,7 @@ $ ip route show | grep 10.88.0.5
 <section>
 <section data-menu-title="04 — iptables &amp; NAT">
   <div class="deck-title">
-    <p class="deck-kicker">5 / 19</p>
+    <p class="deck-kicker">5 / 20</p>
     <h1>04 — iptables &amp; NAT</h1>
     <p class="deck-src">Key source: lib/tunneld/iptables.ex , lib/tunneld/egress.ex</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -2063,7 +2074,7 @@ $ dmesg | grep TRACE
 <section>
 <section data-menu-title="05 — Routing Tables &amp; Egress">
   <div class="deck-title">
-    <p class="deck-kicker">6 / 19</p>
+    <p class="deck-kicker">6 / 20</p>
     <h1>05 — Routing Tables &amp; Egress</h1>
     <p class="deck-src">Key source: lib/tunneld/egress.ex , lib/tunneld/overlay.ex</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -2433,7 +2444,7 @@ $ ip route show | grep 10.0.0.50
 <section>
 <section data-menu-title="06 — Caddy Reverse Proxy">
   <div class="deck-title">
-    <p class="deck-kicker">7 / 19</p>
+    <p class="deck-kicker">7 / 20</p>
     <h1>06 — Caddy Reverse Proxy</h1>
     <p class="deck-src">Key source: lib/tunneld/caddy.ex , lib/tunneld/servers/resources.ex</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -2773,7 +2784,7 @@ $ journalctl -u caddy -f
 <section>
 <section data-menu-title="07 — DNS, dnsmasq &amp; DHCP">
   <div class="deck-title">
-    <p class="deck-kicker">8 / 19</p>
+    <p class="deck-kicker">8 / 20</p>
     <h1>07 — DNS, dnsmasq &amp; DHCP</h1>
     <p class="deck-src">Key source: lib/tunneld/iptables.ex , lib/tunneld/servers/dns_config.ex , lib/tunneld/servers/devices.ex</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -3120,7 +3131,7 @@ $ journalctl -u dnsmasq -f
 <section>
 <section data-menu-title="08 — SSH Transport">
   <div class="deck-title">
-    <p class="deck-kicker">9 / 19</p>
+    <p class="deck-kicker">9 / 20</p>
     <h1>08 — SSH Transport</h1>
     <p class="deck-src">Key source: lib/tunneld/machines/ssh.ex , lib/tunneld/machines/runtime.ex</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -3458,7 +3469,7 @@ LISTEN 0      128    127.0.0.1:11434    0.0.0.0:*         users:(("ollama",pid=5
 <section>
 <section data-menu-title="09 — Elixir &amp; OTP Supervision">
   <div class="deck-title">
-    <p class="deck-kicker">10 / 19</p>
+    <p class="deck-kicker">10 / 20</p>
     <h1>09 — Elixir &amp; OTP Supervision</h1>
     <p class="deck-src">Key source: lib/tunneld/application.ex , lib/tunneld/servers/resources.ex , lib/tunneld/machines.ex</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -3794,7 +3805,7 @@ iex&gt; Supervisor.which_children(Tunneld.Supervisor)
 <section>
 <section data-menu-title="10 — Phoenix LiveView">
   <div class="deck-title">
-    <p class="deck-kicker">11 / 19</p>
+    <p class="deck-kicker">11 / 20</p>
     <h1>10 — Phoenix LiveView</h1>
     <p class="deck-src">Key source: lib/tunneld_web/live/dashboard.ex , lib/tunneld_web/router.ex</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -4191,7 +4202,7 @@ end
 <section>
 <section data-menu-title="11 — Persistence &amp; State">
   <div class="deck-title">
-    <p class="deck-kicker">12 / 19</p>
+    <p class="deck-kicker">12 / 20</p>
     <h1>11 — Persistence &amp; State</h1>
     <p class="deck-src">Key source: lib/tunneld/persistence.ex , lib/tunneld/reconcile.ex</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -4550,7 +4561,7 @@ iex&gt; Tunneld.Reconcile.reconcile(machine, repair: true)
 <section>
 <section data-menu-title="12 — Agent API &amp; Auth">
   <div class="deck-title">
-    <p class="deck-kicker">13 / 19</p>
+    <p class="deck-kicker">13 / 20</p>
     <h1>12 — Agent API &amp; Auth</h1>
     <p class="deck-src">Key source: lib/tunneld/agent_tokens.ex , lib/tunneld/jobs.ex , lib/tunneld/audit.ex</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -4984,7 +4995,7 @@ $ curl -H "Authorization: Bearer $TOKEN" http://10.0.0.1/api/v1/agent/jobs/12345
 <section>
 <section data-menu-title="13 — Build, Release &amp; Deploy">
   <div class="deck-title">
-    <p class="deck-kicker">14 / 19</p>
+    <p class="deck-kicker">14 / 20</p>
     <h1>13 — Build, Release &amp; Deploy</h1>
     <p class="deck-src">Key source: lib/tunneld/application.ex , mix.exs , config/runtime.exs</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -5385,7 +5396,7 @@ $ _build/prod/rel/tunneld/bin/tunneld eval "Tunneld.Machines.list()"
 <section>
 <section data-menu-title="14 — Testing &amp; Mock Mode">
   <div class="deck-title">
-    <p class="deck-kicker">15 / 19</p>
+    <p class="deck-kicker">15 / 20</p>
     <h1>14 — Testing &amp; Mock Mode</h1>
     <p class="deck-src">Key source: lib/tunneld/machines/ssh.ex , test/tunneld/overlay_test.exs , config/test.exs</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -5797,7 +5808,7 @@ end
 <section>
 <section data-menu-title="15 — systemd Service Lifecycle">
   <div class="deck-title">
-    <p class="deck-kicker">16 / 19</p>
+    <p class="deck-kicker">16 / 20</p>
     <h1>15 — systemd Service Lifecycle</h1>
     <p class="deck-src">Key source: lib/tunneld/servers/services.ex , lib/tunneld/overlay.ex</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -6236,7 +6247,7 @@ $ systemctl restart tunneld
 <section>
 <section data-menu-title="16 — Pooling &amp; Load Balancing">
   <div class="deck-title">
-    <p class="deck-kicker">17 / 19</p>
+    <p class="deck-kicker">17 / 20</p>
     <h1>16 — Pooling &amp; Load Balancing</h1>
     <p class="deck-src">Key source: lib/tunneld/caddy.ex , lib/tunneld/servers/resources.ex</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -6662,7 +6673,7 @@ $ curl -H "Authorization: Bearer $TOKEN" http://10.0.0.1/api/v1/agent/resources
 <section>
 <section data-menu-title="17 — Glossary">
   <div class="deck-title">
-    <p class="deck-kicker">18 / 19</p>
+    <p class="deck-kicker">18 / 20</p>
     <h1>17 — Glossary</h1>
     <p class="deck-src">Reference: All curriculum pages, lib/tunneld/*.ex</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -6991,7 +7002,7 @@ $ curl -H "Authorization: Bearer $TOKEN" http://10.0.0.1/api/v1/agent/resources
 <section>
 <section data-menu-title="18 — Terminal Exec">
   <div class="deck-title">
-    <p class="deck-kicker">19 / 19</p>
+    <p class="deck-kicker">19 / 20</p>
     <h1>18 — Terminal Exec</h1>
     <p class="deck-src">Key sources: lib/tunneld_web/channels/exec_channel.ex , lib/tunneld/machines/ssh/session.ex , lib/tunneld_web/channels/user_socket.ex</p>
     <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
@@ -7351,6 +7362,246 @@ const socket = new window.Phoenix.Socket("/ws", {
 #      (assets/js/terminal_hook.js), so the DOM renderer is the only renderer
 #    - Check that the container has a non-zero size so fitAddon.fit() works
 </pre>
+</div>
+</section>
+</section>
+<section>
+<section data-menu-title="19 — Publish &amp; Client Access">
+  <div class="deck-title">
+    <p class="deck-kicker">20 / 20</p>
+    <h1>19 — Publish &amp; Client Access</h1>
+    <p class="deck-src">Key source: lib/tunneld/publish.ex , lib/tunneld/clients.ex</p>
+    <p class="deck-hint"><kbd>&darr;</kbd> through this section &nbsp;&nbsp;<kbd>&rarr;</kbd> next section &nbsp;&nbsp;<kbd>Esc</kbd> overview</p>
+  </div>
+</section>
+<section>
+<p class="deck-eyebrow">19 — Publish &amp; Client Access</p>
+<h2>Two Directions Through One Gateway</h2>
+<div class="deck-body">
+<p>
+        Everything before this page moves traffic <em>outward</em>: a subnet device reaches the
+        internet, optionally via an exit machine. These two features move traffic <em>inward</em>,
+        and they are deliberately different shapes because they answer different questions.
+      </p>
+<table>
+<tr><th></th><th>Publish</th><th>Client access</th></tr>
+<tr><td>Who reaches it</td><td>anyone on the internet</td><td>only people you enrol</td></tr>
+<tr><td>Protocol</td><td>HTTP/S only</td><td>anything, including UDP</td></tr>
+<tr><td>Client software</td><td>none — a browser</td><td>the WireGuard app</td></tr>
+<tr><td>Good for</td><td>a dashboard, a demo, a web app</td><td>Sunshine, SSH, SMB, a media server</td></tr>
+</table>
+<p>
+        A game stream cannot go through Publish: Caddy is an HTTP reverse proxy and Moonlight is
+        latency-sensitive UDP. That is not a gap to be filled later — it is why both exist.
+      </p>
+</div>
+</section>
+<section>
+<p class="deck-eyebrow">19 — Publish &amp; Client Access</p>
+<h2>Publish: the Hairpin</h2>
+<div class="deck-body">
+<p>
+        A resource already resolves to <code>&lt;name&gt;.tunneld.lan:18000</code> on the gateway's
+        Caddy. Publishing puts a second Caddy on a managed machine that listens on a public port
+        and reverse-proxies <strong>to the gateway's Caddy over the overlay</strong>, rewriting the
+        <code>Host</code> header so the gateway's existing route matches.
+      </p>
+<pre>
+internet -&gt; &lt;machine_public_ip&gt;:&lt;port&gt; -&gt; wg -&gt; 10.88.0.1:18000 -&gt; the pool
+</pre>
+<p>
+        The choice of upstream is the whole trick. An earlier implementation pointed the remote
+        Caddy straight at the resource's LAN backends — <code>10.0.0.44:8000</code> — and could
+        never have worked: the gateway's <code>FORWARD</code> chain is <code>DROP</code> and only
+        permits <code>RELATED,ESTABLISHED</code> back from the overlay, so a connection opened
+        <em>into</em> the LAN dies there.
+      </p>
+</div>
+</section>
+<section>
+<p class="deck-eyebrow">19 — Publish &amp; Client Access</p>
+<h2>Publish: the Hairpin (cont.)</h2>
+<div class="deck-body">
+<p>
+        Proxying at <code>10.88.0.1:18000</code> instead means traffic <strong>terminates on the
+        gateway</strong> (the <code>INPUT</code> chain, where tcp/18000 is already open on every
+        interface) and the gateway then opens its <em>own</em> connection to the backend
+        (<code>OUTPUT</code>). It never touches <code>FORWARD</code>. Publishing therefore needs no
+        new gateway firewall rules and exposes no LAN device to the machine.
+      </p>
+</div>
+</section>
+<section>
+<p class="deck-eyebrow">19 — Publish &amp; Client Access</p>
+<h2>Publish: the Hairpin · Config the machine actually runs</h2>
+<div class="deck-body">
+<pre>
+%{
+  "admin" =&gt; %{"disabled" =&gt; true},
+  "apps" =&gt; %{"http" =&gt; %{"servers" =&gt; %{
+    "pub_&lt;resource_id&gt;" =&gt; %{
+      "listen" =&gt; [":8001"],
+      "automatic_https" =&gt; %{"disable" =&gt; true},
+      "routes" =&gt; [%{"handle" =&gt; [%{
+        "handler" =&gt; "reverse_proxy",
+        "upstreams" =&gt; [%{"dial" =&gt; "10.88.0.1:18000"}],
+        "headers" =&gt; %{"request" =&gt; %{"set" =&gt; %{"Host" =&gt; ["printer.tunneld.lan"]}}}
+      }]}]
+    }
+  }}}
+}
+</pre>
+<p>
+        The admin API is <strong>disabled</strong> rather than bound to the overlay. A remote admin
+        endpoint is remote config execution, and the previous attempt shipped a bug that pushed
+        <code>admin: 127.0.0.1:2019</code> to the machine, which would have moved its admin
+        listener and locked the gateway out of every later push. Config is written to
+        <code>/etc/tunneld-caddy.json</code> and loaded by a systemd unit instead.
+      </p>
+</div>
+</section>
+<section>
+<p class="deck-eyebrow">19 — Publish &amp; Client Access</p>
+<h2>Client Access: the Gateway Terminates, the Machine Is a Door</h2>
+<div class="deck-body">
+<p>
+        A client is a person's device. It gets its own keypair and an address in
+        <code>10.88.1.0/24</code>, and it <strong>always terminates on the gateway</strong>:
+      </p>
+<pre>
+at home   client -&gt; 10.0.0.1:51822                            (one hop, no VPS)
+away      client -&gt; &lt;machine&gt;:51822 -DNAT-&gt; 10.88.0.1:51822   (machine is a door)
+</pre>
+<p>
+        The obvious design — clients peering with the VPS — was rejected. If the machine terminates
+        the session it needs key material, a second WireGuard instance, and its own peer list, and
+        swapping to a closer machine means reissuing every config. Forwarding a port into the
+        tunnel the machine <em>already holds</em> costs two iptables rules and keeps one identity
+        per client everywhere. Same keypair, same address, same peer; only <code>Endpoint</code>
+        differs.
+      </p>
+</div>
+</section>
+<section>
+<p class="deck-eyebrow">19 — Publish &amp; Client Access</p>
+<h2>Client Access: the Gateway Terminates, the Machine Is a Door · The rule that is not optional</h2>
+<div class="deck-body">
+<pre>
+iptables -t nat -A PREROUTING  -p udp --dport 51822 -j DNAT --to-destination 10.88.0.1:51822
+iptables -t nat -A POSTROUTING -d 10.88.0.1 -p udp --dport 51822 -j MASQUERADE
+</pre>
+<p>
+        With DNAT alone the gateway sees the client's real public address and replies
+        <em>directly out its own uplink</em>. The client then receives an answer from an address it
+        never wrote to, and its NAT drops it — a tunnel that looks correct at both ends and never
+        completes a handshake. The masquerade makes the gateway answer the machine, which un-NATs
+        and returns it down the path the client actually used.
+      </p>
+</div>
+</section>
+<section>
+<p class="deck-eyebrow">19 — Publish &amp; Client Access</p>
+<h2>AllowedIPs Is Routing, Not Permission</h2>
+<div class="deck-body">
+<p>
+        This distinction caused two separate bugs and is worth internalising.
+      </p>
+<p>
+<code>AllowedIPs</code> in a client's config tells <em>that client</em> what to send down
+        the tunnel. The client owns the file and can set it to <code>0.0.0.0/0</code> whenever it
+        likes. It is not a boundary.
+      </p>
+<p>
+        The first implementation scoped <code>AllowedIPs</code> per grant — add access to
+        <code>10.0.0.52</code>, add <code>10.0.0.52/32</code> to the config. It failed twice over.
+        It was not a boundary, and because the config is baked in at the moment it is issued,
+        granting access later could not reach a phone that had already scanned the QR: the gateway
+        permitted traffic the phone had no route for.
+      </p>
+<p>
+        The config now always routes the whole LAN, and permission lives on the gateway:
+      </p>
+</div>
+</section>
+<section>
+<p class="deck-eyebrow">19 — Publish &amp; Client Access</p>
+<h2>AllowedIPs Is Routing, Not Permission (cont.)</h2>
+<div class="deck-body">
+<pre>
+# in the client's config — routing only
+AllowedIPs = 10.88.0.0/24, 10.88.1.0/24, 10.0.0.0/24
+
+# on the gateway — the actual boundary, per client, per host
+iptables -I FORWARD -i wg-clients -o eth1 -s 10.88.1.2 -d 10.0.0.52 -j ACCEPT
+</pre>
+<p>
+        Grants now take effect immediately, with no reissuing and no rescanning.
+      </p>
+</div>
+</section>
+<section>
+<p class="deck-eyebrow">19 — Publish &amp; Client Access</p>
+<h2>The DNS Trap</h2>
+<div class="deck-body">
+<p>
+        A <code>DNS =</code> line in a WireGuard config is not a hint — the mobile apps apply it as
+        the device's <strong>system resolver</strong> for as long as the tunnel is up. Naming a
+        resolver the client cannot reach takes the whole phone offline the moment it connects, and
+        it presents as "the VPN broke my internet" rather than as a DNS fault.
+      </p>
+<p>
+        Two versions were wrong before the line was removed. <code>DNS = 10.0.0.1</code> pointed at
+        an address that was not in <code>AllowedIPs</code>, so queries were never routed down the
+        tunnel. <code>DNS = 10.88.1.1</code> was routable but dnsmasq here runs with
+        <code>interface=eth1</code> and ignores queries arriving on the client interface. The cost
+        of omitting it is that <code>*.tunneld.lan</code> names do not resolve for clients; the
+        benefit is a phone that still works.
+      </p>
+</div>
+</section>
+<section>
+<p class="deck-eyebrow">19 — Publish &amp; Client Access</p>
+<h2>Verifying a UDP Path</h2>
+<div class="deck-body">
+<p>
+        A TCP port can be tested with a connect. UDP cannot, which is how a blocked provider
+        firewall stays invisible until someone tries to use the feature. The technique that works
+        is to watch the far end while generating traffic:
+      </p>
+<pre>
+# on the machine
+tcpdump -ni any 'udp port 51822'
+
+# from anywhere on the internet
+printf probe | nc -u -w1 &lt;machine_ip&gt; 51822
+</pre>
+<p>
+<code>0 packets captured</code> proves the packets never arrive — the provider firewall,
+        not the host. Packets arriving with the source rewritten to the machine's overlay address
+        prove DNAT <em>and</em> SNAT are both working. This diagnosed a blocked UDP/51821 rule and,
+        later, confirmed the client door end to end.
+      </p>
+<p>
+        The counterpart on the gateway is <code>wg show</code>: non-zero <code>sent</code> with
+        <code>0 B received</code> and no <code>latest handshake</code> line means handshakes are
+        leaving and nothing is coming back — blocked upstream, every time.
+      </p>
+</div>
+</section>
+<section>
+<p class="deck-eyebrow">19 — Publish &amp; Client Access</p>
+<h2>What This Chapter Actually Teaches</h2>
+<div class="deck-body">
+<ul>
+<li>Terminating a tunnel where the state already lives beats terminating it where the
+        public IP is — the machine stays disposable.</li>
+<li><code>INPUT</code> and <code>FORWARD</code> are different security surfaces; a hairpin
+        through a local proxy can avoid opening the second one entirely.</li>
+<li>DNAT without SNAT produces asymmetric return paths that look like a working config.</li>
+<li>Anything a client holds is configuration, not enforcement.</li>
+<li>A green badge that has not been measured is worse than no badge; publish deliberately
+        shows no health indicator because the provider firewall is invisible from here.</li>
+</ul>
 </div>
 </section>
 </section>
