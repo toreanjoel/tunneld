@@ -1242,7 +1242,7 @@ defmodule TunneldWeb.Live.Dashboard do
     |> Enum.map(fn m -> {m["id"], m["name"] || m["id"]} end)
   end
 
-  # Map-card pins for managed machines (TODO §6). Remote machines plot by
+  # Map-card pins for managed machines. Remote machines plot by
   # geolocating their public IP; local machines pin to the gateway's location.
   # Best-effort: falls back to the gateway location when geolocation fails.
   defp map_nodes do

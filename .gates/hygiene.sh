@@ -49,7 +49,7 @@ check_absent '^  def get_service_logs\b'  lib/tunneld/servers/services.ex "get_s
 check_absent 'incus_not_installed'        lib/tunneld_web/controllers/machine_controller.ex "dead incus 424 branch"
 
 # --- 6. Stale Incus references purged from live code --------------------------
-# runtime.ex may legitimately mention incus (runtime *detection*, TODO 4.3).
+# runtime.ex may legitimately mention incus (runtime *detection*).
 # Legitimate: runtime.ex (runtime DETECTION) and setup.ex:27 (product copy listing
 # several runtimes as examples). Everything else is a stale Provider-era reference.
 STALE=$(grep -rniE 'incus' lib/ --include=*.ex --include=*.heex \
@@ -75,7 +75,7 @@ if git status --porcelain 2>/dev/null | grep -q '^?? ad/'; then
   bad "ad/ is untracked AND unignored (pollutes git status)"
 else ok "ad/ not dangling in git status"; fi
 
-# --- 9. Net line reduction (TODO principle 7: delete more than you add) -------
+# --- 9. Net line reduction (delete more than you add) ------------------------
 LIBLINES=$(find lib -name '*.ex' -o -name '*.heex' | xargs wc -l 2>/dev/null | tail -1 | awk '{print $1}')
 BASELINE=12237
 # RE-BASELINED after the UI workstream, and this IS a relaxation of the original

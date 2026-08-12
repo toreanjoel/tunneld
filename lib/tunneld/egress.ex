@@ -23,7 +23,7 @@ defmodule Tunneld.Egress do
   > rule on the gateway's own IP misroutes management traffic; recover by
   > rebooting, since these rules are runtime-only).
 
-  **Two things handled explicitly (see TODO §4.5):**
+  **Two things handled explicitly:**
 
   * This only works because tunneld is the default gateway. We assert that at
     runtime and surface a clear error if a device bypasses the gateway.

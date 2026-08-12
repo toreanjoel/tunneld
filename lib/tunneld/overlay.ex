@@ -11,7 +11,7 @@ defmodule Tunneld.Overlay do
       local  machine -> LAN IP (same subnet as the gateway)
       remote machine -> overlay IP (over the WireGuard tunnel)
 
-  Topology notes (see TODO §4.4):
+  Topology notes:
 
   * One interface per machine: `wg-<machine_id>`, brought up via `wg-quick`.
   * The gateway dials out, so it sets `PersistentKeepalive = 25`.

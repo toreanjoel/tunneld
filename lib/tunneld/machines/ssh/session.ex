@@ -16,10 +16,10 @@ defmodule Tunneld.Machines.SSH.Session do
     whose host keys rotate on reprovision; the security model trusts our own
     SSH key installed on the target, not TOFU host-key checking.
   - The SSH connection AND the temp user_dir are cleaned up when this GenServer
-    dies, preventing both leaked connections (TODO §3.2) and leaked key copies.
+    dies, preventing both leaked connections and leaked key copies.
 
   In mock mode, no real SSH connection is made; a fake shell transcript is
-  emitted instead (lib/TODO.md principle 6).
+  emitted instead.
   """
   use GenServer
   require Logger

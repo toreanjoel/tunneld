@@ -94,7 +94,7 @@ if [ -f lib/tunneld/machines/ssh/session_key_callback.ex ]; then
 else ok "no bespoke key callback"; fi
 
 # --- 11. Mock mode must not attempt a real SSH connection --------------------
-# TODO principle 6: "Mock mode must keep working. Every new module needs a mock path."
+# Mock mode must keep working: every new module needs a mock path.
 if grep -qE '@mock|mock_data' "$SESS" 2>/dev/null; then
   ok "session has a mock path"
 else bad "session has NO mock path - MOCK_DATA=true will attempt a real SSH dial"; fi

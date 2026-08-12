@@ -1,6 +1,6 @@
 defmodule TunneldWeb.Live.Components.EnrollmentWizard do
   @moduledoc """
-  Multi-step machine enrollment wizard (TODO §6 onboarding).
+  Multi-step machine enrollment wizard.
 
   Enrollment is multi-step and involves an out-of-band action (installing the
   public key), so the UI is a wizard with visible state:
@@ -199,7 +199,7 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
   end
 
   # Catch-all for unexpected results. Treat UNKNOWN as FAILURE, never as success.
-  # lib/TODO.md sections 11-13 record exactly this failure mode: ensure_peer
+  # This exact failure mode has been hit repeatedly in the field: ensure_peer
   # returned {:ok, ""} from a short-circuited `with` chain while installing
   # nothing at all, and the green result hid it. An unrecognised shape means we
   # do not know whether the machine is set up, and claiming success would send

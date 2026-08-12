@@ -55,3 +55,7 @@ __pycache__/
 # embedded live-host credentials before, so they stay out of the repo.
 /.notes/
 /showcase/_probe.js
+
+# Personal learning material and working notes, deliberately not part of the
+# system. Kept on disk, never tracked.
+/docs/curriculum/
