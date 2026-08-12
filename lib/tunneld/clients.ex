@@ -87,8 +87,14 @@ defmodule Tunneld.Clients do
   pointing at addresses that may no longer exist.
   """
   def enroll(name, opts \\ []) when is_binary(name) do
-    name = String.trim(name)
+    try do
+      do_enroll(String.trim(name), opts)
+    catch
+      {:door, reason} -> {:error, {:door_failed, reason}}
+    end
+  end
 
+  defp do_enroll(name, opts) do
     if name == "" do
       {:error, :name_required}
     else
@@ -96,6 +102,17 @@ defmodule Tunneld.Clients do
       id = uuid()
 
       machine = Keyword.get(opts, :machine)
+
+      # Set the machine up as a door here rather than only at enrolment. It is
+      # idempotent and it is the moment the door is actually needed, so a
+      # machine added before this feature existed - or one whose rules were
+      # lost - is fixed by the act of adding a client, with no separate repair
+      # step to remember. If it fails, no client is issued: handing over a
+      # config that cannot connect is worse than refusing.
+      case machine && ensure_door(machine) do
+        {:error, reason} -> throw({:door, reason})
+        _ -> :ok
+      end
 
       client = %{
         "id" => id,

@@ -134,6 +134,14 @@ defmodule Tunneld.ClientsTest do
     assert String.length(svg) > 500
   end
 
+  # Adding a client is the moment the door is needed, so it is also the moment
+  # it gets set up - no "remember to hit Reconcile" step for a machine that was
+  # enrolled before client access existed.
+  test "enrolling against a machine provisions its door", %{machine: m} do
+    assert {:ok, client, _config} = Clients.enroll("phone", machine: m)
+    assert client["machine_id"] == m["id"]
+  end
+
   test "clients are scoped to a machine and go with it", %{machine: m} do
     {:ok, a, _} = Clients.enroll("partner-phone", machine: m)
     {:ok, _b, _} = Clients.enroll("elsewhere")
