@@ -514,9 +514,16 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               </button>
             </div>
             <div class="flex flex-col gap-2 mt-2">
-              <div class="self-center bg-surface-2 rounded p-2">
-                <%= Phoenix.HTML.raw(@issued_client.qr) %>
+              <!-- White box, not the panel surface: a QR needs a light background
+                   and a quiet zone around it or scanners will not lock on. -->
+              <div class="self-center bg-white rounded-md p-3 leading-none">
+                <div class="w-[280px] max-w-full [&>svg]:w-full [&>svg]:h-auto [&>svg]:block">
+                  <%= Phoenix.HTML.raw(@issued_client.qr) %>
+                </div>
               </div>
+              <p class="text-[10px] text-text-tertiary text-center">
+                WireGuard app → + → Scan from QR code
+              </p>
               <div class="relative">
                 <pre class="bg-black/60 p-2 pr-14 rounded text-[10px] font-mono text-green-400 whitespace-pre-wrap break-all border border-gray-700"><%= @issued_client.config %></pre>
                 <button

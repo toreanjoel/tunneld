@@ -186,11 +186,32 @@ defmodule Tunneld.Clients do
     """
   end
 
-  @doc "An SVG QR of a client config, for scanning into the phone app."
+  @doc """
+  An SVG QR of a client config, for scanning into the phone app.
+
+  Three things a QR needs that are easy to get wrong on a dark dashboard:
+
+  * **Dark modules on a light background.** Inverting it looks better against
+    the panel and most scanners refuse to read it.
+  * **Few enough modules to resolve on screen.** Every character raises the
+    version and shrinks each module, so comments are stripped here - the copy
+    box keeps them, the QR does not need to carry 130 bytes of prose.
+  * **A quiet zone.** The generated SVG has no margin; the caller must sit it
+    on white padding or scanners will not find the finder patterns.
+  """
   def qr_svg(config) when is_binary(config) do
     config
+    |> qr_payload()
     |> EQRCode.encode()
-    |> EQRCode.svg(width: 260, background_color: "#14131C", color: "#F4F4F5")
+    |> EQRCode.svg(width: 320, background_color: "#FFFFFF", color: "#000000")
+  end
+
+  @doc "The config with comments and blank lines removed, as encoded in the QR."
+  def qr_payload(config) do
+    config
+    |> String.split("\n")
+    |> Enum.reject(&(String.starts_with?(String.trim(&1), "#") or String.trim(&1) == ""))
+    |> Enum.join("\n")
   end
 
   @doc """

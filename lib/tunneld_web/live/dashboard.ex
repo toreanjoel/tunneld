@@ -626,11 +626,13 @@ defmodule TunneldWeb.Live.Dashboard do
       notify(:info, "#{client["name"]} enrolled at #{client["address"]}")
 
       {:noreply,
-       assign(socket, :issued_client, %{
+       socket
+       |> assign(:issued_client, %{
          client: client,
          config: config,
          qr: Tunneld.Clients.qr_svg(config)
-       })}
+       })
+       |> refresh_machine_clients(machine_id)}
     else
       {:error, :name_required} ->
         notify(:error, "Give the device a name")
@@ -643,9 +645,11 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   def handle_event("revoke_client", %{"id" => id}, socket) do
+    machine_id = Tunneld.Clients.get(id)["machine_id"]
     Tunneld.Clients.revoke(id)
     notify(:info, "Client revoked - its key no longer works")
-    {:noreply, assign(socket, :issued_client, nil)}
+
+    {:noreply, socket |> assign(:issued_client, nil) |> refresh_machine_clients(machine_id)}
   end
 
   def handle_event("dismiss_issued_client", _params, socket) do
@@ -1324,6 +1328,29 @@ defmodule TunneldWeb.Live.Dashboard do
       _ ->
         assign(socket, :sidebar, @sidebar_default)
     end
+  end
+
+  # Adding or revoking a client changes nothing the panel already holds - the
+  # list is read live in update/2 - so without an explicit send_update the
+  # machine panel keeps showing the old set until it is closed and reopened.
+  defp refresh_machine_clients(socket, machine_id) do
+    sidebar = Map.get(socket.assigns, :sidebar, %{})
+
+    with true <- Map.get(sidebar, :is_open, false),
+         :machine <- Map.get(sidebar, :view),
+         %{type: :machine, id: ^machine_id} <- Map.get(sidebar, :selection),
+         {:ok, machine} <- Tunneld.Machines.get(machine_id) do
+      # `issued_client` must be passed explicitly: update/2 falls back to the
+      # component's current value for any key the caller omits, which would
+      # resurrect a just-dismissed config block.
+      send_update(SidebarDetails,
+        id: "sidebar_details",
+        data: enrich_overlay(machine),
+        issued_client: socket.assigns[:issued_client]
+      )
+    end
+
+    socket
   end
 
   # The clients panel offers every machine as an endpoint to dial home through,
