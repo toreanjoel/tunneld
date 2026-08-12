@@ -51,9 +51,6 @@ defmodule Tunneld.Clients do
   @doc "The gateway's address inside the client range."
   def gateway_ip, do: @gateway_ip
 
-  @doc "The WireGuard interface clients peer with."
-  def iface, do: @iface
-
   @doc "Clients enrolled against a machine."
   def for_machine(machine_id),
     do: Enum.filter(list(), &(&1["machine_id"] == machine_id))

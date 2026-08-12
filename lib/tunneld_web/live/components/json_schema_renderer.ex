@@ -88,17 +88,36 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
                 <div class="mt-1 max-h-56 overflow-y-auto rounded-md border border-border bg-surface p-1">
                   <label
                     :for={option <- field.enum}
-                    class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-2 cursor-pointer text-sm"
+                    class="group flex items-center gap-2.5 px-2 py-1.5 rounded hover:bg-surface-2 cursor-pointer text-sm select-none"
                   >
                     <% {value, label} = enum_option(option) %>
+                    <!-- The native checkbox is kept for semantics and form
+                         submission but visually replaced: `accent-color` cannot
+                         match the rest of the panel on its own. -->
                     <input
                       type="checkbox"
                       name={"form[#{field.name}][]"}
                       value={value}
                       checked={value in chosen}
-                      class="accent-accent"
+                      class="peer sr-only"
                     />
-                    <span class="truncate"><%= label %></span>
+                    <!-- `peer-checked:` is a sibling selector, so it cannot reach
+                         the svg nested inside this span - hence the [&>svg]
+                         arbitrary variant rather than a class on the svg. -->
+                    <span class="h-[15px] w-[15px] shrink-0 rounded-[4px] border border-border bg-bg flex items-center justify-center transition-colors peer-checked:bg-accent peer-checked:border-accent peer-focus-visible:ring-2 peer-focus-visible:ring-accent/50 [&>svg]:opacity-0 peer-checked:[&>svg]:opacity-100">
+                      <svg viewBox="0 0 12 12" fill="none" class="h-2.5 w-2.5 transition-opacity">
+                        <path
+                          d="M1.5 6.2 4.4 9l6-6.4"
+                          stroke="#0B0A14"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        />
+                      </svg>
+                    </span>
+                    <span class="truncate text-text-secondary group-hover:text-text-primary peer-checked:text-text-primary">
+                      <%= label %>
+                    </span>
                   </label>
                   <p :if={field.enum == []} class="px-2 py-1.5 text-xs text-text-tertiary italic">
                     Nothing to choose from yet.

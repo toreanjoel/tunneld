@@ -77,4 +77,11 @@ In production these are supplied via the `UPSTREAM_INTERFACE` and
 5. **Resources**: Caddy listens on `0.0.0.0:18000` and reverse-proxies `<name>.tunneld.lan` to the resource's backend pool (plus a per-resource loopback listener on `<gateway-ip>:2xxxx`, falling back to `127.0.0.1` when no gateway IP is configured)
 6. **Named resolution**: dnsmasq resolves any `*.tunneld.lan` name to the gateway so resources are reachable by name across the subnet
 7. **Overlay**: a WireGuard overlay (`wg-<hash>`, an 8-char sha256 prefix of the machine id — wg-quick caps interface names at 15 chars; the gateway dials out) makes remote machines reachable as local overlay IPs — so a service on a remote VPS is as reachable as a local one
-8. **Management**: The Phoenix LiveView dashboard controls all components
+8. **Publish**: a resource can be served on a machine's public IP — that machine's Caddy
+   reverse-proxies to the **gateway's** Caddy over the overlay (`10.88.0.1:18000`) with the `Host`
+   header rewritten, so it terminates on the gateway (`INPUT`) and never crosses `FORWARD`
+9. **Clients**: phones and laptops are WireGuard peers in `10.88.1.0/24` terminating on the
+   gateway's `wg-clients` (UDP 51822). On the LAN they dial it directly; from outside, an enrolled
+   machine DNATs the same port into the tunnel it already holds, so it acts as a door without
+   holding any client key
+10. **Management**: The Phoenix LiveView dashboard controls all components

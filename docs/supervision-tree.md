@@ -33,6 +33,8 @@ graph TD
         RUNTIME[Machines.Runtime]
         OVERLAY[Overlay]
         EGRESS[Egress]
+        CLIENTS[Clients]
+        PUBLISH[Publish]
         RECON[Reconcile]
         MACH[Machines]
         AUDIT[Audit]
@@ -42,7 +44,12 @@ graph TD
     end
 
     RES --> CADDY
+    RES --> PUBLISH
     RES --> PERSIST
+    MACH --> CLIENTS
+    CLIENTS --> OVERLAY
+    CLIENTS --> PERSIST
+    PUBLISH --> OVERLAY
     AUTH --> PERSIST
     MACH --> RUNTIME
     MACH --> OVERLAY

@@ -138,9 +138,42 @@ Tunneld discovers what is *listening* (`ss -tlnp`) on a machine; any listener ca
 - Remote machines are reached over the overlay, so no SSH tunnel is involved and resources survive
   a gateway reboot.
 - Pool entries are validated as `IP:port` before writing the Caddy upstream config (injection-safe).
-- **No public-internet exposure at all.** Caddy runs on the gateway with two planes — the LAN
-  server on `0.0.0.0:18000` and the per-resource loopback listener. Putting a resource on the
-  internet is operator-managed and outside tunneld.
+- Caddy runs on the gateway with two planes — the LAN server on `0.0.0.0:18000` and the
+  per-resource loopback listener.
+
+### Publish (a resource on a machine's public IP)
+A resource can be served on the internet through an enrolled machine. Tunneld installs Caddy on
+that machine and points it at the **gateway's** Caddy over the overlay, rewriting `Host` so the
+existing route matches:
+
+```
+internet -> <machine_ip>:<port> -> WireGuard -> gateway 10.88.0.1:18000 -> the pool
+```
+
+Proxying at the gateway rather than straight at the LAN backend is deliberate: traffic terminates
+on the gateway (`INPUT`, where tcp/18000 is already open) and the gateway opens its own connection
+to the backend (`OUTPUT`). It never crosses the gateway's `FORWARD` chain, so publishing needs **no
+new gateway firewall rules and exposes no LAN device to the machine**. Plain `IP:port` only — no
+domain, no TLS; open a Terminal on the machine for that. The machine's Caddy admin API is disabled
+outright.
+
+### Client access (people, not machines)
+Phones and laptops join as WireGuard peers in `10.88.1.0/24` and **always terminate on the
+gateway**:
+
+```
+at home   client -> 10.0.0.1:51822                            (one hop, no VPS)
+away      client -> <machine>:51822 -DNAT-> 10.88.0.1:51822   (the machine is a door)
+```
+
+An enrolled machine forwards that port into the tunnel it already holds, so it never sees a client
+key and never runs a second WireGuard instance — swap machines without reissuing anything. Clients
+are enrolled from the machine panel (QR or config, shown **once**; the private key is never
+stored) and are revoked with that machine.
+
+A new client reaches the overlay and nothing else. LAN access is granted per device and enforced by
+`FORWARD` rules on the gateway — never by the client's own `AllowedIPs`, which the client owns and
+can rewrite. The config routes the whole LAN so grants take effect immediately, without reissuing.
 
 ### Quick Expose
 A subnet device can create, list, and remove a local resource with a single `curl` — no login. The gateway resolves the caller from its DHCP lease (`conn.remote_ip` matched against `dnsmasq.leases`) and validates a per-device allowlist (`expose_allowed.json`, MAC → boolean). The operator must explicitly allowlist a MAC before that device can Quick Expose.
