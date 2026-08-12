@@ -577,25 +577,24 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                 </button>
               </div>
 
-              <form phx-submit="set_client_access" class="mt-1.5">
+              <form phx-submit="set_client_access" class="mt-1.5 flex items-end gap-1.5">
                 <input type="hidden" name="client_id" value={c["id"]} />
-                <div class="flex flex-wrap gap-x-2 gap-y-1">
-                  <label
-                    :for={d <- @subnet_devices}
-                    class="flex items-center gap-1 text-[10px] text-text-secondary"
-                  >
-                    <input
-                      type="checkbox"
-                      name="ips[]"
-                      value={d.ip}
-                      checked={d.ip in (c["lan_access"] || [])}
-                      class="accent-accent"
-                    />
-                    <span class="truncate max-w-[8.5rem]"><%= d.name || d.ip %></span>
+                <div class="min-w-0 flex-1">
+                  <label class="block text-[10px] text-text-tertiary mb-0.5">
+                    Can reach (⌘/ctrl-click for several)
                   </label>
+                  <select name="ips[]" multiple size="3" class="tunl-input text-[11px] w-full">
+                    <option
+                      :for={d <- @subnet_devices}
+                      value={d.ip}
+                      selected={d.ip in (c["lan_access"] || [])}
+                    >
+                      <%= d.name || d.ip %> — <%= d.ip %>
+                    </option>
+                  </select>
                 </div>
-                <button type="submit" class="ghost-btn !px-2 !py-0.5 text-[10px] mt-1">
-                  Save access
+                <button type="submit" class="ghost-btn !px-2 !py-1 text-[10px] shrink-0">
+                  Save
                 </button>
               </form>
             </div>

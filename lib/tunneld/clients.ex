@@ -170,15 +170,16 @@ defmodule Tunneld.Clients do
   @doc "The config text a client needs. Private key is supplied, never stored."
   def config_for(client, private_key) do
     """
-    # DNS is the gateway on THIS interface, not its LAN address. The phone sets
-    # whatever is named here as its system resolver for as long as the tunnel is
-    # up, so pointing at 10.0.0.1 - which is not in AllowedIPs and so never
-    # routed down the tunnel - silently breaks name resolution on the whole
-    # device the moment it connects.
+    # No DNS line, deliberately. The phone applies whatever is named here as its
+    # system resolver for as long as the tunnel is up, so naming a resolver that
+    # does not answer takes the whole device offline - dnsmasq here is bound
+    # with `interface=eth1` and ignores queries arriving on the client
+    # interface. Leaving it out keeps the phone on its own resolver and the
+    # internet working. The cost is that *.tunneld.lan names do not resolve for
+    # clients; use addresses, or the dashboard at #{@gateway_ip}.
     [Interface]
     PrivateKey = #{private_key}
     Address = #{client["address"]}/32
-    DNS = #{@gateway_ip}
     # Two WireGuard layers on the away path (this tunnel inside the gateway's
     # tunnel to the machine), so keep clear of the 1500-byte ceiling.
     MTU = 1360
@@ -297,13 +298,23 @@ defmodule Tunneld.Clients do
 
   # --- internals ---
 
-  defp allowed_ips(client) do
-    base = ["#{Tunneld.Overlay.overlay_subnet_value()}", "#{@subnet}.0/24"]
+  # AllowedIPs always covers the LAN, regardless of what the client is allowed
+  # to reach. It is baked into the config the moment it is issued, so scoping it
+  # per client would mean re-issuing and re-scanning every time access changed -
+  # and granting access to a device the phone has no route for does nothing at
+  # all, which is exactly how the first version failed. Routing here, permission
+  # on the gateway.
+  defp allowed_ips(_client) do
+    Enum.join(
+      [Tunneld.Overlay.overlay_subnet_value(), "#{@subnet}.0/24", lan_subnet()],
+      ", "
+    )
+  end
 
-    case client["lan_access"] do
-      [] -> Enum.join(base, ", ")
-      nil -> Enum.join(base, ", ")
-      ips -> Enum.join(base ++ Enum.map(ips, &"#{&1}/32"), ", ")
+  defp lan_subnet do
+    case String.split(Config.gateway_ip() || "10.0.0.1", ".") do
+      [a, b, c, _] -> "#{a}.#{b}.#{c}.0/24"
+      _ -> "10.0.0.0/24"
     end
   end
 

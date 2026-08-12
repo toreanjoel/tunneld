@@ -53,25 +53,26 @@ defmodule Tunneld.ClientsTest do
     {:ok, client, config} = Clients.enroll("guest")
 
     assert client["lan_access"] == []
-    assert config =~ "AllowedIPs = 10.88.0.0/24, 10.88.1.0/24"
 
-    # assert on the functional lines, not the prose: comments legitimately
-    # mention LAN addresses while explaining why they are absent
-    refute Clients.qr_payload(config) =~ "10.0.0."
+    # the LAN is routed but not permitted: the phone must have a route for a
+    # host before granting access to it can mean anything, and permission is
+    # enforced on the gateway
+    assert config =~ "AllowedIPs = 10.88.0.0/24, 10.88.1.0/24, 192.168.1.0/24"
 
-    # the resolver must be reachable through the tunnel, or the phone points its
-    # system DNS at an address it cannot route to and loses name resolution
-    assert config =~ "DNS = 10.88.1.1"
+    # naming a resolver the phone cannot reach takes the whole device offline
+    refute Clients.qr_payload(config) =~ "DNS ="
   end
 
   test "granting LAN access names only the permitted hosts" do
     {:ok, client, _} = Clients.enroll("partner")
     {:ok, updated} = Clients.set_lan_access(client["id"], ["10.0.0.50", "10.0.0.51"])
 
-    config = Clients.config_for(updated, "PRIVKEY")
-    assert config =~ "10.0.0.50/32"
-    assert config =~ "10.0.0.51/32"
-    refute config =~ "10.0.0.0/24"
+    assert updated["lan_access"] == ["10.0.0.50", "10.0.0.51"]
+
+    # the config does not change - it already routes the LAN, and re-issuing it
+    # every time access changed would mean re-scanning the QR
+    assert Clients.config_for(updated, "PRIVKEY") ==
+             Clients.config_for(client, "PRIVKEY")
   end
 
   test "the gateway interface carries every client as its own /32 peer" do
