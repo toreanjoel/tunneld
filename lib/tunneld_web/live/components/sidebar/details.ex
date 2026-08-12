@@ -48,6 +48,15 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(:listeners_error, listeners_error)
       |> assign(:selection, selection)
       |> assign(:obfuscated, obfuscated)
+      # Derived in update/2, never in render/1. LiveView change tracking keys
+      # off assigns, so a value computed inside render is not tracked and whole
+      # branches keep their stale output - which is exactly why the Publish
+      # button stayed "Publish" after publishing while the URL row below it
+      # updated. Same failure as the map-pin regression.
+      |> assign(:publish, publish_record(view, data))
+      |> assign(:publish_machines, publish_machines(view))
+      |> assign(:link_status, link_status(view))
+      |> assign(:dns_server, dns_server(view))
 
     {:ok, socket}
   end
@@ -126,8 +135,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(gateway: Application.get_env(:tunneld, :network)[:gateway])
       |> assign(data: data)
       |> assign(health: Map.get(data || %{}, :health) || Map.get(data || %{}, "health") || %{})
-      |> assign(publish: data && Tunneld.Publish.get(Map.get(data, :id)))
-      |> assign(publish_machines: Tunneld.Machines.list())
 
     ~H"""
     <div class="p-4 space-y-6 min-h-full">
@@ -618,12 +625,10 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   @spec render(%{:view => :ethernet, optional(any()) => any()}) ::
           Phoenix.LiveView.Rendered.t()
   def render(%{view: :ethernet} = assigns) do
-    status = Tunneld.NetLink.status()
-
     assigns =
       assigns
-      |> assign(upstream: status.upstream)
-      |> assign(downstream: status.downstream)
+      |> assign(upstream: assigns.link_status.upstream)
+      |> assign(downstream: assigns.link_status.downstream)
 
     ~H"""
     <div class="p-4 space-y-6 min-h-full">
@@ -661,12 +666,6 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
   @spec render(%{:view => :dns_server, optional(any()) => any()}) :: Phoenix.LiveView.Rendered.t()
   def render(%{view: :dns_server} = assigns) do
-    dns_server = Tunneld.Servers.DnsConfig.get_dns_server()
-
-    assigns =
-      assigns
-      |> assign(dns_server: dns_server)
-
     ~H"""
     <div class="p-4 space-y-6 min-h-full">
       <%= sidebar_header(assigns, %{
@@ -848,6 +847,24 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   defp human_health(:empty), do: "no backends"
   defp human_health(:not_applicable), do: "n/a"
   defp human_health(_), do: "unknown"
+
+  # Only the resource panel needs these; skip the lookups for other views.
+  defp publish_record(:resource, data) when is_map(data),
+    do: Tunneld.Publish.get(Map.get(data, :id))
+
+  defp publish_record(_view, _data), do: nil
+
+  defp publish_machines(:resource), do: Tunneld.Machines.list()
+  defp publish_machines(_), do: []
+
+  # Same reasoning as publish/1: read live state in update/2 so a change to it
+  # actually re-renders. Guarded by view so the shell-outs only happen for the
+  # panel that needs them.
+  defp link_status(:ethernet), do: Tunneld.NetLink.status()
+  defp link_status(_), do: %{upstream: %{}, downstream: %{}}
+
+  defp dns_server(:dns_server), do: Tunneld.Servers.DnsConfig.get_dns_server()
+  defp dns_server(_), do: nil
 
   defp pool_health_dot(:all_up), do: "bg-green"
   defp pool_health_dot(:none), do: "bg-red"

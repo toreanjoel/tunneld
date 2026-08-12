@@ -162,7 +162,14 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
         message: "#{resource.name} published on #{record["machine_name"]} at #{record["url"]}"
       })
 
-      Phoenix.PubSub.broadcast(Tunneld.PubSub, "publish:steps", {:publish_steps, record})
+      # The resource id rides along so the dashboard can refresh the open panel.
+      # Without it, publishing left the sidebar showing "Publish" and none of
+      # the public-access detail until you closed and reopened it.
+      Phoenix.PubSub.broadcast(
+        Tunneld.PubSub,
+        "publish:steps",
+        {:publish_steps, resource.id, record}
+      )
     else
       {:error, :invalid_port} ->
         notify_error("Port must be a number between 1 and 65535")

@@ -406,10 +406,7 @@ defmodule TunneldWeb.Live.Dashboard do
     modal_data =
       modal_open(%{
         title: "Log out?",
-        body: %{
-          "type" => "string",
-          "data" => "You will need to enter your credentials to access the dashboard again."
-        },
+        body: %{"type" => "string", "data" => "Are you sure?"},
         actions: %{"title" => "Log out", "payload" => %{"type" => "logout", "data" => %{}}}
       })
 
@@ -808,7 +805,7 @@ defmodule TunneldWeb.Live.Dashboard do
   # SSH round trip per machine and has no business running on a timer.
   # Publishing succeeded on our side. Show the operator the one step tunneld
   # cannot do, with the port and address already filled in.
-  def handle_info({:publish_steps, record}, socket) do
+  def handle_info({:publish_steps, resource_id, record}, socket) do
     modal = %{
       show: true,
       title: "Published - one step left",
@@ -824,6 +821,7 @@ defmodule TunneldWeb.Live.Dashboard do
       type: :default
     }
 
+    socket = refresh_resource_sidebar(socket, resource_id)
     {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal))}
   end
 
