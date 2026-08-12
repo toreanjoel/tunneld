@@ -209,37 +209,68 @@ A **client** is a person's device that should reach this subnet from anywhere. I
 keypair and an address in `10.88.1.0/24`, and it **always terminates on the gateway**:
 
 ```
-at home   client -> 10.0.0.1:51822                       (one hop, no VPS involved)
+at home   client -> 10.0.0.1:51822                            (one hop, no VPS involved)
 away      client -> <machine>:51822 -DNAT-> 10.88.0.1:51822   (the machine is a door)
 ```
 
-A machine forwards that port into the tunnel it already holds with the gateway. It never sees
-a client key and never runs a second WireGuard instance, so you can add or swap machines
-without reissuing anything. Same keypair, same address, same peer — only `Endpoint` differs.
+A machine forwards that port into the tunnel it already holds with the gateway. It never sees a
+client key and never runs a second WireGuard instance, so machines stay disposable.
 
 **Enrolling a client**
 
-1. Dashboard → **Clients** → name the device, choose an endpoint:
-   - *this gateway* — home network only, no VPS in the path
-   - *via `<machine>`* — reachable from anywhere
-2. Scan the QR with the WireGuard app, or copy the config.
+1. Dashboard → open a **machine** → **Clients** → name the device → **Add client**.
+   Clients belong to the machine they dial through, so removing that machine revokes them.
+2. Scan the QR, or copy the config.
 3. **The private key is shown once and never stored.** Lost it? Revoke and enrol again.
 
-**Roaming.** WireGuard allows one `Endpoint` per peer, so for a device that is sometimes home
-and sometimes away, either use the app's on-demand activation with your home SSID excluded
-(the tunnel is not needed at home — you are already on the LAN), or keep two profiles that
-differ only in `Endpoint`.
+Adding a client also sets that machine up as a door if it is not already one, so a machine
+enrolled before this feature existed needs no separate repair step.
 
-**Access.** A new client reaches the overlay and nothing else. LAN access is granted per host
-and enforced by FORWARD rules on the gateway — never by the client's own `AllowedIPs`, which
-the client owns and can change at will.
+**On a laptop** — save the copied text as `<name>.conf` (plain INI). Import it in the WireGuard
+app, or on Linux/macOS with the CLI:
 
-**Provider firewall.** Machines need inbound **UDP 51822** as well as 51821. Both are listed
-in the enrolment modal so it is one trip to the console.
+```bash
+sudo install -m 600 ~/Downloads/home.conf /etc/wireguard/home.conf
+sudo wg-quick up home && sudo wg show
+```
+
+Keep the filename short: on Linux it becomes the interface name, which `wg-quick` caps at 15
+characters. `chmod 600` matters — that file holds the only copy of the private key.
+
+**Do not run a client on the home LAN.** The config routes the LAN subnet, so activating it while
+already on that subnet sends local traffic out to the machine and back. Phones: use the app's
+on-demand activation with the home SSID excluded. Laptops: `wg-quick down` before you get home.
+
+**Access.** A new client reaches the overlay and nothing else. Grant per device from the client's
+**Access** button. Enforced by `FORWARD` rules on the gateway — never by the client's own
+`AllowedIPs`, which the client owns and can rewrite. The config deliberately routes the whole LAN
+so grants take effect immediately, with no reissuing and no rescanning.
+
+**No DNS line, deliberately.** The mobile apps apply a config's `DNS =` as the device's *system*
+resolver for as long as the tunnel is up, so naming a resolver the client cannot reach takes the
+whole device offline. dnsmasq here runs with `interface=eth1` and ignores queries arriving on the
+client interface. The cost: `*.tunneld.lan` names do not resolve for clients — use addresses, or
+the dashboard at `10.88.1.1`.
+
+**Provider firewall.** Machines need inbound **UDP 51822** as well as 51821. Both are listed in
+the enrolment modal so it is one trip to the console.
 
 **MTU.** Client configs ship `MTU = 1360`. The away path is doubly encapsulated (the client's
 tunnel inside the gateway's tunnel to the machine); at 1420 TCP still works while UDP quietly
 blackholes.
+
+**Verifying a UDP path.** A blocked provider rule is invisible until someone tries to use it:
+
+```bash
+# on the machine
+tcpdump -ni any 'udp port 51822'
+# from anywhere on the internet
+printf probe | nc -u -w1 <machine_ip> 51822
+```
+
+`0 packets captured` means the packets never arrive — the provider firewall, not the host.
+Packets arriving with the source rewritten to the machine's overlay address prove both DNAT and
+SNAT are working.
 
 ---
 
