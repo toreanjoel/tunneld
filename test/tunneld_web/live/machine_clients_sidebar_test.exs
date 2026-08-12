@@ -70,6 +70,18 @@ defmodule TunneldWeb.Live.MachineClientsSidebarTest do
     assert html =~ "10.88.1.", "the client's overlay address should be listed"
 
     [client] = Clients.for_machine(machine_id)
+
+    # granting access updates the panel in place, and clearing it revokes
+    render_submit(view, "set_client_access", %{
+      "client_id" => client["id"],
+      "ips" => ["10.0.0.50"]
+    })
+
+    assert settle(view, "1 device(s)") =~ "partner-phone"
+
+    render_submit(view, "set_client_access", %{"client_id" => client["id"]})
+    assert settle(view, "overlay only")
+
     render_click(view, "dismiss_issued_client", %{})
     render_click(view, "revoke_client", %{"id" => client["id"]})
 

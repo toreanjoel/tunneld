@@ -58,6 +58,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(:link_status, link_status(view))
       |> assign(:dns_server, dns_server(view))
       |> assign(:machine_clients, machine_clients(view, data))
+      |> assign(:subnet_devices, subnet_devices(view))
       |> assign(
         :issued_client,
         Map.get(assigns, :issued_client, socket.assigns[:issued_client])
@@ -557,21 +558,47 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
             :for={c <- @machine_clients}
             class="flex items-center justify-between gap-2 p-2 mb-1 bg-surface rounded-md"
           >
-            <div class="min-w-0">
-              <div class="text-xs truncate"><%= c["name"] %></div>
-              <div class="text-[10px] text-text-tertiary font-mono truncate">
-                <%= c["address"] %><%= if c["lan_access"] in [nil, []],
-                  do: " · overlay only",
-                  else: " · #{length(c["lan_access"])} LAN host(s)" %>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center justify-between gap-2">
+                <div class="min-w-0">
+                  <div class="text-xs truncate"><%= c["name"] %></div>
+                  <div class="text-[10px] text-text-tertiary font-mono truncate">
+                    <%= c["address"] %><%= if c["lan_access"] in [nil, []],
+                      do: " · overlay only",
+                      else: " · #{length(c["lan_access"])} device(s)" %>
+                  </div>
+                </div>
+                <button
+                  phx-click="revoke_client"
+                  phx-value-id={c["id"]}
+                  class="ghost-btn !px-2 !py-0.5 text-[10px] shrink-0"
+                >
+                  Revoke
+                </button>
               </div>
+
+              <form phx-submit="set_client_access" class="mt-1.5">
+                <input type="hidden" name="client_id" value={c["id"]} />
+                <div class="flex flex-wrap gap-x-2 gap-y-1">
+                  <label
+                    :for={d <- @subnet_devices}
+                    class="flex items-center gap-1 text-[10px] text-text-secondary"
+                  >
+                    <input
+                      type="checkbox"
+                      name="ips[]"
+                      value={d.ip}
+                      checked={d.ip in (c["lan_access"] || [])}
+                      class="accent-accent"
+                    />
+                    <span class="truncate max-w-[8.5rem]"><%= d.name || d.ip %></span>
+                  </label>
+                </div>
+                <button type="submit" class="ghost-btn !px-2 !py-0.5 text-[10px] mt-1">
+                  Save access
+                </button>
+              </form>
             </div>
-            <button
-              phx-click="revoke_client"
-              phx-value-id={c["id"]}
-              class="ghost-btn !px-2 !py-0.5 text-[10px] shrink-0"
-            >
-              Revoke
-            </button>
           </div>
         </div>
 
@@ -955,6 +982,17 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
     do: Tunneld.Clients.for_machine(Map.get(data, "id") || Map.get(data, :id))
 
   defp machine_clients(_view, _data), do: []
+
+  # Devices a client can be granted access to. Read live for the same reason as
+  # everything else on this panel: a new DHCP lease should appear without the
+  # panel being closed and reopened.
+  defp subnet_devices(:machine) do
+    Tunneld.Servers.Devices.fetch_devices()
+    |> Enum.map(&%{ip: &1.ip, name: Map.get(&1, :hostname) || Map.get(&1, :name)})
+    |> Enum.sort_by(& &1.ip)
+  end
+
+  defp subnet_devices(_), do: []
 
   defp link_status(:ethernet), do: Tunneld.NetLink.status()
   defp link_status(_), do: %{upstream: %{}, downstream: %{}}

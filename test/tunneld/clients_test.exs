@@ -54,7 +54,14 @@ defmodule Tunneld.ClientsTest do
 
     assert client["lan_access"] == []
     assert config =~ "AllowedIPs = 10.88.0.0/24, 10.88.1.0/24"
-    refute config =~ "10.0.0."
+
+    # assert on the functional lines, not the prose: comments legitimately
+    # mention LAN addresses while explaining why they are absent
+    refute Clients.qr_payload(config) =~ "10.0.0."
+
+    # the resolver must be reachable through the tunnel, or the phone points its
+    # system DNS at an address it cannot route to and loses name resolution
+    assert config =~ "DNS = 10.88.1.1"
   end
 
   test "granting LAN access names only the permitted hosts" do

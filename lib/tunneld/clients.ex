@@ -170,10 +170,15 @@ defmodule Tunneld.Clients do
   @doc "The config text a client needs. Private key is supplied, never stored."
   def config_for(client, private_key) do
     """
+    # DNS is the gateway on THIS interface, not its LAN address. The phone sets
+    # whatever is named here as its system resolver for as long as the tunnel is
+    # up, so pointing at 10.0.0.1 - which is not in AllowedIPs and so never
+    # routed down the tunnel - silently breaks name resolution on the whole
+    # device the moment it connects.
     [Interface]
     PrivateKey = #{private_key}
     Address = #{client["address"]}/32
-    DNS = #{Config.gateway_ip() || "10.0.0.1"}
+    DNS = #{@gateway_ip}
     # Two WireGuard layers on the away path (this tunnel inside the gateway's
     # tunnel to the machine), so keep clear of the 1500-byte ceiling.
     MTU = 1360

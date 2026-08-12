@@ -74,6 +74,42 @@ defmodule Tunneld.Iptables do
       "ACCEPT"
     ])
 
+    # Overlay clients resolve through dnsmasq like any subnet device. Scoped to
+    # the client range rather than left open on every interface.
+    for proto <- ["udp", "tcp"] do
+      System.cmd("iptables", [
+        "-A",
+        "INPUT",
+        "-s",
+        "10.88.1.0/24",
+        "-p",
+        proto,
+        "--dport",
+        "5336",
+        "-j",
+        "ACCEPT"
+      ])
+    end
+
+    # Let clients reach the machines on the overlay (and each other). LAN access
+    # is deliberately NOT here - that is granted per client, per host.
+    System.cmd("iptables", ["-A", "FORWARD", "-i", "wg-clients", "-o", "wg+", "-j", "ACCEPT"])
+
+    System.cmd("iptables", [
+      "-A",
+      "FORWARD",
+      "-i",
+      "wg+",
+      "-o",
+      "wg-clients",
+      "-m",
+      "conntrack",
+      "--ctstate",
+      "ESTABLISHED,RELATED",
+      "-j",
+      "ACCEPT"
+    ])
+
     # Allow DHCP requests from LAN clients
     System.cmd("iptables", [
       "-A",
