@@ -151,6 +151,11 @@ defmodule Tunneld.Machines do
         {:error, "not found"}
 
       {:ok, machine} ->
+        # Clients enrolled against this machine dial its address, so they go
+        # with it. Done before the remote teardown so their peers are gone from
+        # the gateway even if the machine itself is unreachable.
+        _ = Tunneld.Clients.revoke_for_machine(id)
+
         # Attempt remote teardown with a timeout - do not block on dead hosts
         teardown_result = attempt_remote_teardown(machine)
 

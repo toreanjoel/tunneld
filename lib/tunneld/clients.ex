@@ -54,6 +54,16 @@ defmodule Tunneld.Clients do
   @doc "The WireGuard interface clients peer with."
   def iface, do: @iface
 
+  @doc "Clients enrolled against a machine."
+  def for_machine(machine_id),
+    do: Enum.filter(list(), &(&1["machine_id"] == machine_id))
+
+  @doc "Revoke every client belonging to a machine. Called when it is removed."
+  def revoke_for_machine(machine_id) do
+    machine_id |> for_machine() |> Enum.each(&revoke(&1["id"]))
+    :ok
+  end
+
   @doc "All enrolled clients, newest first."
   def list do
     read()
@@ -68,9 +78,13 @@ defmodule Tunneld.Clients do
   Enrol a client and return `{:ok, client, config}`.
 
   `config` is the full WireGuard config text and is the **only** time the
-  private key exists outside the client's device. `opts` takes `:endpoint`
-  (host or IP the client dials) and `:lan_access` (`:none` or a list of LAN
-  IPs the client may reach).
+  private key exists outside the client's device.
+
+  A client belongs to the machine it dials through, so `:machine` is how you
+  enrol one and removing that machine takes its clients with it. The tunnel
+  still terminates on the gateway - the machine is only a door - but tying the
+  two together keeps one list per machine instead of a global pool of peers
+  pointing at addresses that may no longer exist.
   """
   def enroll(name, opts \\ []) when is_binary(name) do
     name = String.trim(name)
@@ -81,12 +95,17 @@ defmodule Tunneld.Clients do
       {pub, priv} = gen_keypair()
       id = uuid()
 
+      machine = Keyword.get(opts, :machine)
+
       client = %{
         "id" => id,
         "name" => name,
         "public_key" => pub,
         "address" => allocate_address(),
-        "endpoint" => Keyword.get(opts, :endpoint) || @gateway_ip,
+        "machine_id" => machine && machine["id"],
+        "machine_name" => machine && machine["name"],
+        "endpoint" =>
+          (machine && machine["address"]) || Keyword.get(opts, :endpoint) || @gateway_ip,
         "lan_access" => Keyword.get(opts, :lan_access, []),
         "created_at" => now()
       }
@@ -170,11 +189,32 @@ defmodule Tunneld.Clients do
     if @mock, do: :ok, else: real_ensure_door(machine)
   end
 
-  @doc "The rules a door needs, as a shell script. Also used by the unit."
+  @doc """
+  The rules a door needs, as a shell script. Also the body of the unit.
+
+  The SNAT line is not optional. With DNAT alone the gateway would see the
+  client's real public address and reply to it **directly out its own uplink**,
+  so the client would get an answer from an address it never wrote to and its
+  NAT would drop it - a tunnel that looks configured on both ends and never
+  completes a handshake. Masquerading makes the gateway answer the machine,
+  which un-NATs and returns it down the path the client actually used.
+
+  `ip_forward` is set here too rather than relying on `Egress`: a door is
+  useful on a machine that was never made an exit node.
+  """
   def door_script do
+    gw = Tunneld.Overlay.gateway_overlay_ip()
+
     """
-    iptables -t nat -C PREROUTING -p udp --dport #{@port} -j DNAT --to-destination #{Tunneld.Overlay.gateway_overlay_ip()}:#{@port} 2>/dev/null || \\
-      iptables -t nat -A PREROUTING -p udp --dport #{@port} -j DNAT --to-destination #{Tunneld.Overlay.gateway_overlay_ip()}:#{@port}
+    sysctl -w net.ipv4.ip_forward=1 >/dev/null
+    grep -q 'net.ipv4.ip_forward=1' /etc/sysctl.conf || echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf
+
+    iptables -t nat -C PREROUTING -p udp --dport #{@port} -j DNAT --to-destination #{gw}:#{@port} 2>/dev/null || \\
+      iptables -t nat -A PREROUTING -p udp --dport #{@port} -j DNAT --to-destination #{gw}:#{@port}
+
+    iptables -t nat -C POSTROUTING -d #{gw} -p udp --dport #{@port} -j MASQUERADE 2>/dev/null || \\
+      iptables -t nat -A POSTROUTING -d #{gw} -p udp --dport #{@port} -j MASQUERADE
+
     iptables -C FORWARD -p udp --dport #{@port} -j ACCEPT 2>/dev/null || \\
       iptables -I FORWARD 1 -p udp --dport #{@port} -j ACCEPT
     """

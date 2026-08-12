@@ -57,6 +57,11 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
       |> assign(:publish_machines, publish_machines(view))
       |> assign(:link_status, link_status(view))
       |> assign(:dns_server, dns_server(view))
+      |> assign(:machine_clients, machine_clients(view, data))
+      |> assign(
+        :issued_client,
+        Map.get(assigns, :issued_client, socket.assigns[:issued_client])
+      )
 
     {:ok, socket}
   end
@@ -487,6 +492,85 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         <div class="mt-4">
           <div class="flex items-center justify-between mb-2">
             <div class="text-sm font-semibold">
+              Clients
+              <.help_icon
+                class="ml-0.5"
+                text={"Phones and laptops that reach this subnet through this machine. The tunnel " <>
+                      "terminates on the gateway - this machine only forwards the port - but the " <>
+                      "client dials this address, so removing the machine revokes them. The key is " <>
+                      "shown once and never stored; lost means revoke and add again."}
+              />
+            </div>
+            <span class="text-[11px] text-text-tertiary"><%= length(@machine_clients) %></span>
+          </div>
+
+          <div :if={@issued_client} class="mb-2 p-2 bg-surface rounded-md border border-accent/40">
+            <div class="flex items-start justify-between gap-2">
+              <p class="text-xs font-semibold">
+                <%= @issued_client.client["name"] %> — scan or copy, once
+              </p>
+              <button phx-click="dismiss_issued_client" class="ghost-btn !px-2 !py-0.5 text-[10px]">
+                Done
+              </button>
+            </div>
+            <div class="flex flex-col gap-2 mt-2">
+              <div class="self-center bg-surface-2 rounded p-2">
+                <%= Phoenix.HTML.raw(@issued_client.qr) %>
+              </div>
+              <div class="relative">
+                <pre class="bg-black/60 p-2 pr-14 rounded text-[10px] font-mono text-green-400 whitespace-pre-wrap break-all border border-gray-700"><%= @issued_client.config %></pre>
+                <button
+                  type="button"
+                  id={"copy_client_cfg_#{@issued_client.client["id"]}"}
+                  phx-hook="CopyToClipboard"
+                  data-copy-text={@issued_client.config}
+                  class="absolute top-1.5 right-1.5 text-[10px] bg-surface-2 hover:bg-surface border border-border rounded px-2 py-1 text-text-secondary"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <form phx-submit="enroll_client" class="flex gap-1.5 mb-2">
+            <input type="hidden" name="machine_id" value={mget(@machine, "id")} />
+            <input
+              type="text"
+              name="name"
+              placeholder="Device name, e.g. partner-phone"
+              class="tunl-input flex-1 text-xs"
+            />
+            <button type="submit" class="ghost-btn text-xs shrink-0">Add client</button>
+          </form>
+
+          <div :if={@machine_clients == []} class="text-[11px] text-text-tertiary italic mb-2">
+            No clients yet.
+          </div>
+          <div
+            :for={c <- @machine_clients}
+            class="flex items-center justify-between gap-2 p-2 mb-1 bg-surface rounded-md"
+          >
+            <div class="min-w-0">
+              <div class="text-xs truncate"><%= c["name"] %></div>
+              <div class="text-[10px] text-text-tertiary font-mono truncate">
+                <%= c["address"] %><%= if c["lan_access"] in [nil, []],
+                  do: " · overlay only",
+                  else: " · #{length(c["lan_access"])} LAN host(s)" %>
+              </div>
+            </div>
+            <button
+              phx-click="revoke_client"
+              phx-value-id={c["id"]}
+              class="ghost-btn !px-2 !py-0.5 text-[10px] shrink-0"
+            >
+              Revoke
+            </button>
+          </div>
+        </div>
+
+        <div class="mt-4">
+          <div class="flex items-center justify-between mb-2">
+            <div class="text-sm font-semibold">
               Listeners
               <.help_icon
                 class="ml-0.5"
@@ -860,6 +944,11 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   # Same reasoning as publish/1: read live state in update/2 so a change to it
   # actually re-renders. Guarded by view so the shell-outs only happen for the
   # panel that needs them.
+  defp machine_clients(:machine, data) when is_map(data),
+    do: Tunneld.Clients.for_machine(Map.get(data, "id") || Map.get(data, :id))
+
+  defp machine_clients(_view, _data), do: []
+
   defp link_status(:ethernet), do: Tunneld.NetLink.status()
   defp link_status(_), do: %{upstream: %{}, downstream: %{}}
 

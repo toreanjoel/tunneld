@@ -16,7 +16,15 @@ defmodule Tunneld.ClientsTest do
       File.rm_rf(root)
     end)
 
-    :ok
+    {:ok, %{"id" => id}} =
+      Tunneld.Machines.enroll(%{
+        "name" => "za",
+        "address" => "203.0.113.9",
+        "location" => "remote"
+      })
+
+    {:ok, machine} = Tunneld.Machines.get(id)
+    {:ok, machine: machine}
   end
 
   test "enrolling returns a config containing the private key exactly once" do
@@ -99,6 +107,12 @@ defmodule Tunneld.ClientsTest do
 
     assert script =~ "--dport 51822"
     assert script =~ "DNAT --to-destination 10.88.0.1:51822"
+
+    # without SNAT the gateway answers the client directly from its own uplink
+    # and the client's NAT drops the reply - configured everywhere, works nowhere
+    assert script =~ "POSTROUTING -d 10.88.0.1 -p udp --dport 51822 -j MASQUERADE"
+    assert script =~ "ip_forward=1"
+
     refute script =~ "PrivateKey"
     refute script =~ "wg-quick"
   end
@@ -118,5 +132,19 @@ defmodule Tunneld.ClientsTest do
 
     assert svg =~ "<svg"
     assert String.length(svg) > 500
+  end
+
+  test "clients are scoped to a machine and go with it", %{machine: m} do
+    {:ok, a, _} = Clients.enroll("partner-phone", machine: m)
+    {:ok, _b, _} = Clients.enroll("elsewhere")
+
+    assert Clients.for_machine(m["id"]) |> Enum.map(& &1["name"]) == ["partner-phone"]
+    assert a["machine_id"] == m["id"]
+    assert a["endpoint"] == m["address"]
+
+    :ok = Clients.revoke_for_machine(m["id"])
+
+    assert Clients.for_machine(m["id"]) == []
+    assert length(Clients.list()) == 1, "clients on other machines must survive"
   end
 end

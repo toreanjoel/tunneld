@@ -99,6 +99,7 @@ defmodule TunneldWeb.Live.Dashboard do
       |> assign(status: %{internet: internet_status})
       |> assign(:devices, devices)
       |> assign(:pending_actions, %{})
+      |> assign(:issued_client, nil)
       |> assign(:settings_menu_open, false)
       |> assign(:obfuscated, false)
       |> assign(:services_popover_open, false)
@@ -197,14 +198,6 @@ defmodule TunneldWeb.Live.Dashboard do
               <.live_component
                 id="machines"
                 module={TunneldWeb.Live.Components.Machines}
-                obfuscated={@obfuscated}
-              />
-            </div>
-
-            <div class="mt-12">
-              <.live_component
-                id="clients"
-                module={TunneldWeb.Live.Components.Clients}
                 obfuscated={@obfuscated}
               />
             </div>
@@ -623,6 +616,40 @@ defmodule TunneldWeb.Live.Dashboard do
     Tunneld.Publish.unpublish(id, machine)
     notify(:info, "Resource unpublished")
     {:noreply, refresh_resource_sidebar(socket, id)}
+  end
+
+  # Client enrolment lives on the machine panel: a client dials that machine's
+  # address, so the two belong together and removing the machine revokes them.
+  def handle_event("enroll_client", %{"machine_id" => machine_id, "name" => name}, socket) do
+    with {:ok, machine} <- Tunneld.Machines.get(machine_id),
+         {:ok, client, config} <- Tunneld.Clients.enroll(name, machine: machine) do
+      notify(:info, "#{client["name"]} enrolled at #{client["address"]}")
+
+      {:noreply,
+       assign(socket, :issued_client, %{
+         client: client,
+         config: config,
+         qr: Tunneld.Clients.qr_svg(config)
+       })}
+    else
+      {:error, :name_required} ->
+        notify(:error, "Give the device a name")
+        {:noreply, socket}
+
+      {:error, reason} ->
+        notify(:error, "Could not enrol: #{inspect(reason)}")
+        {:noreply, socket}
+    end
+  end
+
+  def handle_event("revoke_client", %{"id" => id}, socket) do
+    Tunneld.Clients.revoke(id)
+    notify(:info, "Client revoked - its key no longer works")
+    {:noreply, assign(socket, :issued_client, nil)}
+  end
+
+  def handle_event("dismiss_issued_client", _params, socket) do
+    {:noreply, assign(socket, :issued_client, nil)}
   end
 
   def handle_event("close_terminal", _params, socket) do
@@ -1057,6 +1084,7 @@ defmodule TunneldWeb.Live.Dashboard do
             selection={@sidebar.selection}
             data={@sidebar.data}
             listeners={@sidebar.listeners}
+            issued_client={@issued_client}
             listeners_loading={Map.get(@sidebar, :listeners_loading, false)}
             listeners_error={Map.get(@sidebar, :listeners_error)}
             obfuscated={@obfuscated}
@@ -1303,7 +1331,6 @@ defmodule TunneldWeb.Live.Dashboard do
   # the map pins did before they were fed from an assign.
   defp machines_changed(socket) do
     send_update(TunneldWeb.Live.Components.Machines, id: "machines", data: %{})
-    send_update(TunneldWeb.Live.Components.Clients, id: "clients", data: %{})
     assign(socket, :map_nodes, map_nodes())
   end
 
