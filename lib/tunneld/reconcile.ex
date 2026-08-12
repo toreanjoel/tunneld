@@ -35,9 +35,22 @@ defmodule Tunneld.Reconcile do
       wireguard: reconcile_wireguard(machine, repair?),
       caddy: reconcile_caddy(machine, repair?),
       ssh: reconcile_ssh(machine),
-      resources: reconcile_resources(machine)
+      resources: reconcile_resources(machine),
+      door: reconcile_door(machine, repair?)
     }
   end
+
+  # Machines enrolled before client access existed have no door, and a target's
+  # iptables do not survive its reboot, so this is both the upgrade path and the
+  # repair path. Cheap and idempotent: it only rewrites a destination port.
+  defp reconcile_door(machine, true) do
+    case Tunneld.Clients.ensure_door(machine) do
+      :ok -> :ok
+      {:error, reason} -> {:drift, {:door_failed, reason}}
+    end
+  end
+
+  defp reconcile_door(_machine, false), do: :ok
 
   # WireGuard: a peer should exist for every machine that is not local.
   defp reconcile_wireguard(machine, repair?) do
