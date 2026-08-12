@@ -68,12 +68,43 @@ defmodule TunneldWeb.Live.Components.JsonSchemaRenderer do
 
           <%= if is_list(field.enum) do %>
             <%= if field.type == "array" do %>
-              <textarea
-                name={"form[#{field.name}]"}
-                rows="5"
-                class={"#{hidden} tunl-input font-mono min-h-[6rem]"}
-                readonly={field.readonly}
-              ><%= array_to_text(Map.get(@changeset, field.name, field.default || [])) %></textarea>
+              <% chosen = List.wrap(Map.get(@changeset, field.name, field.default || [])) %>
+              <!-- A real dropdown, not a listbox: <select multiple> renders as an
+                   always-open scroll box and needs ctrl-click to multi-select,
+                   which nobody discovers. <details> gives click-to-open with
+                   plain checkboxes and no JavaScript. -->
+              <details class={"#{hidden} group relative"}>
+                <summary class="tunl-input flex items-center justify-between cursor-pointer list-none marker:hidden">
+                  <span class="truncate">
+                    <%= case length(chosen) do
+                      0 -> "None selected"
+                      1 -> "1 selected"
+                      n -> "#{n} selected"
+                    end %>
+                  </span>
+                  <span class="hero-chevron-down h-4 w-4 shrink-0 opacity-60 group-open:rotate-180 transition-transform">
+                  </span>
+                </summary>
+                <div class="mt-1 max-h-56 overflow-y-auto rounded-md border border-border bg-surface p-1">
+                  <label
+                    :for={option <- field.enum}
+                    class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-surface-2 cursor-pointer text-sm"
+                  >
+                    <% {value, label} = enum_option(option) %>
+                    <input
+                      type="checkbox"
+                      name={"form[#{field.name}][]"}
+                      value={value}
+                      checked={value in chosen}
+                      class="accent-accent"
+                    />
+                    <span class="truncate"><%= label %></span>
+                  </label>
+                  <p :if={field.enum == []} class="px-2 py-1.5 text-xs text-text-tertiary italic">
+                    Nothing to choose from yet.
+                  </p>
+                </div>
+              </details>
               <div :if={field.help} class="bg-accent/10 py-2 px-3 rounded-md my-2 text-xs text-accent">
                 <%= field.help %>
               </div>

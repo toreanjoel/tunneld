@@ -652,29 +652,6 @@ defmodule TunneldWeb.Live.Dashboard do
     {:noreply, socket |> assign(:issued_client, nil) |> refresh_machine_clients(machine_id)}
   end
 
-  # Replaces the whole scope, so unchecking a box revokes that host. The rules
-  # live on the gateway, never in the client's own config.
-  def handle_event("set_client_access", %{"client_id" => id} = params, socket) do
-    ips = Map.get(params, "ips", [])
-    machine_id = Tunneld.Clients.get(id)["machine_id"]
-
-    case Tunneld.Clients.set_lan_access(id, ips) do
-      {:ok, _client} ->
-        notify(
-          :info,
-          if(ips == [],
-            do: "Access cleared - overlay only",
-            else: "Access set: #{Enum.join(ips, ", ")}"
-          )
-        )
-
-      {:error, reason} ->
-        notify(:error, "Could not set access: #{inspect(reason)}")
-    end
-
-    {:noreply, refresh_machine_clients(socket, machine_id)}
-  end
-
   def handle_event("dismiss_issued_client", _params, socket) do
     {:noreply, assign(socket, :issued_client, nil)}
   end
@@ -883,6 +860,10 @@ defmodule TunneldWeb.Live.Dashboard do
 
     socket = refresh_resource_sidebar(socket, resource_id)
     {:noreply, assign(socket, :modal, Map.merge(socket.assigns.modal, modal))}
+  end
+
+  def handle_info({:client_access_changed, machine_id}, socket) do
+    {:noreply, refresh_machine_clients(socket, machine_id)}
   end
 
   def handle_info(:poll_overlay_state, socket) do

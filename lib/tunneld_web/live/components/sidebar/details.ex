@@ -568,35 +568,34 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                       else: " · #{length(c["lan_access"])} device(s)" %>
                   </div>
                 </div>
-                <button
-                  phx-click="revoke_client"
-                  phx-value-id={c["id"]}
-                  class="ghost-btn !px-2 !py-0.5 text-[10px] shrink-0"
-                >
-                  Revoke
-                </button>
-              </div>
-
-              <form phx-submit="set_client_access" class="mt-1.5 flex items-end gap-1.5">
-                <input type="hidden" name="client_id" value={c["id"]} />
-                <div class="min-w-0 flex-1">
-                  <label class="block text-[10px] text-text-tertiary mb-0.5">
-                    Can reach (⌘/ctrl-click for several)
-                  </label>
-                  <select name="ips[]" multiple size="3" class="tunl-input text-[11px] w-full">
-                    <option
-                      :for={d <- @subnet_devices}
-                      value={d.ip}
-                      selected={d.ip in (c["lan_access"] || [])}
-                    >
-                      <%= d.name || d.ip %> — <%= d.ip %>
-                    </option>
-                  </select>
+                <div class="flex gap-1 shrink-0">
+                  <div
+                    phx-click="modal_open"
+                    phx-value-modal_title={"Access for #{c["name"]}"}
+                    phx-value-modal_body={
+                      Jason.encode!(%{
+                        "type" => "schema",
+                        "data" => client_access_schema(@subnet_devices),
+                        "default_values" => %{
+                          "client_id" => c["id"],
+                          "devices" => c["lan_access"] || []
+                        },
+                        "action" => "set_client_access"
+                      })
+                    }
+                    class="ghost-btn !px-2 !py-0.5 text-[10px] cursor-pointer"
+                  >
+                    Access
+                  </div>
+                  <button
+                    phx-click="revoke_client"
+                    phx-value-id={c["id"]}
+                    class="ghost-btn !px-2 !py-0.5 text-[10px]"
+                  >
+                    Revoke
+                  </button>
                 </div>
-                <button type="submit" class="ghost-btn !px-2 !py-1 text-[10px] shrink-0">
-                  Save
-                </button>
-              </form>
+              </div>
             </div>
           </div>
         </div>
@@ -992,6 +991,33 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
   end
 
   defp subnet_devices(_), do: []
+
+  # Which subnet devices this client may reach. An array field with `ui:enum`
+  # renders as the dropdown multi-select in the schema renderer, so this gets
+  # the same look and the same help styling as every other form.
+  defp client_access_schema(devices) do
+    %{
+      "title" => "Device access",
+      "type" => "object",
+      "ui:order" => ["client_id", "devices"],
+      "properties" => %{
+        "client_id" => %{"type" => "string", "ui:widget" => "hidden", "readOnly" => true},
+        "devices" => %{
+          "type" => "array",
+          "description" => "Devices on this subnet the client may reach.",
+          "ui:enum" =>
+            Enum.map(devices, fn d ->
+              %{"value" => d.ip, "label" => "#{d.name || d.ip} — #{d.ip}"}
+            end),
+          "ui:help" =>
+            "Enforced on the gateway, not in the client's config - so it takes effect " <>
+              "immediately and the client cannot widen it. Saving replaces the whole set; " <>
+              "clearing it leaves the client with overlay access only."
+        }
+      },
+      "required" => ["client_id"]
+    }
+  end
 
   defp link_status(:ethernet), do: Tunneld.NetLink.status()
   defp link_status(_), do: %{upstream: %{}, downstream: %{}}

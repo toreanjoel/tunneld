@@ -72,6 +72,9 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
       "publish_resource" ->
         publish_resource(data)
 
+      "set_client_access" ->
+        set_client_access(data)
+
       "update_share" ->
         Resources.update_share(data, :resource)
 
@@ -183,6 +186,35 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
   end
 
   defp publish_resource(_), do: notify_error("Pick a machine and a port")
+
+  # Replaces the client's whole scope, so an empty selection revokes LAN access
+  # and leaves it on the overlay only.
+  defp set_client_access(%{"client_id" => id} = data) do
+    ips = data |> Map.get("devices", []) |> List.wrap()
+
+    case Tunneld.Clients.set_lan_access(id, ips) do
+      {:ok, client} ->
+        Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{
+          type: :info,
+          message:
+            if(ips == [],
+              do: "#{client["name"]}: overlay only",
+              else: "#{client["name"]} can reach #{Enum.join(ips, ", ")}"
+            )
+        })
+
+        Phoenix.PubSub.broadcast(
+          Tunneld.PubSub,
+          "publish:steps",
+          {:client_access_changed, client["machine_id"]}
+        )
+
+      {:error, reason} ->
+        notify_error("Could not set access: #{inspect(reason)}")
+    end
+  end
+
+  defp set_client_access(_), do: notify_error("No client selected")
 
   defp notify_error(message) do
     Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{type: :error, message: message})
