@@ -219,13 +219,37 @@ defmodule Tunneld.Overlay do
   end
 
   defp real_remove_peer(machine) do
+    remove_peer_local(machine)
+    remove_peer_remote(machine)
+    :ok
+  end
+
+  @doc """
+  Tear down the gateway's half of a peer. Local only, so it always completes.
+
+  Split from the remote half because the two used to run in one function that
+  SSHed to the target *first*. Deleting a machine that was already gone meant
+  that call blocked on the SSH connect timeout, the caller's teardown budget
+  expired, the task was brutal-killed, and the gateway's own interface, route
+  and key were left behind - which is how a gateway ends up with WireGuard
+  interfaces for machines that no longer exist.
+  """
+  def remove_peer_local(machine) do
     id = machine["id"]
     iface = iface_name(id)
-    _ = run(machine, "systemctl stop wg-quick@#{iface} 2>/dev/null || true")
-    _ = run_gateway("systemctl stop wg-quick@#{iface} 2>/dev/null || true")
+    _ = run_gateway("systemctl disable --now wg-quick@#{iface} 2>/dev/null || true")
     _ = run_gateway("wg-quick down #{iface} 2>/dev/null || true")
+    _ = run_gateway("ip link del #{iface} 2>/dev/null || true")
     File.rm(Path.join([Tunneld.Config.fs_root(), "wg", id]))
-    File.rm(Path.join([Tunneld.Config.fs_root(), "wg", id, ".pub"]))
+    File.rm(Path.join([Tunneld.Config.fs_root(), "wg", id <> ".pub"]))
+    File.rm("/etc/wireguard/#{iface}.conf")
+    :ok
+  end
+
+  @doc "Tear down the target's half. Best-effort: the host may be gone."
+  def remove_peer_remote(machine) do
+    iface = iface_name(machine["id"])
+    _ = run(machine, "systemctl disable --now wg-quick@#{iface} 2>/dev/null || true")
     :ok
   end
 

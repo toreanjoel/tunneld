@@ -115,4 +115,31 @@ defmodule Tunneld.MachinesTest do
     assert updated["status"] == "ready"
     assert updated["capabilities"]["arch"] == "x86_64"
   end
+
+  # A machine that is already gone must still leave the gateway clean. The
+  # remote half is best-effort; the local half is not optional.
+  test "removing an unreachable machine still clears the gateway's own state" do
+    {:ok, %{"id" => id}} =
+      Machines.enroll(%{"name" => "dead-vm", "address" => "203.0.113.99", "location" => "remote"})
+
+    {:ok, machine} = Machines.get(id)
+    _ = Tunneld.Overlay.ensure_peer(machine)
+
+    assert Tunneld.Overlay.address_for(machine) =~ "10.88."
+    assert :ok = Machines.remove(id) |> normalise()
+
+    assert {:error, _} = Machines.get(id)
+    refute id in Map.keys(overlay_peers())
+  end
+
+  defp normalise(:ok), do: :ok
+  defp normalise({:ok, _}), do: :ok
+  defp normalise(other), do: other
+
+  defp overlay_peers do
+    case Tunneld.Persistence.read_json(Path.join(Tunneld.Config.fs_root(), "overlay.json")) do
+      {:ok, %{"peers" => m}} -> m
+      _ -> %{}
+    end
+  end
 end

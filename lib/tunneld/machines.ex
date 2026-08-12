@@ -156,7 +156,14 @@ defmodule Tunneld.Machines do
         # the gateway even if the machine itself is unreachable.
         _ = Tunneld.Clients.revoke_for_machine(id)
 
-        # Attempt remote teardown with a timeout - do not block on dead hosts
+        # Local teardown first and unconditionally. It only touches the gateway,
+        # so it cannot block, and doing it after the remote attempt meant a dead
+        # host took the whole budget and left gateway state behind.
+        _ = Tunneld.Egress.cleanup_machine(machine)
+        _ = Tunneld.Overlay.remove_overlay_ip(machine)
+        _ = Tunneld.Overlay.remove_peer_local(machine)
+
+        # Then the target's half, which may well be unreachable.
         teardown_result = attempt_remote_teardown(machine)
 
         # Always delete local state, regardless of remote teardown outcome
@@ -175,9 +182,7 @@ defmodule Tunneld.Machines do
     task =
       Task.async(fn ->
         try do
-          _ = Tunneld.Egress.cleanup_machine(machine)
-          _ = Tunneld.Overlay.remove_overlay_ip(machine)
-          _ = Tunneld.Overlay.remove_peer(machine)
+          _ = Tunneld.Overlay.remove_peer_remote(machine)
           :ok
         rescue
           e -> {:error, Exception.message(e)}
