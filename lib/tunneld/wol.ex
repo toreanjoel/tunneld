@@ -128,8 +128,11 @@ defmodule Tunneld.Wol do
   # elsewhere, so a refusal falls back to an unbound socket - the directed
   # broadcast (10.0.0.255) still routes correctly on its own.
   @doc false
-  def open_socket do
-    iface = Tunneld.Config.network(:downstream) || "eth1"
+  # `iface` is an argument rather than a config read so the fallback can be
+  # exercised without mutating global application env - a test that did so
+  # raced every other async test that reads the downstream interface.
+  def open_socket(iface \\ nil) do
+    iface = iface || Tunneld.Config.network(:downstream) || "eth1"
     base = [:binary, {:broadcast, true}, {:active, false}]
 
     # `bind_to_device` takes a BINARY interface name and rejects anything else

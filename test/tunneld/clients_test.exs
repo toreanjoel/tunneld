@@ -163,4 +163,54 @@ defmodule Tunneld.ClientsTest do
     assert Clients.for_machine(m["id"]) == []
     assert length(Clients.list()) == 1, "clients on other machines must survive"
   end
+
+  # Regression: the phone could reach the gateway and the internet but not the
+  # Sunshine host it had been granted, because forwarding was the only thing
+  # applied. The LAN host saw a packet from 10.88.1.x - not its own subnet -
+  # and dropped it. Measured on the gateway: 0/2 ping replies sourced from
+  # 10.88.1.1, 3/3 once the traffic was presented as the gateway.
+  test "a LAN grant both forwards and source-NATs, per granted host" do
+    {:ok, client, _} = Clients.enroll("partner-phone")
+    {:ok, granted} = Clients.set_lan_access(client["id"], ["10.0.0.52"])
+
+    apply_cmds = Clients.lan_apply_commands(granted, "eth1")
+
+    assert Enum.any?(apply_cmds, fn c ->
+             c =~
+               "-I FORWARD 1 -i wg-clients -o eth1 -s #{granted["address"]} -d 10.0.0.52 -j ACCEPT"
+           end),
+           "the client must be forwarded to the host it was granted"
+
+    assert Enum.any?(apply_cmds, fn c ->
+             c =~
+               "-t nat -A POSTROUTING -s #{granted["address"]} -d 10.0.0.52 -o eth1 -j MASQUERADE"
+           end),
+           "the host must see the gateway, not an address it has no route for"
+
+    # Scoped, not a blanket NAT of the whole client range.
+    refute Enum.any?(apply_cmds, &(&1 =~ "-s 10.88.1.0/24"))
+
+    # Everything applied is also removable.
+    clear_cmds = Clients.lan_clear_commands(granted, "eth1")
+    assert Enum.any?(clear_cmds, &(&1 =~ "-D FORWARD"))
+    assert Enum.any?(clear_cmds, &(&1 =~ "-t nat -D POSTROUTING"))
+  end
+
+  # Regression: Iptables.reset/0 flushes every table on boot and re-adds only a
+  # fixed base set, so every restart silently revoked LAN access until the
+  # operator re-saved the grant in the UI.
+  test "LAN grants can be re-asserted after a flush without touching the UI" do
+    {:ok, a, _} = Clients.enroll("phone")
+    {:ok, b, _} = Clients.enroll("laptop")
+    {:ok, _} = Clients.set_lan_access(a["id"], ["10.0.0.52"])
+    {:ok, _} = Clients.set_lan_access(b["id"], ["10.0.0.60", "10.0.0.61"])
+
+    assert :ok = Clients.ensure_lan_rules()
+
+    granted = Clients.list() |> Enum.flat_map(&Clients.lan_apply_commands(&1, "eth1"))
+
+    for host <- ["10.0.0.52", "10.0.0.60", "10.0.0.61"] do
+      assert Enum.any?(granted, &(&1 =~ "-d #{host} ")), "#{host} lost its rules"
+    end
+  end
 end

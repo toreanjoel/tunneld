@@ -45,6 +45,9 @@ defmodule Tunneld.Application do
 
     if not Application.get_env(:tunneld, :mock_data, false) do
       Tunneld.Iptables.reset()
+      # reset/0 flushes, so anything granted at runtime has to be re-asserted
+      # here or it is lost on every restart.
+      Tunneld.Clients.ensure_lan_rules()
     end
 
     opts = [strategy: :one_for_one, name: Tunneld.Supervisor]

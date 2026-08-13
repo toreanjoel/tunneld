@@ -53,12 +53,10 @@ defmodule Tunneld.WolTest do
   # else, so an option mistake crashed the caller instead of falling back. The
   # socket path has to survive a refusal on any host.
   test "opening a socket never raises, whatever the interface is called" do
-    prev = Application.get_env(:tunneld, :network)
-    Application.put_env(:tunneld, :network, Keyword.put(prev || [], :downstream, "nope0"))
-    on_exit(fn -> Application.put_env(:tunneld, :network, prev) end)
-
-    # mock mode short-circuits wake/1, so exercise the real socket path directly
-    assert {:ok, socket} = Wol.open_socket()
+    # mock mode short-circuits wake/1, so exercise the real socket path directly.
+    # The interface is passed in: an earlier version of this test set it through
+    # application env, which every other async test reading :downstream then saw.
+    assert {:ok, socket} = Wol.open_socket("nope0")
     :gen_udp.close(socket)
   end
 end

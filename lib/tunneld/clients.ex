@@ -164,6 +164,26 @@ defmodule Tunneld.Clients do
     end
   end
 
+  @doc """
+  Re-apply every client's LAN grant to the gateway firewall.
+
+  `Tunneld.Iptables.reset/0` flushes every table on boot and re-adds a fixed
+  base set that deliberately excludes per-client LAN access. Nothing put the
+  grants back, so a restart silently revoked LAN access for every client and
+  the only cure was re-saving the access list in the UI - which looks exactly
+  like the feature being broken, because from the operator's side it is.
+
+  Idempotent: each rule is `-C`-checked before it is added.
+  """
+  def ensure_lan_rules do
+    if @mock do
+      :ok
+    else
+      Enum.each(list(), &apply_lan_rules/1)
+      :ok
+    end
+  end
+
   @doc "The config text a client needs. Private key is supplied, never stored."
   def config_for(client, private_key) do
     """
@@ -376,39 +396,64 @@ defmodule Tunneld.Clients do
     end
   end
 
-  defp apply_lan_rules(%{"lan_access" => ips, "address" => addr}) when is_list(ips) do
-    lan = Config.network(:downstream) || "eth1"
+  defp apply_lan_rules(client), do: run_rules(lan_apply_commands(client, lan_iface()))
 
-    Enum.each(ips, fn ip ->
-      sh(
-        "iptables -C FORWARD -i #{@iface} -o #{lan} -s #{addr} -d #{ip} -j ACCEPT 2>/dev/null || " <>
-          "iptables -I FORWARD 1 -i #{@iface} -o #{lan} -s #{addr} -d #{ip} -j ACCEPT"
-      )
-    end)
+  defp clear_lan_rules(client), do: run_rules(lan_clear_commands(client, lan_iface()))
 
-    sh(
-      "iptables -C FORWARD -i #{lan} -o #{@iface} -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || " <>
-        "iptables -I FORWARD 1 -i #{lan} -o #{@iface} -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT"
-    )
-
+  defp run_rules(commands) do
+    Enum.each(commands, &sh/1)
     :ok
   end
 
-  defp apply_lan_rules(_), do: :ok
+  defp lan_iface, do: Config.network(:downstream) || "eth1"
 
-  defp clear_lan_rules(%{"lan_access" => ips, "address" => addr}) when is_list(ips) do
-    lan = Config.network(:downstream) || "eth1"
+  @doc false
+  # The rules a client's LAN grant consists of, as shell commands. Pure and
+  # public so the exact rule set is testable without an iptables binary.
+  def lan_apply_commands(%{"lan_access" => ips, "address" => addr}, lan) when is_list(ips) do
+    per_host =
+      Enum.flat_map(ips, fn ip ->
+        [
+          "iptables -C FORWARD -i #{@iface} -o #{lan} -s #{addr} -d #{ip} -j ACCEPT 2>/dev/null || " <>
+            "iptables -I FORWARD 1 -i #{@iface} -o #{lan} -s #{addr} -d #{ip} -j ACCEPT",
 
-    Enum.each(ips, fn ip ->
-      sh(
-        "iptables -D FORWARD -i #{@iface} -o #{lan} -s #{addr} -d #{ip} -j ACCEPT 2>/dev/null || true"
-      )
-    end)
+          # Forwarding alone is not enough. Without this the LAN host receives a
+          # packet sourced from the client overlay (10.88.1.x) - an address it
+          # has no route for and, on Windows, a source its firewall rules do not
+          # cover, because they are scoped to "local subnet" by default. It
+          # silently drops it. Measured on the gateway, same ping, same
+          # destination, only the source differing: 0/2 replies from 10.88.1.1,
+          # 3/3 with this rule.
+          #
+          # Presenting client traffic as the gateway makes it indistinguishable
+          # from any other subnet device, so nothing has to be configured on the
+          # LAN host. Scoped per granted host, exactly like the FORWARD rule -
+          # this is not a blanket NAT of the client range.
+          "iptables -t nat -C POSTROUTING -s #{addr} -d #{ip} -o #{lan} -j MASQUERADE 2>/dev/null || " <>
+            "iptables -t nat -A POSTROUTING -s #{addr} -d #{ip} -o #{lan} -j MASQUERADE"
+        ]
+      end)
 
-    :ok
+    per_host ++
+      [
+        "iptables -C FORWARD -i #{lan} -o #{@iface} -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT 2>/dev/null || " <>
+          "iptables -I FORWARD 1 -i #{lan} -o #{@iface} -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT"
+      ]
   end
 
-  defp clear_lan_rules(_), do: :ok
+  def lan_apply_commands(_, _), do: []
+
+  @doc false
+  def lan_clear_commands(%{"lan_access" => ips, "address" => addr}, lan) when is_list(ips) do
+    Enum.flat_map(ips, fn ip ->
+      [
+        "iptables -D FORWARD -i #{@iface} -o #{lan} -s #{addr} -d #{ip} -j ACCEPT 2>/dev/null || true",
+        "iptables -t nat -D POSTROUTING -s #{addr} -d #{ip} -o #{lan} -j MASQUERADE 2>/dev/null || true"
+      ]
+    end)
+  end
+
+  def lan_clear_commands(_, _), do: []
 
   defp gateway_private_key do
     path = Path.join([Config.fs_root(), "wg", "clients.key"])
