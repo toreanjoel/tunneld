@@ -27,6 +27,9 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
           Devices.sync_now()
         end
 
+      "wake_device" ->
+        wake_device(data)
+
       "allow_device_expose" ->
         if mac = data["mac"] do
           Tunneld.Servers.ExposeAllowed.allow(mac)
@@ -149,6 +152,34 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
           message: "Action doesnt exist and cant be handled"
         })
     end
+  end
+
+  # The dashboard is reachable from the overlay; the target's broadcast domain
+  # is not. So the operator asks the gateway to knock, and the gateway - which
+  # is on the wire - does it. Deliberately worded as "sent", never "woke": a
+  # magic packet is fire-and-forget and whether the NIC honours it is not
+  # observable from here.
+  defp wake_device(data) do
+    mac = data["mac"]
+    name = data["hostname"] || mac
+
+    case Tunneld.Wol.wake(mac) do
+      {:ok, _targets} ->
+        notify(:info, "Wake packet sent to #{name}. It takes a few seconds to come up.")
+        :ok
+
+      {:error, :invalid_mac} ->
+        notify(:error, "Cannot wake #{name}: no usable MAC address")
+        {:error, :invalid_mac}
+
+      {:error, reason} ->
+        notify(:error, "Could not send the wake packet: #{inspect(reason)}")
+        {:error, reason}
+    end
+  end
+
+  defp notify(type, message) do
+    Phoenix.PubSub.broadcast(Tunneld.PubSub, "notifications", %{type: type, message: message})
   end
 
   # Publishing is a remote install + config push, so it is reported the way

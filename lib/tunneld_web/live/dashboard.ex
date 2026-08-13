@@ -1216,6 +1216,7 @@ defmodule TunneldWeb.Live.Dashboard do
       "restart_service" -> "Restarting service..."
       "refresh_service_logs" -> "Refreshing service logs..."
       "revoke_release_ip" -> "Releasing device IP..."
+      "wake_device" -> "Sending wake packet..."
       "allow_device_expose" -> "Enabling Quick Expose..."
       "revoke_device_expose" -> "Revoking Quick Expose..."
       "add_device_tag" -> "Adding tag..."

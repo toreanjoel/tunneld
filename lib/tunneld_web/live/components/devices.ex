@@ -173,6 +173,27 @@ defmodule TunneldWeb.Live.Components.Devices do
                 />
               </div>
 
+              <%!-- Wake is only meaningful from here: the magic packet has to be
+                   broadcast inside this subnet, which the gateway can do and a
+                   WireGuard client fundamentally cannot. --%>
+              <div
+                phx-click="trigger_action"
+                phx-value-action="wake_device"
+                phx-value-data={Jason.encode!(%{"mac" => device.mac, "hostname" => device.hostname})}
+                phx-click-loading="opacity-50 cursor-wait"
+                class="cursor-pointer"
+                title={"Send a wake-on-LAN packet to #{device.hostname}"}
+              >
+                <.icon
+                  name="hero-bolt"
+                  class={
+                    if Map.get(device, :online, false),
+                      do: "h-4 w-4 text-text-secondary",
+                      else: "h-4 w-4 text-yellow"
+                  }
+                />
+              </div>
+
               <div
                 phx-click="modal_open"
                 phx-value-modal_title="Revoke devices IP address?"
