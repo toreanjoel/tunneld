@@ -41,6 +41,9 @@ defmodule Tunneld.Geolocation do
      }}
   ]
   @ip_timeout 3_000
+  @cache :tunneld_geolocation_cache
+  @cache_ttl_ms :timer.hours(24)
+  @cache_error_ttl_ms :timer.minutes(5)
 
   def start_link(_) do
     GenServer.start_link(__MODULE__, %{}, name: __MODULE__)
@@ -56,7 +59,14 @@ defmodule Tunneld.Geolocation do
     GenServer.cast(__MODULE__, :refresh)
   end
 
-  @doc "Geolocate an IP address. Returns `{:ok, location}` or `:error`."
+  @doc """
+  Geolocate an IP address. Returns `{:ok, location}` or `:error`.
+
+  Results are cached: the dashboard calls this once per managed machine on
+  every mount and every machine change, and the free providers rate-limit
+  hard. A 429 from the first provider is what pushed lookups onto the
+  second one in the first place.
+  """
   def geolocate(ip) when is_binary(ip) do
     if mock?() do
       {:ok,
@@ -68,15 +78,27 @@ defmodule Tunneld.Geolocation do
          longitude: -122.4194
        }}
     else
-      case fetch_geolocation(ip) do
-        {:ok, geo} -> {:ok, Map.put(geo, :ip, ip)}
-        _ -> :error
+      case cache_get(ip) do
+        {:ok, cached} ->
+          cached
+
+        :miss ->
+          result =
+            case fetch_geolocation(ip) do
+              {:ok, geo} -> {:ok, Map.put(geo, :ip, ip)}
+              _ -> :error
+            end
+
+          cache_put(ip, result)
+          result
       end
     end
   end
 
   @impl true
   def init(_) do
+    ensure_cache()
+
     if mock?() do
       location = %{
         ip: "192.168.1.1",
@@ -244,26 +266,37 @@ defmodule Tunneld.Geolocation do
     end)
   end
 
-  defp parse_geo_response(data, field_map) do
+  @doc false
+  # Public only so the provider response shapes can be tested without a network
+  # round trip. Not part of the module's interface.
+  def parse_geo_response(data, field_map) do
     country_code = get_field(data, field_map, "country_code")
     country_name = get_field(data, field_map, "country")
     lat = get_field(data, field_map, "latitude")
     lng = get_field(data, field_map, "longitude")
 
-    # ipinfo.io returns "loc" as a comma-separated pair like "37.4,-122.0"
+    # ipinfo.io answers with ONE field - "loc" => "-26.12,28.03" - so the field
+    # map points both latitude and longitude at it. Running that through
+    # parse_float/1 twice returns the latitude twice, because Float.parse stops
+    # at the comma. Every ipinfo-sourced pin therefore plotted at
+    # (lat, lat) - which for this gateway is the middle of the South Atlantic.
+    # Split the pair when both fields resolve to the same combined string.
     {lat, lng} =
-      if is_nil(lat) and is_nil(lng) do
-        loc = Map.get(data, "loc") || Map.get(data, "latitude")
+      cond do
+        is_binary(lat) and lat == lng and String.contains?(lat, ",") ->
+          parse_loc(lat)
 
-        case loc do
-          str when is_binary(str) -> parse_loc(str)
-          _ -> {nil, nil}
-        end
-      else
-        {parse_float(lat), parse_float(lng)}
+        is_nil(lat) and is_nil(lng) ->
+          case Map.get(data, "loc") do
+            str when is_binary(str) -> parse_loc(str)
+            _ -> {nil, nil}
+          end
+
+        true ->
+          {parse_float(lat), parse_float(lng)}
       end
 
-    if country_code do
+    if country_code && valid_coords?(lat, lng) do
       {:ok,
        %{
          country_code: String.upcase(country_code) |> String.trim(),
@@ -275,6 +308,16 @@ defmodule Tunneld.Geolocation do
       :error
     end
   end
+
+  # A provider that answers 200 with a null island or an out-of-range pair is
+  # worse than one that fails: the pin lands somewhere plausible-looking and
+  # nobody questions it. Reject it and let try_endpoints/2 fall through.
+  defp valid_coords?(lat, lng)
+       when is_number(lat) and is_number(lng) and lat >= -90 and lat <= 90 and lng >= -180 and
+              lng <= 180,
+       do: true
+
+  defp valid_coords?(_, _), do: false
 
   defp get_field(data, field_map, key) do
     field = Map.get(field_map, key)
@@ -325,6 +368,39 @@ defmodule Tunneld.Geolocation do
 
   defp broadcast(message) do
     Phoenix.PubSub.broadcast(Tunneld.PubSub, @topic, message)
+  end
+
+  # --- per-IP lookup cache -------------------------------------------------
+  # A plain public ETS table owned by this GenServer. Reads and writes happen in
+  # the calling process (usually a LiveView), so a slow HTTP lookup never
+  # serialises behind this server's mailbox.
+
+  defp ensure_cache do
+    if :ets.whereis(@cache) == :undefined do
+      :ets.new(@cache, [:named_table, :public, :set, read_concurrency: true])
+    end
+
+    :ok
+  end
+
+  defp cache_get(ip) do
+    case :ets.lookup(@cache, ip) do
+      [{^ip, result, expires_at}] ->
+        if System.monotonic_time(:millisecond) < expires_at, do: {:ok, result}, else: :miss
+
+      _ ->
+        :miss
+    end
+  rescue
+    ArgumentError -> :miss
+  end
+
+  defp cache_put(ip, result) do
+    ttl = if match?({:ok, _}, result), do: @cache_ttl_ms, else: @cache_error_ttl_ms
+    :ets.insert(@cache, {ip, result, System.monotonic_time(:millisecond) + ttl})
+    :ok
+  rescue
+    ArgumentError -> :ok
   end
 
   defp mock?, do: Application.get_env(:tunneld, :mock_data, false)

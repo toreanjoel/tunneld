@@ -28,10 +28,16 @@ defmodule TunneldWeb.Live.Dashboard.Actions do
         end
 
       "allow_device_expose" ->
-        if mac = data["mac"], do: Tunneld.Servers.ExposeAllowed.allow(mac)
+        if mac = data["mac"] do
+          Tunneld.Servers.ExposeAllowed.allow(mac)
+          Devices.sync_now()
+        end
 
       "revoke_device_expose" ->
-        if mac = data["mac"], do: Tunneld.Servers.ExposeAllowed.revoke(mac)
+        if mac = data["mac"] do
+          Tunneld.Servers.ExposeAllowed.revoke(mac)
+          Devices.sync_now()
+        end
 
       "add_device_tag" ->
         mac = data["mac"]

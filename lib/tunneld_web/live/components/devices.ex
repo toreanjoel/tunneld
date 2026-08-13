@@ -7,60 +7,46 @@ defmodule TunneldWeb.Live.Components.Devices do
   import TunneldWeb.Live.Components.HelpIcon
 
   def mount(socket) do
-    # Paint from current state immediately instead of waiting for broadcast
+    # Paint from the server's warm cache immediately, then ask for a fresh read.
+    # The broadcast that follows arrives as a normal update/2.
     current = Tunneld.Servers.Devices.current()
-    has_data = length(Map.get(current, :devices, [])) > 0
-    {:ok, socket |> assign(loading: !has_data) |> assign(data: current)}
+    Tunneld.Servers.Devices.sync_now()
+
+    {:ok, socket |> assign(loaded: Map.get(current, :loaded, false)) |> assign(data: current)}
   end
 
   def update(assigns, socket) do
-    new_data = Map.get(assigns, :data, %{})
+    # The parent renders this component with no `:data` when the panel is opened
+    # (the payload only arrives on the next broadcast). Defaulting to `%{}` there
+    # emptied the list and flipped the view back to "Scanning Devices..." on
+    # every open. Absent data means "unchanged", not "none".
+    new_data = Map.get(assigns, :data) || Map.get(socket.assigns, :data) || %{}
     devices = Map.get(new_data, :devices, [])
     obfuscated = Map.get(assigns, :obfuscated, false)
 
-    probe_cache = Map.get(socket.assigns, :probe_cache, %{})
-    now = System.monotonic_time(:second)
-
-    {devices, probe_cache} =
-      Enum.reduce(devices, {[], probe_cache}, fn d, {acc, cache} ->
-        online =
-          case Map.get(cache, d.mac) do
-            %{at: at, online: val} when now - at < 30 -> val
-            _ -> probe_online(d.ip)
-          end
-
-        cache = Map.put(cache, d.mac, %{at: now, online: online})
-
-        d =
-          d
-          |> Map.put(:expose_allowed, Tunneld.Servers.ExposeAllowed.allowed?(d.mac))
-          |> Map.put(:tags, Tunneld.Servers.DeviceTags.get_tags(d.mac))
-          |> Map.put(:online, online)
-          |> Map.put(:egress, Tunneld.Egress.device_egress(d.ip) || "local")
-
-        {[d | acc], cache}
+    # Reachability is probed by Tunneld.Servers.Devices, off the render path.
+    devices =
+      Enum.map(devices, fn d ->
+        d
+        |> Map.put(:expose_allowed, Tunneld.Servers.ExposeAllowed.allowed?(d.mac))
+        |> Map.put(:tags, Tunneld.Servers.DeviceTags.get_tags(d.mac))
+        |> Map.put(:online, Map.get(d, :online, false))
+        |> Map.put(:egress, Tunneld.Egress.device_egress(d.ip) || "local")
       end)
 
-    devices = Enum.reverse(devices)
     new_data = Map.put(new_data, :devices, devices)
+
+    # "Loading" means "we have not read the leases yet", not "the list is empty".
+    # A subnet with no devices is a real answer and should say so.
+    loaded = Map.get(new_data, :loaded, false) or Map.get(socket.assigns, :loaded, false)
 
     socket =
       socket
       |> assign_new(:obfuscated, fn -> false end)
       |> assign(:obfuscated, obfuscated)
-      |> assign(:probe_cache, probe_cache)
       |> assign(:egress_machines, Map.get(assigns, :egress_machines, []))
-
-    new_loading =
-      case devices do
-        [] -> true
-        _ -> false
-      end
-
-    socket =
-      socket
       |> assign(data: new_data)
-      |> assign(loading: new_loading)
+      |> assign(loaded: loaded)
 
     {:ok, socket}
   end
@@ -72,7 +58,7 @@ defmodule TunneldWeb.Live.Components.Devices do
         Devices<.help_icon text="Devices discovered on your LAN subnet via DHCP leases. Each device automatically gets an IP from dnsmasq. Use Quick Expose to let devices create local resources via a curl command. Revoke IP to release the DHCP lease. Egress routes traffic through an exit machine instead of the gateway's upstream; pick 'Local' to use the gateway directly." />
       </.section_header>
 
-      <div :if={@loading} class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+      <div :if={!@loaded} class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
         <div class="p-4 flex flex-col bg-surface rounded-lg w-full h-[130px] opacity-10">
           <div class="grow">
             <.icon class="w-10 h-10 text-text-primary" name="hero-computer-desktop" />
@@ -83,7 +69,14 @@ defmodule TunneldWeb.Live.Components.Devices do
       </div>
 
       <div
-        :if={!@loading}
+        :if={@loaded and Map.get(@data, :devices, []) == []}
+        class="text-sm text-text-tertiary py-4"
+      >
+        No devices are holding a DHCP lease on this subnet.
+      </div>
+
+      <div
+        :if={@loaded}
         class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 items-start"
       >
         <%= for device <- Map.get(@data, :devices, []) do %>
@@ -296,25 +289,14 @@ defmodule TunneldWeb.Live.Components.Devices do
       message: format_egress_result(result, ip, egress)
     })
 
+    # Re-read now so the card shows the new egress immediately instead of
+    # waiting out the poll interval.
+    Tunneld.Servers.Devices.sync_now()
+
     {:noreply, socket}
   end
 
   defp tag_classes(_tag), do: "bg-surface-2 text-text-secondary border-border"
-
-  defp probe_online(ip) do
-    mock? = Application.get_env(:tunneld, :mock_data, false)
-
-    if mock? do
-      true
-    else
-      case System.cmd("ping", ["-c", "1", "-W", "1", ip], stderr_to_stdout: true) do
-        {_, 0} -> true
-        _ -> false
-      end
-    end
-  rescue
-    _ -> false
-  end
 
   defp format_egress_result(:ok, ip, "local"), do: "Routing #{ip} through gateway"
   defp format_egress_result(:ok, ip, egress), do: "Routing #{ip} through #{egress}"

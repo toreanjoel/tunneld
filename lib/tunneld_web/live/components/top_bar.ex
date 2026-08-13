@@ -1,7 +1,7 @@
 defmodule TunneldWeb.Live.Components.TopBar do
   @moduledoc """
-  Top navigation bar with services chip, configure button, obfuscation toggle,
-  settings dropdown, and version info badge.
+  Top navigation bar with services chip, obfuscation toggle, settings dropdown,
+  and version info badge.
   """
   use Phoenix.Component
   use Gettext, backend: TunneldWeb.Gettext
@@ -82,15 +82,9 @@ defmodule TunneldWeb.Live.Components.TopBar do
           </div>
         </div>
 
-        <button
-          class="btn-primary text-xs sm:text-[13px] px-2 sm:px-4"
-          phx-click="show_details"
-          phx-value-type="ethernet"
-          phx-value-id="_"
-        >
-          <span class="hidden sm:inline">Network</span>
-          <span class="inline sm:hidden">Network</span>
-        </button>
+        <%!-- No "Network" button here. It opened the same ethernet panel as the
+             INTERNET ACCESS card on the dashboard, which already carries the
+             link status, so the button was a second door to one room. --%>
         <button
           class="ghost-icon"
           phx-click="toggle_obfuscation"

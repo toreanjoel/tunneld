@@ -99,6 +99,14 @@ defmodule TunneldWeb.Live.DashboardPublishSidebarTest do
 
     html = eventually(view, "Unpublish")
     assert html =~ "http://203.0.113.9:8001", "public URL missing from the open sidebar"
+
+    # The URL rows carry a copy button rather than the old "(share this)" /
+    # "(this subnet only)" asides, and the panel header is the only place the
+    # resource is named.
+    assert html =~ ~s(data-copy-text="http://203.0.113.9:8001")
+    refute html =~ "(share this)"
+    refute html =~ "(this subnet only)"
+    refute html =~ "Name:"
   end
 
   test "unpublishing updates the open sidebar without reopening it", %{

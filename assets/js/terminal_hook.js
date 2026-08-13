@@ -168,8 +168,22 @@ const TerminalHook = {
 
     socket.connect();
 
+    // The /ws upgrade is refused for exactly one reason: the dashboard auth
+    // session behind the cookie is no longer valid server-side (it is in-memory
+    // and TTL'd, so it also disappears across a gateway restart). The browser
+    // only ever sees a 403 on the upgrade, so "Socket connection failed" was
+    // technically true and practically useless. Say what it means, once, and
+    // tell the LiveView so it can send the operator back to the login page if
+    // the session really is gone.
     socket.onError(() => {
-      this.setStatus("error", "Socket connection failed");
+      const msg = "Session expired - reload the dashboard and sign in again";
+      this.setStatus("error", msg);
+
+      if (!this.reportedSocketError) {
+        this.reportedSocketError = true;
+        this.writeTerminalError(msg);
+        this.pushEvent("terminal_socket_error", {});
+      }
     });
 
     // Join the exec channel for this machine

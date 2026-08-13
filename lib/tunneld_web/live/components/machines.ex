@@ -35,7 +35,7 @@ defmodule TunneldWeb.Live.Components.Machines do
     {:ok, socket}
   end
 
-  # Attach overlay IP, WireGuard status, and detected runtimes for the card.
+  # Attach overlay IP and WireGuard status for the card.
   # Tolerates mock/unavailable so the UI never crashes.
   defp enrich(machine) do
     overlay_ip = Tunneld.Overlay.address_for(machine)
@@ -47,12 +47,9 @@ defmodule TunneldWeb.Live.Components.Machines do
         _ -> nil
       end
 
-    runtimes = get_in(machine, ["capabilities", "detected_runtimes"]) || []
-
     machine
     |> Map.put("overlay_ip", overlay_ip)
     |> Map.put("overlay_status", wg)
-    |> Map.put("detected_runtimes", runtimes)
   end
 
   @impl true
@@ -110,13 +107,13 @@ defmodule TunneldWeb.Live.Components.Machines do
                 <%= location_label(machine["location"]) %>
               </span>
             </div>
-            <div class="flex items-center gap-1.5 text-[10px] text-text-tertiary">
-              <%= if machine["overlay_ip"] do %>
-                <span class="font-mono"><%= machine["overlay_ip"] %></span>
-              <% end %>
-              <%= if machine["detected_runtimes"] != [] do %>
-                <span class="truncate">· <%= Enum.join(machine["detected_runtimes"], ",") %></span>
-              <% end %>
+            <%!-- Overlay address only. The detected runtime used to sit next to it,
+                 but "docker" says nothing about this machine that the operator
+                 acts on - the same box could run the same service under any
+                 runtime. Runtimes stay where they are useful: annotating the
+                 listeners in the machine panel. --%>
+            <div :if={machine["overlay_ip"]} class="text-[10px] text-text-tertiary">
+              <span class="font-mono"><%= machine["overlay_ip"] %></span>
             </div>
           </div>
         <% end %>

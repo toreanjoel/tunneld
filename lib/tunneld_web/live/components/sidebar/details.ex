@@ -282,11 +282,11 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
         </h1>
 
         <div :if={@has_data}>
-          <div class="flex flex-col p-3 mb-2 bg-surface rounded-lg font-light">
-            <div class="text-sm truncate">
-              <span class="font-bold">Name:</span>
-              <%= mask(@obfuscated, @data.name) %>
-            </div>
+          <%!-- No "Name:" row: the panel header above already is the name.
+               No "(this subnet only)" / "(share this)" either - LAN and Public
+               say that. Each URL gets a copy button instead, which is the thing
+               the operator actually wanted to do with it. --%>
+          <div class="flex flex-col gap-1 p-3 mb-2 bg-surface rounded-lg font-light">
             <% health = Map.get(@data, :health) || Map.get(@data, "health") || %{} %>
             <div class="text-sm truncate">
               <span class="font-bold">Health:</span>
@@ -299,16 +299,18 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
                 </span>
               <% end %>
             </div>
-            <div :if={@data[:lan_url]} class="text-sm truncate">
-              <span class="font-bold">LAN URL:</span>
-              <span class="ml-1 font-mono text-xs"><%= @data[:lan_url] %></span>
-              <span class="ml-1 text-xs text-gray-400">(this subnet only)</span>
-            </div>
-            <div :if={@publish} class="text-sm truncate">
-              <span class="font-bold">Public URL:</span>
-              <span class="ml-1 font-mono text-xs"><%= @publish["url"] %></span>
-              <span class="ml-1 text-xs text-gray-400">(share this)</span>
-            </div>
+            <.url_row
+              :if={@data[:lan_url]}
+              label="LAN URL"
+              url={@data[:lan_url]}
+              id={"copy-lan-url-#{@data.id}"}
+            />
+            <.url_row
+              :if={@publish}
+              label="Public URL"
+              url={@publish["url"]}
+              id={"copy-public-url-#{@data.id}"}
+            />
           </div>
 
           <% pool_details = Map.get(@data, :pool_details, []) %>
@@ -1038,6 +1040,32 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
 
   defp location_label("remote"), do: "remote"
   defp location_label(_), do: "local"
+
+  # A URL and a copy button. CopyToClipboard copies `data-copy-text` verbatim
+  # and flashes the icon green on success.
+  attr :label, :string, required: true
+  attr :url, :string, required: true
+  attr :id, :string, required: true
+
+  defp url_row(assigns) do
+    ~H"""
+    <div class="text-sm flex items-center gap-1.5 min-w-0">
+      <span class="font-bold shrink-0"><%= @label %>:</span>
+      <span class="font-mono text-xs truncate"><%= @url %></span>
+      <button
+        id={@id}
+        type="button"
+        phx-hook="CopyToClipboard"
+        data-copy-text={@url}
+        title={"Copy #{@label}"}
+        aria-label={"Copy #{@label}"}
+        class="shrink-0 text-text-tertiary hover:text-accent transition-colors"
+      >
+        <.icon name="hero-clipboard-document" class="w-3.5 h-3.5" />
+      </button>
+    </div>
+    """
+  end
 
   defp sidebar_header(assigns, %{header: header, body: body}) do
     assigns =

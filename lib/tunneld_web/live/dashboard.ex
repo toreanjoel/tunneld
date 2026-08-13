@@ -444,7 +444,14 @@ defmodule TunneldWeb.Live.Dashboard do
   end
 
   def handle_event("toggle_devices_expanded", _params, socket) do
-    {:noreply, assign(socket, :devices_expanded, !socket.assigns.devices_expanded)}
+    expanded = !socket.assigns.devices_expanded
+
+    # Opening the panel asks for a fresh read straight away. The component still
+    # paints from the server's cached list first, so the list is on screen
+    # before this answer lands.
+    if expanded, do: DevicesServer.sync_now()
+
+    {:noreply, assign(socket, :devices_expanded, expanded)}
   end
 
   def handle_event("enroll_machine_modal", _params, socket) do
@@ -658,6 +665,23 @@ defmodule TunneldWeb.Live.Dashboard do
 
   def handle_event("close_terminal", _params, socket) do
     {:noreply, assign(socket, :terminal_modal, nil)}
+  end
+
+  # The terminal hook reports a refused `/ws` upgrade. That socket authenticates
+  # with the same in-memory session as this LiveView, so if the session is
+  # really gone the honest answer is the login page - this view is only still
+  # alive because it authenticated when it mounted.
+  def handle_event("terminal_socket_error", _params, socket) do
+    if Session.valid?(socket.assigns.client_id) do
+      notify(:error, "Terminal transport failed. Close the terminal and try again.")
+      {:noreply, socket}
+    else
+      {:noreply,
+       socket
+       |> assign(:terminal_modal, nil)
+       |> put_flash(:error, "Session expired, sign in again")
+       |> push_navigate(to: Routes.live_path(socket, TunneldWeb.Live.Login))}
+    end
   end
 
   def handle_event("add_pool_member_modal", %{"id" => id}, socket) do
@@ -1258,7 +1282,7 @@ defmodule TunneldWeb.Live.Dashboard do
       {geo, country} =
         if location == "remote" and is_binary(address) do
           case Tunneld.Geolocation.geolocate(address) do
-            {:ok, loc} -> {loc, loc[:country] || loc[:city] || "Remote"}
+            {:ok, loc} -> {loc, loc[:country_name] || loc[:country_code] || "Remote"}
             _ -> {gateway, "Remote"}
           end
         else

@@ -30,7 +30,21 @@ Hooks.CopyToClipboard = {
       const text = explicit || (pre ? pre.textContent : "");
       if (!text) return;
 
+      // Feedback without destroying the trigger. Swapping textContent works for
+      // a text button but would delete the SVG of an icon button, so an icon
+      // trigger flashes colour and title instead.
       const flash = () => {
+        if (this.el.querySelector("svg")) {
+          const title = this.el.getAttribute("title");
+          this.el.classList.add("text-green");
+          this.el.setAttribute("title", "Copied!");
+          setTimeout(() => {
+            this.el.classList.remove("text-green");
+            if (title) this.el.setAttribute("title", title);
+          }, 1500);
+          return;
+        }
+
         const original = this.el.textContent;
         this.el.textContent = "Copied!";
         setTimeout(() => { this.el.textContent = original; }, 1500);
