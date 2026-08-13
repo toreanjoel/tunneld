@@ -24,10 +24,10 @@ defmodule TunneldWeb.Live.Components.SystemResources do
   @radius 65
 
   def mount(socket) do
-    if connected?(socket) do
-      Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:system_resources")
-    end
-
+    # No PubSub subscription here. A LiveComponent's mount/1 runs in the PARENT
+    # LiveView process, which already subscribes to this topic and forwards the
+    # payload with send_update/3. Subscribing again put two identical
+    # subscriptions on one process, so every broadcast was handled twice.
     {:ok, socket}
   end
 

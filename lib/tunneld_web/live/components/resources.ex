@@ -6,20 +6,26 @@ defmodule TunneldWeb.Live.Components.Resources do
   import TunneldWeb.Live.Components.SectionHeader
 
   def mount(socket) do
-    if connected?(socket) do
-      Phoenix.PubSub.subscribe(Tunneld.PubSub, "component:resources")
-    end
-
+    # No PubSub subscription here. A LiveComponent's mount/1 runs in the PARENT
+    # LiveView process, which already subscribes to this topic and forwards the
+    # payload with send_update/3. Subscribing again put two identical
+    # subscriptions on one process, so every broadcast was handled twice.
     {:ok, socket}
   end
 
   def update(assigns, socket) do
     obfuscated = Map.get(assigns, :obfuscated, false)
 
+    # An absent :data assign means "unchanged", not "empty". The parent renders
+    # this component without one (only `obfuscated` is passed), so defaulting to
+    # %{} blanked the resource list until the next broadcast refilled it. Same
+    # bug the devices panel had, where it showed as a permanent "Scanning".
+    data = Map.get(assigns, :data) || Map.get(socket.assigns, :data) || %{}
+
     socket =
       socket
       |> assign_new(:obfuscated, fn -> false end)
-      |> assign(data: Map.get(assigns, :data, %{}))
+      |> assign(data: data)
       |> assign(:obfuscated, obfuscated)
 
     {:ok, socket}

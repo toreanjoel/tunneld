@@ -387,6 +387,19 @@ Updates both `mix.exs` and `config/config.exs`.
 
 ---
 
+## Security
+
+Tunneld holds SSH keys for every machine it manages and can open a root shell on
+any of them, so it is a high-value target by construction.
+**[SECURITY.md](SECURITY.md)** documents the threat model, what is enforced
+where, the known gaps (including ones that are currently unfixed), and a
+hardening checklist. Read it before deploying this anywhere that matters.
+
+The one thing to do immediately after installing: **set a strong dashboard
+password.** Signup only checks that the two fields match.
+
+---
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on setting up your dev environment, running tests, and submitting changes.
