@@ -397,6 +397,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           </div>
 
           <div
+            :if={Tunneld.Config.remote_features?()}
             phx-click="make_exit_node"
             phx-value-id={mget(@machine, "id")}
             phx-click-loading="opacity-50 cursor-wait"
@@ -474,7 +475,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
               <span class="capitalize"><%= mget(@machine, "overlay_status") %></span>
             </div>
           <% end %>
-          <div class="flex items-center justify-between text-sm">
+          <div :if={Tunneld.Config.remote_features?()} class="flex items-center justify-between text-sm">
             <span class="text-text-tertiary">Exit</span>
             <span class="flex items-center gap-1.5 capitalize">
               <span class={"w-[10px] h-[10px] rounded-full inline-block #{if mget(@machine, "exit_capable"), do: "bg-emerald-500", else: "bg-gray-500"}"}>
@@ -492,7 +493,7 @@ defmodule TunneldWeb.Live.Components.Sidebar.Details do
           <% end %>
         </div>
 
-        <div class="mt-4">
+        <div :if={Tunneld.Config.remote_features?()} class="mt-4">
           <div class="flex items-center justify-between mb-2">
             <div class="text-sm font-semibold">
               Clients

@@ -40,11 +40,17 @@ defmodule TunneldWeb.Live.Components.Devices do
     # A subnet with no devices is a real answer and should say so.
     loaded = Map.get(new_data, :loaded, false) or Map.get(socket.assigns, :loaded, false)
 
+    remote_features = Tunneld.Config.remote_features?()
+
     socket =
       socket
       |> assign_new(:obfuscated, fn -> false end)
       |> assign(:obfuscated, obfuscated)
-      |> assign(:egress_machines, Map.get(assigns, :egress_machines, []))
+      |> assign(:remote_features, remote_features)
+      |> assign(
+        :egress_machines,
+        if(remote_features, do: Map.get(assigns, :egress_machines, []), else: [])
+      )
       |> assign(data: new_data)
       |> assign(loaded: loaded)
 
@@ -88,7 +94,7 @@ defmodule TunneldWeb.Live.Components.Devices do
               <div class="flex-1 flex items-center gap-1.5 min-w-0">
                 <span class="truncate"><%= mask(@obfuscated, device.hostname) %></span>
                 <span class={"status-dot shrink-0 #{if !@obfuscated && Map.get(device, :online, false), do: "status-dot--green", else: "status-dot--gray"}"} />
-                <%= if device.egress != "local" do %>
+                <%= if @remote_features && device.egress != "local" do %>
                   <span class="px-1.5 py-0.5 rounded-full bg-accent/20 text-accent uppercase text-[9px] font-medium shrink-0">
                     via exit
                   </span>
@@ -246,7 +252,7 @@ defmodule TunneldWeb.Live.Components.Devices do
               <% end %>
             </div>
             <div class="mt-auto pt-3">
-              <div class="flex items-center justify-between gap-2 mb-1.5 px-1">
+              <div :if={@remote_features} class="flex items-center justify-between gap-2 mb-1.5 px-1">
                 <span class="text-[10px] uppercase tracking-wide text-text-tertiary">
                   Egress
                 </span>

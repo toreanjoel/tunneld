@@ -43,4 +43,25 @@ defmodule Tunneld.Config do
 
   @doc "The gateway's LAN IP (the downstream interface address)."
   def gateway_ip, do: network(:gateway)
+
+  @doc """
+  Whether remote-machine features (egress/exit nodes and WireGuard clients) are
+  enabled.
+
+  These features only make sense when managed machines are reached remotely.
+  In a purely local setup (one gateway, every machine on the same subnet) they
+  are noise: local devices never exit through a remote VM, and a client has
+  nothing to dial home to that a local box already provides.
+
+  Defaults to `true` for backwards compatibility. Disable with the
+  `TUNNELD_REMOTE_FEATURES=disabled` env var, or by setting
+  `config :tunneld, :remote_features, false`.
+  """
+  def remote_features? do
+    case Application.get_env(:tunneld, :remote_features, true) do
+      false -> false
+      nil -> false
+      _ -> true
+    end
+  end
 end

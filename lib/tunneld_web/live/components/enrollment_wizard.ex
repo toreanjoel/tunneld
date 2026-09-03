@@ -135,13 +135,23 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
   # Exit setup is skipped when the overlay failed, and says so. It depends on
   # the WireGuard interface name, so running it anyway would install FORWARD
   # rules for an interface that does not exist and call that success.
+  #
+  # Exit routing and the client door only make sense when remote features are
+  # enabled (a purely local gateway routes nothing through an exit and has no
+  # remote client to dial in). When disabled, only the overlay is installed.
   defp setup_machine(machine) do
     overlay = Tunneld.Overlay.ensure_peer(machine)
 
+    remote? = Tunneld.Config.remote_features?()
+
     exit_result =
-      case overlay do
-        {:ok, _} -> Tunneld.Egress.ensure_exit_capable(machine)
-        _ -> :skipped
+      if remote? do
+        case overlay do
+          {:ok, _} -> Tunneld.Egress.ensure_exit_capable(machine)
+          _ -> :skipped
+        end
+      else
+        :skipped
       end
 
     # Every enrolled machine also becomes a client door, so a phone can reach
@@ -149,9 +159,11 @@ defmodule TunneldWeb.Live.Components.EnrollmentWizard do
     # rewrites a destination port into the tunnel that already exists - no key
     # material and no second WireGuard instance land on the machine.
     _ =
-      case overlay do
-        {:ok, _} -> Tunneld.Clients.ensure_door(machine)
-        _ -> :skipped
+      if remote? do
+        case overlay do
+          {:ok, _} -> Tunneld.Clients.ensure_door(machine)
+          _ -> :skipped
+        end
       end
 
     %{overlay: overlay, exit: exit_result}

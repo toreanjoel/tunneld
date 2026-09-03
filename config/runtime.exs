@@ -10,6 +10,11 @@ if mock_data? do
   config :tunneld, mock_data: true
 end
 
+# Remote features (egress/exit nodes, WireGuard clients) default to enabled.
+# A purely local gateway can disable them so the UI stays honest about what
+# this box actually does.
+config :tunneld, :remote_features, System.get_env("TUNNELD_REMOTE_FEATURES", "enabled") != "disabled"
+
 # Data paths (overrideable via ENV) - skip in test, config/test.exs handles it
 unless config_env() == :test do
   default_root = if mock_data?, do: "data", else: "/var/lib/tunneld"

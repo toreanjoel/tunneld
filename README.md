@@ -261,6 +261,7 @@ Set by the installer in the `tunneld.service` systemd unit:
 | `DEVICE_ID` | Unique device identifier (UUID) |
 | `SECRET_KEY_BASE` | Phoenix signing key (generated at install time) |
 | `PORT` | HTTP port for the dashboard (default `80`) |
+| `TUNNELD_REMOTE_FEATURES` | `enabled` (default) or `disabled` — turns off egress/exit-node and WireGuard client features for a purely local gateway |
 
 ### Dev/test config
 Interface names default to `eth0` / `eth1` in `config/dev.exs` and `config/test.exs`. Mock mode is on by default in both. The LAN domain (`tunneld.lan`) and listen port (`18000`) are module attributes in `Tunneld.Caddy`.

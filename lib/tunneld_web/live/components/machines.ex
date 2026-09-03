@@ -128,13 +128,19 @@ defmodule TunneldWeb.Live.Components.Machines do
 
   defp machine_detail(_assigns), do: nil
 
-  # Combined status: unreachable (red) / reachable but overlay down (yellow) / fully up (green)
+  # Combined status: unreachable (red) / reachable but overlay down (yellow) / fully up (green).
+  # A local machine is reached by its LAN IP, not the WireGuard overlay, so its
+  # overlay status is irrelevant to whether it is usable - a probed ("ready")
+  # local machine is simply green.
   defp combined_status_dot(machine) do
     status = machine["status"]
     wg = machine["overlay_status"]
+    location = machine["location"]
 
     cond do
       status == "unreachable" -> "bg-red"
+      location == "local" and status == "ready" -> "bg-green"
+      location == "local" and status in ["enrolled", "probing"] -> "bg-yellow"
       status in ["ready"] and wg == "up" -> "bg-green"
       status in ["ready"] and wg != "up" -> "bg-yellow"
       status in ["enrolled", "probing"] -> "bg-yellow"
@@ -145,9 +151,16 @@ defmodule TunneldWeb.Live.Components.Machines do
   defp combined_status_tooltip(machine) do
     status = machine["status"]
     wg = machine["overlay_status"]
+    location = machine["location"]
 
-    wg_detail = if wg, do: ", WG #{wg}", else: ""
-    "Status: #{status}#{wg_detail}"
+    detail =
+      cond do
+        location == "local" and status == "ready" -> ", reached by LAN IP"
+        is_nil(wg) -> ""
+        true -> ", WG #{wg}"
+      end
+
+    "Status: #{status}#{detail}"
   end
 
   defp location_chip("remote"), do: "bg-blue-500/15 text-blue-400"
