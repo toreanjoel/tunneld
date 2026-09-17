@@ -245,6 +245,7 @@ One `one_for_one` supervisor (`Tunneld.Supervisor`) starts Telemetry, DNSCluster
 Detailed architecture diagrams with Mermaid (rendered on GitHub):
 - [Network Topology](docs/network-topology.md) — How Tunneld bridges the upstream and downstream ethernet interfaces
 - [Supervision Tree](docs/supervision-tree.md) — OTP process map, polling intervals, and PubSub topics
+- [Health Scoring and Signals](docs/health-scoring.md) — **research, not built.** Scoring what the box can see, aggregating what enrolled machines report, and notifying without ever acting
 
 ---
 
