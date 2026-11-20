@@ -119,7 +119,56 @@ defmodule Tunneld.Overlay do
     with {:ok, target_pub} <- exchange_keys(machine),
          :ok <- install_target(machine, target_pub, iface),
          {:ok, _} <- configure_gateway(machine, target_pub, iface) do
+      # A machine re-enrolled under a new id leaves its old interface behind on
+      # the target, and a stale config can claim this machine's overlay address:
+      # wg-quick then fails the real interface with "Address already in use" and
+      # the tunnel never comes back after a reboot. Seen live on 139.84.235.70 on
+      # 2026-11-20, where four abandoned configs held the host's overlay addrs.
+      _ = prune_target(machine)
       {:ok, %{overlay_ip: overlay_ip_for(machine)}}
+    end
+  end
+
+  @doc """
+  Move the target's WireGuard configs that belong to no machine tunneld knows
+  about on that host into `/root/tunneld-stale-wireguard/`, disabling their units.
+
+  Only names this tool generates (`wg-<8 hex>`) are considered; anything an
+  operator made by hand is left running.
+  """
+  def prune_target(machine) do
+    if @mock do
+      []
+    else
+      ours =
+        Tunneld.Machines.list()
+        |> Enum.filter(&(&1["address"] == machine["address"]))
+        |> Enum.map(&iface_name(&1["id"]))
+        |> MapSet.new()
+
+      case SSH.run(machine, "ls /etc/wireguard 2>/dev/null") do
+        {:ok, out} ->
+          out
+          |> String.split("\n", trim: true)
+          |> Enum.map(&String.replace_suffix(&1, ".conf", ""))
+          |> Enum.filter(&Regex.match?(~r/^wg-[0-9a-f]{8}$/, &1))
+          |> Enum.reject(&MapSet.member?(ours, &1))
+          |> Enum.map(fn iface ->
+            _ =
+              SSH.run(
+                machine,
+                "systemctl disable --now wg-quick@#{iface} 2>/dev/null || true; " <>
+                  "wg-quick down #{iface} 2>/dev/null || true; " <>
+                  "mkdir -p /root/tunneld-stale-wireguard && " <>
+                  "mv /etc/wireguard/#{iface}.conf /root/tunneld-stale-wireguard/ 2>/dev/null || true"
+              )
+
+            iface
+          end)
+
+        _ ->
+          []
+      end
     end
   end
 
@@ -142,11 +191,32 @@ defmodule Tunneld.Overlay do
         {gpub, gpriv}
       end
 
-    # Generate a keypair for the target; push its private half + the gateway's
-    # public half over SSH; return the target's public half.
-    {t_pub, t_priv} = do_gen_keypair()
+    # The target's keypair is generated on the gateway and kept here (the
+    # private half mode 0600), so re-running is genuinely idempotent. Generating
+    # a fresh pair every time meant every Sync rotated the keys on both ends, and
+    # if only one end picked the new pair up the tunnel could never handshake.
+    {t_pub, t_priv} =
+      if File.exists?(priv_path <> ".target") do
+        {File.read!(priv_path <> ".target.pub") |> String.trim(),
+         File.read!(priv_path <> ".target") |> String.trim()}
+      else
+        {tpub, tpriv} = do_gen_keypair()
+        File.write!(priv_path <> ".target", tpriv)
+        File.chmod!(priv_path <> ".target", 0o600)
+        File.write!(priv_path <> ".target.pub", tpub <> "\n")
+        {tpub, tpriv}
+      end
 
     gw_overlay_ip = @gateway_overlay_ip
+
+    # PostUp, not a one-off SSH command: this is the rule that lets the gateway
+    # reach the machine again after *its* reboot, and a plain `iptables -I` was
+    # gone by the next boot. wg-quick runs it every time the interface comes up,
+    # and both halves are idempotent.
+    post_up =
+      "ip route replace #{gw_overlay_ip}/32 dev #{iface_name(id)} 2>/dev/null || true; " <>
+        "iptables -C INPUT -p udp --dport #{@wg_port} -j ACCEPT 2>/dev/null || " <>
+        "iptables -I INPUT 1 -p udp --dport #{@wg_port} -j ACCEPT 2>/dev/null || true"
 
     target_conf = """
     [Interface]
@@ -154,7 +224,7 @@ defmodule Tunneld.Overlay do
     PrivateKey = #{t_priv}
     ListenPort = #{@wg_port}
     Table = off
-    PostUp = ip route add #{gw_overlay_ip}/32 dev #{iface_name(id)} 2>/dev/null || true
+    PostUp = #{post_up}
 
     [Peer]
     PublicKey = #{gw_pub}
@@ -177,9 +247,20 @@ defmodule Tunneld.Overlay do
         "(command -v apk >/dev/null 2>&1 && apk add wireguard-tools) || true"
     )
 
-    # Enable + start the wg-quick service for this peer (config file is
-    # /etc/wireguard/<iface>.conf, so the unit is wg-quick@<iface>).
-    run(machine, "systemctl enable --now wg-quick@#{iface} 2>/dev/null || true")
+    # Enable the wg-quick service so the peer survives the target's reboot, and
+    # *restart* it rather than `enable --now`: `--now` is a no-op on a unit that
+    # is already active, so the freshly written config (with a new keypair) sat
+    # on disk while the running interface kept its old key. The gateway then
+    # listed a peer the target no longer had, and no amount of clicking
+    # Reconcile could close the gap - which is what made a reboot look like the
+    # machine had to be removed and re-enrolled.
+    run(
+      machine,
+      "systemctl enable wg-quick@#{iface} 2>/dev/null || true; " <>
+        "systemctl restart wg-quick@#{iface} 2>/dev/null || " <>
+        "(wg-quick down #{iface} 2>/dev/null; wg-quick up #{iface}) 2>/dev/null || true"
+    )
+
     # Open the overlay port on the target's firewall (ufw or iptables) so the
     # gateway's dial-out handshake can reach it.
     run(
@@ -205,7 +286,13 @@ defmodule Tunneld.Overlay do
     Address = #{@gateway_overlay_ip}/32
     PrivateKey = #{gw_priv}
     Table = off
-    PostUp = ip route add #{overlay_ip}/32 dev #{iface} 2>/dev/null || true
+    # replace, never add: if a stale interface still holds this /32 (the gateway
+    # accumulates wg-* configs for machines that were removed), `add` fails with
+    # "File exists", `|| true` hides it, and the machine comes back from a reboot
+    # with its tunnel handshaking but no route to it - exactly the reported
+    # "restart breaks the VMs". Seen live on the gateway on 2026-11-20 for
+    # 10.88.0.5, where the route belonged to a removed machine's interface.
+    PostUp = ip route replace #{overlay_ip}/32 dev #{iface} 2>/dev/null || true
 
     [Peer]
     PublicKey = #{String.trim(target_pub)}
@@ -218,7 +305,103 @@ defmodule Tunneld.Overlay do
     """
 
     write_gateway("/etc/wireguard/#{iface}.conf", gw_conf)
-    run_gateway("systemctl enable --now wg-quick@#{iface} 2>/dev/null || true")
+
+    # Same reason as the target side: enable for the next boot, restart so the
+    # config just written is the one actually running.
+    run_gateway(
+      "systemctl enable wg-quick@#{iface} 2>/dev/null || true; " <>
+        "systemctl restart wg-quick@#{iface} 2>/dev/null || " <>
+        "(wg-quick down #{iface} 2>/dev/null; wg-quick up #{iface}) 2>/dev/null || true"
+    )
+  end
+
+  @doc """
+  Bring the gateway's per-machine overlay interfaces up after a gateway reboot.
+
+  The units are enabled, so systemd normally does this. It does not do it if the
+  interface was left up-but-associatingless, or if tunneld's iptables reset ran
+  first and an operator has since edited a config, so the interfaces are
+  restarted once at boot and their PostUp routes re-asserted.
+
+  Configs belonging to machines that no longer exist are moved aside first. Each
+  per-machine interface carries a route for its peer's overlay IP, so an orphaned
+  interface can be holding that /32 when the real interface comes up: the tunnel
+  handshakes, the route never lands, and the machine looks enrolled but
+  unreachable. Seen live on the gateway on 2026-11-20, where 10.88.0.5 was
+  claimed by an interface for a machine removed months earlier - and by a manual
+  test tunnel claiming the whole 10.88.0.0/24.
+  """
+  def restore_all do
+    if @mock do
+      :ok
+    else
+      live = Tunneld.Machines.list() |> Enum.map(&iface_name(&1["id"]))
+
+      prune_orphans(live)
+
+      Enum.each(live, fn iface ->
+        _ =
+          run_gateway(
+            "systemctl restart wg-quick@#{iface} 2>/dev/null || " <>
+              "(wg-quick down #{iface} 2>/dev/null; wg-quick up #{iface}) 2>/dev/null || true"
+          )
+      end)
+
+      :ok
+    end
+  end
+
+  @doc """
+  Take WireGuard configs that belong to no enrolled machine out of the running
+  set. Moved to `backup/wireguard-<date>/` under the data dir and their units
+  disabled - never deleted, so a config can be put back by hand.
+
+  `wg-clients` is the shared client door and is left alone, as is any config
+  whose name is not one this gateway generated.
+  """
+  def prune_orphans(live_ifaces) do
+    if @mock do
+      []
+    else
+      live = MapSet.new(live_ifaces ++ ["wg-clients"])
+      ours = ~r/^wg-[0-9a-f]{8}$/
+
+      generated_ifaces()
+      |> Enum.filter(&Regex.match?(ours, &1))
+      |> Enum.reject(&MapSet.member?(live, &1))
+      |> Enum.map(fn iface ->
+        dest =
+          Path.join([
+            Tunneld.Config.fs_root(),
+            "backup",
+            "wireguard-#{Date.utc_today() |> Date.to_iso8601()}"
+          ])
+
+        File.mkdir_p!(dest)
+
+        _ =
+          run_gateway(
+            "systemctl disable --now wg-quick@#{iface} 2>/dev/null || true; " <>
+              "wg-quick down #{iface} 2>/dev/null || true"
+          )
+
+        case File.exists?("/etc/wireguard/#{iface}.conf") do
+          true ->
+            _ = File.rename("/etc/wireguard/#{iface}.conf", Path.join(dest, "#{iface}.conf"))
+            iface
+
+          false ->
+            nil
+        end
+      end)
+      |> Enum.reject(&is_nil/1)
+    end
+  end
+
+  # Every wg-*.conf on the gateway, as interface names.
+  defp generated_ifaces do
+    Path.wildcard("/etc/wireguard/wg-*.conf")
+    |> Enum.map(&(&1 |> Path.basename() |> String.replace_suffix(".conf", "")))
   end
 
   @doc """
@@ -243,6 +426,8 @@ defmodule Tunneld.Overlay do
     _ = run_gateway("ip link del #{iface} 2>/dev/null || true")
     File.rm(Path.join([Tunneld.Config.fs_root(), "wg", id]))
     File.rm(Path.join([Tunneld.Config.fs_root(), "wg", id <> ".pub"]))
+    File.rm(Path.join([Tunneld.Config.fs_root(), "wg", id <> ".target"]))
+    File.rm(Path.join([Tunneld.Config.fs_root(), "wg", id <> ".target.pub"]))
     File.rm("/etc/wireguard/#{iface}.conf")
     :ok
   end
@@ -255,6 +440,23 @@ defmodule Tunneld.Overlay do
   defp real_remove_peer_remote(machine) do
     iface = iface_name(machine["id"])
     _ = run(machine, "systemctl disable --now wg-quick@#{iface} 2>/dev/null || true")
+
+    # The units the machine was told to keep running at boot: exit NAT and the
+    # client door. Leaving them means a disenrolled machine keeps forwarding (or
+    # DNAT-ing 51822) forever, with nothing on the gateway able to turn it off.
+    _ =
+      run(
+        machine,
+        "systemctl disable --now wg-quick@#{iface} 2>/dev/null || true; " <>
+          "wg-quick down #{iface} 2>/dev/null || true; " <>
+          "rm -f /etc/wireguard/#{iface}.conf; " <>
+          "systemctl disable --now tunneld-exit 2>/dev/null || true; " <>
+          "systemctl disable --now tunneld-door 2>/dev/null || true; " <>
+          "rm -f /usr/local/sbin/tunneld-exit /usr/local/sbin/tunneld-door " <>
+          "/etc/systemd/system/tunneld-exit.service /etc/systemd/system/tunneld-door.service; " <>
+          "systemctl daemon-reload 2>/dev/null || true"
+      )
+
     :ok
   end
 

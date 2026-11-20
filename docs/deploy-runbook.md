@@ -288,6 +288,36 @@ Route a subnet device's traffic out through an exit machine.
 > **Important:** only ever route *device* traffic — never the gateway's own source IP, or you
 > will lock yourself out of the gateway. Always keep a rollback path.
 
+### 6.1 What survives a reboot
+
+Both halves of egress are runtime state, and neither box keeps it by itself:
+
+| State | Where | How it comes back |
+|---|---|---|
+| Overlay interface + `/32` route | gateway, `wg-<hash>` | `wg-quick@wg-<hash>` is enabled; `Overlay.restore_all/0` restarts it at boot |
+| Policy rules + table routes | gateway (`ip rule`, `ip route table N`) | rebuilt at boot from `egress_tables.json` + `device_egress.json` (`Egress.restore_all/0`) |
+| Gateway `FORWARD` pair per exit | gateway | re-added after `Iptables.reset/0` by the same pass |
+| NAT, `FORWARD`, ip_forward, device return routes | exit machine | `tunneld-exit.service` + `/usr/local/sbin/tunneld-exit`, installed by `ensure_exit_capable/1` |
+| Client door (DNAT + SNAT on 51822) | exit machine | `tunneld-door.service` |
+| Client LAN grants | gateway | `Clients.ensure_lan_rules/0` at boot |
+
+`Tunneld.Reconciler` re-runs a repairing pass every 5 minutes, and
+`Egress.restore_targets/0` re-pushes the exit script at boot, so a VM that
+restarts *after* the gateway is also covered — nothing has to be re-enrolled.
+
+> **Exit-node status is explicit.** A machine is an exit node iff it has an entry
+> in `egress_tables.json`, which only "Make Exit Node" (or the wizard) creates.
+> Reconcile re-applies exit rules **only** to those machines — otherwise the
+> button would promote any VM it was clicked on.
+>
+> **Why `PartOf` matters:** repairing WireGuard restarts `wg-quick@<iface>` on
+> both ends, and that deletes the policy table's `default` route on the gateway
+> and every device return route on the VM. `tunneld-exit.service` is `PartOf` its
+> wg unit so it re-runs with it, `Egress.restore_all/0` runs *after* the repair
+> loop, and both drift probes (`gateway_check_command/2`, `target_check_command/3`)
+> check routes as well as iptables — otherwise the pass reports "current" over a
+> route-less exit node.
+
 ---
 
 ## Troubleshooting
@@ -299,6 +329,7 @@ Route a subnet device's traffic out through an exit machine.
 | `systemctl restart tunneld` fails | `sudo journalctl -u tunneld -n 50` |
 | WireGuard handshake won't establish | Open inbound UDP/**51821** in the **provider** firewall (not the OS). `0 B received` with non-zero `sent` in `wg show` is this, every time |
 | Machine reads `ready` but Terminal times out | Only the terminal uses the overlay IP; probe/listeners/exit use the public IP. So `ready` says nothing about the tunnel — check the `WireGuard` field |
+| Everything worked until a reboot | Egress, overlay routes and exit NAT are runtime state. See 6.1 for which unit or boot pass owns each; `systemctl status tunneld-exit tunneld-door wg-quick@wg-<hash>` on the machine |
 | Client connects at home but not away | Inbound **UDP 51822** is not open in that machine's provider firewall. `wg show wg-clients` on the gateway will show no handshake for that peer |
 | Client connects, LAN hosts unreachable | Expected until you grant access — a new client reaches the overlay only. Grant per host in the Clients panel |
 | Client works for SSH but the video stalls | MTU. The away path is doubly encapsulated; keep the client at 1360 |

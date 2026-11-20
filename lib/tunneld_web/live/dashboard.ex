@@ -486,17 +486,31 @@ defmodule TunneldWeb.Live.Dashboard do
       case Tunneld.Machines.get(id) do
         {:ok, machine} ->
           # One "sync" action: ensure the overlay is up, re-apply the exit
-          # rules (they are lost on the target's reboot), probe, check drift.
+          # rules on a machine that *is* an exit node (they are lost on the
+          # target's reboot), probe, check drift.
           overlay = Tunneld.Overlay.ensure_peer(machine)
 
+          # Only for machines already marked exit-capable. `ensure_exit_capable/1`
+          # allocates a routing table and installs a persistent unit that turns on
+          # IP forwarding and NAT, so calling it on every machine made the Reconcile
+          # button silently promote any VM into an exit node - permanently, because
+          # the table allocation is what both the boot pass and the 5-minute
+          # reconciler use to decide who is one.
           exit_result =
-            case overlay do
-              {:ok, _} -> Tunneld.Egress.ensure_exit_capable(machine)
-              _ -> :skipped
+            cond do
+              not Tunneld.Egress.exit_capable?(machine) -> :skipped
+              match?({:ok, _}, overlay) -> Tunneld.Egress.ensure_exit_capable(machine)
+              true -> :skipped
             end
 
           probe = Tunneld.Machines.probe(id)
           reconcile = Tunneld.Reconcile.reconcile(machine, repair: true)
+
+          # ensure_peer above restarted the gateway's wg-quick interface, which
+          # deletes the egress policy table's default route. Re-assert the
+          # gateway half last so the button cannot leave the device black-holed.
+          _ = Tunneld.Egress.restore_all()
+
           %{overlay: overlay, exit: exit_result, probe: probe, reconcile: reconcile}
 
         _ ->
@@ -1595,9 +1609,10 @@ defmodule TunneldWeb.Live.Dashboard do
       |> Enum.reject(fn {_name, res} -> match?({:ok, _}, res) or res in [:ok, :skipped] end)
       |> Enum.map(&elem(&1, 0))
 
-    case failed do
-      [] -> "Sync complete: overlay up, exit routing applied"
-      names -> "Sync finished with problems: #{Enum.join(names, " and ")} failed"
+    case {failed, exit_result} do
+      {[], :skipped} -> "Sync complete: overlay up; not an exit node, so nothing to re-apply"
+      {[], _} -> "Sync complete: overlay up, exit routing applied"
+      {names, _} -> "Sync finished with problems: #{Enum.join(names, " and ")} failed"
     end
   end
 

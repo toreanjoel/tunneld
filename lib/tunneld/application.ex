@@ -40,6 +40,7 @@ defmodule Tunneld.Application do
           {Tunneld.AgentTokens, []},
           {Tunneld.Jobs, []},
           {Tunneld.Geolocation, []},
+          {Tunneld.Reconciler, []},
           TunneldWeb.Endpoint
         ]
 
@@ -57,7 +58,21 @@ defmodule Tunneld.Application do
         # Machines is a plain module, so boot-time recovery has no init/1 to run
         # from. Probing the fleet can take a minute per unreachable host, so it
         # must not block application start. Only run it once the tree is up.
-        Task.start(fn -> Tunneld.Machines.recover_all() end)
+        #
+        # Order matters. recover_all brings the fleet's SSH up, Overlay.restart
+        # makes each per-machine tunnel real again (its PostUp route is runtime
+        # state), Egress.restore_all re-asserts the gateway's policy rules and
+        # FORWARD pair on the interfaces that now exist - `Iptables.reset/0`
+        # flushed FORWARD above - and restore_targets re-pushes each exit node's
+        # rules over SSH so a VM that rebooted while tunneld was down is fixed
+        # without anyone pressing anything.
+        Task.start(fn ->
+          Tunneld.Machines.recover_all()
+          Tunneld.Overlay.restore_all()
+          Tunneld.Egress.restore_all()
+          Tunneld.Egress.restore_targets()
+        end)
+
         {:ok, pid}
 
       other ->

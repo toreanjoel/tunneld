@@ -21,7 +21,7 @@ defmodule Tunneld.Reconcile do
   require Logger
 
   alias Tunneld.Machines.SSH
-  alias Tunneld.Overlay
+  alias Tunneld.{Egress, Overlay}
 
   @doc """
   Reconcile a machine against desired state. `opts` may include
@@ -33,11 +33,35 @@ defmodule Tunneld.Reconcile do
 
     %{
       wireguard: reconcile_wireguard(machine, repair?),
+      egress: reconcile_egress(machine, repair?),
       caddy: reconcile_caddy(machine, repair?),
       ssh: reconcile_ssh(machine),
       resources: reconcile_resources(machine),
       door: reconcile_door(machine, repair?)
     }
+  end
+
+  # Egress: both halves are runtime state. The target's NAT/FORWARD rules and
+  # per-device return routes die with its reboot; the gateway's policy rules and
+  # FORWARD pair die with `Iptables.reset/0`. Checking only the local
+  # "exit capable" flag - which is what this used to do - reported a machine as
+  # correct while it forwarded nothing, so drift was invisible.
+  defp reconcile_egress(machine, repair?) do
+    if Egress.exit_capable?(machine) and not Egress.rules_current?(machine) do
+      if repair? do
+        with {:ok, _} <- Egress.ensure_exit_capable(machine),
+             :ok <- Egress.ensure_gateway_rules(machine) do
+          {:repaired, :egress}
+        else
+          {:error, reason} -> {:drift, {:egress, reason}}
+          other -> {:drift, {:egress, other}}
+        end
+      else
+        {:drift, :egress_rules}
+      end
+    else
+      :ok
+    end
   end
 
   # Machines enrolled before client access existed have no door, and a target's

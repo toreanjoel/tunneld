@@ -134,4 +134,82 @@ defmodule Tunneld.EgressTest do
     {:ok, second} = Egress.ensure_exit_capable(m)
     assert first.table == second.table
   end
+
+  # The exit machine's rules are installed as a script run by a unit, because
+  # none of them survive the machine's reboot. This is the script, asserted
+  # without an SSH connection: it is the only place the reboot-repair contract
+  # can be tested.
+  test "exit_script carries forwarding, NAT, FORWARD and the device return routes" do
+    {:ok, %{"id" => id}} =
+      Machines.enroll(%{"name" => "vps8", "address" => "203.0.113.16", "location" => "remote"})
+
+    wg = Tunneld.Overlay.iface_name(id)
+    script = Egress.exit_script(id, "eth0", ["10.0.0.50", "10.0.0.51", "10.0.0.50"])
+
+    assert script =~ "net.ipv4.ip_forward=1"
+    assert script =~ "iptables -t nat -C POSTROUTING -o eth0 -j MASQUERADE"
+    assert script =~ "iptables -C FORWARD -i #{wg} -o eth0 -j ACCEPT"
+    assert script =~ "iptables -C FORWARD -i eth0 -o #{wg} -m conntrack"
+    # every rule is -C checked first, so re-running the unit changes nothing
+    assert script =~ "iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE"
+
+    # one route per device, deduplicated, `replace` so a rerun cannot fail
+    assert length(Enum.reject(script |> String.split("\n"), &(String.trim(&1) == ""))) ==
+             Enum.count(Enum.uniq(["10.0.0.50", "10.0.0.51"])) + 4
+
+    assert script =~ "ip route replace 10.0.0.50/32 dev #{wg}"
+    assert script =~ "ip route replace 10.0.0.51/32 dev #{wg}"
+    refute script =~ "ip route add"
+  end
+
+  test "gateway egress restore is safe with nothing to restore" do
+    assert :ok = Egress.restore_all()
+
+    {:ok, %{"id" => id}} =
+      Machines.enroll(%{"name" => "vps9", "address" => "203.0.113.17", "location" => "remote"})
+
+    {:ok, m} = Machines.get(id)
+    assert :ok = Egress.ensure_gateway_rules(m)
+    assert :ok = Egress.restore_targets()
+  end
+
+  test "an exit-capable machine reports its rules as current in mock mode" do
+    {:ok, %{"id" => id}} =
+      Machines.enroll(%{"name" => "vps10", "address" => "203.0.113.18", "location" => "remote"})
+
+    {:ok, m} = Machines.get(id)
+    refute Egress.rules_current?(m)
+    {:ok, _} = Egress.ensure_exit_capable(m)
+    assert Egress.rules_current?(m)
+  end
+
+  # A WireGuard repair restarts the interface on both ends, which deletes the
+  # policy table's default route and the VM's per-device return routes. The drift
+  # check has to see that, or the repair pass leaves the device black-holed while
+  # reporting everything current.
+  test "the drift probes check the routes, not just iptables" do
+    target = Egress.target_check_command("wg-abcd1234", "eth0", ["10.0.0.50", "10.0.0.51"])
+
+    assert target =~ "iptables -t nat -C POSTROUTING -o eth0 -j MASQUERADE"
+    assert target =~ "ip route show dev wg-abcd1234"
+    assert target =~ "10.0.0.50"
+    assert target =~ "10.0.0.51"
+    # ip_forward's `1` must stay the last thing printed
+    assert target =~ ~r/sysctl -n net.ipv4.ip_forward && ip route show/
+
+    gateway = Egress.gateway_check_command("wg-abcd1234", "100")
+    assert gateway =~ "iptables -C FORWARD -i eth1 -o wg-abcd1234 -j ACCEPT"
+    assert gateway =~ "grep -q 'lookup 100'"
+    assert gateway =~ "ip route show table 100"
+    assert gateway =~ "grep -q '^default'"
+  end
+
+  # Without PartOf, the WG repair restarts the interface and the exit unit never
+  # re-runs, so the routes its script installs stay gone.
+  test "the exit unit is coupled to its WireGuard unit" do
+    unit = Egress.exit_unit("wg-abcd1234")
+    assert unit =~ "Wants=wg-quick@wg-abcd1234.service"
+    assert unit =~ "PartOf=wg-quick@wg-abcd1234.service"
+    assert unit =~ "ExecStart=/usr/local/sbin/tunneld-exit"
+  end
 end

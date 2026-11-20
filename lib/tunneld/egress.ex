@@ -57,8 +57,14 @@ defmodule Tunneld.Egress do
 
     # Persist the device -> machine mapping so the selection survives a refresh.
     case result do
-      {:ok, _} -> set_device_egress(device_ip, machine["id"])
-      _ -> :ok
+      {:ok, _} ->
+        set_device_egress(device_ip, machine["id"])
+        # The VM needs this device's return route to survive *its* reboot too,
+        # so the installed script is rewritten with the new device list.
+        refresh_exit_unit(machine)
+
+      _ ->
+        :ok
     end
 
     result
@@ -74,6 +80,7 @@ defmodule Tunneld.Egress do
       end
 
     clear_device_egress(device_ip)
+    refresh_exit_unit(machine)
     result
   end
 
@@ -106,6 +113,99 @@ defmodule Tunneld.Egress do
   @doc "Whether a machine has been made exit-capable (has a table allocated)."
   def exit_capable?(machine) do
     Map.has_key?(read_tables(), machine["id"])
+  end
+
+  @doc """
+  Whether the rules an exit node needs are actually in place *right now*, on
+  both ends.
+
+  `exit_capable?/1` reads a local JSON flag, so it answered "yes" to a machine
+  that had rebooted and lost every one of those rules - which is why the drift
+  report was useless exactly when it was needed. This checks the live rules with
+  `iptables -C` on the target and `ip rule` on the gateway.
+  """
+  def rules_current?(machine) do
+    if @mock do
+      # No live rules to read in mock mode; the table allocation is the state,
+      # so report "current" for a machine that has one.
+      exit_capable?(machine)
+    else
+      cond do
+        not exit_capable?(machine) ->
+          false
+
+        true ->
+          wg_iface = Tunneld.Overlay.iface_name(machine["id"])
+
+          case default_iface(machine) do
+            {:ok, iface} ->
+              target_rules_ok?(machine, wg_iface, iface) and gateway_rules_ok?(machine, wg_iface)
+
+            _ ->
+              false
+          end
+      end
+    end
+  end
+
+  defp target_rules_ok?(machine, wg_iface, iface) do
+    check = target_check_command(wg_iface, iface, egressed_devices(machine["id"]))
+
+    case SSH.run(machine, check <> " 2>/dev/null") do
+      {:ok, out} -> String.trim(out) =~ ~r/1\s*$/
+      _ -> false
+    end
+  end
+
+  @doc false
+  # The one probe that answers "is this box still an exit node, right now".
+  #
+  # The per-device return routes live on the VM and die with its interface, and a
+  # WireGuard repair restarts that interface - so they vanish under the very
+  # action meant to fix the machine. Checking only iptables reported a healthy
+  # exit node whose devices had no way home, which is the state that reads to an
+  # operator as "the exit node broke again". `sysctl` prints last among the
+  # checked items, so its `1` is still the final line the caller inspects.
+  def target_check_command(wg_iface, egress_iface, device_ips) do
+    device_route_checks =
+      Enum.map(device_ips, fn ip ->
+        "ip route show dev #{wg_iface} 2>/dev/null | grep -qE '(^|[[:space:]])#{ip}([[:space:]]|$)'"
+      end)
+
+    Enum.join(
+      [
+        "iptables -t nat -C POSTROUTING -o #{egress_iface} -j MASQUERADE",
+        "iptables -C FORWARD -i #{wg_iface} -o #{egress_iface} -j ACCEPT",
+        "iptables -C FORWARD -i #{egress_iface} -o #{wg_iface} -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT",
+        "sysctl -n net.ipv4.ip_forward"
+      ] ++ device_route_checks,
+      " && "
+    )
+  end
+
+  # Device IPs egressed through this machine.
+  defp egressed_devices(machine_id) do
+    read_device_egress()
+    |> Enum.filter(fn {_ip, mid} -> mid == machine_id end)
+    |> Enum.map(&elem(&1, 0))
+  end
+
+  defp gateway_rules_ok?(machine, wg_iface) do
+    table = Map.get(read_tables(), machine["id"])
+    match?({:ok, _}, run_gateway(gateway_check_command(wg_iface, table)))
+  end
+
+  @doc false
+  # `ip rule` alone is not enough: the default route inside the policy table is
+  # keyed to the interface and disappears when wg-quick restarts that interface,
+  # leaving a rule that looks up an empty table - the device is matched, routed
+  # nowhere, and the drift report says everything is fine.
+  def gateway_check_command(wg_iface, table) do
+    lan = lan_iface()
+
+    "iptables -C FORWARD -i #{lan} -o #{wg_iface} -j ACCEPT 2>/dev/null && " <>
+      "ip rule 2>/dev/null | grep -q 'lookup #{table}' && " <>
+      "ip route show table #{table} 2>/dev/null | grep -q '^default'"
   end
 
   @doc "Remove all egress state for a machine. Idempotent."
@@ -190,13 +290,187 @@ defmodule Tunneld.Egress do
   defp real_ensure_exit_capable(machine) do
     wg_iface = Tunneld.Overlay.iface_name(machine["id"])
 
-    with {:ok, _} <- SSH.run(machine, ip_forward_cmd()),
-         {:ok, iface} <- default_iface(machine),
+    with {:ok, iface} <- default_iface(machine),
          :ok <- assert_iface(iface),
-         {:ok, _} <- SSH.run(machine, masquerade_cmd(iface)),
-         {:ok, _} <- SSH.run(machine, forward_cmd(wg_iface, iface)),
-         {:ok, _} <- SSH.run(machine, forward_return_cmd(iface, wg_iface)) do
+         :ok <- install_exit_unit(machine, wg_iface, iface) do
       {:ok, %{iface: iface, table: table_for(machine)}}
+    end
+  end
+
+  @doc """
+  The exit machine's rules, as a shell script body.
+
+  Nothing here survives the machine's reboot on its own, so it is installed as
+  `/usr/local/sbin/tunneld-exit` and run by the `tunneld-exit` unit - the same
+  trick the client door uses. Before that, exit nodes were configured by
+  one-off SSH commands: the VM came back from a restart with IP forwarding and
+  NAT gone, the gateway still had its policy routes pointing at it, and every
+  egressed device simply had no internet with nothing in the UI to explain it.
+
+  The per-device return routes are part of the script for the same reason:
+  `ip route add <device>/32 dev <wg-iface>` on the VM is runtime state too.
+  """
+  def exit_script(machine_id, egress_iface, device_ips) do
+    wg_iface = Tunneld.Overlay.iface_name(machine_id)
+
+    routes =
+      device_ips
+      |> Enum.uniq()
+      |> Enum.map_join("\n", fn ip ->
+        "ip route replace #{ip}/32 dev #{wg_iface} 2>/dev/null || true"
+      end)
+
+    [
+      ip_forward_cmd(),
+      masquerade_cmd(egress_iface),
+      forward_cmd(wg_iface, egress_iface),
+      forward_return_cmd(egress_iface, wg_iface),
+      routes
+    ]
+    |> Enum.reject(&(&1 == ""))
+    |> Enum.join("\n")
+    |> Kernel.<>("\n")
+  end
+
+  # Write the script + unit and run it now. Idempotent, and the unit is what
+  # makes the next reboot of the exit machine a non-event.
+  defp install_exit_unit(machine, wg_iface, egress_iface) do
+    unit = exit_unit(wg_iface)
+
+    device_ips = egressed_devices(machine["id"])
+    script = "#!/bin/sh\n" <> exit_script(machine["id"], egress_iface, device_ips)
+
+    with {:ok, _} <- write_remote(machine, "/usr/local/sbin/tunneld-exit", script),
+         {:ok, _} <- SSH.run(machine, "chmod +x /usr/local/sbin/tunneld-exit"),
+         {:ok, _} <- write_remote(machine, "/etc/systemd/system/tunneld-exit.service", unit),
+         {:ok, _} <-
+           SSH.run(
+             machine,
+             "systemctl daemon-reload && systemctl enable tunneld-exit && systemctl restart tunneld-exit"
+           ) do
+      :ok
+    else
+      {:error, reason} -> {:error, reason}
+    end
+  end
+
+  @doc false
+  # `PartOf` is the load-bearing line. A WireGuard repair restarts
+  # `wg-quick@<iface>` on the VM, and that restart deletes every route this
+  # script installs; without the coupling the exit node comes back from the
+  # repair with NAT intact and its devices' return routes gone.
+  def exit_unit(wg_iface) do
+    """
+    [Unit]
+    Description=Tunneld exit node (forwarding, NAT and return routes)
+    After=network-online.target wg-quick@#{wg_iface}.service
+    Wants=wg-quick@#{wg_iface}.service
+    PartOf=wg-quick@#{wg_iface}.service
+
+    [Service]
+    Type=oneshot
+    RemainAfterExit=yes
+    ExecStart=/usr/local/sbin/tunneld-exit
+    [Install]
+    WantedBy=multi-user.target
+    """
+  end
+
+  defp write_remote(machine, path, content) do
+    dir = Path.dirname(path)
+
+    SSH.run(
+      machine,
+      "mkdir -p #{dir} && cat > #{path} <<'TUNNELD_EOF'\n#{content}\nTUNNELD_EOF"
+    )
+  end
+
+  @doc """
+  Re-assert every gateway-side egress rule: the FORWARD pair per exit interface
+  and the policy route + table routes per egressed device.
+
+  `Tunneld.Iptables.reset/0` flushes FORWARD on every tunneld start, and `ip
+  rule`/table routes never survive a gateway reboot at all. Both were rebuilt
+  only by clicking the device again, so a gateway restart silently turned every
+  egressed device back to the gateway's own upstream. The tables and device
+  assignments are on disk (`egress_tables.json`, `device_egress.json`), so the
+  whole thing is rebuilt from them, without needing the exit machine to answer.
+  """
+  def restore_all do
+    if @mock, do: :ok, else: do_restore_all()
+  end
+
+  defp do_restore_all do
+    tables = read_tables()
+
+    Enum.each(tables, fn {id, table} ->
+      iface = Tunneld.Overlay.iface_name(id)
+      # `ip route replace default dev <iface> table N` fails outright when the
+      # interface does not exist yet, so the boot sequence brings the interfaces
+      # up first (`Overlay.restore_all/0` runs before this). A peer still down is
+      # skipped here and picked up by the periodic pass - do not abort the whole
+      # pass over one dead machine.
+      _ = add_forward_rules(iface)
+      _ = add_default_route(nil, iface, table)
+      _ = add_lan_route(table)
+    end)
+
+    Enum.each(read_device_egress(), fn {device_ip, id} ->
+      case Map.get(tables, id) do
+        nil -> :ok
+        table -> _ = add_rule(device_ip, table)
+      end
+    end)
+
+    :ok
+  end
+
+  @doc "Re-apply the gateway half of one machine's egress. Idempotent."
+  def ensure_gateway_rules(machine) do
+    if @mock, do: :ok, else: do_ensure_gateway_rules(machine)
+  end
+
+  defp do_ensure_gateway_rules(machine) do
+    case Map.get(read_tables(), machine["id"]) do
+      nil ->
+        :ok
+
+      table ->
+        iface = Tunneld.Overlay.iface_name(machine["id"])
+        _ = add_forward_rules(iface)
+        _ = add_default_route(nil, iface, table)
+        _ = add_lan_route(table)
+
+        read_device_egress()
+        |> Enum.filter(fn {_ip, mid} -> mid == machine["id"] end)
+        |> Enum.each(fn {device_ip, _} -> _ = add_rule(device_ip, table) end)
+
+        :ok
+    end
+  end
+
+  @doc """
+  Re-push the exit rules to every machine that has one, after a gateway start.
+
+  Cheap enough to run on boot and on a timer: one SSH round trip per exit
+  machine, and every command in it is `-C`-checked, so a machine that is
+  already correct changes nothing. This is what makes "the VM restarted an hour
+  after the gateway" work without anyone pressing Reconcile.
+  """
+  def restore_targets do
+    if @mock do
+      :ok
+    else
+      read_tables()
+      |> Map.keys()
+      |> Enum.each(fn id ->
+        case Tunneld.Machines.get(id) do
+          {:ok, machine} -> _ = real_ensure_exit_capable(machine)
+          _ -> :ok
+        end
+      end)
+
+      :ok
     end
   end
 
@@ -300,8 +574,29 @@ defmodule Tunneld.Egress do
   end
 
   # The VM must route the device's return traffic back through the tunnel.
+  # `replace`, not `add`: this runs on every route_device and on repair passes.
   defp add_vm_device_route(machine, device_ip, iface) do
-    SSH.run(machine, "ip route add #{device_ip}/32 dev #{iface} 2>/dev/null || true")
+    SSH.run(machine, "ip route replace #{device_ip}/32 dev #{iface} 2>/dev/null || true")
+  end
+
+  # Rewrite the installed exit script after the device list changes, so the VM
+  # comes back from a reboot with the right return routes and not the old set.
+  defp refresh_exit_unit(machine) do
+    if @mock do
+      :ok
+    else
+      if exit_capable?(machine) do
+        case default_iface(machine) do
+          {:ok, iface} ->
+            install_exit_unit(machine, Tunneld.Overlay.iface_name(machine["id"]), iface)
+
+          _ ->
+            :ok
+        end
+      else
+        :ok
+      end
+    end
   end
 
   # Assert tunneld is the device's default gateway (the prerequisite for egress).

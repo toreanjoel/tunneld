@@ -113,4 +113,17 @@ defmodule Tunneld.OverlayTest do
     {:ok, m} = Machines.get(id)
     assert Overlay.address_for(m) =~ "10.88.0."
   end
+
+  # Boot-time repair must never touch /etc/wireguard in mock mode, where nothing
+  # is installed and the machine list is fictional.
+  test "restore_all and prune_orphans do nothing in mock mode" do
+    assert Overlay.restore_all() == :ok
+    assert Overlay.prune_orphans(["wg-12345678"]) == []
+
+    {:ok, %{"id" => id}} =
+      Machines.enroll(%{"name" => "p", "address" => "203.0.113.41", "location" => "remote"})
+
+    {:ok, m} = Machines.get(id)
+    assert Overlay.prune_target(m) == []
+  end
 end
