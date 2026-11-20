@@ -59,3 +59,6 @@ __pycache__/
 # Personal learning material and working notes, deliberately not part of the
 # system. Kept on disk, never tracked.
 /docs/curriculum/
+
+# Nullrouter configs
+/.nullrouter
